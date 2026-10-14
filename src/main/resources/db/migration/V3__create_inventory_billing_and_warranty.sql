@@ -1,0 +1,237 @@
+CREATE TABLE repair_order_parts (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    repair_order_id BIGINT NOT NULL,
+    estimate_item_id BIGINT NOT NULL,
+    part_id BIGINT NOT NULL,
+    quantity DECIMAL(14,3) NOT NULL DEFAULT 0,
+    unit_price DECIMAL(18,2) NOT NULL,
+    unit_cost DECIMAL(18,2) NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_order_parts_estimate_item UNIQUE (estimate_item_id),
+    CONSTRAINT fk_order_parts_order FOREIGN KEY (repair_order_id) REFERENCES repair_orders(id),
+    CONSTRAINT fk_order_parts_estimate_item FOREIGN KEY (estimate_item_id) REFERENCES estimate_items(id),
+    CONSTRAINT fk_order_parts_part FOREIGN KEY (part_id) REFERENCES parts(id),
+    CONSTRAINT ck_order_parts_values CHECK (quantity >= 0 AND unit_price >= 0 AND unit_cost >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE inventory_documents (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    document_code VARCHAR(30) NOT NULL,
+    document_type VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+    supplier_id BIGINT NULL,
+    repair_order_id BIGINT NULL,
+    source_document_id BIGINT NULL,
+    supplier_invoice_number VARCHAR(100) NULL,
+    supplier_invoice_date DATE NULL,
+    due_date DATE NULL,
+    subtotal DECIMAL(18,2) NOT NULL DEFAULT 0,
+    tax_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    total_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    reason TEXT NULL,
+    created_by BIGINT NOT NULL,
+    posted_by BIGINT NULL,
+    posted_at DATETIME(6) NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_inventory_documents_code UNIQUE (document_code),
+    CONSTRAINT uq_inventory_supplier_invoice UNIQUE (supplier_id,supplier_invoice_number),
+    CONSTRAINT fk_inventory_documents_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers(id),
+    CONSTRAINT fk_inventory_documents_order FOREIGN KEY (repair_order_id) REFERENCES repair_orders(id),
+    CONSTRAINT fk_inventory_documents_source FOREIGN KEY (source_document_id) REFERENCES inventory_documents(id),
+    CONSTRAINT fk_inventory_documents_creator FOREIGN KEY (created_by) REFERENCES users(id),
+    CONSTRAINT fk_inventory_documents_poster FOREIGN KEY (posted_by) REFERENCES users(id),
+    CONSTRAINT ck_inventory_documents_status CHECK (status IN ('DRAFT','POSTED','CANCELLED')),
+    CONSTRAINT ck_inventory_documents_post CHECK ((status = 'POSTED' AND posted_by IS NOT NULL AND posted_at IS NOT NULL) OR (status IN ('DRAFT','CANCELLED') AND posted_by IS NULL AND posted_at IS NULL)),
+    CONSTRAINT ck_inventory_documents_type CHECK (
+        (document_type = 'IN' AND supplier_id IS NOT NULL AND repair_order_id IS NULL AND source_document_id IS NULL) OR
+        (document_type = 'OPENING' AND supplier_id IS NULL AND repair_order_id IS NULL AND source_document_id IS NULL) OR
+        (document_type = 'OUT' AND supplier_id IS NULL AND repair_order_id IS NOT NULL AND source_document_id IS NULL) OR
+        (document_type = 'RETURN' AND supplier_id IS NULL AND repair_order_id IS NOT NULL AND source_document_id IS NOT NULL) OR
+        (document_type = 'ADJUSTMENT' AND supplier_id IS NULL AND repair_order_id IS NULL AND source_document_id IS NULL AND reason IS NOT NULL)),
+    CONSTRAINT ck_inventory_documents_amount CHECK (subtotal >= 0 AND tax_amount >= 0 AND total_amount = subtotal + tax_amount),
+    INDEX ix_inventory_documents_supplier (supplier_id,status,due_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE inventory_document_items (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    document_id BIGINT NOT NULL,
+    line_no INT NOT NULL,
+    part_id BIGINT NOT NULL,
+    estimate_item_id BIGINT NULL,
+    repair_order_part_id BIGINT NULL,
+    source_item_id BIGINT NULL,
+    quantity DECIMAL(14,3) NOT NULL,
+    unit_cost DECIMAL(18,2) NOT NULL,
+    line_total DECIMAL(18,2) NOT NULL,
+    notes TEXT NULL,
+    CONSTRAINT uq_inventory_items_line UNIQUE (document_id,line_no),
+    CONSTRAINT fk_inventory_items_document FOREIGN KEY (document_id) REFERENCES inventory_documents(id),
+    CONSTRAINT fk_inventory_items_part FOREIGN KEY (part_id) REFERENCES parts(id),
+    CONSTRAINT fk_inventory_items_estimate FOREIGN KEY (estimate_item_id) REFERENCES estimate_items(id),
+    CONSTRAINT fk_inventory_items_order_part FOREIGN KEY (repair_order_part_id) REFERENCES repair_order_parts(id),
+    CONSTRAINT fk_inventory_items_source FOREIGN KEY (source_item_id) REFERENCES inventory_document_items(id),
+    CONSTRAINT ck_inventory_items_values CHECK (line_no > 0 AND quantity <> 0 AND unit_cost >= 0 AND line_total = ROUND(ABS(quantity) * unit_cost,2))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE inventory_transactions (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    document_item_id BIGINT NOT NULL,
+    part_id BIGINT NOT NULL,
+    transaction_type VARCHAR(20) NOT NULL,
+    quantity_change DECIMAL(14,3) NOT NULL,
+    stock_after DECIMAL(14,3) NOT NULL,
+    unit_cost DECIMAL(18,2) NOT NULL,
+    created_by BIGINT NOT NULL,
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT uq_inventory_transactions_item UNIQUE (document_item_id),
+    CONSTRAINT fk_inventory_transactions_item FOREIGN KEY (document_item_id) REFERENCES inventory_document_items(id),
+    CONSTRAINT fk_inventory_transactions_part FOREIGN KEY (part_id) REFERENCES parts(id),
+    CONSTRAINT fk_inventory_transactions_creator FOREIGN KEY (created_by) REFERENCES users(id),
+    CONSTRAINT ck_inventory_transactions_type CHECK (
+        (transaction_type IN ('IN','OPENING','RETURN') AND quantity_change > 0) OR
+        (transaction_type = 'OUT' AND quantity_change < 0) OR
+        (transaction_type = 'ADJUSTMENT' AND quantity_change <> 0)),
+    CONSTRAINT ck_inventory_transactions_values CHECK (stock_after >= 0 AND unit_cost >= 0),
+    INDEX ix_inventory_transactions_part_time (part_id,created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE invoices (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    invoice_code VARCHAR(30) NOT NULL,
+    repair_order_id BIGINT NOT NULL,
+    customer_id BIGINT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'UNPAID',
+    customer_snapshot JSON NOT NULL,
+    vehicle_snapshot JSON NOT NULL,
+    subtotal DECIMAL(18,2) NOT NULL,
+    discount_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    tax_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    total_amount DECIMAL(18,2) NOT NULL,
+    issued_by BIGINT NOT NULL,
+    issued_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    due_date DATE NULL,
+    void_reason TEXT NULL,
+    voided_by BIGINT NULL,
+    voided_at DATETIME(6) NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_invoices_code UNIQUE (invoice_code),
+    CONSTRAINT uq_invoices_order UNIQUE (repair_order_id),
+    CONSTRAINT fk_invoices_order FOREIGN KEY (repair_order_id) REFERENCES repair_orders(id),
+    CONSTRAINT fk_invoices_customer FOREIGN KEY (customer_id) REFERENCES customers(id),
+    CONSTRAINT fk_invoices_issuer FOREIGN KEY (issued_by) REFERENCES users(id),
+    CONSTRAINT fk_invoices_voider FOREIGN KEY (voided_by) REFERENCES users(id),
+    CONSTRAINT ck_invoices_status CHECK (status IN ('UNPAID','PARTIALLY_PAID','PAID','VOID')),
+    CONSTRAINT ck_invoices_void CHECK (status <> 'VOID' OR (void_reason IS NOT NULL AND voided_by IS NOT NULL AND voided_at IS NOT NULL)),
+    CONSTRAINT ck_invoices_amount CHECK (subtotal >= 0 AND discount_amount >= 0 AND discount_amount <= subtotal AND tax_amount >= 0 AND total_amount = subtotal - discount_amount + tax_amount),
+    INDEX ix_invoices_customer_time (customer_id,issued_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE invoice_items (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    invoice_id BIGINT NOT NULL,
+    line_no INT NOT NULL,
+    item_type VARCHAR(10) NOT NULL,
+    repair_task_id BIGINT NULL,
+    repair_order_part_id BIGINT NULL,
+    item_name VARCHAR(150) NOT NULL,
+    unit VARCHAR(30) NOT NULL,
+    quantity DECIMAL(14,3) NOT NULL,
+    unit_price DECIMAL(18,2) NOT NULL,
+    unit_cost DECIMAL(18,2) NOT NULL,
+    discount_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    tax_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    line_total DECIMAL(18,2) NOT NULL,
+    warranty_days INT NOT NULL DEFAULT 0,
+    warranty_km INT NOT NULL DEFAULT 0,
+    warranty_terms TEXT NULL,
+    CONSTRAINT uq_invoice_items_line UNIQUE (invoice_id,line_no),
+    CONSTRAINT uq_invoice_items_task UNIQUE (repair_task_id),
+    CONSTRAINT uq_invoice_items_order_part UNIQUE (repair_order_part_id),
+    CONSTRAINT fk_invoice_items_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+    CONSTRAINT fk_invoice_items_task FOREIGN KEY (repair_task_id) REFERENCES repair_tasks(id),
+    CONSTRAINT fk_invoice_items_order_part FOREIGN KEY (repair_order_part_id) REFERENCES repair_order_parts(id),
+    CONSTRAINT ck_invoice_items_source CHECK ((item_type = 'SERVICE' AND repair_task_id IS NOT NULL AND repair_order_part_id IS NULL) OR (item_type = 'PART' AND repair_order_part_id IS NOT NULL AND repair_task_id IS NULL)),
+    CONSTRAINT ck_invoice_items_values CHECK (line_no > 0 AND quantity > 0 AND unit_price >= 0 AND unit_cost >= 0 AND discount_amount >= 0 AND discount_amount <= ROUND(quantity * unit_price,2) AND tax_amount >= 0 AND line_total = ROUND(quantity * unit_price,2) - discount_amount + tax_amount),
+    CONSTRAINT ck_invoice_items_warranty CHECK (warranty_days >= 0 AND warranty_km >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE payments (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    transaction_code VARCHAR(100) COLLATE utf8mb4_bin NOT NULL,
+    direction VARCHAR(3) NOT NULL,
+    invoice_id BIGINT NULL,
+    inventory_document_id BIGINT NULL,
+    amount DECIMAL(18,2) NOT NULL,
+    payment_method VARCHAR(20) NOT NULL,
+    provider_reference VARCHAR(150) COLLATE utf8mb4_bin NULL,
+    paid_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    recorded_by BIGINT NOT NULL,
+    notes TEXT NULL,
+    CONSTRAINT uq_payments_code UNIQUE (transaction_code),
+    CONSTRAINT uq_payments_provider_reference UNIQUE (provider_reference),
+    CONSTRAINT fk_payments_invoice FOREIGN KEY (invoice_id) REFERENCES invoices(id),
+    CONSTRAINT fk_payments_document FOREIGN KEY (inventory_document_id) REFERENCES inventory_documents(id),
+    CONSTRAINT fk_payments_recorder FOREIGN KEY (recorded_by) REFERENCES users(id),
+    CONSTRAINT ck_payments_target CHECK ((direction = 'IN' AND invoice_id IS NOT NULL AND inventory_document_id IS NULL) OR (direction = 'OUT' AND inventory_document_id IS NOT NULL AND invoice_id IS NULL)),
+    CONSTRAINT ck_payments_amount CHECK (amount > 0),
+    CONSTRAINT ck_payments_method CHECK (payment_method IN ('CASH','CARD','BANK_TRANSFER','VIETQR')),
+    INDEX ix_payments_time (direction,paid_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE warranties (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    warranty_code VARCHAR(30) NOT NULL,
+    invoice_item_id BIGINT NOT NULL,
+    vehicle_id BIGINT NOT NULL,
+    customer_id BIGINT NOT NULL,
+    starts_at DATETIME(6) NOT NULL,
+    expires_at DATETIME(6) NULL,
+    start_odometer INT NOT NULL,
+    end_odometer INT NULL,
+    warranty_days INT NOT NULL DEFAULT 0,
+    warranty_km INT NOT NULL DEFAULT 0,
+    terms_snapshot TEXT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    CONSTRAINT uq_warranties_code UNIQUE (warranty_code),
+    CONSTRAINT uq_warranties_item UNIQUE (invoice_item_id),
+    CONSTRAINT fk_warranties_item FOREIGN KEY (invoice_item_id) REFERENCES invoice_items(id),
+    CONSTRAINT fk_warranties_vehicle FOREIGN KEY (vehicle_id) REFERENCES vehicles(id),
+    CONSTRAINT fk_warranties_customer FOREIGN KEY (customer_id) REFERENCES customers(id),
+    CONSTRAINT ck_warranties_status CHECK (status IN ('ACTIVE','EXPIRED','VOID')),
+    CONSTRAINT ck_warranties_limits CHECK (warranty_days >= 0 AND warranty_km >= 0 AND (warranty_days > 0 OR warranty_km > 0) AND start_odometer >= 0 AND (expires_at IS NULL OR expires_at > starts_at) AND (end_odometer IS NULL OR end_odometer > start_odometer)),
+    CONSTRAINT ck_warranties_policy CHECK ((warranty_days = 0 AND expires_at IS NULL OR warranty_days > 0 AND expires_at IS NOT NULL) AND (warranty_km = 0 AND end_odometer IS NULL OR warranty_km > 0 AND end_odometer IS NOT NULL)),
+    INDEX ix_warranties_expiry (status,expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE warranty_claims (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    claim_code VARCHAR(30) NOT NULL,
+    warranty_id BIGINT NOT NULL,
+    requested_by BIGINT NULL,
+    requested_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    current_odometer INT NOT NULL,
+    description TEXT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+    decided_by BIGINT NULL,
+    decided_at DATETIME(6) NULL,
+    decision_reason TEXT NULL,
+    handling_order_id BIGINT NULL,
+    closed_at DATETIME(6) NULL,
+    version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uq_claims_code UNIQUE (claim_code),
+    CONSTRAINT uq_claims_handling_order UNIQUE (handling_order_id),
+    CONSTRAINT fk_claims_warranty FOREIGN KEY (warranty_id) REFERENCES warranties(id),
+    CONSTRAINT fk_claims_requester FOREIGN KEY (requested_by) REFERENCES users(id),
+    CONSTRAINT fk_claims_decider FOREIGN KEY (decided_by) REFERENCES users(id),
+    CONSTRAINT fk_claims_handling_order FOREIGN KEY (handling_order_id) REFERENCES repair_orders(id),
+    CONSTRAINT ck_claims_odometer CHECK (current_odometer >= 0),
+    CONSTRAINT ck_claims_status CHECK (status IN ('OPEN','APPROVED','REJECTED','IN_PROGRESS','CLOSED')),
+    CONSTRAINT ck_claims_decision CHECK (
+        (status = 'OPEN' AND decided_by IS NULL AND decided_at IS NULL AND handling_order_id IS NULL) OR
+        (status = 'REJECTED' AND decided_by IS NOT NULL AND decided_at IS NOT NULL AND decision_reason IS NOT NULL AND handling_order_id IS NULL) OR
+        (status IN ('APPROVED','IN_PROGRESS','CLOSED') AND decided_by IS NOT NULL AND decided_at IS NOT NULL AND decision_reason IS NOT NULL AND handling_order_id IS NOT NULL))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
