@@ -1,7 +1,3 @@
-# M13 Thông báo và nhắc bảo dưỡng
+# M13 — Notification frontend (TV1)
 
-Chủ trì: TV1.
-
-Tạo `pages/`, `components/`, `api/`, `types/` khi triển khai màn hình của module. Đối chiếu UC và tiêu chí nghiệm thu trong `docs/WORK_BREAKDOWN.md`. Mỗi chức năng gồm màn hình, tích hợp API và xử lý 403/409/validation.
-
-Phạm vi CSDL: `notifications`.
+Đã có private WEB inbox/detail/read/unread-count; API/hooks riêng, polling theo cấu hình và pause khi tab ẩn. Payload chỉ render text, không HTML. Không có composer/outbox/provider console trong P0. Scheduler và delivery thuộc backend; UI không tự gửi EMAIL/SMS.

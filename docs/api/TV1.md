@@ -1,6 +1,10 @@
 # Backend TV1: audit, thông báo, reminder và reporting
 
-Tất cả JSON dùng envelope trong SECURITY.md; route cần JWT. Module theo Entity/DTO/MapStruct/JpaRepository/Service/ServiceImpl/Controller, có Swagger annotations. Các worker mặc định tắt, bootstrap test tắt.
+Tất cả JSON dùng envelope trong SECURITY.md; route nghiệp vụ cần JWT. Public UI policy bên dưới được phép đọc anonymous. Module theo Entity/DTO/MapStruct/JpaRepository/Service/ServiceImpl/Controller, có Swagger annotations. Các worker mặc định tắt, bootstrap test tắt.
+
+## Public UI policy
+
+GET `/api/v1/public/ui-policy`: anonymous, 200/code1000, data gồm passwordMinLength, passwordMaxUtf8Bytes, paginationDefaultSize, paginationMaxSize, paginationMaxPage, reportMaxPeriodSeconds, garageTimeZone. Giá trị lấy từ typed properties đang được validate; không secret, issuer/key, connection string hay provider credential. Không cấp quyền cho POST/PUT/DELETE trên path này. Frontend đọc lại policy sau thời gian stale, không dùng fallback policy riêng khi tải lỗi.
 
 ## Audit và I08
 

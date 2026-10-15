@@ -14,7 +14,8 @@ Yêu cầu ngày 15/10/2026: toàn bộ backend TV1 theo 7 tầng và package-by
 
 ## Tiếp theo để nghiệm thu toàn TV1
 
-- UI React login/admin/inbox/report và xử lý contract mới code số/data/Page/envelope.
+- UI React TV1 P0 đã triển khai: login/account/users/inbox/audit/report, hooks/schema/error handling và public UI policy. Hướng dẫn ở frontend/README.md; kết quả kiểm chứng ở docs/frontend/TV1_FRONTEND_VALIDATION.md.
+- Kế hoạch frontend chi tiết: [frontend/TV1_FRONTEND_PLAN.md](frontend/TV1_FRONTEND_PLAN.md), gồm UI/UX, component/hook/validation, gap API và 16 đầu việc. P0 đã có source tích hợp API thật; các cổng chưa nghiệm thu được ghi cụ thể trong kết quả frontend.
 - TV2–TV4 tích hợp I01 và I08 đúng transaction; T01–T38/G0–G5 cần các nghiệp vụ của nhóm được triển khai.
 - Provision SMTP/SMS gateway của môi trường, kiểm thử delivery thực tế; quyết định kênh nhắc cho khách không có account.
 - Worker/provider mặc định tắt; bật chủ động và vận hành theo chính sách retry/delivery at-least-once đã ghi trong API docs.

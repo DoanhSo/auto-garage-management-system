@@ -1,7 +1,3 @@
-# M14 Dashboard và báo cáo
+# M14 — Reporting frontend (TV1)
 
-Chủ trì: TV1.
-
-Tạo `pages/`, `components/`, `api/`, `types/` khi triển khai màn hình của module. Đối chiếu UC và tiêu chí nghiệm thu trong `docs/WORK_BREAKDOWN.md`. Mỗi chức năng gồm màn hình, tích hợp API và xử lý 403/409/validation.
-
-Phạm vi CSDL: Đọc dữ liệu qua service của module sở hữu; không tạo bảng riêng..
+Đã có dashboard tổng hợp, date range theo múi giờ gara, số dư hiện tại, invoice debt và CSV có bearer. Số tiền dùng Decimal.js; ID/BigDecimal parse lossless. Không có time series chart khi backend chỉ trả aggregate. ADMIN only; frontend không truy cập DB trực tiếp.

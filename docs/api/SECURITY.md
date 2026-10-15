@@ -22,7 +22,7 @@ Mã: 1000 success, 1001 created, 1002 updated, 1003 deleted; 2001 validation, 20
 - GET `/api/v1/admin/users`: ADMIN, keyword/active/page/size/sortBy/sortDir. Mặc định page 0–100000, size 1–100; giới hạn theo PaginationProperties; sort allowlist id/username/fullName/role/active/createdAt, asc/desc.
 - GET `/api/v1/admin/users/{id}`: ADMIN, 200 UserResponse hoặc 404.
 - PUT `/api/v1/admin/users/{id}`: ADMIN, bắt buộc fullName/role/active/version; email null hoặc thiếu nghĩa xóa email. 200/1002.
-- DELETE `/api/v1/admin/users/{id}?version=...`: ADMIN, soft deactivate, 200/1003; giữ lịch sử.
+- DELETE `/api/v1/admin/users/{id}?version=...`: ADMIN, 200/1003; ghi deleted_at, đặt inactive, thu hồi token và loại khỏi search/get/update. Giữ lịch sử/FK, không có restore API. Username/email vẫn được giữ, không tái sử dụng. Khóa/mở khóa dùng PUT cùng version với active=false/true, không ghi deleted_at.
 
 UserResponse gồm id/username/email/fullName/role/active/version/createdAt; không Entity, password/hash/auth_version. Username 3–100 ASCII chữ/số/dot/underscore/hyphen, lowercase và bất biến. Email lowercase, blank thành null; fullName tối đa 150, email tối đa 254. Password mới theo AUTH_PASSWORD_MIN_LENGTH (mặc định ít nhất 12 Unicode code point), tối đa 72 byte UTF-8 của BCrypt. JSON field lạ bị 400. Password không writable qua PUT.
 

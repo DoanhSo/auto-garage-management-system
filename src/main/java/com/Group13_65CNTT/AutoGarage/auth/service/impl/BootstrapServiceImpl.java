@@ -40,7 +40,8 @@ public class BootstrapServiceImpl implements BootstrapService {
         String username = properties.username().toLowerCase(Locale.ROOT);
         var existing = userRepository.findByUsername(username);
         if (existing.isPresent()) {
-            if (existing.get().getRole() != Role.ADMIN || !existing.get().isActive()) {
+            if (existing.get().getRole() != Role.ADMIN || !existing.get().isActive()
+                    || existing.get().getDeletedAt() != null) {
                 throw new BusinessException(ResponseCode.BOOTSTRAP_ACCOUNT_CONFLICT);
             }
             return null;

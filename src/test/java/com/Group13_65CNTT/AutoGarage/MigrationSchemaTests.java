@@ -101,7 +101,7 @@ class MigrationSchemaTests extends IntegrationTestSupport {
                         "SELECT COUNT(*) FROM information_schema.views WHERE"
                                 + " table_schema=DATABASE()",
                         Integer.class));
-        assertEquals(7, flyway.info().applied().length);
+        assertEquals(8, flyway.info().applied().length);
         assertEquals(0, flyway.info().pending().length);
         flyway.validate();
     }
@@ -111,6 +111,13 @@ class MigrationSchemaTests extends IntegrationTestSupport {
         assertNull(
                 jdbc.queryForObject("SELECT user_id FROM customers WHERE id=910001", Long.class));
         rejected("UPDATE users SET role='MANAGER' WHERE id=910001");
+    }
+
+    @Test
+    void deletedUsersCannotBeReactivatedByDatabaseWrite() {
+        rejected("UPDATE users SET deleted_at=UTC_TIMESTAMP(6) WHERE id=910001");
+        jdbc.update("UPDATE users SET is_active=FALSE, deleted_at=UTC_TIMESTAMP(6) WHERE id=910001");
+        rejected("UPDATE users SET is_active=TRUE WHERE id=910001");
     }
 
     @Test

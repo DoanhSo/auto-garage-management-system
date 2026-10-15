@@ -1,8 +1,8 @@
 # Từ điển cột của schema khởi tạo
 
-Schema V1–V7, cập nhật ngày 15/10/2026: 30 bảng, 430 cột, kể cả hai cột generated. V6/V7 thêm audit metadata cho users/notifications; SQL và metadata MySQL là nguồn thực thi.
+Schema V1–V8, cập nhật ngày 15/10/2026: 30 bảng, 431 cột, kể cả hai cột generated. V6/V7 thêm audit metadata cho users/notifications; V8 thêm users.deleted_at; SQL và metadata MySQL là nguồn thực thi.
 
-Các FK/CHECK/index xem trực tiếp bảy file SQL trong `src/main/resources/db/migration`. `DEFAULT <none>` nghĩa là không có default ghi nhận trong metadata hoặc default NULL; đọc NULL/NOT NULL đi kèm. Generated column chỉ đọc từ JPA.
+Các FK/CHECK/index xem trực tiếp tám file SQL trong `src/main/resources/db/migration`. `DEFAULT <none>` nghĩa là không có default ghi nhận trong metadata hoặc default NULL; đọc NULL/NOT NULL đi kèm. Generated column chỉ đọc từ JPA.
 
 
 ## attachments
@@ -450,6 +450,7 @@ Các FK/CHECK/index xem trực tiếp bảy file SQL trong `src/main/resources/d
 - `full_name`: `varchar(150)`; NOT NULL; DEFAULT `<none>`.
 - `role`: `varchar(30)`; NOT NULL; DEFAULT `<none>`.
 - `is_active`: `tinyint(1)`; NOT NULL; DEFAULT `1`.
+- `deleted_at`: `datetime(6)`; NULL; DEFAULT NULL; V8, tài khoản đã xóa phải có is_active=FALSE.
 - `last_login_at`: `datetime(6)`; NULL; DEFAULT `<none>`.
 - `created_at`: `datetime(6)`; NOT NULL; DEFAULT `CURRENT_TIMESTAMP(6)`; DEFAULT_GENERATED.
 - `updated_at`: `datetime(6)`; NOT NULL; DEFAULT `CURRENT_TIMESTAMP(6)`; DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6).

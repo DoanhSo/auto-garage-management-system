@@ -50,6 +50,9 @@ public class User extends BaseEntity {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 

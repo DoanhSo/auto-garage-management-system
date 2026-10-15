@@ -72,7 +72,7 @@ public class AuthServiceImpl implements AuthService {
                         && passwordEncoder.matches(
                                 request.getPassword(),
                                 user == null ? dummyHash : user.getPasswordHash());
-        if (!matches || user == null || !user.isActive())
+        if (!matches || user == null || !user.isActive() || user.getDeletedAt() != null)
             throw new BusinessException(ResponseCode.BAD_CREDENTIALS);
         user.setLastLoginAt(clock.instant());
         user.setUpdatedBy(user.getId());
@@ -128,6 +128,7 @@ public class AuthServiceImpl implements AuthService {
         return userRepository
                 .findById(id)
                 .filter(User::isActive)
+                .filter(user -> user.getDeletedAt() == null)
                 .orElseThrow(() -> new BusinessException(ResponseCode.UNAUTHORIZED));
     }
 
