@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:autogarage_h2;MODE=MySQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+security:
+  auth:
+    issuer: autogarage-h2
+    audience: autogarage-h2-api
+    ttl: 15m
+    clock-skew: 0s
+    bcrypt-strength: 4
+  bootstrap:
+    enabled: false
+
+garage:
+  notification:
+    worker-enabled: false
+    reminders-enabled: false
+    email-enabled: false
+    sms-enabled: false

@@ -1,0 +1,15 @@
+---
+description: AutoGarage follows the supplied seven-layer Java architecture
+alwaysApply: true
+---
+
+Read AGENTS.md and docs/CODING_GUIDELINES.md before changes.
+Use common/ and feature controller/dto/request/dto/response/entity/mapper/repository/service/impl.
+Ordinary entities extend BaseEntity, use LAZY relationships and never @Data.
+Use MapStruct spring mappers, JpaRepository/JPQL/Pageable and Service/ServiceImpl.
+Use Lombok RequiredArgsConstructor, private final dependencies and ServiceImpl transactions.
+Use implemented Audited annotations for important writes, ApiPaths/SecurityConstants and per-method RBAC.
+Use numeric ResponseCode, BusinessException and ApiResponse(code,message,success,data,timestamp,path).
+Use Swagger Tag/Operation; validate DTOs and object ownership, never expose entity credentials.
+Test Mockito/InjectMocks/AssertJ, H2 integration, and MySQL for native queries/locking/migrations.
+Preserve published migrations and secrets; report actual test/build results.

@@ -5,7 +5,7 @@ Bản phân công ngày 14/10/2026 dựa trên báo cáo được cung cấp. D�
 ## Quy tắc làm việc
 
 - Mỗi đầu việc có một người chủ trì chịu trách nhiệm cả backend, màn hình frontend tương ứng, kiểm thử và tài liệu API. Người phối hợp cung cấp service contract, không tự sửa nghiệp vụ của người chủ trì.
-- Dùng các mã bên dưới khi tạo issue/branch/PR. TV1-01 đã hoàn thành phần nền tảng G0; các checkbox chức năng nghiệp vụ còn trống. Khung thư mục, migrations và interface đã có.
+- Dùng mã bên dưới khi tạo issue/branch/PR. TV1-01 đã hoàn thành nền tảng G0; backend common/auth/identity/audit/notification/reporting đã có theo TV1_IMPLEMENTATION_PLAN.md. Checkbox đầu việc bao gồm cả frontend/tích hợp nên chỉ đánh dấu khi đủ toàn bộ tiêu chí.
 - Trình tự trong từng nhóm là thứ tự ưu tiên; phụ thuộc ghi rõ là điều kiện để tích hợp hoàn chỉnh, không cấm chuẩn bị UI hoặc test trước.
 - TV1 điều phối phiên bản migration. Sau khi migration được chia sẻ/chạy chung, mọi sửa đổi schema phải dùng V5 trở lên; không sửa checksum V1–V4.
 - M01–M14 được đặt tên cụ thể trong lần khởi tạo này, theo phạm vi phân hệ của báo cáo. Không tự mở rộng thành nhiều chi nhánh hoặc thêm bảng role, skill, history.
@@ -42,6 +42,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 ### TV1-02 Đăng nhập và đăng xuất
 
 - [ ] Hoàn thành và được nghiệm thu.
+- **Đã có backend:** login/me/logout/password JWT/BCrypt, token revocation và test; chưa có UI login.
 - **Module/mốc:** M01 / G1.
 - **Đầu ra:** API login/logout, băm BCrypt, phiên hoặc JWT, UI đăng nhập.
 - **Phụ thuộc:** TV1-01.
@@ -50,6 +51,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 ### TV1-03 Tài khoản và năm vai trò
 
 - [ ] Hoàn thành và được nghiệm thu.
+- **Đã có backend:** ADMIN create/list/get/PUT/soft deactivate, năm role, last-admin/version/concurrency; chưa có UI admin.
 - **Module/mốc:** M01 / G1.
 - **Đầu ra:** CRUD tài khoản, đổi role, khóa tài khoản, giao diện admin.
 - **Phụ thuộc:** TV1-02.
@@ -58,6 +60,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 ### TV1-04 Bảo mật theo đối tượng I01
 
 - [ ] Hoàn thành và được nghiệm thu.
+- **Đã có backend:** SecurityAccess/ObjectAccessServiceImpl ownership/assignment/QC và test A/B; cần tích hợp vào API/file của TV2–TV4 khi các module được triển khai.
 - **Module/mốc:** M01 / G1.
 - **Đầu ra:** SecurityAccess và kiểm tra ownership ở mọi API/file.
 - **Phụ thuộc:** TV1-03, TV2-01.
@@ -66,6 +69,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 ### TV1-05 Lỗi API và kiểm tra đầu vào
 
 - [ ] Hoàn thành và được nghiệm thu.
+- **Đã có backend:** API advice và security filter handlers, strict DTO/JSON/status; chưa có UI hiển thị lỗi và chưa nghiệm thu các API nghiệp vụ mới.
 - **Module/mốc:** M01 / G1.
 - **Đầu ra:** Định dạng lỗi thống nhất, mã 400/403/404/409, validation.
 - **Phụ thuộc:** TV1-01.
@@ -74,6 +78,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 ### TV1-06 Audit và chống lệnh lặp I08
 
 - [ ] Hoàn thành và được nghiệm thu.
+- **Đã có backend:** audit AOP/JPA/query API và I08 replay theo actor/hash, unique/locking và rollback cùng nghiệp vụ; chờ tích hợp TV2–TV4.
 - **Module/mốc:** M01 / G2.
 - **Đầu ra:** Nhật ký actor, request_key/hash, kết quả replay.
 - **Phụ thuộc:** TV1-04.
@@ -82,6 +87,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 ### TV1-07 Outbox thông báo I08
 
 - [ ] Hoàn thành và được nghiệm thu.
+- **Đã có backend:** Inbox WEB/private/read, dedup enqueue, worker lease/retry/recovery; SMTP/HTTPS gateway có config, chờ provider thật và UI.
 - **Module/mốc:** M13 / G2.
 - **Đầu ra:** Ghi PENDING cùng transaction, worker lease/retry, UI thông báo.
 - **Phụ thuộc:** TV1-06.
@@ -90,6 +96,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 ### TV1-08 Nhắc bảo dưỡng và hết hạn
 
 - [ ] Hoàn thành và được nghiệm thu.
+- **Đã có backend:** Scheduler 08:00 zone gara, maintenance cycle/warranty deadline và dedup/chuyển chủ; hiện WEB cho account active, chờ UI và policy khách offline.
 - **Module/mốc:** M13 / G5.
 - **Đầu ra:** Worker 08:00 giờ gara; chu kỳ km/tháng; nhắc trước 15 ngày.
 - **Phụ thuộc:** TV1-07, TV2-04, TV3-10.
@@ -98,6 +105,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 ### TV1-09 Dashboard và xuất báo cáo
 
 - [ ] Hoàn thành và được nghiệm thu.
+- **Đã có backend:** ADMIN dashboard/debt Page/CSV, aggregation dữ liệu nguồn/ledger; chờ UI, dữ liệu nghiệp vụ TV2–TV4 và nghiệm thu tổng thể.
 - **Module/mốc:** M14 / G5.
 - **Đầu ra:** UC36; doanh thu, thu chi, công nợ, tồn kho, giờ công; UI và export.
 - **Phụ thuộc:** TV4-08, TV3-08.
