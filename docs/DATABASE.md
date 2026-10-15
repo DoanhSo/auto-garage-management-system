@@ -2,14 +2,18 @@
 
 Nguồn: `BaoCao_PhanTich_Va_ThietKe_HeThong_QuanLy_GaraOto.docx`, ngày 14/10/2026. Báo cáo cung cấp tên 30 bảng, ERD Chen với một phần thuộc tính, BR01–BR24 và đặc tả 38 use case. Phần thân tài liệu không có data dictionary 373 cột hay DDL 71 FK như giới thiệu. Vì vậy V1–V4 là schema khởi tạo được suy ra từ luồng nghiệp vụ và có các quyết định bổ sung dưới đây; không khẳng định khớp chính xác 373 cột/71 FK.
 
-Schema hiện gồm **30 bảng nghiệp vụ, 423 cột (kể cả hai cột generated), 76 khóa ngoại, 75 CHECK và hai view**. Không tính `flyway_schema_history` hoặc cột của view. Danh sách cột/kiểu/nullable/default/generated có trong `DATA_DICTIONARY.md`; SQL là nguồn thực thi chính thức.
+Schema V1–V7 hiện gồm **30 bảng nghiệp vụ, 430 cột (kể cả hai cột generated), 76 khóa ngoại, 76 CHECK và hai view**. V1–V4 ban đầu có 423 cột/75 CHECK; V5 thêm auth_version và CHECK không âm. Không tính `flyway_schema_history` hoặc cột của view. Danh sách cột trong `DATA_DICTIONARY.md`; SQL là nguồn thực thi chính thức.
 
-## Nội dung V1–V4
+## Nội dung V1–V7
 
 - **V1 create_identity_and_catalogs:** users, customers, vehicles, services, employees, employee_shifts, service_bays, bookings, suppliers, parts, notifications, audit_events.
 - **V2 create_repair_workflow:** repair_orders, bay_reservations, estimates, estimate_items, repair_tasks, task_assignments, labor_sessions, vehicle_checks, attachments.
 - **V3 create_inventory_billing_and_warranty:** repair_order_parts, inventory_documents, inventory_document_items, inventory_transactions, invoices, invoice_items, payments, warranties, warranty_claims.
 - **V4 add_workflow_links_and_balance_views:** FK vòng latest_qc_check_id và attachment của claim, v_invoice_balances, v_supplier_balances.
+- **V5 add_user_auth_version:** users.auth_version để thu hồi JWT, CHECK không âm và index role/is_active. Không sửa checksum V1–V4, không thêm bảng/seed credential. Version account dùng cho optimistic update, auth_version riêng cho token revocation.
+
+- **V6 add_user_audit_columns:** users.created_by/updated_by và index để map BaseEntity.
+- **V7 add_notification_audit_columns:** notifications.updated_at/created_by/updated_by/version, inbox index; giữ checksum V1–V5.
 
 ## Quyết định bổ sung để triển khai
 
@@ -43,7 +47,7 @@ View là dữ liệu suy ra, không lưu dư nợ ở một bảng riêng. View 
 
 ## Phân chia ràng buộc
 
-Database bảo đảm PK/FK/UNIQUE, giá/số lượng hợp lệ, nguồn thanh toán/dòng báo giá đúng cấu trúc, một timer mở, một MAIN active, công thức tiền tại dòng và một lần ghi ledger mỗi dòng chứng từ. Service đảm bảo quyền, trạng thái, overlap, kỹ năng/ca, QC đúng loại/mới nhất, duyệt trước thi công, khớp reserved totals, không xuất/trả/thu/chi vượt hạn, immutable snapshot và transaction nhiều bảng. Các mục service vẫn thuộc 42 đầu việc, chưa có implementation.
+Database bảo đảm PK/FK/UNIQUE, giá/số lượng hợp lệ, nguồn thanh toán/dòng báo giá đúng cấu trúc, một timer mở, một MAIN active, công thức tiền tại dòng và một lần ghi ledger mỗi dòng chứng từ. Backend identity đã có role/ownership/assignment/QC access policy và account transaction. Service nghiệp vụ TV2–TV4 còn cần trạng thái, overlap, kỹ năng/ca, QC đúng loại/mới nhất, duyệt trước thi công, khớp reserved totals, không xuất/trả/thu/chi vượt hạn, immutable snapshot và transaction nhiều bảng theo 42 đầu việc.
 
 ## Tài liệu kỹ thuật đã đối chiếu
 

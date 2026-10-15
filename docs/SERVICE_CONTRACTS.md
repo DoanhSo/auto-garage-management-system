@@ -1,6 +1,6 @@
 # Hợp đồng giao tiếp giữa các module
 
-Tám hợp đồng I01–I08 dưới đây được đề xuất cụ thể trong lần khởi tạo này. Báo cáo chỉ nhắc đến số lượng hợp đồng, không cung cấp chữ ký. Interface nằm trong `src/main/java/com/Group13_65CNTT/AutoGarage/shared/contracts`; chưa có implementation hoặc bean Spring tương ứng.
+Tám hợp đồng I01–I08 được đề xuất trong lần khởi tạo; báo cáo không cung cấp chữ ký. Interface nằm trong `src/main/java/com/Group13_65CNTT/AutoGarage/shared/contracts`. I01 có ObjectAccessServiceImpl (JPA projections), I08 có NotificationAuditServiceImpl (audit/replay/outbox) theo cấu trúc layered; I02–I07 còn chờ các module nghiệp vụ. Xem api/SECURITY.md và api/TV1.md.
 
 ## Quy ước chung
 

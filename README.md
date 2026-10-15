@@ -1,52 +1,51 @@
 # AutoGarage
 
-Khung hệ thống quản lý gara một chi nhánh. Backend giữ Spring Boot 4.1.1 và Java 21 từ dự án ban đầu; MySQL 8.4 dùng Flyway V1–V4. Frontend đã chia thư mục cho React/TypeScript, chưa khởi tạo ứng dụng chạy được. Chức năng nghiệp vụ đang ở mức phân công và hợp đồng interface.
+Hệ thống quản lý gara một chi nhánh, Java 21/Spring Boot 4.1.1/MySQL 8.4. Backend TV1 được viết lại theo tài liệu kiến trúc người dùng cung cấp: common, auth, identity, audit, notification và reporting. Các module nghiệp vụ TV2–TV4 và frontend còn là khung/hợp đồng.
 
-## Tài liệu làm việc
+## Cấu trúc và tài liệu
 
-- [Phân công 42 đầu việc cho TV1–TV4](docs/WORK_BREAKDOWN.md): module, đầu ra, phụ thuộc và tiêu chí nghiệm thu.
-- [Cấu trúc dự án](docs/ARCHITECTURE.md): 14 module, phân lớp và quyền sở hữu dữ liệu.
-- [Tám hợp đồng service I01–I08](docs/SERVICE_CONTRACTS.md): chữ ký, transaction và quy tắc tích hợp.
-- [Thiết kế database và quyết định bổ sung](docs/DATABASE.md).
-- [Từ điển cột thực tế](docs/DATA_DICTIONARY.md).
-- [Kế hoạch T01–T38](docs/ACCEPTANCE_TESTS.md): các kịch bản nghiệm thu nghiệp vụ theo báo cáo.
+- [Quy chuẩn viết code](docs/CODING_GUIDELINES.md): 7 tầng, Lombok, MapStruct, JPA, Service/ServiceImpl, Swagger, RBAC, transaction và kiểm thử.
+- [Kiến trúc thực tế](docs/ARCHITECTURE.md), [phân công TV1–TV4](docs/WORK_BREAKDOWN.md), [kế hoạch/trạng thái TV1](docs/TV1_IMPLEMENTATION_PLAN.md).
+- [API auth/tài khoản](docs/api/SECURITY.md), [API audit/notification/report và I08](docs/api/TV1.md).
+- [Database](docs/DATABASE.md), [data dictionary](docs/DATA_DICTIONARY.md), [I01–I08](docs/SERVICE_CONTRACTS.md), [T01–T38](docs/ACCEPTANCE_TESTS.md).
+- [Kết quả kiểm chứng thực tế](docs/VALIDATION.md).
 
-## Chạy backend trên Windows PowerShell
+## Chạy local trên PowerShell
 
-Thực hiện trong thư mục chứa `pom.xml` (thư mục `AutoGarage` bên trong workspace). Cần JDK 21 và Docker đang chạy.
+Từ thư mục chứa pom.xml; cần JDK 21 và Docker đang chạy:
 
 ```powershell
+.\scripts\initialize-local-env.ps1 -WithBootstrapAdministrator
+. .\scripts\import-local-env.ps1
 docker compose up -d --wait mysql
 .\mvnw.cmd spring-boot:run
 ```
 
-MySQL local dùng cổng 3307, database `autogarage`, user `autogarage`, password `autogarage_local`. Backend chạy cổng 8080; Flyway tự áp dụng migrations khi khởi động. Spring Security hiện vẫn dùng cấu hình mặc định của starter; API đăng nhập/role nghiệp vụ chưa được triển khai.
+Script tạo secret ngẫu nhiên trong .env riêng và không ghi đè file đã có. Đọc username/password bootstrap trong file riêng trên máy; sau lần khởi tạo đặt AUTH_BOOTSTRAP_ENABLED=false và xóa bootstrap password. Spring Boot nhận biến process, nên phải import cấu hình. Password trong .env phải khớp volume MySQL đã provision.
 
-Có thể dùng `mvn` nếu đã cài Maven. Nếu đổi mật khẩu/cổng Compose, phải đồng thời đặt biến môi trường cho Spring Boot:
+Backend cổng 8080, MySQL local 3307. Swagger UI `/swagger-ui/index.html` và JSON `/v3/api-docs` khi OPENAPI_ENABLED=true; mặc định ứng dụng tắt docs, helper local bật. Login `/api/v1/auth/login`, sau đó dùng Authorization: Bearer token.
 
-```powershell
-$env:DB_URL='jdbc:mysql://localhost:3307/autogarage?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true'
-$env:DB_USERNAME='autogarage'
-$env:DB_PASSWORD='mat_khau_local_cua_ban'
-.\mvnw.cmd spring-boot:run
-```
+JSON thống nhất `code` số, `message`, `success`, `data`, `timestamp`, `path`. Admin create user 201; logout/password/deactivate trả 200 có envelope. List trả Spring Page trong data.content/totalElements. API chi tiết và các thay đổi contract ở docs/api.
 
-`.env.example` là ví dụ cho Compose; file `.env` không tự được Spring Boot đọc. Các thông tin mặc định chỉ dùng local. Database cần được tạo trước; migrations không tạo user/database.
-
-## Kiểm thử schema trên database riêng
+## Kiểm thử
 
 ```powershell
+.\scripts\initialize-local-env.ps1
+. .\scripts\import-local-env.ps1
 docker compose --profile test up -d --wait mysql-test
 .\mvnw.cmd test
+.\mvnw.cmd -DskipTests package
 docker compose stop mysql-test
 ```
 
-Profile test dùng cổng 3308 và database `autogarage_test`. Có thể đổi bằng `TEST_DB_URL`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`. Tests ghi fixtures và rollback sau từng bài; Flyway vẫn khởi tạo schema test. Không dùng database nghiệp vụ để chạy test.
+H2 integration dùng profile h2 riêng, tự chạy trong suite. MySQL test cổng 3308/DB autogarage_test; TEST_DB_URL/TEST_DB_USERNAME/TEST_DB_PASSWORD có thể override. Test sinh signing key riêng và tắt bootstrap/workers/provider. Test transaction rollback hoặc cleanup namespace trên DB riêng; không chạy suite cạnh tranh trên cùng DB fixture.
 
-`AutoGarageApplicationTests` kiểm tra context. `MigrationSchemaTests` kiểm tra 30 bảng, hai view, bốn phiên bản, FK/CHECK/UNIQUE, timer, thợ chính, tồn kho, nguồn thanh toán, chống post trùng, thông báo và công nợ nhiều lần thu/chi. Hiện có 17 bài tự động; kế hoạch T01–T38 là công việc cho giai đoạn triển khai, chưa được chạy như test nghiệp vụ.
+V1–V7 có 30 bảng nghiệp vụ, 430 cột, 76 FK, 76 CHECK và hai view; Flyway history riêng. V5 auth_version, V6 audit columns users, V7 audit/version notifications. Giữ checksum migrations đã áp dụng; schema mới thêm migration mới.
 
-## Quy ước migrations
+## Worker và provider
 
-V1 tạo 12 bảng nền tảng/danh mục; V2 tạo 9 bảng điều phối/sửa chữa; V3 tạo 9 bảng kho/tài chính/bảo hành; V4 hoàn thiện liên kết vòng và hai view. Có đúng 30 bảng nghiệp vụ, thêm `flyway_schema_history` do Flyway tự tạo. Không có seed tài khoản/password trong migrations.
+NOTIFICATION_WORKER_ENABLED và NOTIFICATION_REMINDERS_ENABLED mặc định false. Bật chủ động sau khi cấu hình; reminder chạy 08:00 theo GARAGE_TIME_ZONE. WEB hoạt động qua inbox; EMAIL dùng SMTP, SMS dùng HTTPS gateway có contract trong docs/api/TV1.md. Không có credential/provider mặc định. Test gửi ngoài qua mock; cần cấu hình provider của môi trường để gửi thật.
 
-Sau khi áp dụng chung, không sửa V1–V4; thay đổi mới dùng V5 trở lên. Không dùng Hibernate để tạo schema, không bật baseline tự động, không chạy Flyway clean trên dữ liệu đã có.
+Frontend/UI, tích hợp I01/I08 vào các nghiệp vụ TV2–TV4 và demo toàn bộ T01–T38 vẫn theo WORK_BREAKDOWN. Kết quả backend không đồng nghĩa đã nghiệm thu toàn ứng dụng gara.
+
+Cấu hình policy và quy tắc exception/response của TV1: [docs/CONFIGURATION_AND_ERRORS.md](docs/CONFIGURATION_AND_ERRORS.md).
