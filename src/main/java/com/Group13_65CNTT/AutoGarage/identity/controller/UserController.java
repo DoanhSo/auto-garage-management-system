@@ -103,12 +103,12 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
-    @Operation(summary = "Deactivate user", description = "Soft delete; preserves account history")
-    public ApiResponse<Void> deactivateUser(
+    @Operation(summary = "Delete user", description = "Removes from management without deleting history; use PUT active=false to lock")
+    public ApiResponse<Void> deleteUser(
             @PathVariable @Min(1) Long id,
             @RequestParam @Min(0) long version,
             HttpServletRequest httpRequest) {
-        userService.deactivateUser(id, version);
+        userService.deleteUser(id, version);
         return ApiResponse.success(ResponseCode.DELETED, null, httpRequest.getRequestURI());
     }
 }

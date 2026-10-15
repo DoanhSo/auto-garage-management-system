@@ -1,6 +1,6 @@
 # AutoGarage
 
-Hệ thống quản lý gara một chi nhánh, Java 21/Spring Boot 4.1.1/MySQL 8.4. Backend TV1 được viết lại theo tài liệu kiến trúc người dùng cung cấp: common, auth, identity, audit, notification và reporting. Các module nghiệp vụ TV2–TV4 và frontend còn là khung/hợp đồng.
+Hệ thống quản lý gara một chi nhánh, Java 21/Spring Boot 4.1.1/MySQL 8.4. Backend TV1 được viết lại theo tài liệu kiến trúc người dùng cung cấp: common, auth, identity, audit, notification và reporting. Frontend TV1 đã có React/TypeScript tích hợp API; các module nghiệp vụ TV2–TV4 còn là khung/hợp đồng.
 
 ## Cấu trúc và tài liệu
 
@@ -40,12 +40,16 @@ docker compose stop mysql-test
 
 H2 integration dùng profile h2 riêng, tự chạy trong suite. MySQL test cổng 3308/DB autogarage_test; TEST_DB_URL/TEST_DB_USERNAME/TEST_DB_PASSWORD có thể override. Test sinh signing key riêng và tắt bootstrap/workers/provider. Test transaction rollback hoặc cleanup namespace trên DB riêng; không chạy suite cạnh tranh trên cùng DB fixture.
 
-V1–V7 có 30 bảng nghiệp vụ, 430 cột, 76 FK, 76 CHECK và hai view; Flyway history riêng. V5 auth_version, V6 audit columns users, V7 audit/version notifications. Giữ checksum migrations đã áp dụng; schema mới thêm migration mới.
+V1–V8 có 30 bảng nghiệp vụ, 431 cột, 76 FK, 77 CHECK và hai view; Flyway history riêng. V5 auth_version, V6 audit columns users, V7 audit/version notifications. Giữ checksum migrations đã áp dụng; schema mới thêm migration mới.
 
 ## Worker và provider
 
 NOTIFICATION_WORKER_ENABLED và NOTIFICATION_REMINDERS_ENABLED mặc định false. Bật chủ động sau khi cấu hình; reminder chạy 08:00 theo GARAGE_TIME_ZONE. WEB hoạt động qua inbox; EMAIL dùng SMTP, SMS dùng HTTPS gateway có contract trong docs/api/TV1.md. Không có credential/provider mặc định. Test gửi ngoài qua mock; cần cấu hình provider của môi trường để gửi thật.
 
-Frontend/UI, tích hợp I01/I08 vào các nghiệp vụ TV2–TV4 và demo toàn bộ T01–T38 vẫn theo WORK_BREAKDOWN. Kết quả backend không đồng nghĩa đã nghiệm thu toàn ứng dụng gara.
+Frontend TV1 P0 đã triển khai tại [frontend/](frontend/README.md); tích hợp I01/I08 vào nghiệp vụ TV2–TV4 và demo toàn bộ T01–T38 vẫn theo WORK_BREAKDOWN. Kết quả backend không đồng nghĩa đã nghiệm thu toàn ứng dụng gara.
 
 Cấu hình policy và quy tắc exception/response của TV1: [docs/CONFIGURATION_AND_ERRORS.md](docs/CONFIGURATION_AND_ERRORS.md).
+
+Kế hoạch frontend TV1: [UI/UX, component, hooks, validation, API dependencies và lộ trình nghiệm thu](docs/frontend/TV1_FRONTEND_PLAN.md).
+
+Frontend: xem [hướng dẫn chạy và cấu trúc](frontend/README.md) và [kiểm chứng TV1 frontend](docs/frontend/TV1_FRONTEND_VALIDATION.md). Cần Node 24; chạy npm ci rồi npm run dev trong frontend/.

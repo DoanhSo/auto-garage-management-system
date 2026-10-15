@@ -1,7 +1,3 @@
-# M01 Đăng nhập và phân quyền
+# M01 — Identity frontend (TV1)
 
-Chủ trì: TV1.
-
-Tạo `pages/`, `components/`, `api/`, `types/` khi triển khai màn hình của module. Đối chiếu UC và tiêu chí nghiệm thu trong `docs/WORK_BREAKDOWN.md`. Mỗi chức năng gồm màn hình, tích hợp API và xử lý 403/409/validation.
-
-Phạm vi CSDL: `users`, `audit_events`.
+Đã có API/hooks/schema, UsersPage, UserEditor và UserCards. Auth/session/login/password nằm trong feature auth. Desktop dùng bảng + sheet; mobile dùng thẻ + sheet toàn chiều rộng. Mutation allowlist, optimistic version, last-admin, self-change và dirty guard. Xem [hướng dẫn frontend](../../../README.md).

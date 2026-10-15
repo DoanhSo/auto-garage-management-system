@@ -510,7 +510,7 @@ class SecurityIntegrationTests extends IntegrationTestSupport {
     }
 
     @Test
-    void deactivationIsSoftAndInvalidatesToken() throws Exception {
+    void deletionPreservesHistoryButRemovesManagementAccessAndInvalidatesToken() throws Exception {
         String admin = login("security_admin", PASSWORD),
                 customer = login("security_customer_b", PASSWORD);
         perform(
@@ -522,7 +522,54 @@ class SecurityIntegrationTests extends IntegrationTestSupport {
                                 .header("Authorization", "Bearer " + admin))
                 .andExpect(status().isOk());
         assertFalse(users.findById(920006L).orElseThrow().isActive());
+        var deleted = users.findById(920006L).orElseThrow();
+        assertNotNull(deleted.getDeletedAt());
+        assertEquals(1L, jdbc.queryForObject("SELECT COUNT(*) FROM customers WHERE user_id=920006", Long.class));
+        assertEquals(1L, jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE action='USER_DELETED' AND entity_id=920006", Long.class));
+        perform(get("/api/v1/admin/users/920006").header("Authorization", "Bearer " + admin))
+                .andExpect(status().isNotFound());
+        perform(get("/api/v1/admin/users").param("keyword", "security_customer_b")
+                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        perform(put("/api/v1/admin/users/920006").header("Authorization", "Bearer " + admin)
+                .contentType(MediaType.APPLICATION_JSON).content(updateBody("CUSTOMER", true, deleted.getVersion())))
+                .andExpect(status().isNotFound());
+        perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
+                .content(body(Map.of("identifier", "security_customer_b", "password", PASSWORD))))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value(3005));
         rejectToken(customer);
+    }
+
+    @Test
+    void lockingCanBeReversedWithoutDeletingTheAccount() throws Exception {
+        String admin = login("security_admin", PASSWORD), customer = login("security_customer_b", PASSWORD);
+        long version = users.findById(920006L).orElseThrow().getVersion();
+        perform(put("/api/v1/admin/users/920006").header("Authorization", "Bearer " + admin)
+                .contentType(MediaType.APPLICATION_JSON).content(updateBody("CUSTOMER", false, version)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.active").value(false));
+        var locked = users.findById(920006L).orElseThrow();
+        assertNull(locked.getDeletedAt());
+        rejectToken(customer);
+        perform(get("/api/v1/admin/users").param("keyword", "security_customer_b").param("active", "false")
+                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1));
+        perform(put("/api/v1/admin/users/920006").header("Authorization", "Bearer " + admin)
+                .contentType(MediaType.APPLICATION_JSON).content(updateBody("CUSTOMER", true, locked.getVersion())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.active").value(true));
+        assertNotNull(login("security_customer_b", PASSWORD));
+    }
+
+    @Test
+    void staleDeleteCannotRemoveAnUpdatedAccount() throws Exception {
+        String admin = login("security_admin", PASSWORD);
+        long stale = users.findById(920006L).orElseThrow().getVersion();
+        perform(put("/api/v1/admin/users/920006").header("Authorization", "Bearer " + admin)
+                .contentType(MediaType.APPLICATION_JSON).content(updateBody("CUSTOMER", false, stale)))
+                .andExpect(status().isOk());
+        perform(delete("/api/v1/admin/users/920006").param("version", Long.toString(stale))
+                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value(2005));
+        assertNull(users.findById(920006L).orElseThrow().getDeletedAt());
     }
 
     @Test

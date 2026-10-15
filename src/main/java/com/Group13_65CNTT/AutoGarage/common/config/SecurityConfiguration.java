@@ -70,7 +70,9 @@ public class SecurityConfiguration {
                                                 "/swagger-ui/**",
                                                 "/swagger-ui.html")
                                         .permitAll();
-                            a.requestMatchers(HttpMethod.POST, ApiPaths.AUTH_BASE + ApiPaths.LOGIN)
+                            a.requestMatchers(HttpMethod.GET, ApiPaths.UI_POLICY)
+                                    .permitAll()
+                                    .requestMatchers(HttpMethod.POST, ApiPaths.AUTH_BASE + ApiPaths.LOGIN)
                                     .permitAll()
                                     .requestMatchers(ApiPaths.AUTH_BASE + "/**")
                                     .authenticated()

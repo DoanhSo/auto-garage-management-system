@@ -66,6 +66,15 @@ class HttpErrorContractIntegrationTest extends IntegrationTestSupport {
                         .build());
 
         try (HttpClient client = HttpClient.newHttpClient()) {
+            var policy = envelope(exchange(client, "GET", "/api/v1/public/ui-policy", null, null, Map.of()), 200, 1000).path("data");
+            assertThat(policy.path("passwordMinLength").asInt()).isEqualTo(20);
+            assertThat(policy.path("passwordMaxUtf8Bytes").asInt()).isEqualTo(72);
+            assertThat(policy.path("paginationDefaultSize").asInt()).isEqualTo(10);
+            assertThat(policy.path("paginationMaxSize").asInt()).isEqualTo(25);
+            assertThat(policy.path("reportMaxPeriodSeconds").asLong()).isEqualTo(Duration.ofDays(30).toSeconds());
+            assertThat(policy.path("garageTimeZone").asString()).isEqualTo(notificationProperties.getZone());
+            assertThat(policy.size()).isEqualTo(7);
+            envelope(exchange(client, "POST", "/api/v1/public/ui-policy", null, null, Map.of()), 401, 3001);
             envelope(exchange(client, "GET", "/api/v1/auth/me", null, null, Map.of()), 401, 3001);
             var accepted =
                     exchange(

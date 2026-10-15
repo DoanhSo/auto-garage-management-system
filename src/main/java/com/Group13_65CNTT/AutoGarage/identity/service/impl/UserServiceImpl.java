@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Locale;
+import java.time.Clock;
 
 @Service
 @Slf4j
@@ -45,6 +46,7 @@ public class UserServiceImpl implements UserService {
     private final PasswordPolicy passwordPolicy;
     private final CurrentUserProvider currentUser;
     private final EntityManager entityManager;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -94,6 +96,7 @@ public class UserServiceImpl implements UserService {
         return userMapper.toResponse(
                 userRepository
                         .findById(id)
+                        .filter(user -> user.getDeletedAt() == null)
                         .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND)));
     }
 
@@ -114,8 +117,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    @Audited(action = "USER_UPDATED", entity = "USER", idArgument = 0)
-    public void deactivateUser(Long id, long version) {
+    @Audited(action = "USER_DELETED", entity = "USER", idArgument = 0)
+    public void deleteUser(Long id, long version) {
         validateId(id);
         if (version < 0) throw new BusinessException(ResponseCode.BAD_REQUEST);
         long actorId = requireAdministrator();
@@ -123,8 +126,9 @@ public class UserServiceImpl implements UserService {
         requireLockedAdministrator(actorId);
         User user = lockUser(id);
         verifyMutation(user, user.getRole(), false, version, administrators.size());
-        if (user.isActive()) user.setAuthVersion(user.getAuthVersion() + 1);
+        user.setAuthVersion(user.getAuthVersion() + 1);
         user.setActive(false);
+        user.setDeletedAt(clock.instant());
         user.setUpdatedBy(actorId);
         save(user);
     }
@@ -169,6 +173,7 @@ public class UserServiceImpl implements UserService {
                 userRepository
                         .findById(actorId)
                         .filter(User::isActive)
+                        .filter(user -> user.getDeletedAt() == null)
                         .orElseThrow(() -> new BusinessException(ResponseCode.UNAUTHORIZED));
         if (actor.getRole() != Role.ADMIN) throw new BusinessException(ResponseCode.FORBIDDEN);
         return actorId;
@@ -187,6 +192,7 @@ public class UserServiceImpl implements UserService {
                         .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
         // Refresh defeats a stale persistence-context/snapshot after waiting on a MySQL row lock.
         entityManager.refresh(user, LockModeType.PESSIMISTIC_WRITE);
+        if (user.getDeletedAt() != null) throw new BusinessException(ResponseCode.RESOURCE_NOT_FOUND);
         return user;
     }
 

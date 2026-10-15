@@ -2,9 +2,9 @@
 
 Nguồn: `BaoCao_PhanTich_Va_ThietKe_HeThong_QuanLy_GaraOto.docx`, ngày 14/10/2026. Báo cáo cung cấp tên 30 bảng, ERD Chen với một phần thuộc tính, BR01–BR24 và đặc tả 38 use case. Phần thân tài liệu không có data dictionary 373 cột hay DDL 71 FK như giới thiệu. Vì vậy V1–V4 là schema khởi tạo được suy ra từ luồng nghiệp vụ và có các quyết định bổ sung dưới đây; không khẳng định khớp chính xác 373 cột/71 FK.
 
-Schema V1–V7 hiện gồm **30 bảng nghiệp vụ, 430 cột (kể cả hai cột generated), 76 khóa ngoại, 76 CHECK và hai view**. V1–V4 ban đầu có 423 cột/75 CHECK; V5 thêm auth_version và CHECK không âm. Không tính `flyway_schema_history` hoặc cột của view. Danh sách cột trong `DATA_DICTIONARY.md`; SQL là nguồn thực thi chính thức.
+Schema V1–V8 hiện gồm **30 bảng nghiệp vụ, 431 cột (kể cả hai cột generated), 76 khóa ngoại, 77 CHECK và hai view**. V1–V4 ban đầu có 423 cột/75 CHECK; V5 thêm auth_version và CHECK không âm. Không tính `flyway_schema_history` hoặc cột của view. Danh sách cột trong `DATA_DICTIONARY.md`; SQL là nguồn thực thi chính thức.
 
-## Nội dung V1–V7
+## Nội dung V1–V8
 
 - **V1 create_identity_and_catalogs:** users, customers, vehicles, services, employees, employee_shifts, service_bays, bookings, suppliers, parts, notifications, audit_events.
 - **V2 create_repair_workflow:** repair_orders, bay_reservations, estimates, estimate_items, repair_tasks, task_assignments, labor_sessions, vehicle_checks, attachments.
@@ -14,6 +14,8 @@ Schema V1–V7 hiện gồm **30 bảng nghiệp vụ, 430 cột (kể cả hai 
 
 - **V6 add_user_audit_columns:** users.created_by/updated_by và index để map BaseEntity.
 - **V7 add_notification_audit_columns:** notifications.updated_at/created_by/updated_by/version, inbox index; giữ checksum V1–V5.
+
+- **V8 separate_user_deletion_from_locking:** users.deleted_at, index deleted_at/is_active, CHECK tài khoản đã xóa không được active. Khóa dùng is_active=false và có thể mở lại; DELETE ghi deleted_at và loại khỏi quản trị, giữ FK/lịch sử.
 
 ## Quyết định bổ sung để triển khai
 

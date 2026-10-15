@@ -51,7 +51,7 @@ public final class AccountTokenValidator implements OAuth2TokenValidator<Jwt> {
         }
         // Do not disguise a database outage as invalid credentials.
         return users.findById(id)
-                .filter(u -> u.isActive() && u.getAuthVersion() == version && u.getRole() == role)
+                .filter(u -> u.isActive() && u.getDeletedAt() == null && u.getAuthVersion() == version && u.getRole() == role)
                 .map(u -> OAuth2TokenValidatorResult.success())
                 .orElse(INVALID);
     }

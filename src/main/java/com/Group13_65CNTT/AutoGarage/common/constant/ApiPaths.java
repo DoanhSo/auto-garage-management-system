@@ -1,6 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.common.constant;
 
 public final class ApiPaths {
+    public static final String UI_POLICY = "/api/v1/public/ui-policy";
     public static final String AUTH_BASE = "/api/v1/auth";
     public static final String USERS_BASE = "/api/v1/admin/users";
     public static final String LOGIN = "/login";

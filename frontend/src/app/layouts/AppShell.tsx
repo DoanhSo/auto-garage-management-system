@@ -1,0 +1,178 @@
+import { useEffect, useRef, useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import {
+  Bell,
+  ChartNoAxesCombined,
+  ChevronRight,
+  History,
+  LogOut,
+  Menu,
+  ShieldCheck,
+  Users,
+  Wrench,
+  X,
+} from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { useAuth } from '../providers/AuthProvider';
+import { useMeQuery, useLogoutMutation } from '../../features/auth/hooks/useAuthQueries';
+import { useUnreadCountQuery } from '../../features/notification/hooks/useNotifications';
+import { Button } from '../../shared/components/ui';
+import { initials } from '../../shared/utils/format';
+const links = [
+  {
+    to: '/admin/reports',
+    label: 'Báo cáo',
+    icon: ChartNoAxesCombined,
+    admin: true,
+  },
+  { to: '/admin/users', label: 'Tài khoản', icon: Users, admin: true },
+  { to: '/admin/audit', label: 'Nhật ký', icon: History, admin: true },
+  { to: '/notifications', label: 'Thông báo', icon: Bell, admin: false },
+];
+export function AppShell() {
+  const { user, setCurrentUser } = useAuth();
+  const me = useMeQuery();
+  const logout = useLogoutMutation();
+  const unread = useUnreadCountQuery();
+  const location = useLocation();
+  const [mobile, setMobile] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (me.data) setCurrentUser(me.data);
+  }, [me.data, setCurrentUser]);
+  const allowed = links.filter((link) => !link.admin || user?.role === 'ADMIN');
+  const title =
+    links.find((link) => location.pathname.startsWith(link.to))?.label ?? 'Tài khoản cá nhân';
+  const nav = (close?: () => void) => (
+    <nav className="main-navigation" aria-label="Điều hướng chính">
+      <span className="nav-heading">KHÔNG GIAN LÀM VIỆC</span>
+      {allowed.map(({ to, label, icon: Icon }) => (
+        <NavLink
+          key={to}
+          to={to}
+          onClick={close}
+          className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+        >
+          <Icon size={19} aria-hidden />
+          <span>{label}</span>
+          {to === '/notifications' && unread.data !== undefined && BigInt(unread.data) > 0n && (
+            <span className="nav-count">{BigInt(unread.data) > 99n ? '99+' : unread.data}</span>
+          )}
+        </NavLink>
+      ))}
+      <span className="nav-heading account-nav-heading">CÁ NHÂN</span>
+      <NavLink
+        to="/account/security"
+        onClick={close}
+        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+      >
+        <ShieldCheck size={19} />
+        <span>Tài khoản của tôi</span>
+      </NavLink>
+    </nav>
+  );
+  return (
+    <div className="app-layout">
+      <aside className="sidebar">
+        <NavLink
+          to={user?.role === 'ADMIN' ? '/admin/reports' : '/notifications'}
+          className="brand"
+        >
+          <span className="brand-mark">
+            <Wrench size={22} />
+          </span>
+          <span>
+            AutoGarage<small>GARAGE WORKSPACE</small>
+          </span>
+        </NavLink>
+        {nav()}
+        <div className="sidebar-footer">
+          <span className="avatar">{initials(user?.fullName ?? '')}</span>
+          <div>
+            <strong>{user?.fullName}</strong>
+            <span>{user?.username}</span>
+          </div>
+        </div>
+      </aside>
+      <div className="app-content">
+        <header className="app-header">
+          <div className="breadcrumb">
+            <Button
+              className="mobile-menu"
+              variant="ghost"
+              aria-label="Mở menu"
+              onClick={() => setMobile(true)}
+              ref={trigger}
+            >
+              <Menu size={20} />
+            </Button>
+            <span>Không gian làm việc</span>
+            <ChevronRight size={14} aria-hidden />
+            <strong>{title}</strong>
+          </div>
+          <div className="header-actions">
+            <NavLink
+              className="bell-button"
+              to="/notifications"
+              aria-label={`Thông báo${unread.data ? ' — ' + unread.data + ' chưa đọc' : ''}`}
+            >
+              <Bell size={20} />
+              {unread.data !== undefined && BigInt(unread.data) > 0n && (
+                <span className="bell-dot" />
+              )}
+            </NavLink>
+            <span className="header-name">{user?.fullName}</span>
+            <Button
+              variant="ghost"
+              pending={logout.isPending}
+              onClick={() => logout.mutate()}
+              aria-label="Đăng xuất"
+            >
+              <LogOut size={18} />
+              <span className="logout-label">Đăng xuất</span>
+            </Button>
+          </div>
+        </header>
+        {me.error && (
+          <div className="session-banner" role="status">
+            Chưa thể kiểm tra lại thông tin tài khoản.{' '}
+            <button
+              type="button"
+              onClick={() => {
+                void me.refetch();
+              }}
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+        <main id="main-content" className="workspace">
+          <Outlet />
+        </main>
+      </div>
+      <Dialog.Root open={mobile} onOpenChange={setMobile}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="overlay" />
+          <Dialog.Content
+            className="mobile-nav"
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              trigger.current?.focus();
+            }}
+          >
+            <div className="mobile-nav-header">
+              <Dialog.Title>AutoGarage</Dialog.Title>
+              <Dialog.Close asChild>
+                <Button variant="ghost" aria-label="Đóng menu">
+                  <X size={20} />
+                </Button>
+              </Dialog.Close>
+            </div>
+            <Dialog.Description className="sr-only">Chọn phân hệ làm việc</Dialog.Description>
+            {nav(() => setMobile(false))}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
+  );
+}
