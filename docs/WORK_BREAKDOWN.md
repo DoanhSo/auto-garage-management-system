@@ -116,7 +116,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-01 Hồ sơ khách hàng
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Entity, Repository, Service, Controller, Unit Tests UC04).
 - **Module/mốc:** M02 / G1.
 - **Đầu ra:** Entity/repository/service/controller, UI CRUD khách.
 - **Phụ thuộc:** TV1-01.
@@ -124,7 +124,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-02 Hồ sơ phương tiện
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Entity, Repository, Service, Controller, Unit Tests UC05).
 - **Module/mốc:** M03 / G1.
 - **Đầu ra:** CRUD xe, chuẩn hóa biển số, VIN, ODO; UI xe.
 - **Phụ thuộc:** TV2-01.
@@ -132,7 +132,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-03 Đổi chủ và lịch sử giao dịch
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Chuyển nhượng phương tiện, bảo toàn dữ liệu lịch sử).
 - **Module/mốc:** M03 / G1.
 - **Đầu ra:** Luồng đổi vehicles.customer_id; lọc dữ liệu lịch sử.
 - **Phụ thuộc:** TV2-02, TV1-04.
@@ -140,7 +140,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-04 Danh mục dịch vụ và gói
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Entity, Repository, Service, Controller, Unit Tests UC06).
 - **Module/mốc:** M04 / G1.
 - **Đầu ra:** CRUD SINGLE/PACKAGE, giá, kỹ năng, loại khoang, chu kỳ, bảo hành.
 - **Phụ thuộc:** TV1-01.
