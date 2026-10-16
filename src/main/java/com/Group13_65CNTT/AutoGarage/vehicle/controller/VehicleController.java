@@ -66,4 +66,20 @@ public class VehicleController {
         vehicleService.deactivateVehicle(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/{id}/timeline")
+    public ResponseEntity<com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse> getVehicleTimeline(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long requestingCustomerId,
+            @RequestParam(required = false, defaultValue = "STAFF") String role) {
+        return ResponseEntity.ok(vehicleService.getVehicleTimeline(id, requestingCustomerId, role));
+    }
+
+    @GetMapping("/plate/{plate}/timeline")
+    public ResponseEntity<com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse> getVehicleTimelineByPlate(
+            @PathVariable String plate,
+            @RequestParam(required = false) Long requestingCustomerId,
+            @RequestParam(required = false, defaultValue = "STAFF") String role) {
+        return ResponseEntity.ok(vehicleService.getVehicleTimelineByPlate(plate, requestingCustomerId, role));
+    }
 }

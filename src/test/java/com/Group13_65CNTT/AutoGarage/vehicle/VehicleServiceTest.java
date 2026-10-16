@@ -160,4 +160,42 @@ class VehicleServiceTest {
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> vehicleService.transferOwnership(100L, transferReq));
         assertTrue(ex.getMessage().contains("hiện đã thuộc về khách hàng"));
     }
+
+    @Test
+    @DisplayName("TV2-09: Tra cứu timeline phương tiện thành công với vai trò nhân viên")
+    void testGetVehicleTimeline_StaffRole() {
+        Vehicle existing = new Vehicle();
+        existing.setId(100L);
+        existing.setCustomerId(10L);
+        existing.setLicensePlate("51F12345");
+        existing.setBrand("Toyota");
+        existing.setModel("Corolla Cross");
+        existing.setOdometer(20000);
+
+        when(vehicleRepository.findById(100L)).thenReturn(Optional.of(existing));
+        when(customerRepository.findById(10L)).thenReturn(Optional.of(owner));
+
+        com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse timeline =
+                vehicleService.getVehicleTimeline(100L, null, "STAFF");
+
+        assertNotNull(timeline);
+        assertEquals(100L, timeline.getVehicleId());
+        assertEquals("51F12345", timeline.getLicensePlate());
+        assertEquals("Tran Van Chu Xe", timeline.getCurrentCustomerName());
+    }
+
+    @Test
+    @DisplayName("TV2-09: Chặn khách hàng xem lịch sử xe của người khác (BR02)")
+    void testGetVehicleTimeline_DenyOtherCustomer() {
+        Vehicle existing = new Vehicle();
+        existing.setId(100L);
+        existing.setCustomerId(10L);
+
+        when(vehicleRepository.findById(100L)).thenReturn(Optional.of(existing));
+
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () ->
+                vehicleService.getVehicleTimeline(100L, 999L, "CUSTOMER"));
+
+        assertTrue(ex.getMessage().contains("không có quyền truy cập"));
+    }
 }

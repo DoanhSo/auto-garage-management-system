@@ -22,4 +22,8 @@ public interface VehicleService {
     VehicleResponse transferOwnership(Long vehicleId, TransferOwnershipRequest request);
 
     void deactivateVehicle(Long id);
+
+    com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse getVehicleTimeline(Long vehicleId, Long requestingCustomerId, String userRole);
+
+    com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse getVehicleTimelineByPlate(String plate, Long requestingCustomerId, String userRole);
 }

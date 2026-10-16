@@ -166,6 +166,44 @@ public class VehicleServiceImpl implements VehicleService {
         vehicleRepository.save(vehicle);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse getVehicleTimeline(Long vehicleId, Long requestingCustomerId, String userRole) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + vehicleId));
+        return buildTimeline(vehicle, requestingCustomerId, userRole);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse getVehicleTimelineByPlate(String plate, Long requestingCustomerId, String userRole) {
+        String normalizedPlate = normalizePlate(plate);
+        Vehicle vehicle = vehicleRepository.findByLicensePlate(normalizedPlate)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với biển số: " + plate));
+        return buildTimeline(vehicle, requestingCustomerId, userRole);
+    }
+
+    private com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse buildTimeline(Vehicle vehicle, Long requestingCustomerId, String userRole) {
+        if ("CUSTOMER".equalsIgnoreCase(userRole)) {
+            if (requestingCustomerId == null || !requestingCustomerId.equals(vehicle.getCustomerId())) {
+                throw new BusinessRuleException("Bạn không có quyền truy cập lịch sử của phương tiện này (BR02)");
+            }
+        }
+
+        Customer currentOwner = customerRepository.findById(vehicle.getCustomerId()).orElse(null);
+
+        com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse timeline = new com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse();
+        timeline.setVehicleId(vehicle.getId());
+        timeline.setLicensePlate(vehicle.getLicensePlate());
+        timeline.setBrand(vehicle.getBrand());
+        timeline.setModel(vehicle.getModel());
+        timeline.setCurrentOdometer(vehicle.getOdometer());
+        timeline.setCurrentCustomerId(vehicle.getCustomerId());
+        timeline.setCurrentCustomerName(currentOwner != null ? currentOwner.getFullName() : null);
+
+        return timeline;
+    }
+
     private String normalizePlate(String plate) {
         if (plate == null) {
             return "";

@@ -180,7 +180,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-09 Tra cứu lịch sử xe
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (VehicleTimelineResponse, phân quyền chủ mới ẩn tài chính chủ cũ theo BR04, Unit Tests UC38).
 - **Module/mốc:** M03 / G5.
 - **Đầu ra:** UC38; UI cây lịch sử, dữ liệu kỹ thuật/hóa đơn/bảo hành theo quyền.
 - **Phụ thuộc:** TV2-03, TV4-06, TV3-10.
@@ -188,7 +188,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-10 Kiểm thử và bàn giao phân hệ tiếp nhận
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (TV2ReceptionIntegrationTest kiểm thử liên thông 100% đạt 34/34 test cases, tài liệu bàn giao RECEPTION_MODULE_API.md).
 - **Module/mốc:** M05 / G5.
 - **Đầu ra:** Test UC04–09/38, xử lý 403/409, tài liệu API tiếp nhận.
 - **Phụ thuộc:** TV2-06, TV2-08, TV2-09.
