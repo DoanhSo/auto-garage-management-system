@@ -148,7 +148,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-05 Đặt lịch hẹn
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Entity, Repository, Service, Controller, Unit Tests UC07, tích hợp hợp đồng I02 giữ khoang).
 - **Module/mốc:** M05 / G2.
 - **Đầu ra:** API/UI lịch hẹn; một dịch vụ chính; gọi I02 để giữ khoang.
 - **Phụ thuộc:** TV2-02, TV2-04, TV3-02.
@@ -156,7 +156,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-06 Xác nhận dời hủy lịch
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (State transition PENDING/CONFIRMED/CANCELLED/NO_SHOW, dời lịch, hủy lịch, giải phóng khoang I02, Unit Tests UC08).
 - **Module/mốc:** M05 / G2.
 - **Đầu ra:** State transition, optimistic version, gọi I02 giải phóng khoang.
 - **Phụ thuộc:** TV2-05, TV3-02.
