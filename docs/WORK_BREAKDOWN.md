@@ -172,7 +172,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-08 Checklist và ảnh bằng chứng
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (VehicleCheck & Attachment entities, repos, services, controllers, upload an toàn sha256 & storageKey, Unit Tests BR16).
 - **Module/mốc:** M05 / G2.
 - **Đầu ra:** Service lưu vehicle_checks/attachments, JSON schema, upload/download có quyền.
 - **Phụ thuộc:** TV2-07, TV1-04.
