@@ -164,7 +164,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-07 Tiếp nhận xe
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (CheckInVehicleRequest/Response, Service, Controller, Unit Tests UC09, cập nhật booking RECEIVED, gọi I03 RepairWorkflow).
 - **Module/mốc:** M05 / G2.
 - **Đầu ra:** UI tiếp nhận; gọi I03 tạo phiếu; đổi booking thành RECEIVED.
 - **Phụ thuộc:** TV2-02, TV3-03.
