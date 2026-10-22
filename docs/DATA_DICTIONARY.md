@@ -1,8 +1,8 @@
 # Từ điển cột của schema khởi tạo
 
-Trích từ information_schema trên MySQL 8.4 sau khi Flyway áp dụng V1–V4 ngày 14/10/2026. Gồm 30 bảng, 423 cột, kể cả hai cột generated. Đây là thiết kế khởi tạo đã thực thi, không phải danh sách 373 cột chưa có trong phần thân báo cáo nguồn.
+Schema V1–V8, cập nhật ngày 15/10/2026: 30 bảng, 431 cột, kể cả hai cột generated. V6/V7 thêm audit metadata cho users/notifications; V8 thêm users.deleted_at; SQL và metadata MySQL là nguồn thực thi.
 
-Các FK/CHECK/index xem trực tiếp bốn file SQL trong `src/main/resources/db/migration`. `DEFAULT <none>` nghĩa là không có default ghi nhận trong metadata hoặc default NULL; đọc NULL/NOT NULL đi kèm. Generated column chỉ đọc từ JPA.
+Các FK/CHECK/index xem trực tiếp tám file SQL trong `src/main/resources/db/migration`. `DEFAULT <none>` nghĩa là không có default ghi nhận trong metadata hoặc default NULL; đọc NULL/NOT NULL đi kèm. Generated column chỉ đọc từ JPA.
 
 
 ## attachments
@@ -282,6 +282,10 @@ Các FK/CHECK/index xem trực tiếp bốn file SQL trong `src/main/resources/d
 - `sent_at`: `datetime(6)`; NULL; DEFAULT `<none>`.
 - `read_at`: `datetime(6)`; NULL; DEFAULT `<none>`.
 - `created_at`: `datetime(6)`; NOT NULL; DEFAULT `CURRENT_TIMESTAMP(6)`; DEFAULT_GENERATED.
+- `updated_at`: `datetime(6)`; NOT NULL; DEFAULT CURRENT_TIMESTAMP(6), ON UPDATE; V7.
+- `created_by`: `bigint`; NULL; V7.
+- `updated_by`: `bigint`; NULL; V7.
+- `version`: `bigint`; NOT NULL; DEFAULT 0; V7 optimistic locking.
 
 ## parts
 
@@ -446,10 +450,14 @@ Các FK/CHECK/index xem trực tiếp bốn file SQL trong `src/main/resources/d
 - `full_name`: `varchar(150)`; NOT NULL; DEFAULT `<none>`.
 - `role`: `varchar(30)`; NOT NULL; DEFAULT `<none>`.
 - `is_active`: `tinyint(1)`; NOT NULL; DEFAULT `1`.
+- `deleted_at`: `datetime(6)`; NULL; DEFAULT NULL; V8, tài khoản đã xóa phải có is_active=FALSE.
 - `last_login_at`: `datetime(6)`; NULL; DEFAULT `<none>`.
 - `created_at`: `datetime(6)`; NOT NULL; DEFAULT `CURRENT_TIMESTAMP(6)`; DEFAULT_GENERATED.
 - `updated_at`: `datetime(6)`; NOT NULL; DEFAULT `CURRENT_TIMESTAMP(6)`; DEFAULT_GENERATED on update CURRENT_TIMESTAMP(6).
 - `version`: `bigint`; NOT NULL; DEFAULT `0`.
+- `auth_version`: `bigint`; NOT NULL; DEFAULT `0`; V5, CHECK >= 0; thu hồi JWT khi thay quyền/active/password/logout.
+- `created_by`: `bigint`; NULL; V6, actor tạo tài khoản.
+- `updated_by`: `bigint`; NULL; V6, actor cập nhật gần nhất.
 
 ## vehicle_checks
 

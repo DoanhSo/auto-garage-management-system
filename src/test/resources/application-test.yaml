@@ -3,3 +3,25 @@ spring:
     url: ${TEST_DB_URL:jdbc:mysql://localhost:3308/autogarage_test?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
     username: ${TEST_DB_USERNAME:autogarage}
     password: ${TEST_DB_PASSWORD:autogarage_test}
+
+security:
+  auth:
+    issuer: http://localhost:8081/realms/autogarage-test
+    audience: autogarage-test-api
+    clock-skew: 0s
+    allowed-origins: http://localhost:5173
+  bootstrap:
+    enabled: false
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+garage:
+  notification:
+    worker-enabled: false
+    reminders-enabled: false
+    email-enabled: false
+    sms-enabled: false

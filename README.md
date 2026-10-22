@@ -1,52 +1,43 @@
 # AutoGarage
 
-Khung hệ thống quản lý gara một chi nhánh. Backend giữ Spring Boot 4.1.1 và Java 21 từ dự án ban đầu; MySQL 8.4 dùng Flyway V1–V4. Frontend đã chia thư mục cho React/TypeScript, chưa khởi tạo ứng dụng chạy được. Chức năng nghiệp vụ đang ở mức phân công và hợp đồng interface.
+Hệ thống quản lý gara một chi nhánh, Java 21/Spring Boot 4.1.1/MySQL 8.4 tích hợp **Keycloak 26 IAM (OIDC / OAuth 2.0 / RS256)** và PostgreSQL 16 riêng cho Keycloak. Backend TV1 theo kiến trúc 7 tầng: `common`, `auth`, `identity`, `audit`, `notification` và `reporting`.
 
-## Tài liệu làm việc
+## Cấu trúc và tài liệu
 
-- [Phân công 42 đầu việc cho TV1–TV4](docs/WORK_BREAKDOWN.md): module, đầu ra, phụ thuộc và tiêu chí nghiệm thu.
-- [Cấu trúc dự án](docs/ARCHITECTURE.md): 14 module, phân lớp và quyền sở hữu dữ liệu.
-- [Tám hợp đồng service I01–I08](docs/SERVICE_CONTRACTS.md): chữ ký, transaction và quy tắc tích hợp.
-- [Thiết kế database và quyết định bổ sung](docs/DATABASE.md).
-- [Từ điển cột thực tế](docs/DATA_DICTIONARY.md).
-- [Kế hoạch T01–T38](docs/ACCEPTANCE_TESTS.md): các kịch bản nghiệm thu nghiệp vụ theo báo cáo.
+- [Quy chuẩn viết code](docs/CODING_GUIDELINES.md): 7 tầng, Lombok, MapStruct, JPA, Service/ServiceImpl, Swagger, RBAC, transaction và kiểm thử.
+- [Kiến trúc thực tế](docs/ARCHITECTURE.md), [phân công TV1–TV4](docs/WORK_BREAKDOWN.md), [kế hoạch/trạng thái TV1](docs/TV1_IMPLEMENTATION_PLAN.md).
+- [API auth/tài khoản (Keycloak OIDC Resource Server)](docs/api/SECURITY.md), [API audit/notification/report và I08](docs/api/TV1.md).
+- [Database](docs/DATABASE.md), [data dictionary](docs/DATA_DICTIONARY.md), [I01–I08](docs/SERVICE_CONTRACTS.md), [T01–T38](docs/ACCEPTANCE_TESTS.md).
+- [Kết quả kiểm chứng thực tế](docs/VALIDATION.md).
 
-## Chạy backend trên Windows PowerShell
+## Chạy local trên PowerShell
 
-Thực hiện trong thư mục chứa `pom.xml` (thư mục `AutoGarage` bên trong workspace). Cần JDK 21 và Docker đang chạy.
+Từ thư mục chứa `pom.xml`; cần JDK 21 và Docker đang chạy:
 
 ```powershell
-docker compose up -d --wait mysql
+.\scripts\initialize-local-env.ps1 -WithBootstrapAdministrator
+. .\scripts\import-local-env.ps1
+docker compose up -d --wait mysql keycloak-postgres keycloak
 .\mvnw.cmd spring-boot:run
 ```
 
-MySQL local dùng cổng 3307, database `autogarage`, user `autogarage`, password `autogarage_local`. Backend chạy cổng 8080; Flyway tự áp dụng migrations khi khởi động. Spring Security hiện vẫn dùng cấu hình mặc định của starter; API đăng nhập/role nghiệp vụ chưa được triển khai.
+Script tạo secret ngẫu nhiên trong `.env` riêng và không ghi đè file đã có. Dịch vụ `keycloak` tự động nạp cấu hình realm từ [`docker/keycloak/realm-export.json`](docker/keycloak/realm-export.json) (`autogarage-realm`, 5 roles, `autogarage-frontend` với PKCE S256 & Refresh Token Rotation, `autogarage-api` Resource Server).
 
-Có thể dùng `mvn` nếu đã cài Maven. Nếu đổi mật khẩu/cổng Compose, phải đồng thời đặt biến môi trường cho Spring Boot:
+Backend cổng 8080, MySQL local 3307, Keycloak cổng 8081. Swagger UI `/swagger-ui/index.html` và JSON `/v3/api-docs` khi `OPENAPI_ENABLED=true`. Client xác thực OIDC với Keycloak để nhận cặp Access Token + Refresh Token (RS256), sau đó gửi `Authorization: Bearer <access_token>` tới Backend.
 
-```powershell
-$env:DB_URL='jdbc:mysql://localhost:3307/autogarage?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true'
-$env:DB_USERNAME='autogarage'
-$env:DB_PASSWORD='mat_khau_local_cua_ban'
-.\mvnw.cmd spring-boot:run
-```
+JSON thống nhất `code` số, `message`, `success`, `data`, `timestamp`, `path`. Admin create user 201; logout/deactivate trả 200 có envelope. List trả Spring Page trong `data.content`/`totalElements`.
 
-`.env.example` là ví dụ cho Compose; file `.env` không tự được Spring Boot đọc. Các thông tin mặc định chỉ dùng local. Database cần được tạo trước; migrations không tạo user/database.
-
-## Kiểm thử schema trên database riêng
+## Kiểm thử
 
 ```powershell
+.\scripts\initialize-local-env.ps1
+. .\scripts\import-local-env.ps1
 docker compose --profile test up -d --wait mysql-test
 .\mvnw.cmd test
+.\mvnw.cmd -DskipTests package
 docker compose stop mysql-test
 ```
 
-Profile test dùng cổng 3308 và database `autogarage_test`. Có thể đổi bằng `TEST_DB_URL`, `TEST_DB_USERNAME`, `TEST_DB_PASSWORD`. Tests ghi fixtures và rollback sau từng bài; Flyway vẫn khởi tạo schema test. Không dùng database nghiệp vụ để chạy test.
+H2 integration dùng profile `h2` riêng, tự chạy trong suite. MySQL test cổng 3308/DB `autogarage_test`. Test tự động khởi tạo loopback JWKS endpoint và cặp khóa RSA 2048-bit (`RS256`) trong JVM để kiểm chứng toàn bộ đường đi của `NimbusJwtDecoder` mà không phụ thuộc mạng ngoài.
 
-`AutoGarageApplicationTests` kiểm tra context. `MigrationSchemaTests` kiểm tra 30 bảng, hai view, bốn phiên bản, FK/CHECK/UNIQUE, timer, thợ chính, tồn kho, nguồn thanh toán, chống post trùng, thông báo và công nợ nhiều lần thu/chi. Hiện có 17 bài tự động; kế hoạch T01–T38 là công việc cho giai đoạn triển khai, chưa được chạy như test nghiệp vụ.
-
-## Quy ước migrations
-
-V1 tạo 12 bảng nền tảng/danh mục; V2 tạo 9 bảng điều phối/sửa chữa; V3 tạo 9 bảng kho/tài chính/bảo hành; V4 hoàn thiện liên kết vòng và hai view. Có đúng 30 bảng nghiệp vụ, thêm `flyway_schema_history` do Flyway tự tạo. Không có seed tài khoản/password trong migrations.
-
-Sau khi áp dụng chung, không sửa V1–V4; thay đổi mới dùng V5 trở lên. Không dùng Hibernate để tạo schema, không bật baseline tự động, không chạy Flyway clean trên dữ liệu đã có.
+V1–V9 quản lý toàn bộ schema nghiệp vụ qua Flyway (`V9__add_keycloak_identity_id.sql` bổ sung `identity_id` UNIQUE liên kết Keycloak `sub` UUID và cho phép `password_hash` nullable).

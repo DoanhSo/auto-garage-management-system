@@ -2,9 +2,9 @@ spring:
   application:
     name: AutoGarage
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3307/autogarage?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
-    username: ${DB_USERNAME:autogarage}
-    password: ${DB_PASSWORD:autogarage_local}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -17,6 +17,70 @@ spring:
       ddl-auto: validate
     properties:
       hibernate.jdbc.time_zone: UTC
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:true}
+      mail.smtp.connectiontimeout: ${SMTP_CONNECT_TIMEOUT_MS:5000}
+      mail.smtp.timeout: ${SMTP_READ_TIMEOUT_MS:10000}
+      mail.smtp.writetimeout: ${SMTP_WRITE_TIMEOUT_MS:10000}
 
 server:
   port: ${SERVER_PORT:8080}
+
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_ENABLED:false}
+  swagger-ui:
+    enabled: ${OPENAPI_ENABLED:false}
+
+security:
+  auth:
+    issuer: ${KEYCLOAK_ISSUER_URI}
+    audience: ${AUTH_JWT_AUDIENCE}
+    jwk-set-uri: ${KEYCLOAK_JWKS_URI}
+    clock-skew: ${AUTH_JWT_CLOCK_SKEW:0s}
+    allowed-origins: ${AUTH_CORS_ORIGINS:}
+    cors-max-age: ${AUTH_CORS_MAX_AGE:1h}
+  password:
+    min-length: ${AUTH_PASSWORD_MIN_LENGTH:12}
+  bootstrap:
+    enabled: ${AUTH_BOOTSTRAP_ENABLED:false}
+    username: ${AUTH_BOOTSTRAP_USERNAME:}
+    full-name: ${AUTH_BOOTSTRAP_FULL_NAME:}
+    identity-id: ${AUTH_BOOTSTRAP_IDENTITY_ID:}
+
+garage:
+  pagination:
+    default-size: ${PAGINATION_DEFAULT_SIZE:20}
+    max-size: ${PAGINATION_MAX_SIZE:100}
+    max-page: ${PAGINATION_MAX_PAGE:100000}
+  report:
+    max-period: ${REPORT_MAX_PERIOD:366d}
+  notification:
+    worker-enabled: ${NOTIFICATION_WORKER_ENABLED:false}
+    reminders-enabled: ${NOTIFICATION_REMINDERS_ENABLED:false}
+    batch-size: ${NOTIFICATION_BATCH_SIZE:20}
+    max-attempts: ${NOTIFICATION_MAX_ATTEMPTS:3}
+    lease: ${NOTIFICATION_LEASE:2m}
+    retry-delay: ${NOTIFICATION_RETRY_DELAY:5m}
+    zone: ${GARAGE_TIME_ZONE:Asia/Bangkok}
+    reminder-days: ${NOTIFICATION_REMINDER_DAYS:15}
+    email-enabled: ${NOTIFICATION_EMAIL_ENABLED:false}
+    email-from: ${NOTIFICATION_EMAIL_FROM:}
+    sms-enabled: ${NOTIFICATION_SMS_ENABLED:false}
+    sms-url: ${SMS_GATEWAY_URL:}
+    sms-token: ${SMS_GATEWAY_TOKEN:}
+    connect-timeout: ${NOTIFICATION_CONNECT_TIMEOUT:5s}
+    request-timeout: ${NOTIFICATION_REQUEST_TIMEOUT:10s}
+    poll-delay: ${NOTIFICATION_POLL_DELAY:5s}
+    reminder-cron: ${NOTIFICATION_REMINDER_CRON:0 0 8 * * *}
+    reminder-max-batches: ${NOTIFICATION_REMINDER_MAX_BATCHES:100}
+    default-subject: ${NOTIFICATION_DEFAULT_SUBJECT:AutoGarage notification}

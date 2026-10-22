@@ -6,10 +6,8 @@ import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class AutoGarageApplicationTests {
+class AutoGarageApplicationTests extends IntegrationTestSupport {
 
-	@Test
-	void contextLoads() {
-	}
-
+    @Test
+    void contextLoads() {}
 }

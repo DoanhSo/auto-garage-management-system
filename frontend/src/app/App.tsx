@@ -1,0 +1,165 @@
+import { Component, Suspense, lazy, type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createBrowserRouter,
+  Link,
+  Navigate,
+  Outlet,
+  RouterProvider,
+  useLocation,
+  useRouteError,
+} from 'react-router-dom';
+import { AuthProvider, useAuth } from './providers/AuthProvider';
+import { ToastProvider } from './providers/ToastProvider';
+import { AppShell } from './layouts/AppShell';
+import { Button, Loading } from '../shared/components/ui';
+import { retryQuery } from '../shared/api/errors';
+const LoginPage = lazy(() =>
+  import('../features/auth/pages/LoginPage').then((module) => ({
+    default: module.LoginPage,
+  })),
+);
+const AccountPage = lazy(() =>
+  import('../features/auth/pages/AccountPage').then((module) => ({
+    default: module.AccountPage,
+  })),
+);
+const UsersPage = lazy(() =>
+  import('../features/identity/pages/UsersPage').then((module) => ({
+    default: module.UsersPage,
+  })),
+);
+const AuditPage = lazy(() =>
+  import('../features/audit/pages/AuditPage').then((module) => ({
+    default: module.AuditPage,
+  })),
+);
+const NotificationsPage = lazy(() =>
+  import('../features/notification/pages/NotificationsPage').then((module) => ({
+    default: module.NotificationsPage,
+  })),
+);
+const ReportsPage = lazy(() =>
+  import('../features/reporting/pages/ReportsPage').then((module) => ({
+    default: module.ReportsPage,
+  })),
+);
+export function RequireAuth() {
+  const { user } = useAuth();
+  const location = useLocation();
+  return user ? (
+    <Outlet />
+  ) : (
+    <Navigate to="/login" replace state={{ returnTo: location.pathname + location.search }} />
+  );
+}
+export function RequireAdmin() {
+  const { user } = useAuth();
+  return user?.role === 'ADMIN' ? <Outlet /> : <Navigate to="/403" replace />;
+}
+function Home() {
+  const { user } = useAuth();
+  return <Navigate to={user?.role === 'ADMIN' ? '/admin/reports' : '/notifications'} replace />;
+}
+function StatusPage({ forbidden = false }: { forbidden?: boolean }) {
+  return (
+    <div className="status-page">
+      <p className="eyebrow">{forbidden ? '403 · GIỚI HẠN TRUY CẬP' : '404 · KHÔNG TÌM THẤY'}</p>
+      <h1>{forbidden ? 'Bạn chưa có quyền truy cập' : 'Trang này không tồn tại'}</h1>
+      <p>
+        {forbidden
+          ? 'Liên hệ quản trị viên nếu bạn cần quyền cho công việc này.'
+          : 'Kiểm tra lại địa chỉ hoặc quay về không gian làm việc.'}
+      </p>
+      <Link className="button button-primary" to="/">
+        Về trang chính
+      </Link>
+    </div>
+  );
+}
+function RouteError() {
+  useRouteError();
+  return (
+    <div className="status-page">
+      <h1>Chưa thể mở trang</h1>
+      <p>Đã xảy ra lỗi hiển thị. Hãy thử tải lại trang.</p>
+      <Button onClick={() => window.location.reload()}>Tải lại</Button>
+    </div>
+  );
+}
+class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? (
+      <div className="status-page">
+        <h1>Ứng dụng cần được tải lại</h1>
+        <p>Không thể hiển thị nội dung hiện tại.</p>
+        <Button onClick={() => window.location.reload()}>Tải lại</Button>
+      </div>
+    ) : (
+      this.props.children
+    );
+  }
+}
+const router = createBrowserRouter([
+  {
+    errorElement: <RouteError />,
+    children: [
+      { path: '/login', element: <LoginPage /> },
+      {
+        element: <RequireAuth />,
+        children: [
+          {
+            element: <AppShell />,
+            children: [
+              { index: true, element: <Home /> },
+              { path: 'notifications', element: <NotificationsPage /> },
+              { path: 'account/security', element: <AccountPage /> },
+              {
+                element: <RequireAdmin />,
+                children: [
+                  { path: 'admin/users', element: <UsersPage /> },
+                  { path: 'admin/audit', element: <AuditPage /> },
+                  { path: 'admin/reports', element: <ReportsPage /> },
+                ],
+              },
+              { path: '403', element: <StatusPage forbidden /> },
+              { path: '*', element: <StatusPage /> },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+]);
+const client = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 15000,
+      retry: retryQuery,
+      refetchOnWindowFocus: true,
+    },
+    mutations: { retry: 0 },
+  },
+});
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={client}>
+        <AuthProvider>
+          <ToastProvider>
+            <a className="skip-link" href="#main-content">
+              Đến nội dung chính
+            </a>
+            <Suspense fallback={<Loading label="Đang mở không gian làm việc…" />}>
+              <RouterProvider router={router} />
+            </Suspense>
+          </ToastProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+}
