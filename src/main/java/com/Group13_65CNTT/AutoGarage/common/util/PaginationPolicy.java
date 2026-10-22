@@ -1,6 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.common.util;
 
 import com.Group13_65CNTT.AutoGarage.common.config.PaginationProperties;
+import com.Group13_65CNTT.AutoGarage.common.constant.UserQueryConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 
@@ -30,8 +31,10 @@ public class PaginationPolicy {
 
     public PageRequest page(
             int page, int size, String sortBy, String sortDir, Set<String> allowedFields) {
-        if (!allowedFields.contains(sortBy)
-                || !("asc".equalsIgnoreCase(sortDir) || "desc".equalsIgnoreCase(sortDir))) {
+        if (sortBy == null
+                || !allowedFields.contains(sortBy)
+                || !(UserQueryConstants.SORT_ASC.equalsIgnoreCase(sortDir)
+                        || UserQueryConstants.SORT_DESC.equalsIgnoreCase(sortDir))) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
         return page(page, size, Sort.by(Sort.Direction.fromString(sortDir), sortBy));
@@ -42,5 +45,14 @@ public class PaginationPolicy {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
         page(pageable.getPageNumber(), pageable.getPageSize(), pageable.getSort());
+    }
+
+    public void validate(Pageable pageable, Set<String> allowedFields) {
+        validate(pageable);
+        for (Sort.Order order : pageable.getSort()) {
+            if (!allowedFields.contains(order.getProperty())) {
+                throw new BusinessException(ResponseCode.BAD_REQUEST);
+            }
+        }
     }
 }
