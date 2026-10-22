@@ -38,6 +38,7 @@ Giữ package gara, Java 21/Spring Boot 4.1.1 và năm role gara. Auth dùng Ent
 ## Repository và Service
 
 - Repository @Repository extends JpaRepository<Entity,Long>; find trả Optional, exists dùng derived query, search JPQL với keyword/filter/Pageable.
+- Giá trị từ request phải bind bằng JPA derived query, @Query với @Param hoặc PreparedStatement/NamedParameterJdbcTemplate nếu có adapter JDBC; không nối chuỗi, format/interpolate dữ liệu người dùng vào SQL/JPQL. Tên bảng/cột, biểu thức ORDER BY và chiều sort không lấy trực tiếp từ request: ánh xạ/allowlist tại boundary, kiểm tra lại Pageable trong service khi nhận sort động. Không dùng JpaSort.unsafe với dữ liệu người dùng. Không thay parameter binding bằng xóa dấu nháy hoặc blacklist từ khóa SQL; chuỗi hợp lệ chứa dấu nháy vẫn được lưu/tìm như dữ liệu. CONCAT trong một truy vấn cố định với tham số bind chỉ tạo giá trị tìm kiếm, không xây dựng mã SQL.
 - Native query dành cho projection liên module/view và chức năng đặc thù MySQL; không tự mutation dữ liệu module khác. Không query trong vòng lặp nếu có thể batch.
 - Service interface và service/impl; @Service, @Slf4j, @RequiredArgsConstructor, dependency private final; không field injection.
 - Read @Transactional(readOnly=true), mutation @Transactional; transaction boundary ở ServiceImpl. Khóa theo thứ tự thống nhất và re-read sau khi chờ; version/UNIQUE bảo vệ race.

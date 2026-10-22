@@ -4,20 +4,24 @@ import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.Group13_65CNTT.AutoGarage.common.config.AuthProperties;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
 import com.Group13_65CNTT.AutoGarage.notification.dto.request.NotificationCreateRequest;
 import com.Group13_65CNTT.AutoGarage.notification.service.*;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.NotificationAudit;
 
 import jakarta.persistence.EntityManager;
 
+import lombok.RequiredArgsConstructor;
+
 import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.*;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,51 +36,45 @@ import java.util.Map;
 @AutoConfigureMockMvc
 @Transactional
 @DisplayName("TV1 HTTP, notification, report and replay integration on MySQL")
+@RequiredArgsConstructor
 class TV1IntegrationTests extends IntegrationTestSupport {
-    @Autowired MockMvc mvc;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired PasswordEncoder encoder;
-    @Autowired ObjectMapper json;
-    @Autowired EntityManager entities;
-    @Autowired NotificationService notifications;
-    @Autowired ReminderService reminders;
-    @Autowired NotificationAudit replay;
-    private static final String PASSWORD = "TV1Integration!123";
+    private final MockMvc mvc;
+    private final JdbcTemplate jdbc;
+    private final ObjectMapper json;
+    private final EntityManager entities;
+    private final UserRepository users;
+    private final AuthProperties authProperties;
+    private final NotificationService notifications;
+    private final ReminderService reminders;
+    private final NotificationAudit replay;
 
     @BeforeEach
     void fixture() {
-        String hash = encoder.encode(PASSWORD);
         jdbc.update(
-                "INSERT INTO users(id,username,password_hash,full_name,role)"
-                    + " VALUES(960001,'tv1.admin',?,'Admin','ADMIN'),(960002,'tv1.customer',?,'Customer','CUSTOMER')",
-                hash,
-                hash);
+                "INSERT INTO users(id,identity_id,username,full_name,role)"
+                    + " VALUES(960001,'550e8400-e29b-41d4-a716-446655960001','tv1.admin','Admin','ADMIN'),"
+                    + "(960002,'550e8400-e29b-41d4-a716-446655960002','tv1.customer','Customer','CUSTOMER')");
     }
 
     @Test
     void responseHasTheExactArchitectureEnvelopeAndNumericCodes() throws Exception {
-        perform(
-                        post("/api/v1/auth/login")
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        json.writeValueAsString(
-                                                Map.of(
-                                                        "identifier",
-                                                        "tv1.customer",
-                                                        "password",
-                                                        PASSWORD))))
+        String customer = token("tv1.customer");
+        perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + customer))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(1000))
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.user.id").value(960002))
+                .andExpect(jsonPath("$.data.id").value(960002))
+                .andExpect(
+                        jsonPath("$.data.identityId")
+                                .value("550e8400-e29b-41d4-a716-446655960002"))
                 .andExpect(jsonPath("$.timestamp").isNotEmpty())
-                .andExpect(jsonPath("$.path").value("/api/v1/auth/login"))
+                .andExpect(jsonPath("$.path").value("/api/v1/auth/me"))
                 .andExpect(jsonPath("$.result").doesNotExist());
     }
 
     @Test
     void notificationsAreDeduplicatedPrivateAndReadIdempotently() throws Exception {
-        String admin = login("tv1.admin"), customer = login("tv1.customer");
+        String admin = token("tv1.admin"), customer = token("tv1.customer");
         String payload =
                 json.writeValueAsString(
                         Map.of(
@@ -149,7 +147,7 @@ class TV1IntegrationTests extends IntegrationTestSupport {
 
     @Test
     void dashboardAndCsvAreAdminOnlyAndPeriodValidated() throws Exception {
-        String admin = login("tv1.admin"), customer = login("tv1.customer");
+        String admin = token("tv1.admin"), customer = token("tv1.customer");
         String from = "2026-10-01T00:00:00Z", until = "2026-11-01T00:00:00Z";
         perform(
                         get("/api/v1/reports/dashboard")
@@ -181,11 +179,16 @@ class TV1IntegrationTests extends IntegrationTestSupport {
 
     @Test
     void auditQueryDoesNotExposeReplayDataAndRejectsCustomer() throws Exception {
-        String admin = login("tv1.admin"), customer = login("tv1.customer");
+        String admin = token("tv1.admin"), customer = token("tv1.customer");
+        perform(post("/api/v1/auth/logout").header("Authorization", "Bearer " + customer))
+                .andExpect(status().isOk());
         perform(get("/api/v1/admin/audit-events").header("Authorization", "Bearer " + admin))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].requestHash").doesNotExist());
-        perform(get("/api/v1/admin/audit-events").header("Authorization", "Bearer " + customer))
+        String newCustomerToken = token("tv1.customer");
+        perform(
+                        get("/api/v1/admin/audit-events")
+                                .header("Authorization", "Bearer " + newCustomerToken))
                 .andExpect(status().isForbidden());
     }
 
@@ -200,7 +203,7 @@ class TV1IntegrationTests extends IntegrationTestSupport {
 
     @Test
     void userSearchFiltersAndSortAllowlistAreEnforced() throws Exception {
-        String admin = login("tv1.admin");
+        String admin = token("tv1.admin");
         perform(
                         get("/api/v1/admin/users")
                                 .param("keyword", "customer")
@@ -217,11 +220,144 @@ class TV1IntegrationTests extends IntegrationTestSupport {
                 .andExpect(status().isBadRequest());
     }
 
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "' OR 1=1 --", "%' OR 1=1 --", "' UNION SELECT 1 --", "'; DROP TABLE users; --"
+            })
+    void sqlFragmentsAreBoundAsDataInTokenSubjectUserSearchAndAuditFilter(String input)
+            throws Exception {
+        String admin = token("tv1.admin");
+        String injectedToken =
+                issueKeycloakToken(authProperties, input, input, "CUSTOMER", 0L);
+        perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + injectedToken))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(3003));
+        perform(
+                        get("/api/v1/admin/users")
+                                .param("keyword", input)
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+        perform(
+                        get("/api/v1/admin/audit-events")
+                                .param("action", input)
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM users WHERE id IN (?, ?)",
+                                Integer.class,
+                                960001,
+                                960002))
+                .isEqualTo(2);
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "id desc; DROP TABLE users; --",
+                "username) OR 1=1 --",
+                "LENGTH(username)",
+                "passwordHash"
+            })
+    void rejectsInjectedSortPropertiesWithControlledBadRequest(String property) throws Exception {
+        String admin = token("tv1.admin");
+        perform(
+                        get("/api/v1/admin/users")
+                                .param("sortBy", property)
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(2004));
+        perform(
+                        get("/api/v1/admin/users")
+                                .param("sortDir", "asc; DROP TABLE users; --")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(2004));
+        perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void quotedProfileDataCanBeStoredAndSearchedWithoutBroadeningResults() throws Exception {
+        String admin = token("tv1.admin");
+        String fullName = "O'Brien ' OR 1=1 --";
+        perform(
+                        post("/api/v1/admin/users")
+                                .header("Authorization", "Bearer " + admin)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        json.writeValueAsString(
+                                                Map.of(
+                                                        "username", "tv1.quoted",
+                                                        "fullName", fullName,
+                                                        "role", "CUSTOMER"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.fullName").value(fullName));
+        perform(
+                        get("/api/v1/admin/users")
+                                .param("keyword", "O'Brien")
+                                .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].username").value("tv1.quoted"))
+                .andExpect(jsonPath("$.data.content[0].fullName").value(fullName));
+    }
+
+    @Test
+    void nativeNotificationInsertBindsQuotedEventSubjectAndJsonWithoutExecutingThem()
+            throws Exception {
+        String admin = token("tv1.admin"), customer = token("tv1.customer");
+        String subject = "Notice '); DROP TABLE users; --";
+        String eventKey = "tv1.notice' OR 1=1 --";
+        String payload = json.writeValueAsString(Map.of("text", subject));
+        perform(
+                        post("/api/v1/notifications")
+                                .header("Authorization", "Bearer " + admin)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(
+                                        json.writeValueAsString(
+                                                Map.of(
+                                                        "userId", 960002,
+                                                        "eventKey", eventKey,
+                                                        "channel", "WEB",
+                                                        "destination", "web",
+                                                        "subject", subject,
+                                                        "payloadJson", payload))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subject").value(subject));
+        var response =
+                perform(get("/api/v1/notifications").header("Authorization", "Bearer " + customer))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.data.totalElements").value(1))
+                        .andExpect(jsonPath("$.data.content[0].subject").value(subject))
+                        .andReturn();
+        String storedPayload =
+                json.readTree(response.getResponse().getContentAsString())
+                        .path("data")
+                        .path("content")
+                        .get(0)
+                        .path("payloadJson")
+                        .asText();
+        assertThat(json.readTree(storedPayload).path("text").asText()).isEqualTo(subject);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM notifications WHERE event_key = ?",
+                                Integer.class,
+                                eventKey))
+                .isEqualTo(1);
+        perform(get("/api/v1/notifications").header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+
     @Test
     void dashboardReconcilesPaymentsLedgerAndClosedLaborWithoutMultiplyingTotals()
             throws Exception {
         businessFixture();
-        String admin = login("tv1.admin");
+        String admin = token("tv1.admin");
         var response =
                 perform(
                                 get("/api/v1/reports/dashboard")
@@ -264,8 +400,8 @@ class TV1IntegrationTests extends IntegrationTestSupport {
 
     private void businessFixture() {
         jdbc.update(
-                "INSERT INTO users(id,username,password_hash,full_name,role)"
-                        + " VALUES(960003,'tv1.tech','test-only','Tech','TECHNICIAN')");
+                "INSERT INTO users(id,username,full_name,role)"
+                        + " VALUES(960003,'tv1.tech','Tech','TECHNICIAN')");
         jdbc.update(
                 "INSERT INTO customers(id,user_id,customer_code,full_name,phone)"
                         + " VALUES(960001,960002,'TV1_CUSTOMER','Customer','01')");
@@ -349,24 +485,9 @@ class TV1IntegrationTests extends IntegrationTestSupport {
                         + " HOUR),UTC_TIMESTAMP(6),'COMPLETE')");
     }
 
-    private String login(String identifier) throws Exception {
-        var result =
-                perform(
-                                post("/api/v1/auth/login")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                json.writeValueAsString(
-                                                        Map.of(
-                                                                "identifier",
-                                                                identifier,
-                                                                "password",
-                                                                PASSWORD))))
-                        .andExpect(status().isOk())
-                        .andReturn();
-        return json.readTree(result.getResponse().getContentAsString())
-                .path("data")
-                .path("accessToken")
-                .asText();
+    private String token(String identifier) {
+        return issueKeycloakToken(
+                authProperties, users.findByIdentifier(identifier).orElseThrow());
     }
 
     private ResultActions perform(RequestBuilder request) throws Exception {

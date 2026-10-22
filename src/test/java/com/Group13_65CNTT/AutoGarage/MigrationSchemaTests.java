@@ -2,10 +2,11 @@ package com.Group13_65CNTT.AutoGarage;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import lombok.RequiredArgsConstructor;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -20,9 +21,10 @@ import java.util.Set;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
+@RequiredArgsConstructor
 class MigrationSchemaTests extends IntegrationTestSupport {
-    @Autowired JdbcTemplate jdbc;
-    @Autowired Flyway flyway;
+    private final JdbcTemplate jdbc;
+    private final Flyway flyway;
 
     @BeforeEach
     void fixtures() {
@@ -101,9 +103,19 @@ class MigrationSchemaTests extends IntegrationTestSupport {
                         "SELECT COUNT(*) FROM information_schema.views WHERE"
                                 + " table_schema=DATABASE()",
                         Integer.class));
-        assertEquals(8, flyway.info().applied().length);
+        assertEquals(9, flyway.info().applied().length);
         assertEquals(0, flyway.info().pending().length);
         flyway.validate();
+    }
+
+    @Test
+    void keycloakIdentityIdIsUniqueAndPasswordHashIsOptional() {
+        jdbc.update(
+                "INSERT INTO users(id,identity_id,username,password_hash,full_name,role)"
+                        + " VALUES(910099,'550e8400-e29b-41d4-a716-446655440000','kc_user',NULL,'Keycloak User','CUSTOMER')");
+        rejected(
+                "INSERT INTO users(identity_id,username,password_hash,full_name,role)"
+                        + " VALUES('550e8400-e29b-41d4-a716-446655440000','kc_user_dup',NULL,'Dup','CUSTOMER')");
     }
 
     @Test

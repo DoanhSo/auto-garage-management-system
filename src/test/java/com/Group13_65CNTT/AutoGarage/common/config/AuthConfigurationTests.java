@@ -7,62 +7,57 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
-import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.List;
 
 class AuthConfigurationTests {
-    private static String randomKey() {
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        return Base64.getEncoder().encodeToString(bytes);
-    }
+    private static final String VALID_JWKS =
+            "http://localhost:8081/realms/autogarage-realm/protocol/openid-connect/certs";
 
     private final ApplicationContextRunner context =
             new ApplicationContextRunner()
                     .withUserConfiguration(PropertiesConfiguration.class)
                     .withPropertyValues(
-                            "security.auth.secret-base64=" + randomKey(),
-                            "security.auth.issuer=test",
-                            "security.auth.audience=test-api",
-                            "security.auth.ttl=15m",
+                            "security.auth.issuer=http://localhost:8081/realms/autogarage-realm",
+                            "security.auth.audience=autogarage-api",
+                            "security.auth.jwk-set-uri=" + VALID_JWKS,
                             "security.auth.clock-skew=0s",
-                            "security.auth.bcrypt-strength=4",
                             "security.bootstrap.enabled=false");
 
     @Test
-    void completePropertiesBindAndSecretsAreRedacted() {
+    void completeKeycloakPropertiesBindCleanly() {
         context.run(
                 c -> {
                     assertNull(c.getStartupFailure());
                     assertNotNull(c.getBean(AuthProperties.class));
-                    assertFalse(
-                            c.getBean(AuthProperties.class)
-                                    .toString()
-                                    .contains(c.getBean(AuthProperties.class).secretBase64()));
+                    assertEquals(VALID_JWKS, c.getBean(AuthProperties.class).jwkSetUri());
                 });
     }
 
     @Test
-    void emptySecretFailsBinding() {
-        context.withPropertyValues("security.auth.secret-base64=")
-                .run(c -> assertNotNull(c.getStartupFailure()));
-    }
-
-    @Test
-    void missingIssuerOrAudienceFailsBinding() {
+    void missingIssuerAudienceOrJwksUriFailsBinding() {
         context.withPropertyValues("security.auth.issuer=")
                 .run(c -> assertNotNull(c.getStartupFailure()));
         context.withPropertyValues("security.auth.audience=")
                 .run(c -> assertNotNull(c.getStartupFailure()));
+        context.withPropertyValues("security.auth.jwk-set-uri=")
+                .run(c -> assertNotNull(c.getStartupFailure()));
     }
 
     @Test
-    void invalidTtlAndClockSkewFailBinding() {
-        for (String ttl : List.of("0s", "-1s", "25h"))
-            context.withPropertyValues("security.auth.ttl=" + ttl)
+    void invalidJwksUriAndClockSkewFailBinding() {
+        for (String uri :
+                List.of(
+                        "not a uri",
+                        "ftp://localhost:8081/certs",
+                        "https://user:pass@localhost:8081/certs",
+                        "http://localhost:8081/certs#frag")) {
+            context.withPropertyValues("security.auth.jwk-set-uri=" + uri)
                     .run(c -> assertNotNull(c.getStartupFailure()));
+        }
+        context.withPropertyValues("security.auth.clock-skew=-1s")
+                .run(c -> assertNotNull(c.getStartupFailure()));
         context.withPropertyValues("security.auth.clock-skew=61s")
                 .run(c -> assertNotNull(c.getStartupFailure()));
     }
@@ -82,54 +77,32 @@ class AuthConfigurationTests {
     }
 
     @Test
-    void badEncodingAndShortSigningKeysAreRejected() {
+    void identityConfigurationCreatesRs256JwtDecoderFromJwksUri() {
         var config = new IdentityConfiguration();
         assertThrows(
                 IllegalArgumentException.class,
-                () -> config.jwtSecretKey(properties("not base64!")));
-        assertThrows(
-                IllegalArgumentException.class,
-                () ->
-                        config.jwtSecretKey(
-                                properties(Base64.getEncoder().encodeToString(new byte[8]))));
-        assertNotNull(config.jwtSecretKey(properties(randomKey())));
+                () -> config.jwtDecoder(properties("ftp://bad"), null, Clock.systemUTC()));
+        assertNotNull(config.jwtDecoder(properties(VALID_JWKS), null, Clock.systemUTC()));
     }
 
     @Test
-    void bootstrapOnlyAcceptsExplicitCompleteCredentials() {
+    void bootstrapOnlyAcceptsValidAdministratorProfile() {
         context.withPropertyValues("security.bootstrap.enabled=true")
                 .run(c -> assertNotNull(c.getStartupFailure()));
         context.withPropertyValues(
                         "security.bootstrap.enabled=true",
                         "security.bootstrap.username=initial.admin",
                         "security.bootstrap.full-name=Initial Admin",
-                        "security.bootstrap.password=TestBootstrap!123")
-                .run(
-                        c -> {
-                            assertNull(c.getStartupFailure());
-                            assertFalse(
-                                    c.getBean(BootstrapProperties.class)
-                                            .toString()
-                                            .contains("TestBootstrap!123"));
-                        });
+                        "security.bootstrap.identity-id=550e8400-e29b-41d4-a716-446655440000")
+                .run(c -> assertNull(c.getStartupFailure()));
     }
 
-    @Test
-    void unsupportedBcryptCostsFailConfiguration() {
-        context.withPropertyValues("security.auth.bcrypt-strength=3")
-                .run(c -> assertNotNull(c.getStartupFailure()));
-        context.withPropertyValues("security.auth.bcrypt-strength=17")
-                .run(c -> assertNotNull(c.getStartupFailure()));
-    }
-
-    private static AuthProperties properties(String secret) {
+    private static AuthProperties properties(String jwksUri) {
         return new AuthProperties(
-                secret,
-                "test",
-                "api",
-                Duration.ofMinutes(15),
+                "http://localhost:8081/realms/autogarage-realm",
+                "autogarage-api",
+                jwksUri,
                 Duration.ZERO,
-                4,
                 List.of(),
                 Duration.ofHours(1));
     }
