@@ -90,6 +90,15 @@ public class SecurityConfiguration {
                                             ApiPaths.NOTIFICATIONS_BASE,
                                             ApiPaths.NOTIFICATIONS_BASE + "/**")
                                     .authenticated()
+                                    .requestMatchers(
+                                            ApiPaths.CUSTOMERS_BASE, ApiPaths.CUSTOMERS_BASE + "/**",
+                                            ApiPaths.VEHICLES_BASE, ApiPaths.VEHICLES_BASE + "/**",
+                                            ApiPaths.SERVICES_BASE, ApiPaths.SERVICES_BASE + "/**",
+                                            ApiPaths.BOOKINGS_BASE, ApiPaths.BOOKINGS_BASE + "/**",
+                                            ApiPaths.RECEPTION_BASE, ApiPaths.RECEPTION_BASE + "/**",
+                                            ApiPaths.VEHICLE_CHECKS_BASE, ApiPaths.VEHICLE_CHECKS_BASE + "/**",
+                                            ApiPaths.ATTACHMENTS_BASE, ApiPaths.ATTACHMENTS_BASE + "/**")
+                                    .authenticated()
                                     .anyRequest()
                                     .denyAll();
                         })

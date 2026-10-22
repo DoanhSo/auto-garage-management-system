@@ -1,7 +1,14 @@
 package com.Group13_65CNTT.AutoGarage.shared.exception;
 
-public class ResourceNotFoundException extends RuntimeException {
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+
+public class ResourceNotFoundException extends BusinessException {
     public ResourceNotFoundException(String message) {
-        super(message);
+        super(ResponseCode.RESOURCE_NOT_FOUND, message);
+    }
+
+    public ResourceNotFoundException(ResponseCode responseCode) {
+        super(responseCode);
     }
 }
