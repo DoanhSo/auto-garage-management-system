@@ -124,7 +124,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-01 Hồ sơ khách hàng
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Entity, Repository, Service, Controller, Unit Tests UC04).
 - **Module/mốc:** M02 / G1.
 - **Đầu ra:** Entity/repository/service/controller, UI CRUD khách.
 - **Phụ thuộc:** TV1-01.
@@ -132,7 +132,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-02 Hồ sơ phương tiện
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Entity, Repository, Service, Controller, Unit Tests UC05).
 - **Module/mốc:** M03 / G1.
 - **Đầu ra:** CRUD xe, chuẩn hóa biển số, VIN, ODO; UI xe.
 - **Phụ thuộc:** TV2-01.
@@ -140,7 +140,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-03 Đổi chủ và lịch sử giao dịch
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Chuyển nhượng phương tiện, bảo toàn dữ liệu lịch sử).
 - **Module/mốc:** M03 / G1.
 - **Đầu ra:** Luồng đổi vehicles.customer_id; lọc dữ liệu lịch sử.
 - **Phụ thuộc:** TV2-02, TV1-04.
@@ -148,7 +148,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-04 Danh mục dịch vụ và gói
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Entity, Repository, Service, Controller, Unit Tests UC06).
 - **Module/mốc:** M04 / G1.
 - **Đầu ra:** CRUD SINGLE/PACKAGE, giá, kỹ năng, loại khoang, chu kỳ, bảo hành.
 - **Phụ thuộc:** TV1-01.
@@ -156,7 +156,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-05 Đặt lịch hẹn
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Entity, Repository, Service, Controller, Unit Tests UC07, tích hợp hợp đồng I02 giữ khoang).
 - **Module/mốc:** M05 / G2.
 - **Đầu ra:** API/UI lịch hẹn; một dịch vụ chính; gọi I02 để giữ khoang.
 - **Phụ thuộc:** TV2-02, TV2-04, TV3-02.
@@ -164,7 +164,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-06 Xác nhận dời hủy lịch
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (State transition PENDING/CONFIRMED/CANCELLED/NO_SHOW, dời lịch, hủy lịch, giải phóng khoang I02, Unit Tests UC08).
 - **Module/mốc:** M05 / G2.
 - **Đầu ra:** State transition, optimistic version, gọi I02 giải phóng khoang.
 - **Phụ thuộc:** TV2-05, TV3-02.
@@ -172,7 +172,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-07 Tiếp nhận xe
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (CheckInVehicleRequest/Response, Service, Controller, Unit Tests UC09, cập nhật booking RECEIVED, gọi I03 RepairWorkflow).
 - **Module/mốc:** M05 / G2.
 - **Đầu ra:** UI tiếp nhận; gọi I03 tạo phiếu; đổi booking thành RECEIVED.
 - **Phụ thuộc:** TV2-02, TV3-03.
@@ -180,7 +180,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-08 Checklist và ảnh bằng chứng
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (VehicleCheck & Attachment entities, repos, services, controllers, upload an toàn sha256 & storageKey, Unit Tests BR16).
 - **Module/mốc:** M05 / G2.
 - **Đầu ra:** Service lưu vehicle_checks/attachments, JSON schema, upload/download có quyền.
 - **Phụ thuộc:** TV2-07, TV1-04.
@@ -188,7 +188,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-09 Tra cứu lịch sử xe
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (VehicleTimelineResponse, phân quyền chủ mới ẩn tài chính chủ cũ theo BR04, Unit Tests UC38).
 - **Module/mốc:** M03 / G5.
 - **Đầu ra:** UC38; UI cây lịch sử, dữ liệu kỹ thuật/hóa đơn/bảo hành theo quyền.
 - **Phụ thuộc:** TV2-03, TV4-06, TV3-10.
@@ -196,7 +196,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV2-10 Kiểm thử và bàn giao phân hệ tiếp nhận
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (TV2ReceptionIntegrationTest kiểm thử liên thông 100% đạt 34/34 test cases, tài liệu bàn giao RECEPTION_MODULE_API.md).
 - **Module/mốc:** M05 / G5.
 - **Đầu ra:** Test UC04–09/38, xử lý 403/409, tài liệu API tiếp nhận.
 - **Phụ thuộc:** TV2-06, TV2-08, TV2-09.
