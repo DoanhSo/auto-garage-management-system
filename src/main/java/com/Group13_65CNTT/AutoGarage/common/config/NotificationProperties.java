@@ -1,6 +1,14 @@
 package com.Group13_65CNTT.AutoGarage.common.config;
 
-import jakarta.validation.constraints.*;
+import com.Group13_65CNTT.AutoGarage.common.constant.NotificationConstants;
+import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
+
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -52,7 +60,7 @@ public class NotificationProperties {
     private int reminderMaxBatches = 100;
 
     @NotBlank
-    @Size(max = 255)
+    @Size(max = NotificationConstants.SUBJECT_MAX_LENGTH)
     private String defaultSubject = "AutoGarage notification";
 
     @AssertTrue(
@@ -85,12 +93,13 @@ public class NotificationProperties {
             return false;
         }
         if (emailEnabled
-                && (emailFrom == null || !emailFrom.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")))
+                && (emailFrom == null
+                        || !emailFrom.matches(NotificationConstants.EMAIL_DESTINATION_PATTERN)))
             return false;
         if (smsEnabled) {
             try {
                 var uri = URI.create(smsUrl);
-                if (!"https".equalsIgnoreCase(uri.getScheme())
+                if (!SecurityConstants.HTTPS_SCHEME.equalsIgnoreCase(uri.getScheme())
                         || uri.getHost() == null
                         || uri.getUserInfo() != null
                         || uri.getQuery() != null

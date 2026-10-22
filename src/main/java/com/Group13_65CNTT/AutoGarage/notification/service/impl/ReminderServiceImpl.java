@@ -1,6 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.notification.service.impl;
 
 import com.Group13_65CNTT.AutoGarage.common.config.NotificationProperties;
+import com.Group13_65CNTT.AutoGarage.common.constant.NotificationConstants;
 import com.Group13_65CNTT.AutoGarage.notification.dto.request.NotificationCreateRequest;
 import com.Group13_65CNTT.AutoGarage.notification.repository.ReminderRepository;
 import com.Group13_65CNTT.AutoGarage.notification.repository.projection.ReminderCandidate;
@@ -46,8 +47,10 @@ public class ReminderServiceImpl implements ReminderService {
                             .userId(candidate.getUserId())
                             .customerId(candidate.getCustomerId())
                             .eventKey(candidate.getEventKey())
-                            .channel("WEB")
-                            .destination("user:" + candidate.getUserId())
+                            .channel(NotificationConstants.CHANNEL_WEB)
+                            .destination(
+                                    NotificationConstants.USER_RECIPIENT_PREFIX
+                                            + candidate.getUserId())
                             .payloadJson(candidate.getPayloadJson())
                             .build());
         }

@@ -1,11 +1,13 @@
 package com.Group13_65CNTT.AutoGarage.reporting.service.impl;
 
 import com.Group13_65CNTT.AutoGarage.common.config.ReportProperties;
+import com.Group13_65CNTT.AutoGarage.common.constant.ReportConstants;
 import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
-import com.Group13_65CNTT.AutoGarage.reporting.dto.response.*;
+import com.Group13_65CNTT.AutoGarage.reporting.dto.response.DashboardResponse;
+import com.Group13_65CNTT.AutoGarage.reporting.dto.response.InvoiceBalanceResponse;
 import com.Group13_65CNTT.AutoGarage.reporting.mapper.ReportMapper;
 import com.Group13_65CNTT.AutoGarage.reporting.repository.ReportRepository;
 import com.Group13_65CNTT.AutoGarage.reporting.service.ReportService;
@@ -61,21 +63,28 @@ public class ReportServiceImpl implements ReportService {
     public byte[] exportDashboard(Instant from, Instant until) {
         DashboardResponse report = dashboard(from, until);
         String csv =
-                "metric,value\r\nrevenue,"
+                ReportConstants.CSV_HEADER
+                        + ReportConstants.METRIC_REVENUE
                         + report.getRevenue().toPlainString()
-                        + "\r\ncash_in,"
+                        + ReportConstants.CSV_LINE_ENDING
+                        + ReportConstants.METRIC_CASH_IN
                         + report.getCashIn().toPlainString()
-                        + "\r\ncash_out,"
+                        + ReportConstants.CSV_LINE_ENDING
+                        + ReportConstants.METRIC_CASH_OUT
                         + report.getCashOut().toPlainString()
-                        + "\r\ncustomer_debt,"
+                        + ReportConstants.CSV_LINE_ENDING
+                        + ReportConstants.METRIC_CUSTOMER_DEBT
                         + report.getCustomerDebt().toPlainString()
-                        + "\r\nsupplier_debt,"
+                        + ReportConstants.CSV_LINE_ENDING
+                        + ReportConstants.METRIC_SUPPLIER_DEBT
                         + report.getSupplierDebt().toPlainString()
-                        + "\r\nstock_value,"
+                        + ReportConstants.CSV_LINE_ENDING
+                        + ReportConstants.METRIC_STOCK_VALUE
                         + report.getStockValue().toPlainString()
-                        + "\r\nlabor_hours,"
+                        + ReportConstants.CSV_LINE_ENDING
+                        + ReportConstants.METRIC_LABOR_HOURS
                         + report.getLaborHours().toPlainString()
-                        + "\r\n";
+                        + ReportConstants.CSV_LINE_ENDING;
         return csv.getBytes(StandardCharsets.UTF_8);
     }
 }

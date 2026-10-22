@@ -11,6 +11,4 @@ public interface AuditService {
             String entityType,
             Long entityId,
             Map<String, Object> details);
-
-    void recordFailedLogin();
 }

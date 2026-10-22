@@ -2,6 +2,7 @@ package com.Group13_65CNTT.AutoGarage.audit.service.impl;
 
 import com.Group13_65CNTT.AutoGarage.audit.entity.AuditEvent;
 import com.Group13_65CNTT.AutoGarage.audit.repository.AuditEventRepository;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
@@ -89,13 +90,13 @@ public class NotificationAuditServiceImpl implements NotificationAudit {
             throw new BusinessException(ResponseCode.FORBIDDEN);
         if (action == null
                 || action.isBlank()
-                || action.length() > 100
+                || action.length() > AuditConstants.ACTION_MAX_LENGTH
                 || entityType == null
                 || entityType.isBlank()
-                || entityType.length() > 80
+                || entityType.length() > AuditConstants.ENTITY_TYPE_MAX_LENGTH
                 || entityId <= 0
                 || resultJson == null
-                || resultJson.length() > 65536) {
+                || resultJson.length() > AuditConstants.RESULT_JSON_MAX_LENGTH) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
         String canonical;
@@ -132,9 +133,9 @@ public class NotificationAuditServiceImpl implements NotificationAudit {
     private void validateKey(String key, String hash) {
         if (key == null
                 || key.isBlank()
-                || key.length() > 100
+                || key.length() > AuditConstants.REQUEST_KEY_MAX_LENGTH
                 || hash == null
-                || !hash.matches("[a-f0-9]{64}")) {
+                || !hash.matches(AuditConstants.REQUEST_HASH_PATTERN)) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
     }
