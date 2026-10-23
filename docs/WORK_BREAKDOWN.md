@@ -247,7 +247,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-06 Phân công kỹ thuật viên
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (TaskAssignment, phân công MAIN/ASSISTANT/QC, kiểm tra tối đa 1 MAIN active, kiểm tra quyền can_qc cho QC, chống chồng ca công việc của KTV, 4 unit tests đạt 100%).
 - **Module/mốc:** M08 / G3.
 - **Đầu ra:** UC11; MAIN/ASSISTANT/QC, lịch nhân viên và khóa task.
 - **Phụ thuộc:** TV3-01, TV3-05.
@@ -255,7 +255,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-07 Timer bắt đầu tạm dừng tiếp tục
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (LaborSession, startTimer snapshot hourly_cost, kiểm tra duy nhất 1 timer mở mỗi KTV, stopTimer với PAUSE/COMPLETE/CANCEL, chuyển trạng thái task IN_PROGRESS/PAUSED, 3 unit tests đạt 100%).
 - **Module/mốc:** M08 / G3.
 - **Đầu ra:** UC16–18; labor_sessions, cost snapshot; UI bảng việc KTV.
 - **Phụ thuộc:** TV3-06.
@@ -263,7 +263,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-08 Hoàn thành công việc
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (completeTask đóng timer mở, giải phóng phân công, chuyển task sang COMPLETED, tự động chuyển RepairOrder sang WAITING_QC khi hết việc, tính tổng giờ công thực loại trừ pause, 1 unit test đạt 100%).
 - **Module/mốc:** M08 / G3.
 - **Đầu ra:** UC19; đóng timer, cập nhật task, tổng giờ công thực.
 - **Phụ thuộc:** TV3-07.
