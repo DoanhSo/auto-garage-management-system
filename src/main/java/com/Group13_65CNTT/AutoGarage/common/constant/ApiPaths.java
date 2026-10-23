@@ -17,5 +17,11 @@ public final class ApiPaths {
     public static final String SERVICE_BAYS_BASE = "/api/v1/service-bays";
     public static final String BAY_RESERVATIONS_BASE = "/api/v1/bay-reservations";
 
+    public static final String REPAIR_ORDERS_BASE = "/api/v1/repair-orders";
+    public static final String REPAIR_TASKS_BASE = "/api/v1/repair-tasks";
+    public static final String ESTIMATES_BASE = "/api/v1/estimates";
+    public static final String QUALITY_CHECKS_BASE = "/api/v1/quality-checks";
+    public static final String WARRANTIES_BASE = "/api/v1/warranties";
+
     private ApiPaths() {}
 }

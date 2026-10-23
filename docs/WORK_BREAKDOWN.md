@@ -223,7 +223,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-03 Vòng đời phiếu I03
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (RepairOrder, RepairTask, TaskAssignment, LaborSession, Contract I03 RepairWorkflow với receive/createWarrantyOrder/requireInvoiceReady/handOver, State Machine transition status, 19 unit tests đạt 100%).
 - **Module/mốc:** M08 / G2.
 - **Đầu ra:** RepairWorkflow; nhận xe, phiếu chẩn đoán, transition status.
 - **Phụ thuộc:** TV2-01, TV2-02.
