@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { roles } from './contracts';
+import { roles, customerTypes } from './contracts';
 export const idSchema = z.string().regex(/^[1-9]\d*$/);
 export const userSchema = z.object({
   id: idSchema,
@@ -64,4 +64,24 @@ export const invoiceSchema = z.object({
   totalAmount: decimal,
   paidAmount: decimal,
   balanceAmount: decimal,
+});
+
+export const customerTypeSchema = z.enum(customerTypes);
+export const customerSchema = z.object({
+  id: idSchema,
+  userId: idSchema.nullable(),
+  customerCode: z.string(),
+  fullName: z.string(),
+  customerType: customerTypeSchema,
+  phone: z.string(),
+  email: z.string().nullable(),
+  address: z.string().nullable(),
+  companyName: z.string().nullable(),
+  taxCode: z.string().nullable(),
+  creditLimit: decimal,
+  paymentTermDays: z.number().int().nonnegative(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  version: z.string().regex(/^\d+$/),
 });

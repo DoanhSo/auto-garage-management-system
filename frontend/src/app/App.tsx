@@ -14,6 +14,7 @@ import { ToastProvider } from './providers/ToastProvider';
 import { AppShell } from './layouts/AppShell';
 import { Button, Loading } from '../shared/components/ui';
 import { retryQuery } from '../shared/api/errors';
+
 const LoginPage = lazy(() =>
   import('../features/auth/pages/LoginPage').then((module) => ({
     default: module.LoginPage,
@@ -27,6 +28,11 @@ const AccountPage = lazy(() =>
 const UsersPage = lazy(() =>
   import('../features/identity/pages/UsersPage').then((module) => ({
     default: module.UsersPage,
+  })),
+);
+const CustomersPage = lazy(() =>
+  import('../features/customer/pages/CustomersPage').then((module) => ({
+    default: module.CustomersPage,
   })),
 );
 const AuditPage = lazy(() =>
@@ -44,6 +50,7 @@ const ReportsPage = lazy(() =>
     default: module.ReportsPage,
   })),
 );
+
 export function RequireAuth() {
   const { user } = useAuth();
   const location = useLocation();
@@ -53,14 +60,17 @@ export function RequireAuth() {
     <Navigate to="/login" replace state={{ returnTo: location.pathname + location.search }} />
   );
 }
+
 export function RequireAdmin() {
   const { user } = useAuth();
   return user?.role === 'ADMIN' ? <Outlet /> : <Navigate to="/403" replace />;
 }
+
 function Home() {
   const { user } = useAuth();
-  return <Navigate to={user?.role === 'ADMIN' ? '/admin/reports' : '/notifications'} replace />;
+  return <Navigate to={user?.role === 'ADMIN' ? '/admin/reports' : '/customers'} replace />;
 }
+
 function StatusPage({ forbidden = false }: { forbidden?: boolean }) {
   return (
     <div className="status-page">
@@ -77,6 +87,7 @@ function StatusPage({ forbidden = false }: { forbidden?: boolean }) {
     </div>
   );
 }
+
 function RouteError() {
   useRouteError();
   return (
@@ -87,6 +98,7 @@ function RouteError() {
     </div>
   );
 }
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
@@ -104,6 +116,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
     );
   }
 }
+
 const router = createBrowserRouter([
   {
     errorElement: <RouteError />,
@@ -116,6 +129,7 @@ const router = createBrowserRouter([
             element: <AppShell />,
             children: [
               { index: true, element: <Home /> },
+              { path: 'customers', element: <CustomersPage /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'account/security', element: <AccountPage /> },
               {
@@ -135,6 +149,7 @@ const router = createBrowserRouter([
     ],
   },
 ]);
+
 const client = new QueryClient({
   defaultOptions: {
     queries: {
@@ -145,6 +160,7 @@ const client = new QueryClient({
     mutations: { retry: 0 },
   },
 });
+
 export default function App() {
   return (
     <ErrorBoundary>

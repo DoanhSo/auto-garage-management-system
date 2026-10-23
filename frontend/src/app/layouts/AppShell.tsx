@@ -4,6 +4,7 @@ import {
   Bell,
   ChartNoAxesCombined,
   ChevronRight,
+  Contact,
   History,
   LogOut,
   Menu,
@@ -19,6 +20,7 @@ import { useUnreadCountQuery } from '../../features/notification/hooks/useNotifi
 import { Button } from '../../shared/components/ui';
 import { initials } from '../../shared/utils/format';
 const links = [
+  { to: '/customers', label: 'Khách hàng', icon: Contact, admin: false },
   {
     to: '/admin/reports',
     label: 'Báo cáo',
@@ -98,77 +100,59 @@ export function AppShell() {
         <header className="app-header">
           <div className="breadcrumb">
             <Button
-              className="mobile-menu"
-              variant="ghost"
-              aria-label="Mở menu"
-              onClick={() => setMobile(true)}
               ref={trigger}
+              variant="ghost"
+              className="menu-button"
+              aria-label="Mở menu điều hướng"
+              aria-expanded={mobile}
+              onClick={() => setMobile(true)}
             >
               <Menu size={20} />
             </Button>
-            <span>Không gian làm việc</span>
-            <ChevronRight size={14} aria-hidden />
-            <strong>{title}</strong>
+            <span>{title}</span>
           </div>
           <div className="header-actions">
-            <NavLink
-              className="bell-button"
-              to="/notifications"
-              aria-label={`Thông báo${unread.data ? ' — ' + unread.data + ' chưa đọc' : ''}`}
-            >
-              <Bell size={20} />
-              {unread.data !== undefined && BigInt(unread.data) > 0n && (
-                <span className="bell-dot" />
-              )}
-            </NavLink>
-            <span className="header-name">{user?.fullName}</span>
+            <span className="avatar-chip">
+              <span className="avatar">{initials(user?.fullName ?? '')}</span>
+              <span>{user?.fullName}</span>
+            </span>
             <Button
               variant="ghost"
-              pending={logout.isPending}
               onClick={() => logout.mutate()}
-              aria-label="Đăng xuất"
+              aria-label="Đăng xuất khỏi hệ thống"
+              pending={logout.isPending}
             >
-              <LogOut size={18} />
-              <span className="logout-label">Đăng xuất</span>
+              <LogOut size={16} />
+              <span>Đăng xuất</span>
             </Button>
           </div>
         </header>
-        {me.error && (
-          <div className="session-banner" role="status">
-            Chưa thể kiểm tra lại thông tin tài khoản.{' '}
-            <button
-              type="button"
-              onClick={() => {
-                void me.refetch();
-              }}
-            >
-              Thử lại
-            </button>
-          </div>
-        )}
-        <main id="main-content" className="workspace">
+        <main className="main-viewport" id="main-content" tabIndex={-1}>
           <Outlet />
         </main>
       </div>
       <Dialog.Root open={mobile} onOpenChange={setMobile}>
         <Dialog.Portal>
-          <Dialog.Overlay className="overlay" />
+          <Dialog.Overlay className="dialog-backdrop" />
           <Dialog.Content
-            className="mobile-nav"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
+            className="mobile-drawer"
+            aria-label="Thanh điều hướng di động"
+            onCloseAutoFocus={(e) => {
+              e.preventDefault();
               trigger.current?.focus();
             }}
           >
-            <div className="mobile-nav-header">
-              <Dialog.Title>AutoGarage</Dialog.Title>
+            <div className="drawer-header">
+              <span className="brand-mark">
+                <Wrench size={20} />
+              </span>
+              <span>AutoGarage</span>
               <Dialog.Close asChild>
-                <Button variant="ghost" aria-label="Đóng menu">
-                  <X size={20} />
+                <Button variant="ghost" aria-label="Đóng thanh điều hướng">
+                  <X size={18} />
                 </Button>
               </Dialog.Close>
             </div>
-            <Dialog.Description className="sr-only">Chọn phân hệ làm việc</Dialog.Description>
             {nav(() => setMobile(false))}
           </Dialog.Content>
         </Dialog.Portal>

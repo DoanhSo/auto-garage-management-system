@@ -13,6 +13,60 @@ export const roleLabels: Record<Role, string> = {
   TECHNICIAN: 'Kỹ thuật viên',
   CUSTOMER: 'Khách hàng',
 };
+
+export const customerTypes = ['INDIVIDUAL', 'BUSINESS'] as const;
+export type CustomerType = (typeof customerTypes)[number];
+export const customerTypeLabels: Record<CustomerType, string> = {
+  INDIVIDUAL: 'Cá nhân',
+  BUSINESS: 'Doanh nghiệp',
+};
+
+export interface Customer {
+  id: string;
+  userId: string | null;
+  customerCode: string;
+  fullName: string;
+  customerType: CustomerType;
+  phone: string;
+  email: string | null;
+  address: string | null;
+  companyName: string | null;
+  taxCode: string | null;
+  creditLimit: string;
+  paymentTermDays: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  version: string;
+}
+
+export interface CustomerCreate {
+  userId?: string | null;
+  customerCode?: string | null;
+  fullName: string;
+  customerType: CustomerType;
+  phone: string;
+  email?: string | null;
+  address?: string | null;
+  companyName?: string | null;
+  taxCode?: string | null;
+  creditLimit: number;
+  paymentTermDays: number;
+}
+
+export interface CustomerUpdate {
+  fullName: string;
+  customerType?: CustomerType;
+  phone: string;
+  email?: string | null;
+  address?: string | null;
+  companyName?: string | null;
+  taxCode?: string | null;
+  creditLimit?: number;
+  paymentTermDays?: number;
+  isActive?: boolean;
+}
+
 export interface User {
   id: string;
   username: string;
