@@ -12,5 +12,10 @@ public final class ApiPaths {
     public static final String AUDIT_BASE = "/api/v1/admin/audit-events";
     public static final String REPORTS_BASE = "/api/v1/reports";
 
+    public static final String EMPLOYEES_BASE = "/api/v1/employees";
+    public static final String SHIFTS_BASE = "/api/v1/employee-shifts";
+    public static final String SERVICE_BAYS_BASE = "/api/v1/service-bays";
+    public static final String BAY_RESERVATIONS_BASE = "/api/v1/bay-reservations";
+
     private ApiPaths() {}
 }

@@ -207,7 +207,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-01 Nhân viên kỹ năng ca và khoang
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (CRUD employees, employee_shifts, service_bays, can_qc, chống trùng ca làm UC37, lịch bảo trì khoang BR06, 20 unit tests).
 - **Module/mốc:** M06 / G1.
 - **Đầu ra:** CRUD employees/shifts/bays, can_qc, UI ca làm UC37.
 - **Phụ thuộc:** TV1-03.
@@ -215,7 +215,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-02 Lịch khoang I02
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (BayScheduling contract, khóa khoang với pessimistic write lock, kiểm tra giao nhau [start, end), tự động hết hạn reservation HELD, giải phóng khoang cho booking và repair order, 7 unit tests).
 - **Module/mốc:** M06 / G2.
 - **Đầu ra:** BayScheduling; khóa bay; truy vấn giao nhau; release/expiry.
 - **Phụ thuộc:** TV3-01.
