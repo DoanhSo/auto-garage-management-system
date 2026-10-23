@@ -11,6 +11,13 @@ import {
   Users,
   Wrench,
   X,
+  Package,
+  Building2,
+  FileText,
+  Scale,
+  Receipt,
+  DollarSign,
+  CreditCard,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from '../providers/AuthProvider';
@@ -18,7 +25,15 @@ import { useMeQuery, useLogoutMutation } from '../../features/auth/hooks/useAuth
 import { useUnreadCountQuery } from '../../features/notification/hooks/useNotifications';
 import { Button } from '../../shared/components/ui';
 import { initials } from '../../shared/utils/format';
+
 const links = [
+  { to: '/inventory/parts', label: 'Kho & Phụ tùng', icon: Package, admin: false },
+  { to: '/inventory/suppliers', label: 'Nhà cung cấp', icon: Building2, admin: false },
+  { to: '/inventory/documents', label: 'Chứng từ kho', icon: FileText, admin: false },
+  { to: '/inventory/reconciliation', label: 'Đối soát kho', icon: Scale, admin: false },
+  { to: '/billing/invoices', label: 'Hóa đơn dịch vụ', icon: Receipt, admin: false },
+  { to: '/billing/payments', label: 'Sổ quỹ Thu / Chi', icon: DollarSign, admin: false },
+  { to: '/billing/debt-ledger', label: 'Sổ nợ & Tín dụng', icon: CreditCard, admin: false },
   {
     to: '/admin/reports',
     label: 'Báo cáo',
