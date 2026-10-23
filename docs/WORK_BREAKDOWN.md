@@ -231,7 +231,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-04 Lập gửi và phát sinh báo giá
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Estimate, EstimateItem, Part, PartRepository, lập báo giá INITIAL/SUPPLEMENTAL, version_no tăng dưới khóa phiếu, snapshot giá/bảo hành, gửi báo giá SENT qua outbox I08, 5 unit tests đạt 100%).
 - **Module/mốc:** M07 / G2.
 - **Đầu ra:** Header/items, snapshot giá, version_no, INITIAL/SUPPLEMENTAL; UI báo giá.
 - **Phụ thuộc:** TV3-03, TV2-04, TV4-02.
@@ -239,7 +239,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-05 Duyệt từng dòng I04
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (EstimateApproval contract I04, duyệt từng dòng APPROVED/REJECTED, tự động sinh RepairTask loại REPAIR từ SERVICE, gọi I05 reserve phụ tùng PART, xử lý idempotency replay, 5 unit tests đạt 100%).
 - **Module/mốc:** M07 / G3.
 - **Đầu ra:** EstimateApproval, tạo task từ SERVICE, gọi I05 giữ PART, notify.
 - **Phụ thuộc:** TV3-04, TV4-04, TV1-06.
