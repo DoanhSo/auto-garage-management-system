@@ -271,7 +271,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-09 QC và yêu cầu làm lại
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (VehicleCheck loại QC, attempt_no tự động tăng, QC PASSED chuyển phiếu sang COMPLETED, QC FAILED chuyển sang QC_FAILED và kích hoạt REWORK cho task, kiểm tra quyền can_qc và chặn khi còn task/timer mở, 5 unit tests đạt 100%).
 - **Module/mốc:** M10 / G4.
 - **Đầu ra:** UC27; gọi service lưu checklist của TV2; latest_qc_check_id và attempt.
 - **Phụ thuộc:** TV3-08, TV2-08.
