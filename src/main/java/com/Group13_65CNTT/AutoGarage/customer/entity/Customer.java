@@ -1,6 +1,10 @@
 package com.Group13_65CNTT.AutoGarage.customer.entity;
 
 import jakarta.persistence.*;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 
@@ -22,6 +26,7 @@ public class Customer {
     private String fullName;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "customer_type", nullable = false, length = 20)
     private CustomerType customerType = CustomerType.INDIVIDUAL;
 
@@ -87,8 +92,7 @@ public class Customer {
         this.updatedAt = Instant.now();
     }
 
-    public Customer() {
-    }
+    public Customer() {}
 
     public Long getId() {
         return id;

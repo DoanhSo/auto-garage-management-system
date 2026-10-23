@@ -1,6 +1,10 @@
 package com.Group13_65CNTT.AutoGarage.reception.entity;
 
 import jakarta.persistence.*;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
 
 @Entity
@@ -15,6 +19,7 @@ public class VehicleCheck {
     private Long repairOrderId;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "check_type", nullable = false, length = 20)
     private CheckType checkType;
 
@@ -22,9 +27,11 @@ public class VehicleCheck {
     private Integer attemptNo = 1;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "result", nullable = false, length = 20)
     private CheckResult result = CheckResult.RECORDED;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "checklist_json", nullable = false, columnDefinition = "JSON")
     private String checklistJson;
 
@@ -59,8 +66,7 @@ public class VehicleCheck {
         }
     }
 
-    public VehicleCheck() {
-    }
+    public VehicleCheck() {}
 
     public Long getId() {
         return id;

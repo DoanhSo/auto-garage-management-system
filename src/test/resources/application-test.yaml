@@ -6,11 +6,9 @@ spring:
 
 security:
   auth:
-    issuer: autogarage-test
+    issuer: http://localhost:8081/realms/autogarage-test
     audience: autogarage-test-api
-    ttl: 15m
     clock-skew: 0s
-    bcrypt-strength: 4
     allowed-origins: http://localhost:5173
   bootstrap:
     enabled: false

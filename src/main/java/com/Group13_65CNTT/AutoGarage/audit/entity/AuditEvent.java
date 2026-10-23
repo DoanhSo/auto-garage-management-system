@@ -1,5 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.audit.entity;
 
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -35,10 +37,10 @@ public class AuditEvent {
     @Column(name = "actor_user_id")
     private Long actorUserId;
 
-    @Column(nullable = false, length = 100)
+    @Column(nullable = false, length = AuditConstants.ACTION_MAX_LENGTH)
     private String action;
 
-    @Column(name = "entity_type", nullable = false, length = 80)
+    @Column(name = "entity_type", nullable = false, length = AuditConstants.ENTITY_TYPE_MAX_LENGTH)
     private String entityType;
 
     @Column(name = "entity_id")
@@ -51,10 +53,10 @@ public class AuditEvent {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    @Column(name = "request_key", length = 100)
+    @Column(name = "request_key", length = AuditConstants.REQUEST_KEY_MAX_LENGTH)
     private String requestKey;
 
-    @Column(name = "request_hash", length = 64)
+    @Column(name = "request_hash", length = AuditConstants.REQUEST_HASH_LENGTH)
     private String requestHash;
 
     @JdbcTypeCode(SqlTypes.JSON)

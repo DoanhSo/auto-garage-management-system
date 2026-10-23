@@ -65,6 +65,41 @@ const ReportsPage = lazy(() =>
     default: module.ReportsPage,
   })),
 );
+const PartsPage = lazy(() =>
+  import('../features/inventory/pages/PartsPage').then((module) => ({
+    default: module.PartsPage,
+  })),
+);
+const SuppliersPage = lazy(() =>
+  import('../features/inventory/pages/SuppliersPage').then((module) => ({
+    default: module.SuppliersPage,
+  })),
+);
+const InventoryDocumentsPage = lazy(() =>
+  import('../features/inventory/pages/InventoryDocumentsPage').then((module) => ({
+    default: module.InventoryDocumentsPage,
+  })),
+);
+const StockReconciliationPage = lazy(() =>
+  import('../features/inventory/pages/StockReconciliationPage').then((module) => ({
+    default: module.StockReconciliationPage,
+  })),
+);
+const InvoicesPage = lazy(() =>
+  import('../features/billing/pages/InvoicesPage').then((module) => ({
+    default: module.InvoicesPage,
+  })),
+);
+const PaymentsPage = lazy(() =>
+  import('../features/billing/pages/PaymentsPage').then((module) => ({
+    default: module.PaymentsPage,
+  })),
+);
+const DebtLedgerPage = lazy(() =>
+  import('../features/billing/pages/DebtLedgerPage').then((module) => ({
+    default: module.DebtLedgerPage,
+  })),
+);
 
 export function RequireAuth() {
   const { user } = useAuth();
@@ -83,7 +118,7 @@ export function RequireAdmin() {
 
 function Home() {
   const { user } = useAuth();
-  return <Navigate to={user?.role === 'ADMIN' ? '/admin/reports' : '/customers'} replace />;
+  return <Navigate to={user?.role === 'ADMIN' ? '/admin/reports' : '/reception'} replace />;
 }
 
 function StatusPage({ forbidden = false }: { forbidden?: boolean }) {
@@ -144,10 +179,17 @@ const router = createBrowserRouter([
             element: <AppShell />,
             children: [
               { index: true, element: <Home /> },
+              { path: 'reception', element: <BookingsPage /> },
               { path: 'customers', element: <CustomersPage /> },
               { path: 'vehicles', element: <VehiclesPage /> },
               { path: 'services', element: <ServicesPage /> },
-              { path: 'reception', element: <BookingsPage /> },
+              { path: 'inventory/parts', element: <PartsPage /> },
+              { path: 'inventory/suppliers', element: <SuppliersPage /> },
+              { path: 'inventory/documents', element: <InventoryDocumentsPage /> },
+              { path: 'inventory/reconciliation', element: <StockReconciliationPage /> },
+              { path: 'billing/invoices', element: <InvoicesPage /> },
+              { path: 'billing/payments', element: <PaymentsPage /> },
+              { path: 'billing/debt-ledger', element: <DebtLedgerPage /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'account/security', element: <AccountPage /> },
               {

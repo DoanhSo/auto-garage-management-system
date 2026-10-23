@@ -1,6 +1,10 @@
 package com.Group13_65CNTT.AutoGarage.catalog.entity;
 
 import jakarta.persistence.*;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 
@@ -19,6 +23,7 @@ public class ServiceEntity {
     private String serviceName;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "service_type", nullable = false, length = 20)
     private ServiceType serviceType = ServiceType.SINGLE;
 
@@ -37,6 +42,7 @@ public class ServiceEntity {
     @Column(name = "required_bay_type", length = 30)
     private String requiredBayType;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "required_skills_json", columnDefinition = "JSON")
     private String requiredSkillsJson;
 
@@ -102,8 +108,7 @@ public class ServiceEntity {
         this.updatedAt = Instant.now();
     }
 
-    public ServiceEntity() {
-    }
+    public ServiceEntity() {}
 
     public Long getId() {
         return id;

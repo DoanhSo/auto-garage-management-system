@@ -17,6 +17,7 @@ import java.time.Instant;
 @AllArgsConstructor
 public class UserResponse {
     private Long id;
+    private String identityId;
     private String username;
     private String email;
     private String fullName;

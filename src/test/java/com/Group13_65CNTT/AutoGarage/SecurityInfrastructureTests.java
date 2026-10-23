@@ -1,6 +1,6 @@
 package com.Group13_65CNTT.AutoGarage;
 
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -8,50 +8,36 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.Group13_65CNTT.AutoGarage.common.config.AuthProperties;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
 
+import lombok.RequiredArgsConstructor;
+
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DataAccessResourceFailureException;
-import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
-import org.springframework.security.oauth2.jwt.*;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.Instant;
-import java.util.List;
-
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
+@RequiredArgsConstructor
 class SecurityInfrastructureTests extends IntegrationTestSupport {
-    @Autowired MockMvc mvc;
-    @Autowired JwtEncoder encoder;
-    @Autowired AuthProperties properties;
+    private final MockMvc mvc;
+    private final AuthProperties properties;
     @MockitoBean UserRepository users;
 
     @Test
     void databaseOutageReturns503WithoutDisguisingItAsInvalidCredentials() throws Exception {
-        when(users.findById(anyLong()))
+        when(users.findByIdentityId(anyString()))
                 .thenThrow(new DataAccessResourceFailureException("Injected database outage"));
-        var now = Instant.now();
-        var claims =
-                JwtClaimsSet.builder()
-                        .issuer(properties.issuer())
-                        .audience(List.of(properties.audience()))
-                        .subject("950005")
-                        .issuedAt(now.minusSeconds(1))
-                        .expiresAt(now.plusSeconds(300))
-                        .id("infrastructure-test")
-                        .claim("role", "CUSTOMER")
-                        .claim("auth_version", 0L)
-                        .build();
         String token =
-                encoder.encode(
-                                JwtEncoderParameters.from(
-                                        JwsHeader.with(MacAlgorithm.HS256).build(), claims))
-                        .getTokenValue();
+                issueKeycloakToken(
+                        properties,
+                        "550e8400-e29b-41d4-a716-446655440005",
+                        "customer",
+                        "CUSTOMER",
+                        0L);
         mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.code").value(4002))

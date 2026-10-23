@@ -1,35 +1,33 @@
 package com.Group13_65CNTT.AutoGarage.common.config;
 
-import com.Group13_65CNTT.AutoGarage.common.util.PasswordPolicy;
+import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 
 import jakarta.validation.constraints.AssertTrue;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
-import java.nio.charset.StandardCharsets;
-
 @Validated
 @ConfigurationProperties("security.bootstrap")
 public record BootstrapProperties(
-        boolean enabled, String username, String fullName, String password) {
+        boolean enabled, String username, String fullName, String identityId) {
     @AssertTrue(
-            message = "Enabled admin bootstrap requires a valid username, full name and password")
+            message =
+                    "Enabled admin bootstrap requires a valid username, full name and optional identity ID")
     public boolean isConfigured() {
         return !enabled
                 || (username != null
-                        && username.matches("[A-Za-z0-9._-]{3,100}")
+                        && username.matches(SecurityConstants.USERNAME_PATTERN)
                         && fullName != null
                         && !fullName.isBlank()
-                        && fullName.length() <= 150
-                        && password != null
-                        && !password.isBlank()
-                        && password.getBytes(StandardCharsets.UTF_8).length
-                                <= PasswordPolicy.BCRYPT_MAX_BYTES);
+                        && fullName.length() <= SecurityConstants.FULL_NAME_MAX_LENGTH
+                        && (identityId == null
+                                || identityId.isBlank()
+                                || identityId.matches(SecurityConstants.IDENTITY_ID_PATTERN)));
     }
 
     @Override
     public String toString() {
-        return "BootstrapProperties[enabled=" + enabled + ", password=redacted]";
+        return "BootstrapProperties[enabled=" + enabled + ", username=" + username + "]";
     }
 }

@@ -40,3 +40,5 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/.cache/
 frontend/output/playwright/
+.DS_Store
+*.DS_Store

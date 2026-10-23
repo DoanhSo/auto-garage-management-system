@@ -1,6 +1,8 @@
 package com.Group13_65CNTT.AutoGarage.notification.service.impl;
 
 import com.Group13_65CNTT.AutoGarage.common.config.NotificationProperties;
+import com.Group13_65CNTT.AutoGarage.common.constant.NotificationConstants;
+import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.exception.NotificationDeliveryException;
@@ -37,9 +39,10 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
     @Override
     public String deliver(Notification notification) {
         return switch (notification.getChannel()) {
-            case "WEB" -> "web:" + notification.getId();
-            case "EMAIL" -> sendEmail(notification);
-            case "SMS" -> sendSms(notification);
+            case NotificationConstants.CHANNEL_WEB ->
+                    NotificationConstants.WEB_PROVIDER_PREFIX + notification.getId();
+            case NotificationConstants.CHANNEL_EMAIL -> sendEmail(notification);
+            case NotificationConstants.CHANNEL_SMS -> sendSms(notification);
             default -> throw new BusinessException(ResponseCode.INTERNAL_SERVER_ERROR);
         };
     }
@@ -61,27 +64,32 @@ public class NotificationDeliveryServiceImpl implements NotificationDeliveryServ
         } catch (MailException failure) {
             throw new NotificationDeliveryException(failure);
         }
-        return "smtp:" + notification.getId();
+        return NotificationConstants.SMTP_PROVIDER_PREFIX + notification.getId();
     }
 
     private String sendSms(Notification notification) {
         if (!properties.isSmsEnabled()) throw new NotificationDeliveryException();
-        String idempotencyKey = "notification:" + notification.getId();
+        String idempotencyKey =
+                NotificationConstants.SMS_IDEMPOTENCY_PREFIX + notification.getId();
         String body =
                 objectMapper.writeValueAsString(
                         Map.of(
-                                "destination",
+                                NotificationConstants.SMS_FIELD_DESTINATION,
                                 notification.getDestination(),
-                                "payload",
+                                NotificationConstants.SMS_FIELD_PAYLOAD,
                                 objectMapper.readTree(notification.getPayloadJson()),
-                                "idempotencyKey",
+                                NotificationConstants.SMS_FIELD_IDEMPOTENCY_KEY,
                                 idempotencyKey));
         HttpRequest request =
                 HttpRequest.newBuilder(URI.create(properties.getSmsUrl()))
                         .timeout(properties.getRequestTimeout())
-                        .header("Authorization", "Bearer " + properties.getSmsToken())
-                        .header("Content-Type", "application/json")
-                        .header("Idempotency-Key", idempotencyKey)
+                        .header(
+                                NotificationConstants.HEADER_AUTHORIZATION,
+                                SecurityConstants.BEARER_PREFIX + properties.getSmsToken())
+                        .header(
+                                NotificationConstants.HEADER_CONTENT_TYPE,
+                                NotificationConstants.APPLICATION_JSON)
+                        .header(NotificationConstants.HEADER_IDEMPOTENCY_KEY, idempotencyKey)
                         .POST(HttpRequest.BodyPublishers.ofString(body))
                         .build();
         try {

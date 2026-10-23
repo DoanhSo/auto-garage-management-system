@@ -5,6 +5,7 @@ import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.security.JsonCorsProcessor;
+import com.Group13_65CNTT.AutoGarage.common.security.KeycloakJwtAuthenticationConverter;
 import com.Group13_65CNTT.AutoGarage.common.security.SecurityErrorWriter;
 import com.Group13_65CNTT.AutoGarage.common.util.SafeFailureLog;
 
@@ -12,6 +13,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
+import lombok.RequiredArgsConstructor;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,8 +30,6 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -49,11 +50,8 @@ public class SecurityConfiguration {
             SecurityErrorWriter errors,
             @Value("${springdoc.api-docs.enabled:false}") boolean docsEnabled)
             throws Exception {
-        JwtGrantedAuthoritiesConverter roles = new JwtGrantedAuthoritiesConverter();
-        roles.setAuthoritiesClaimName(SecurityConstants.ROLE_CLAIM);
-        roles.setAuthorityPrefix(SecurityConstants.ROLE_PREFIX);
-        JwtAuthenticationConverter authentication = new JwtAuthenticationConverter();
-        authentication.setJwtGrantedAuthoritiesConverter(roles);
+        KeycloakJwtAuthenticationConverter authentication =
+                new KeycloakJwtAuthenticationConverter();
         http.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(csrf -> csrf.disable()) // Authorization: Bearer only; no session/cookie
                 // authentication
@@ -66,29 +64,30 @@ public class SecurityConfiguration {
                         a -> {
                             if (docsEnabled)
                                 a.requestMatchers(
-                                                "/v3/api-docs/**",
-                                                "/swagger-ui/**",
-                                                "/swagger-ui.html")
+                                                ApiPaths.OPENAPI_DOCS_PATTERN,
+                                                ApiPaths.SWAGGER_UI_PATTERN,
+                                                ApiPaths.SWAGGER_UI_HTML)
                                         .permitAll();
                             a.requestMatchers(HttpMethod.GET, ApiPaths.UI_POLICY)
                                     .permitAll()
-                                    .requestMatchers(HttpMethod.POST, ApiPaths.AUTH_BASE + ApiPaths.LOGIN)
-                                    .permitAll()
-                                    .requestMatchers(ApiPaths.AUTH_BASE + "/**")
+                                    .requestMatchers(ApiPaths.AUTH_WILDCARD)
                                     .authenticated()
-                                    .requestMatchers(
-                                            ApiPaths.USERS_BASE, ApiPaths.USERS_BASE + "/**")
+                                    .requestMatchers(ApiPaths.USERS_BASE, ApiPaths.USERS_WILDCARD)
                                     .hasRole(Role.ADMIN.name())
                                     .requestMatchers(
-                                            ApiPaths.AUDIT_BASE + "/**",
+                                            ApiPaths.AUDIT_WILDCARD,
                                             ApiPaths.AUDIT_BASE,
-                                            ApiPaths.REPORTS_BASE + "/**")
+                                            ApiPaths.REPORTS_WILDCARD)
                                     .hasRole(Role.ADMIN.name())
                                     .requestMatchers(HttpMethod.POST, ApiPaths.NOTIFICATIONS_BASE)
                                     .hasRole(Role.ADMIN.name())
                                     .requestMatchers(
                                             ApiPaths.NOTIFICATIONS_BASE,
-                                            ApiPaths.NOTIFICATIONS_BASE + "/**")
+                                            ApiPaths.NOTIFICATIONS_WILDCARD)
+                                    .authenticated()
+                                    .requestMatchers(
+                                            "/api/v1/inventory/**",
+                                            "/api/v1/billing/**")
                                     .authenticated()
                                     .requestMatchers(
                                             ApiPaths.CUSTOMERS_BASE, ApiPaths.CUSTOMERS_BASE + "/**",
@@ -160,24 +159,21 @@ public class SecurityConfiguration {
                 properties.allowedOrigins() == null
                         ? List.of()
                         : properties.allowedOrigins().stream().filter(s -> !s.isBlank()).toList());
-        cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        cors.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-        cors.setExposedHeaders(List.of("Location"));
+        cors.setAllowedMethods(SecurityConstants.CORS_ALLOWED_METHODS);
+        cors.setAllowedHeaders(SecurityConstants.CORS_ALLOWED_HEADERS);
+        cors.setExposedHeaders(SecurityConstants.CORS_EXPOSED_HEADERS);
         cors.setAllowCredentials(false);
         cors.setMaxAge(properties.corsMaxAge().toSeconds());
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", cors);
+        source.registerCorsConfiguration(ApiPaths.API_CORS_PATTERN, cors);
         return source;
     }
 
+    @RequiredArgsConstructor
     private static final class InfrastructureFailureBoundary extends OncePerRequestFilter {
         private static final Logger LOG =
                 LoggerFactory.getLogger(InfrastructureFailureBoundary.class);
         private final SecurityErrorWriter errors;
-
-        private InfrastructureFailureBoundary(SecurityErrorWriter errors) {
-            this.errors = errors;
-        }
 
         protected void doFilterInternal(
                 HttpServletRequest request, HttpServletResponse response, FilterChain chain)

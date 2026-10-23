@@ -15,6 +15,13 @@ import {
   Users,
   Wrench,
   X,
+  Package,
+  Building2,
+  FileText,
+  Scale,
+  Receipt,
+  DollarSign,
+  CreditCard,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from '../providers/AuthProvider';
@@ -22,11 +29,24 @@ import { useMeQuery, useLogoutMutation } from '../../features/auth/hooks/useAuth
 import { useUnreadCountQuery } from '../../features/notification/hooks/useNotifications';
 import { Button } from '../../shared/components/ui';
 import { initials } from '../../shared/utils/format';
+
 const links = [
+  // TV2: Tiếp nhận xe, Khách hàng, Phương tiện, Dịch vụ & Tiền công
+  { to: '/reception', label: 'Tiếp nhận xe', icon: CalendarCheck, admin: false },
   { to: '/customers', label: 'Khách hàng', icon: Contact, admin: false },
   { to: '/vehicles', label: 'Phương tiện', icon: Car, admin: false },
   { to: '/services', label: 'Dịch vụ & Tiền công', icon: Layers, admin: false },
-  { to: '/reception', label: 'Tiếp nhận xe', icon: CalendarCheck, admin: false },
+
+  // TV4: Kho phụ tùng & Tài chính hóa đơn
+  { to: '/inventory/parts', label: 'Kho & Phụ tùng', icon: Package, admin: false },
+  { to: '/inventory/suppliers', label: 'Nhà cung cấp', icon: Building2, admin: false },
+  { to: '/inventory/documents', label: 'Chứng từ kho', icon: FileText, admin: false },
+  { to: '/inventory/reconciliation', label: 'Đối soát kho', icon: Scale, admin: false },
+  { to: '/billing/invoices', label: 'Hóa đơn dịch vụ', icon: Receipt, admin: false },
+  { to: '/billing/payments', label: 'Sổ quỹ Thu / Chi', icon: DollarSign, admin: false },
+  { to: '/billing/debt-ledger', label: 'Sổ nợ & Tín dụng', icon: CreditCard, admin: false },
+
+  // TV1: Báo cáo, Quản trị người dùng & Nhật ký
   {
     to: '/admin/reports',
     label: 'Báo cáo',
@@ -37,6 +57,7 @@ const links = [
   { to: '/admin/audit', label: 'Nhật ký', icon: History, admin: true },
   { to: '/notifications', label: 'Thông báo', icon: Bell, admin: false },
 ];
+
 export function AppShell() {
   const { user, setCurrentUser } = useAuth();
   const me = useMeQuery();
@@ -45,12 +66,15 @@ export function AppShell() {
   const location = useLocation();
   const [mobile, setMobile] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     if (me.data) setCurrentUser(me.data);
   }, [me.data, setCurrentUser]);
+
   const allowed = links.filter((link) => !link.admin || user?.role === 'ADMIN');
   const title =
     links.find((link) => location.pathname.startsWith(link.to))?.label ?? 'Tài khoản cá nhân';
+
   const nav = (close?: () => void) => (
     <nav className="main-navigation" aria-label="Điều hướng chính">
       <span className="nav-heading">KHÔNG GIAN LÀM VIỆC</span>
@@ -79,6 +103,7 @@ export function AppShell() {
       </NavLink>
     </nav>
   );
+
   return (
     <div className="app-layout">
       <aside className="sidebar">
