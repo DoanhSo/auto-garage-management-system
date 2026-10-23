@@ -65,8 +65,9 @@ public class InvoiceItem {
     @Column(name = "unit_price", nullable = false, precision = 18, scale = 2)
     private BigDecimal unitPrice;
 
+    @Builder.Default
     @Column(name = "unit_cost", nullable = false, precision = 18, scale = 2)
-    private BigDecimal unitCost;
+    private BigDecimal unitCost = BigDecimal.ZERO;
 
     @Builder.Default
     @Column(name = "discount_amount", nullable = false, precision = 18, scale = 2)
