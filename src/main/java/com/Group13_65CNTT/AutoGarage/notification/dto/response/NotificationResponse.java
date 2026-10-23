@@ -11,6 +11,7 @@ import java.time.Instant;
 @AllArgsConstructor
 public class NotificationResponse {
     private Long id;
+    private Long userId;
     private String channel;
     private String subject;
     private String payloadJson;

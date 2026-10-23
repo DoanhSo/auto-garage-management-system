@@ -14,6 +14,7 @@ import { ToastProvider } from './providers/ToastProvider';
 import { AppShell } from './layouts/AppShell';
 import { Button, Loading } from '../shared/components/ui';
 import { retryQuery } from '../shared/api/errors';
+import type { Role } from '../shared/types/contracts';
 const LoginPage = lazy(() =>
   import('../features/auth/pages/LoginPage').then((module) => ({
     default: module.LoginPage,
@@ -53,9 +54,12 @@ export function RequireAuth() {
     <Navigate to="/login" replace state={{ returnTo: location.pathname + location.search }} />
   );
 }
-export function RequireAdmin() {
+export function RequireRoles({ allowedRoles }: { allowedRoles: readonly Role[] }) {
   const { user } = useAuth();
-  return user?.role === 'ADMIN' ? <Outlet /> : <Navigate to="/403" replace />;
+  return user && allowedRoles.includes(user.role) ? <Outlet /> : <Navigate to="/403" replace />;
+}
+export function RequireAdmin() {
+  return <RequireRoles allowedRoles={['ADMIN']} />;
 }
 function Home() {
   const { user } = useAuth();

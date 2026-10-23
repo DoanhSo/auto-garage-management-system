@@ -40,3 +40,4 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/.cache/
 frontend/output/playwright/
+frontend/.playwright-cli/

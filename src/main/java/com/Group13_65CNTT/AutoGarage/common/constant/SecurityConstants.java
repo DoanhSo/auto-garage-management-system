@@ -5,11 +5,20 @@ import java.util.List;
 public final class SecurityConstants {
     public static final String HAS_ROLE_ADMIN = "hasRole('ADMIN')";
     public static final String HAS_ANY_ROLE = "isAuthenticated()";
+    public static final String HAS_STAFF_OR_ADMIN =
+            "hasAnyRole('ADMIN','RECEPTIONIST','WAREHOUSE_STAFF','TECHNICIAN')";
+    public static final String HAS_FRONT_DESK = "hasAnyRole('ADMIN','RECEPTIONIST')";
+    public static final String HAS_BOOKING_ACCESS = "hasAnyRole('ADMIN','RECEPTIONIST','CUSTOMER')";
+    public static final String HAS_TECHNICAL_ACCESS =
+            "hasAnyRole('ADMIN','RECEPTIONIST','TECHNICIAN')";
 
     public static final String REALM_ACCESS_CLAIM = "realm_access";
     public static final String ROLES_CLAIM = "roles";
     public static final String ROLE_CLAIM = "role";
     public static final String PREFERRED_USERNAME_CLAIM = "preferred_username";
+    public static final String EMAIL_CLAIM = "email";
+    public static final String EMAIL_VERIFIED_CLAIM = "email_verified";
+    public static final String NAME_CLAIM = "name";
     public static final String AUTH_VERSION_CLAIM = "auth_version";
     public static final String ROLE_PREFIX = "ROLE_";
     public static final String BEARER_TOKEN_TYPE = "Bearer";
@@ -37,6 +46,9 @@ public final class SecurityConstants {
     public static final int FULL_NAME_MAX_LENGTH = 150;
     public static final int ROLE_MAX_LENGTH = 30;
     public static final int PASSWORD_HASH_MAX_LENGTH = 255;
+
+    public static final String CUSTOMER_CODE_OIDC_PREFIX = "CUS-OIDC-";
+    public static final String DEFAULT_CUSTOMER_NAME = "Khách hàng AutoGarage";
 
     public static final long MAX_CLOCK_SKEW_SECONDS = 60L;
     public static final String HTTP_SCHEME = "http";

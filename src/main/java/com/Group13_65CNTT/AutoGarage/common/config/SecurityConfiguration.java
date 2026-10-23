@@ -79,12 +79,64 @@ public class SecurityConfiguration {
                                             ApiPaths.AUDIT_BASE,
                                             ApiPaths.REPORTS_WILDCARD)
                                     .hasRole(Role.ADMIN.name())
-                                    .requestMatchers(HttpMethod.POST, ApiPaths.NOTIFICATIONS_BASE)
+                                    .requestMatchers(
+                                            HttpMethod.POST,
+                                            ApiPaths.NOTIFICATIONS_BASE,
+                                            ApiPaths.NOTIFICATIONS_BASE
+                                                    + ApiPaths.NOTIFICATIONS_BROADCAST)
+                                    .hasRole(Role.ADMIN.name())
+                                    .requestMatchers(
+                                            HttpMethod.GET,
+                                            ApiPaths.NOTIFICATIONS_BASE
+                                                    + ApiPaths.NOTIFICATIONS_ADMIN)
+                                    .hasRole(Role.ADMIN.name())
+                                    .requestMatchers(
+                                            HttpMethod.DELETE, ApiPaths.NOTIFICATIONS_WILDCARD)
                                     .hasRole(Role.ADMIN.name())
                                     .requestMatchers(
                                             ApiPaths.NOTIFICATIONS_BASE,
                                             ApiPaths.NOTIFICATIONS_WILDCARD)
                                     .authenticated()
+                                    .requestMatchers(
+                                            HttpMethod.GET,
+                                            ApiPaths.SERVICES_BASE,
+                                            ApiPaths.SERVICES_WILDCARD)
+                                    .authenticated()
+                                    .requestMatchers(
+                                            ApiPaths.SERVICES_BASE, ApiPaths.SERVICES_WILDCARD)
+                                    .hasRole(Role.ADMIN.name())
+                                    .requestMatchers(
+                                            ApiPaths.CUSTOMERS_BASE, ApiPaths.CUSTOMERS_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.CUSTOMER.name())
+                                    .requestMatchers(
+                                            ApiPaths.VEHICLES_BASE, ApiPaths.VEHICLES_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.TECHNICIAN.name(),
+                                            Role.CUSTOMER.name())
+                                    .requestMatchers(
+                                            ApiPaths.BOOKINGS_BASE, ApiPaths.BOOKINGS_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.CUSTOMER.name())
+                                    .requestMatchers(
+                                            ApiPaths.RECEPTION_BASE, ApiPaths.RECEPTION_WILDCARD)
+                                    .hasAnyRole(Role.ADMIN.name(), Role.RECEPTIONIST.name())
+                                    .requestMatchers(
+                                            ApiPaths.VEHICLE_CHECKS_BASE,
+                                            ApiPaths.VEHICLE_CHECKS_WILDCARD,
+                                            ApiPaths.ATTACHMENTS_BASE,
+                                            ApiPaths.ATTACHMENTS_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.TECHNICIAN.name(),
+                                            Role.CUSTOMER.name())
                                     .anyRequest()
                                     .denyAll();
                         })

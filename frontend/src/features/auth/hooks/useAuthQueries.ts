@@ -5,6 +5,10 @@ export function useLoginMutation() {
   const { login } = useAuth();
   return useMutation({ mutationFn: login, retry: 0, gcTime: 0 });
 }
+export function usePkceCallbackMutation() {
+  const { completePkceLogin } = useAuth();
+  return useMutation({ mutationFn: completePkceLogin, retry: 0, gcTime: 0 });
+}
 export function useLogoutMutation() {
   const { logout } = useAuth();
   return useMutation({ mutationFn: logout, retry: 0, gcTime: 0 });
@@ -17,12 +21,5 @@ export function useMeQuery() {
     enabled: !!user,
     staleTime: 30000,
     refetchOnWindowFocus: 'always',
-  });
-}
-export function useChangePasswordMutation() {
-  return useMutation({
-    mutationFn: authApi.changePassword,
-    retry: 0,
-    gcTime: 0,
   });
 }

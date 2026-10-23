@@ -13,7 +13,7 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Mở `http://127.0.0.1:5173`. Vite chuyển `/api` đến `DEV_API_PROXY`, mặc định `http://127.0.0.1:8080`. Backend cần allow origin tương ứng trong `AUTH_CORS_ORIGINS`. Source không chứa tài khoản/mật khẩu đăng nhập mặc định.
+Mở `http://127.0.0.1:5173`. Vite chuyển `/api` đến `DEV_API_PROXY`, mặc định `http://127.0.0.1:8080`, giữ cặp Host/Origin của trình duyệt để các request ghi cùng nguồn không bị nhận nhầm là CORS. Proxy không xóa hoặc giả mạo Origin. Nếu gọi API khác origin trực tiếp, backend cần allow origin tương ứng trong `AUTH_CORS_ORIGINS`. Source không chứa tài khoản/mật khẩu đăng nhập mặc định.
 
 `VITE_API_BASE_URL`, `VITE_NOTIFICATION_POLL_MS`, `VITE_REQUEST_TIMEOUT_MS` là biến công khai lúc build. `DEV_API_PROXY` chỉ dùng ở dev server. Không đặt signing key, DB/SMTP/SMS credential vào `VITE_*`.
 
@@ -61,6 +61,7 @@ npm run typecheck
 npm run lint
 npm run format:check
 npm test
+npm run test:proxy
 npm run build
 ```
 

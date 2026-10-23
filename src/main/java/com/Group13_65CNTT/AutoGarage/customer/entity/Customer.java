@@ -30,7 +30,7 @@ public class Customer {
     @Column(name = "customer_type", nullable = false, length = 20)
     private CustomerType customerType = CustomerType.INDIVIDUAL;
 
-    @Column(name = "phone", nullable = false, length = 30)
+    @Column(name = "phone", length = 30)
     private String phone;
 
     @Column(name = "email", length = 254)

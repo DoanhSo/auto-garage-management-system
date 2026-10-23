@@ -3,6 +3,7 @@ import { roles } from './contracts';
 export const idSchema = z.string().regex(/^[1-9]\d*$/);
 export const userSchema = z.object({
   id: idSchema,
+  identityId: z.string().nullable().optional(),
   username: z.string(),
   email: z.string().nullable(),
   fullName: z.string(),
@@ -11,8 +12,16 @@ export const userSchema = z.object({
   version: z.string().regex(/^\d+$/),
   createdAt: z.string(),
 });
+export const oidcTokenSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().min(1).optional(),
+  expires_in: z.number().int().positive().default(1800),
+  token_type: z.string().default('Bearer'),
+});
 export const loginResultSchema = z.object({
   accessToken: z.string().min(1),
+  refreshToken: z.string().nullable().optional(),
+  expiresIn: z.number().int().positive().optional(),
   tokenType: z.literal('Bearer'),
   expiresAt: z.string(),
   user: userSchema,
@@ -28,12 +37,21 @@ export function pageSchema<T extends z.ZodType>(item: T) {
 }
 export const noticeSchema = z.object({
   id: idSchema,
+  userId: idSchema.nullable().optional(),
   channel: z.string(),
   subject: z.string().nullable(),
   payloadJson: z.string(),
   status: z.string(),
   readAt: z.string().nullable(),
   createdAt: z.string(),
+});
+export const noticeBroadcastResultSchema = z.object({
+  eventKey: z.string().optional(),
+  recipientCount: z.number().int().nonnegative(),
+  targetRole: z.enum(roles).nullable().optional().default(null),
+  targetRoles: z.array(z.enum(roles)).optional(),
+  channel: z.string().optional(),
+  subject: z.string().nullable().optional(),
 });
 export const auditSchema = z.object({
   id: idSchema,

@@ -47,10 +47,10 @@ describe('Forms against HTTP contracts', () => {
   it('validates login and prevents duplicate requests while pending', async () => {
     let calls = 0;
     server.use(
-      http.post('/api/v1/auth/login', async () => {
+      http.post('/realms/autogarage-realm/protocol/openid-connect/token', async () => {
         calls++;
         await delay(100);
-        return HttpResponse.json(envelope(null, 3005), { status: 401 });
+        return HttpResponse.json({ error: 'invalid_grant' }, { status: 401 });
       }),
     );
     app();
@@ -84,7 +84,6 @@ describe('Forms against HTTP contracts', () => {
       }),
     );
     expect(await within(dialog).findByText('Nhập họ và tên.')).toBeVisible();
-    expect(within(dialog).getAllByText('Ít nhất 12 ký tự, tối đa 72 byte UTF-8.')).toHaveLength(1);
     expect(within(dialog).queryByText('3–100 ký tự: chữ/số, dấu . _ -')).not.toBeInTheDocument();
     expect(create).not.toHaveBeenCalled();
     await user.type(within(dialog).getByLabelText('Họ và tên', { exact: false }), 'New Member');
@@ -92,14 +91,6 @@ describe('Forms against HTTP contracts', () => {
     await user.selectOptions(
       within(dialog).getByLabelText('Vai trò', { exact: false }),
       'RECEPTIONIST',
-    );
-    await user.type(
-      within(dialog).getByLabelText(/^Mật khẩu\s*\*/, { selector: 'input' }),
-      'temporary-password',
-    );
-    await user.type(
-      within(dialog).getByLabelText('Xác nhận mật khẩu', { exact: false }),
-      'temporary-password',
     );
     await user.click(
       within(dialog).getByRole('button', {
@@ -112,7 +103,6 @@ describe('Forms against HTTP contracts', () => {
       email: null,
       fullName: 'New Member',
       role: 'RECEPTIONIST',
-      password: 'temporary-password',
     });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
@@ -233,26 +223,23 @@ describe('Forms against HTTP contracts', () => {
     );
     expect(deletes).toBe(1);
   });
-  it('does not log out for a wrong current password', async () => {
+  it('renders Keycloak security panel and revokes all active sessions', async () => {
+    let logoutCalls = 0;
     server.use(
-      http.post('/api/v1/auth/password', () =>
-        HttpResponse.json(envelope(null, 3005), { status: 401 }),
-      ),
+      http.post('/api/v1/auth/logout', () => {
+        logoutCalls++;
+        return HttpResponse.json(envelope(null));
+      }),
     );
     app(<AccountPage />);
     const user = await login();
-    await user.type(await screen.findByLabelText('Mật khẩu hiện tại', { exact: false }), 'wrong');
-    await user.type(
-      screen.getByLabelText(/^Mật khẩu mới/, { selector: 'input' }),
-      'new-password-long',
+    expect(await screen.findByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+    expect(screen.getByRole('link', { name: /Mở cổng tài khoản Keycloak/i })).toHaveAttribute(
+      'href',
+      'http://localhost:8081/realms/autogarage-realm/account',
     );
-    await user.type(
-      screen.getByLabelText('Xác nhận mật khẩu mới', { exact: false }),
-      'new-password-long',
-    );
-    await user.click(screen.getByRole('button', { name: 'Đổi mật khẩu' }));
-    expect(await screen.findByText('Mật khẩu hiện tại chưa đúng.')).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Thu hồi mọi phiên đăng nhập/i }));
+    await waitFor(() => expect(logoutCalls).toBe(1));
   });
   it('renders notification payload as text and saves read state once', async () => {
     const notice = {

@@ -88,8 +88,8 @@ describe('Credential and mutation validation', () => {
       password: 'a'.repeat(12),
       confirmPassword: 'a'.repeat(12),
     };
-    expect(userFormSchema(policy, true).safeParse(values).success).toBe(true);
-    expect(userFormSchema(policy, true).safeParse({ ...values, role: 'ROOT' }).success).toBe(false);
+    expect(userFormSchema().safeParse(values).success).toBe(true);
+    expect(userFormSchema().safeParse({ ...values, role: 'ROOT' }).success).toBe(false);
   });
 });
 describe('Safe rendering and navigation', () => {

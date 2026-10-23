@@ -1,5 +1,16 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownLeft, ArrowUpRight, CalendarDays, Download, RefreshCw } from 'lucide-react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CalendarDays,
+  Clock3,
+  Download,
+  Package,
+  RefreshCw,
+  TrendingUp,
+  Truck,
+  Users,
+} from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useUiPolicy } from '../../../shared/config/policy';
 import {
@@ -235,23 +246,29 @@ function ReadyReports({ policy }: { policy: UiPolicy }) {
               label="Doanh thu"
               value={money(dashboard.data.revenue)}
               description="Doanh thu ghi nhận trong kỳ"
+              icon={<TrendingUp size={18} />}
+              tone="primary"
             />
             <Metric
               label="Tiền thu"
               value={money(dashboard.data.cashIn)}
               description="Dòng tiền vào trong kỳ"
               icon={<ArrowDownLeft size={18} />}
+              tone="success"
             />
             <Metric
               label="Tiền chi"
               value={money(dashboard.data.cashOut)}
               description="Dòng tiền ra trong kỳ"
               icon={<ArrowUpRight size={18} />}
+              tone="danger"
             />
             <Metric
               label="Giờ công"
               value={hours(dashboard.data.laborHours)}
               description="Tổng giờ công trong kỳ"
+              icon={<Clock3 size={18} />}
+              tone="info"
             />
           </div>
           <div className="section-heading">
@@ -268,16 +285,22 @@ function ReadyReports({ policy }: { policy: UiPolicy }) {
               label="Khách hàng còn nợ"
               value={money(dashboard.data.customerDebt)}
               description="Tổng công nợ phải thu"
+              icon={<Users size={18} />}
+              tone="warning"
             />
             <Metric
               label="Nợ nhà cung cấp"
               value={money(dashboard.data.supplierDebt)}
               description="Tổng công nợ phải trả"
+              icon={<Truck size={18} />}
+              tone="danger"
             />
             <Metric
               label="Giá trị tồn kho"
               value={money(dashboard.data.stockValue)}
               description="Giá trị vật tư hiện có"
+              icon={<Package size={18} />}
+              tone="primary"
             />
           </div>
         </>
@@ -326,16 +349,18 @@ function Metric({
   value,
   description,
   icon,
+  tone = 'primary',
 }: {
   label: string;
   value: string;
   description: string;
   icon?: React.ReactNode;
+  tone?: 'primary' | 'success' | 'warning' | 'danger' | 'info';
 }) {
   return (
-    <article className="metric-card">
+    <article className={`metric-card metric-tone-${tone}`}>
       <div className="metric-label">
-        {label}
+        <span>{label}</span>
         {icon && <span className="metric-icon">{icon}</span>}
       </div>
       <strong className="metric-value">{value}</strong>

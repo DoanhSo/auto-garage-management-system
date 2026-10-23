@@ -61,15 +61,30 @@ public final class AccountTokenValidator implements OAuth2TokenValidator<Jwt> {
             return INVALID;
         }
         // Do not disguise a database outage as invalid credentials.
-        return resolveUser(users, token)
-                .filter(
-                        u ->
-                                u.isActive()
-                                        && u.getDeletedAt() == null
-                                        && u.getAuthVersion() == version
-                                        && u.getRole() == role)
-                .map(u -> OAuth2TokenValidatorResult.success())
-                .orElse(INVALID);
+        Optional<User> resolved = resolveUser(users, token);
+        if (resolved.isPresent()) {
+            return resolved.filter(
+                            u ->
+                                    u.isActive()
+                                            && u.getDeletedAt() == null
+                                            && u.getAuthVersion() == version
+                                            && u.getRole() == role)
+                    .map(u -> OAuth2TokenValidatorResult.success())
+                    .orElse(INVALID);
+        }
+        // Allow JIT provisioning exclusively for self-registered or Google-authenticated CUSTOMER
+        // tokens issued by Keycloak (never for staff or administrator roles).
+        if (role == Role.CUSTOMER
+                && version == SecurityConstants.DEFAULT_AUTH_VERSION
+                && token.getSubject().matches(SecurityConstants.IDENTITY_ID_PATTERN)
+                && !token.getSubject().matches(SecurityConstants.POSITIVE_LONG_ID_PATTERN)) {
+            String preferredUsername =
+                    token.getClaimAsString(SecurityConstants.PREFERRED_USERNAME_CLAIM);
+            if (preferredUsername != null && !preferredUsername.isBlank()) {
+                return OAuth2TokenValidatorResult.success();
+            }
+        }
+        return INVALID;
     }
 
     public static Optional<User> resolveUser(UserRepository users, Jwt token) {

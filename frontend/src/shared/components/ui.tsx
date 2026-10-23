@@ -111,7 +111,11 @@ export function FormError({ message }: { message?: string }) {
   ) : null;
 }
 export function RoleBadge({ role }: { role: Role }) {
-  return <span className="badge badge-neutral">{roleLabels[role]}</span>;
+  return (
+    <span className={`badge badge-neutral badge-role-${role.toLowerCase()}`}>
+      {roleLabels[role]}
+    </span>
+  );
 }
 export function StatusBadge({ active }: { active: boolean }) {
   return (

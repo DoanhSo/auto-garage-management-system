@@ -15,6 +15,7 @@ export const roleLabels: Record<Role, string> = {
 };
 export interface User {
   id: string;
+  identityId?: string | null;
   username: string;
   email: string | null;
   fullName: string;
@@ -23,8 +24,16 @@ export interface User {
   version: string;
   createdAt: string;
 }
+export interface OidcTokenBundle {
+  accessToken: string;
+  refreshToken: string | null;
+  expiresIn: number;
+  tokenType: string;
+}
 export interface LoginResult {
   accessToken: string;
+  refreshToken?: string | null;
+  expiresIn?: number;
   tokenType: string;
   expiresAt: string;
   user: User;
@@ -47,12 +56,26 @@ export interface UiPolicy {
 }
 export interface Notice {
   id: string;
+  userId?: string | null;
   channel: string;
   subject: string | null;
   payloadJson: string;
   status: string;
   readAt: string | null;
   createdAt: string;
+}
+export interface NoticeBroadcastRequest {
+  targetRoles?: Role[];
+  subject: string;
+  payloadJson: string;
+}
+export interface NoticeBroadcastResult {
+  eventKey?: string;
+  recipientCount: number;
+  targetRole: Role | null;
+  targetRoles?: Role[];
+  channel?: string;
+  subject?: string | null;
 }
 export interface AuditEvent {
   id: string;
@@ -88,7 +111,8 @@ export interface UserCreate {
   email: string | null;
   fullName: string;
   role: Role;
-  password: string;
+  password?: string | null;
+  identityId?: string | null;
 }
 export interface UserUpdate {
   email: string | null;

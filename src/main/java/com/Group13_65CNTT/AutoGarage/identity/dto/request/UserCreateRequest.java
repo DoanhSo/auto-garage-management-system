@@ -24,13 +24,15 @@ public class UserCreateRequest {
 
     @Pattern(
             regexp = SecurityConstants.IDENTITY_ID_PATTERN,
-            message = "Identity ID must be a 1-36 character ASCII alphanumeric or hyphen identifier")
+            message =
+                    "Identity ID must be a 1-36 character ASCII alphanumeric or hyphen identifier")
     private String identityId;
 
     @NotBlank(message = "Username is required")
     @Pattern(
             regexp = SecurityConstants.USERNAME_PATTERN,
-            message = "Username requires 3-100 ASCII letters, digits, dots, underscores or hyphens")
+            message =
+                    "Username requires 3-100 ASCII letters, digits, dots, underscores or hyphens")
     private String username;
 
     @Email(message = "Email must be valid")
@@ -47,6 +49,9 @@ public class UserCreateRequest {
 
     @NotNull(message = "Role is required")
     private Role role;
+
+    @Size(max = 72, message = "Initial password must not exceed 72 characters")
+    private String password;
 
     @Override
     public String toString() {

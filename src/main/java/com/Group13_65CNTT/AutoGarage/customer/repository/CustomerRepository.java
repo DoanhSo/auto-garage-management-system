@@ -18,6 +18,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     Optional<Customer> findByUserId(Long userId);
 
+    Optional<Customer> findFirstByEmailIgnoreCaseAndUserIdIsNullOrderByIdAsc(String email);
+
     boolean existsByCustomerCode(String customerCode);
 
     boolean existsByPhone(String phone);
