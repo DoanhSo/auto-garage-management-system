@@ -167,3 +167,82 @@ export const serviceSchema = z.object({
   updatedAt: z.string(),
   version: z.string().regex(/^\d+$/),
 });
+
+export const bookingStatusSchema = z.enum([
+  'PENDING',
+  'CONFIRMED',
+  'CANCELLED',
+  'NO_SHOW',
+  'RECEIVED',
+]);
+
+export const bookingSchema = z.object({
+  id: idSchema,
+  bookingCode: z.string(),
+  customerId: idSchema,
+  customerName: z.string(),
+  customerPhone: z.string(),
+  vehicleId: idSchema,
+  licensePlate: z.string(),
+  vehicleModel: z.string().nullable().optional(),
+  serviceId: idSchema.nullable().optional(),
+  serviceName: z.string().nullable().optional(),
+  standardMinutes: z.number().int().nullable().optional(),
+  bayId: idSchema.nullable().optional(),
+  appointmentAt: z.string(),
+  expectedEndAt: z.string(),
+  requestDescription: z.string().nullable().optional(),
+  status: bookingStatusSchema,
+  cancellationReason: z.string().nullable().optional(),
+  createdBy: idSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  version: z.string().regex(/^\d+$/),
+});
+
+export const checkInVehicleResultSchema = z.object({
+  repairOrderId: idSchema,
+  orderCode: z.string(),
+  bookingId: idSchema.nullable().optional(),
+  vehicleId: idSchema,
+  status: z.string(),
+  receivedAt: z.string(),
+});
+
+export const checkTypeSchema = z.enum(['CHECK_IN', 'QC', 'HANDOVER']);
+export const checkResultSchema = z.enum(['PASS', 'FAIL', 'CONDITIONAL']);
+export const attachmentCategorySchema = z.enum([
+  'CHECK_IN',
+  'DIAGNOSIS',
+  'QC',
+  'HANDOVER',
+  'WARRANTY',
+]);
+
+export const attachmentSchema = z.object({
+  id: idSchema,
+  repairOrderId: idSchema.nullable().optional(),
+  vehicleCheckId: idSchema.nullable().optional(),
+  warrantyClaimId: idSchema.nullable().optional(),
+  category: attachmentCategorySchema,
+  fileName: z.string(),
+  fileSize: z.number().optional(),
+  contentType: z.string().optional(),
+  fileUrl: z.string(),
+  createdAt: z.string(),
+});
+
+export const vehicleCheckSchema = z.object({
+  id: idSchema,
+  repairOrderId: idSchema,
+  checkType: checkTypeSchema,
+  attemptNo: z.number().int(),
+  result: checkResultSchema,
+  checklistJson: z.string(),
+  schemaVersion: z.number().int(),
+  odometer: z.number().int().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  checkedBy: idSchema,
+  checkedAt: z.string(),
+  attachments: z.array(attachmentSchema).default([]),
+});

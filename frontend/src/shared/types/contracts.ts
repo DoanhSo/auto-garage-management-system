@@ -215,6 +215,119 @@ export interface ServiceUpdate {
   isActive?: boolean;
 }
 
+export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'NO_SHOW' | 'RECEIVED';
+export const bookingStatuses: [BookingStatus, ...BookingStatus[]] = [
+  'PENDING',
+  'CONFIRMED',
+  'CANCELLED',
+  'NO_SHOW',
+  'RECEIVED',
+];
+
+export interface Booking {
+  id: string;
+  bookingCode: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  vehicleId: string;
+  licensePlate: string;
+  vehicleModel?: string | null;
+  serviceId?: string | null;
+  serviceName?: string | null;
+  standardMinutes?: number | null;
+  bayId?: string | null;
+  appointmentAt: string;
+  expectedEndAt: string;
+  requestDescription?: string | null;
+  status: BookingStatus;
+  cancellationReason?: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  version: string;
+}
+
+export interface BookingCreate {
+  customerId: string;
+  vehicleId: string;
+  serviceId?: string | null;
+  bayId?: string | null;
+  appointmentAt: string;
+  requestDescription?: string | null;
+  createdBy?: string;
+}
+
+export interface BookingReschedule {
+  newAppointmentAt: string;
+  newBayId?: string | null;
+  actorUserId?: string;
+}
+
+export interface BookingCancel {
+  cancellationReason: string;
+  actorUserId?: string;
+}
+
+export interface CheckInVehicle {
+  bookingId?: string | null;
+  vehicleId: string;
+  odometerIn: number;
+  fuelLevelPercent?: number | null;
+  customerComplaint?: string | null;
+  actorUserId?: string;
+}
+
+export interface CheckInVehicleResult {
+  repairOrderId: string;
+  orderCode: string;
+  bookingId?: string | null;
+  vehicleId: string;
+  status: string;
+  receivedAt: string;
+}
+
+export type CheckType = 'CHECK_IN' | 'QC' | 'HANDOVER';
+export type CheckResult = 'PASS' | 'FAIL' | 'CONDITIONAL';
+export type AttachmentCategory = 'CHECK_IN' | 'DIAGNOSIS' | 'QC' | 'HANDOVER' | 'WARRANTY';
+
+export interface Attachment {
+  id: string;
+  repairOrderId?: string | null;
+  vehicleCheckId?: string | null;
+  warrantyClaimId?: string | null;
+  category: AttachmentCategory;
+  fileName: string;
+  fileSize?: number;
+  contentType?: string;
+  fileUrl: string;
+  createdAt: string;
+}
+
+export interface VehicleCheck {
+  id: string;
+  repairOrderId: string;
+  checkType: CheckType;
+  attemptNo: number;
+  result: CheckResult;
+  checklistJson: string;
+  schemaVersion: number;
+  odometer?: number | null;
+  notes?: string | null;
+  checkedBy: string;
+  checkedAt: string;
+  attachments: Attachment[];
+}
+
+export interface VehicleCheckCreate {
+  repairOrderId: string;
+  checkType: CheckType;
+  checklistJson: string;
+  odometer?: number | null;
+  notes?: string | null;
+  checkedBy?: string;
+}
+
 export interface User {
   id: string;
   username: string;

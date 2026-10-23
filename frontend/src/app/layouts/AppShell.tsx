@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Bell,
+  CalendarCheck,
   Car,
   ChartNoAxesCombined,
   ChevronRight,
@@ -25,6 +26,7 @@ const links = [
   { to: '/customers', label: 'Khách hàng', icon: Contact, admin: false },
   { to: '/vehicles', label: 'Phương tiện', icon: Car, admin: false },
   { to: '/services', label: 'Dịch vụ & Tiền công', icon: Layers, admin: false },
+  { to: '/reception', label: 'Tiếp nhận xe', icon: CalendarCheck, admin: false },
   {
     to: '/admin/reports',
     label: 'Báo cáo',
