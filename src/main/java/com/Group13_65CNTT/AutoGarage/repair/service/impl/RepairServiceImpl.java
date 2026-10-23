@@ -38,6 +38,7 @@ import com.Group13_65CNTT.AutoGarage.shared.contracts.BillingOperations;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.InventoryOperations;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.NotificationAudit;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.RepairWorkflow;
+import com.Group13_65CNTT.AutoGarage.shared.contracts.WarrantyOperations;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
@@ -92,6 +93,13 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
 
     @Autowired(required = false)
     private NotificationAudit notificationAudit;
+
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private WarrantyOperations warrantyOperations;
+
+    @Autowired(required = false)
+    private com.Group13_65CNTT.AutoGarage.billing.repository.InvoiceRepository invoiceRepository;
 
     // =========================================================================
     // Contract I03 (RepairWorkflow)
@@ -328,6 +336,17 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         handoverCheck.setCheckedBy(actorUserId);
         handoverCheck.setCheckedAt(now);
         vehicleCheckRepository.save(handoverCheck);
+
+        // Tạo chính sách bảo hành I07 nếu đã có hóa đơn phát hành cho phiếu
+        if (warrantyOperations != null && invoiceRepository != null) {
+            invoiceRepository.findByRepairOrderId(repairOrderId).ifPresent(inv -> {
+                try {
+                    warrantyOperations.createFromInvoice(actorUserId, inv.getId(), odometerOut);
+                } catch (Exception ex) {
+                    log.warn("Lỗi khi tạo chính sách bảo hành từ hóa đơn #{}: {}", inv.getId(), ex.getMessage());
+                }
+            });
+        }
 
         // Ghi completed request nếu có notificationAudit
         if (notificationAudit != null && requestKey != null && !requestKey.isBlank()) {

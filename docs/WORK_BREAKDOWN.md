@@ -279,7 +279,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-10 Bảo hành I07
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Warranty, WarrantyClaim, WarrantyOperations I07 createFromInvoice/openClaim/decideClaim, Controller 8 endpoints, kiểm tra đồng thời ngày/km mốc bằng hạn, ADMIN duyệt tạo phiếu bảo hành mới I03, 10 unit tests đạt 100%).
 - **Module/mốc:** M12 / G4.
 - **Đầu ra:** UC32–33; snapshot policy khi bàn giao; claim và phiếu xử lý mới.
 - **Phụ thuộc:** TV4-06, TV3-03.
@@ -287,7 +287,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-11 Bàn giao đóng phiếu và nghiệm thu
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (RepairWorkflow.handOver phối hợp I02 giải phóng khoang, I05 giải phóng kho, I06 kiểm tra nợ, I07 tạo bảo hành từ hóa đơn, ghi biên bản HANDOVER; TV3WorkflowIntegrationTest kiểm thử tích hợp liên thông toàn bộ chu trình TV3-01 đến TV3-11 đạt 100%).
 - **Module/mốc:** M08 / G5.
 - **Đầu ra:** UC31; phối hợp I05/I06/I07, biên bản HANDOVER, release nguyên tử.
 - **Phụ thuộc:** TV3-09, TV3-10, TV4-08.
