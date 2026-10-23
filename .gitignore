@@ -41,3 +41,5 @@ frontend/test-results/
 frontend/.cache/
 frontend/output/playwright/
 frontend/.playwright-cli/
+.DS_Store
+*.DS_Store

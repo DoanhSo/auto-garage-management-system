@@ -15,6 +15,7 @@ import { AppShell } from './layouts/AppShell';
 import { Button, Loading } from '../shared/components/ui';
 import { retryQuery } from '../shared/api/errors';
 import type { Role } from '../shared/types/contracts';
+
 const LoginPage = lazy(() =>
   import('../features/auth/pages/LoginPage').then((module) => ({
     default: module.LoginPage,
@@ -45,6 +46,42 @@ const ReportsPage = lazy(() =>
     default: module.ReportsPage,
   })),
 );
+const PartsPage = lazy(() =>
+  import('../features/inventory/pages/PartsPage').then((module) => ({
+    default: module.PartsPage,
+  })),
+);
+const SuppliersPage = lazy(() =>
+  import('../features/inventory/pages/SuppliersPage').then((module) => ({
+    default: module.SuppliersPage,
+  })),
+);
+const InventoryDocumentsPage = lazy(() =>
+  import('../features/inventory/pages/InventoryDocumentsPage').then((module) => ({
+    default: module.InventoryDocumentsPage,
+  })),
+);
+const StockReconciliationPage = lazy(() =>
+  import('../features/inventory/pages/StockReconciliationPage').then((module) => ({
+    default: module.StockReconciliationPage,
+  })),
+);
+const InvoicesPage = lazy(() =>
+  import('../features/billing/pages/InvoicesPage').then((module) => ({
+    default: module.InvoicesPage,
+  })),
+);
+const PaymentsPage = lazy(() =>
+  import('../features/billing/pages/PaymentsPage').then((module) => ({
+    default: module.PaymentsPage,
+  })),
+);
+const DebtLedgerPage = lazy(() =>
+  import('../features/billing/pages/DebtLedgerPage').then((module) => ({
+    default: module.DebtLedgerPage,
+  })),
+);
+
 export function RequireAuth() {
   const { user } = useAuth();
   const location = useLocation();
@@ -54,17 +91,28 @@ export function RequireAuth() {
     <Navigate to="/login" replace state={{ returnTo: location.pathname + location.search }} />
   );
 }
+
 export function RequireRoles({ allowedRoles }: { allowedRoles: readonly Role[] }) {
   const { user } = useAuth();
   return user && allowedRoles.includes(user.role) ? <Outlet /> : <Navigate to="/403" replace />;
 }
+
 export function RequireAdmin() {
   return <RequireRoles allowedRoles={['ADMIN']} />;
 }
+
+const STAFF_ROLES: readonly Role[] = ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN'];
+const WAREHOUSE_ROLES: readonly Role[] = ['ADMIN', 'WAREHOUSE_STAFF'];
+const FINANCE_ROLES: readonly Role[] = ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF'];
+
 function Home() {
   const { user } = useAuth();
-  return <Navigate to={user?.role === 'ADMIN' ? '/admin/reports' : '/notifications'} replace />;
+  if (user?.role === 'ADMIN') return <Navigate to="/admin/reports" replace />;
+  if (user?.role === 'WAREHOUSE_STAFF') return <Navigate to="/inventory/parts" replace />;
+  if (user?.role === 'RECEPTIONIST') return <Navigate to="/billing/invoices" replace />;
+  return <Navigate to="/notifications" replace />;
 }
+
 function StatusPage({ forbidden = false }: { forbidden?: boolean }) {
   return (
     <div className="status-page">
@@ -81,6 +129,7 @@ function StatusPage({ forbidden = false }: { forbidden?: boolean }) {
     </div>
   );
 }
+
 function RouteError() {
   useRouteError();
   return (
@@ -91,6 +140,7 @@ function RouteError() {
     </div>
   );
 }
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
@@ -108,6 +158,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
     );
   }
 }
+
 const router = createBrowserRouter([
   {
     errorElement: <RouteError />,
@@ -122,6 +173,28 @@ const router = createBrowserRouter([
               { index: true, element: <Home /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'account/security', element: <AccountPage /> },
+              {
+                element: <RequireRoles allowedRoles={STAFF_ROLES} />,
+                children: [
+                  { path: 'inventory/parts', element: <PartsPage /> },
+                  { path: 'inventory/documents', element: <InventoryDocumentsPage /> },
+                  { path: 'billing/invoices', element: <InvoicesPage /> },
+                  { path: 'billing/payments', element: <PaymentsPage /> },
+                ],
+              },
+              {
+                element: <RequireRoles allowedRoles={WAREHOUSE_ROLES} />,
+                children: [
+                  { path: 'inventory/suppliers', element: <SuppliersPage /> },
+                  { path: 'inventory/reconciliation', element: <StockReconciliationPage /> },
+                ],
+              },
+              {
+                element: <RequireRoles allowedRoles={FINANCE_ROLES} />,
+                children: [
+                  { path: 'billing/debt-ledger', element: <DebtLedgerPage /> },
+                ],
+              },
               {
                 element: <RequireAdmin />,
                 children: [
@@ -139,6 +212,7 @@ const router = createBrowserRouter([
     ],
   },
 ]);
+
 const client = new QueryClient({
   defaultOptions: {
     queries: {
@@ -149,6 +223,7 @@ const client = new QueryClient({
     mutations: { retry: 0 },
   },
 });
+
 export default function App() {
   return (
     <ErrorBoundary>

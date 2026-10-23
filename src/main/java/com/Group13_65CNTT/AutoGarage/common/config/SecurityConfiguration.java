@@ -137,6 +137,34 @@ public class SecurityConfiguration {
                                             Role.RECEPTIONIST.name(),
                                             Role.TECHNICIAN.name(),
                                             Role.CUSTOMER.name())
+                                    .requestMatchers(
+                                            ApiPaths.EMPLOYEES_BASE,
+                                            ApiPaths.EMPLOYEES_WILDCARD,
+                                            ApiPaths.SHIFTS_BASE,
+                                            ApiPaths.SHIFTS_WILDCARD,
+                                            ApiPaths.SERVICE_BAYS_BASE,
+                                            ApiPaths.SERVICE_BAYS_WILDCARD,
+                                            ApiPaths.BAY_RESERVATIONS_BASE,
+                                            ApiPaths.BAY_RESERVATIONS_WILDCARD,
+                                            ApiPaths.REPAIR_ORDERS_BASE,
+                                            ApiPaths.REPAIR_ORDERS_WILDCARD,
+                                            ApiPaths.REPAIR_TASKS_BASE,
+                                            ApiPaths.REPAIR_TASKS_WILDCARD,
+                                            ApiPaths.QUALITY_CHECKS_BASE,
+                                            ApiPaths.QUALITY_CHECKS_WILDCARD,
+                                            ApiPaths.WARRANTIES_BASE,
+                                            ApiPaths.WARRANTIES_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.TECHNICIAN.name(),
+                                            Role.WAREHOUSE_STAFF.name())
+                                    .requestMatchers(
+                                            ApiPaths.ESTIMATES_BASE,
+                                            ApiPaths.ESTIMATES_WILDCARD,
+                                            ApiPaths.INVENTORY_WILDCARD,
+                                            ApiPaths.BILLING_WILDCARD)
+                                    .authenticated()
                                     .anyRequest()
                                     .denyAll();
                         })

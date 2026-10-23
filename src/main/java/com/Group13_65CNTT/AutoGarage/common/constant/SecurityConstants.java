@@ -4,6 +4,23 @@ import java.util.List;
 
 public final class SecurityConstants {
     public static final String HAS_ROLE_ADMIN = "hasRole('ADMIN')";
+    public static final String HAS_ROLE_RECEPTIONIST = "hasRole('RECEPTIONIST')";
+    public static final String HAS_ROLE_TECHNICIAN = "hasRole('TECHNICIAN')";
+    public static final String HAS_ROLE_WAREHOUSE_STAFF = "hasRole('WAREHOUSE_STAFF')";
+    public static final String HAS_ROLE_WAREHOUSE_OR_ADMIN =
+            "hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')";
+    public static final String HAS_ROLE_RECEPTION_OR_ADMIN =
+            "hasAnyRole('ADMIN', 'RECEPTIONIST')";
+    public static final String HAS_ROLE_ADMIN_OR_RECEPTIONIST =
+            "hasAnyRole('ADMIN', 'RECEPTIONIST')";
+    public static final String HAS_ROLE_ADMIN_OR_TECHNICIAN =
+            "hasAnyRole('ADMIN', 'TECHNICIAN')";
+    public static final String HAS_ROLE_FINANCE_STAFF =
+            "hasAnyRole('ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF')";
+    public static final String HAS_ROLE_STAFF =
+            "hasAnyRole('ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN')";
+    public static final String HAS_ROLE_INTERNAL_STAFF =
+            "hasAnyRole('ADMIN', 'RECEPTIONIST', 'TECHNICIAN', 'WAREHOUSE_STAFF')";
     public static final String HAS_ANY_ROLE = "isAuthenticated()";
     public static final String HAS_STAFF_OR_ADMIN =
             "hasAnyRole('ADMIN','RECEPTIONIST','WAREHOUSE_STAFF','TECHNICIAN')";

@@ -15,6 +15,13 @@ import {
   Users,
   Wrench,
   X,
+  Package,
+  Building2,
+  FileText,
+  Scale,
+  Receipt,
+  DollarSign,
+  CreditCard,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from '../providers/AuthProvider';
@@ -37,6 +44,48 @@ const links: ReadonlyArray<{
   icon: typeof Bell;
   allowedRoles: readonly Role[];
 }> = [
+  {
+    to: '/inventory/parts',
+    label: 'Kho & Phụ tùng',
+    icon: Package,
+    allowedRoles: ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN'],
+  },
+  {
+    to: '/inventory/suppliers',
+    label: 'Nhà cung cấp',
+    icon: Building2,
+    allowedRoles: ['ADMIN', 'WAREHOUSE_STAFF'],
+  },
+  {
+    to: '/inventory/documents',
+    label: 'Chứng từ kho',
+    icon: FileText,
+    allowedRoles: ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN'],
+  },
+  {
+    to: '/inventory/reconciliation',
+    label: 'Đối soát kho',
+    icon: Scale,
+    allowedRoles: ['ADMIN', 'WAREHOUSE_STAFF'],
+  },
+  {
+    to: '/billing/invoices',
+    label: 'Hóa đơn dịch vụ',
+    icon: Receipt,
+    allowedRoles: ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN'],
+  },
+  {
+    to: '/billing/payments',
+    label: 'Sổ quỹ Thu / Chi',
+    icon: DollarSign,
+    allowedRoles: ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN'],
+  },
+  {
+    to: '/billing/debt-ledger',
+    label: 'Sổ nợ & Tín dụng',
+    icon: CreditCard,
+    allowedRoles: ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF'],
+  },
   {
     to: '/admin/reports',
     label: 'Báo cáo',

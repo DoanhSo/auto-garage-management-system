@@ -207,7 +207,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-01 Nhân viên kỹ năng ca và khoang
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (CRUD employees, employee_shifts, service_bays, can_qc, chống trùng ca làm UC37, lịch bảo trì khoang BR06, 20 unit tests).
 - **Module/mốc:** M06 / G1.
 - **Đầu ra:** CRUD employees/shifts/bays, can_qc, UI ca làm UC37.
 - **Phụ thuộc:** TV1-03.
@@ -215,7 +215,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-02 Lịch khoang I02
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (BayScheduling contract, khóa khoang với pessimistic write lock, kiểm tra giao nhau [start, end), tự động hết hạn reservation HELD, giải phóng khoang cho booking và repair order, 7 unit tests).
 - **Module/mốc:** M06 / G2.
 - **Đầu ra:** BayScheduling; khóa bay; truy vấn giao nhau; release/expiry.
 - **Phụ thuộc:** TV3-01.
@@ -223,7 +223,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-03 Vòng đời phiếu I03
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (RepairOrder, RepairTask, TaskAssignment, LaborSession, Contract I03 RepairWorkflow với receive/createWarrantyOrder/requireInvoiceReady/handOver, State Machine transition status, 19 unit tests đạt 100%).
 - **Module/mốc:** M08 / G2.
 - **Đầu ra:** RepairWorkflow; nhận xe, phiếu chẩn đoán, transition status.
 - **Phụ thuộc:** TV2-01, TV2-02.
@@ -231,7 +231,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-04 Lập gửi và phát sinh báo giá
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Estimate, EstimateItem, Part, PartRepository, lập báo giá INITIAL/SUPPLEMENTAL, version_no tăng dưới khóa phiếu, snapshot giá/bảo hành, gửi báo giá SENT qua outbox I08, 5 unit tests đạt 100%).
 - **Module/mốc:** M07 / G2.
 - **Đầu ra:** Header/items, snapshot giá, version_no, INITIAL/SUPPLEMENTAL; UI báo giá.
 - **Phụ thuộc:** TV3-03, TV2-04, TV4-02.
@@ -239,7 +239,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-05 Duyệt từng dòng I04
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (EstimateApproval contract I04, duyệt từng dòng APPROVED/REJECTED, tự động sinh RepairTask loại REPAIR từ SERVICE, gọi I05 reserve phụ tùng PART, xử lý idempotency replay, 5 unit tests đạt 100%).
 - **Module/mốc:** M07 / G3.
 - **Đầu ra:** EstimateApproval, tạo task từ SERVICE, gọi I05 giữ PART, notify.
 - **Phụ thuộc:** TV3-04, TV4-04, TV1-06.
@@ -247,7 +247,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-06 Phân công kỹ thuật viên
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (TaskAssignment, phân công MAIN/ASSISTANT/QC, kiểm tra tối đa 1 MAIN active, kiểm tra quyền can_qc cho QC, chống chồng ca công việc của KTV, 4 unit tests đạt 100%).
 - **Module/mốc:** M08 / G3.
 - **Đầu ra:** UC11; MAIN/ASSISTANT/QC, lịch nhân viên và khóa task.
 - **Phụ thuộc:** TV3-01, TV3-05.
@@ -255,7 +255,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-07 Timer bắt đầu tạm dừng tiếp tục
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (LaborSession, startTimer snapshot hourly_cost, kiểm tra duy nhất 1 timer mở mỗi KTV, stopTimer với PAUSE/COMPLETE/CANCEL, chuyển trạng thái task IN_PROGRESS/PAUSED, 3 unit tests đạt 100%).
 - **Module/mốc:** M08 / G3.
 - **Đầu ra:** UC16–18; labor_sessions, cost snapshot; UI bảng việc KTV.
 - **Phụ thuộc:** TV3-06.
@@ -263,7 +263,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-08 Hoàn thành công việc
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (completeTask đóng timer mở, giải phóng phân công, chuyển task sang COMPLETED, tự động chuyển RepairOrder sang WAITING_QC khi hết việc, tính tổng giờ công thực loại trừ pause, 1 unit test đạt 100%).
 - **Module/mốc:** M08 / G3.
 - **Đầu ra:** UC19; đóng timer, cập nhật task, tổng giờ công thực.
 - **Phụ thuộc:** TV3-07.
@@ -271,7 +271,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-09 QC và yêu cầu làm lại
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (VehicleCheck loại QC, attempt_no tự động tăng, QC PASSED chuyển phiếu sang COMPLETED, QC FAILED chuyển sang QC_FAILED và kích hoạt REWORK cho task, kiểm tra quyền can_qc và chặn khi còn task/timer mở, 5 unit tests đạt 100%).
 - **Module/mốc:** M10 / G4.
 - **Đầu ra:** UC27; gọi service lưu checklist của TV2; latest_qc_check_id và attempt.
 - **Phụ thuộc:** TV3-08, TV2-08.
@@ -279,7 +279,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-10 Bảo hành I07
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (Warranty, WarrantyClaim, WarrantyOperations I07 createFromInvoice/openClaim/decideClaim, Controller 8 endpoints, kiểm tra đồng thời ngày/km mốc bằng hạn, ADMIN duyệt tạo phiếu bảo hành mới I03, 10 unit tests đạt 100%).
 - **Module/mốc:** M12 / G4.
 - **Đầu ra:** UC32–33; snapshot policy khi bàn giao; claim và phiếu xử lý mới.
 - **Phụ thuộc:** TV4-06, TV3-03.
@@ -287,7 +287,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV3-11 Bàn giao đóng phiếu và nghiệm thu
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (RepairWorkflow.handOver phối hợp I02 giải phóng khoang, I05 giải phóng kho, I06 kiểm tra nợ, I07 tạo bảo hành từ hóa đơn, ghi biên bản HANDOVER; TV3WorkflowIntegrationTest kiểm thử tích hợp liên thông toàn bộ chu trình TV3-01 đến TV3-11 đạt 100%).
 - **Module/mốc:** M08 / G5.
 - **Đầu ra:** UC31; phối hợp I05/I06/I07, biên bản HANDOVER, release nguyên tử.
 - **Phụ thuộc:** TV3-09, TV3-10, TV4-08.
@@ -298,7 +298,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-01 Nhà cung cấp
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend & frontend (Entity, Repository, Service, Controller, Unit Tests, H2 Integration Tests, UI SuppliersPage).
 - **Module/mốc:** M09 / G1.
 - **Đầu ra:** UC20; CRUD NCC, MST, điều khoản thanh toán, UI.
 - **Phụ thuộc:** TV1-01.
@@ -306,7 +306,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-02 Danh mục phụ tùng
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend & frontend (Entity, Repository, Service, Controller, Unit Tests, H2 Integration Tests, UI PartsPage cảnh báo tồn kho tối thiểu).
 - **Module/mốc:** M09 / G1.
 - **Đầu ra:** UC21; SKU, giá bán, giá vốn, bảo hành, reorder level; UI.
 - **Phụ thuộc:** TV4-01.
@@ -314,7 +314,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-03 Nhập mua và tồn đầu kỳ
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend & frontend (Chứng từ kho DRAFT/POSTED/CANCELLED, bình quân gia quyền MAC, UI InventoryDocumentsPage).
 - **Module/mốc:** M09 / G2.
 - **Đầu ra:** UC22; chứng từ/dòng, DRAFT/POSTED, bình quân gia quyền.
 - **Phụ thuộc:** TV4-02, TV1-06.
@@ -322,7 +322,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-04 Giữ và giải phóng hàng I05
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend (InventoryOperations.reserve/release với khóa ID phụ tùng tăng dần chống deadlock).
 - **Module/mốc:** M09 / G3.
 - **Đầu ra:** InventoryOperations.reserve/release; khóa part theo ID tăng.
 - **Phụ thuộc:** TV4-02.
@@ -330,7 +330,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-05 Xuất trả và điều chỉnh kho I05
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend & frontend (InventoryOperations.issue/returnParts, tạo inventory_transactions bất biến).
 - **Module/mốc:** M09 / G3.
 - **Đầu ra:** UC24–26; post sổ kho, tham chiếu dòng nguồn, repair_order_parts.
 - **Phụ thuộc:** TV4-03, TV4-04, TV3-05.
@@ -338,7 +338,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-06 Phát hành hóa đơn I06
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend & frontend (BillingOperations.issueInvoice, snapshot JSON khách/xe bất biến, kiểm tra QC, UI InvoicesPage).
 - **Module/mốc:** M11 / G4.
 - **Đầu ra:** UC28; snapshot khách/xe/dòng/cost, BigDecimal, UI hóa đơn.
 - **Phụ thuộc:** TV3-09, TV4-05.
@@ -346,7 +346,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-07 Thu tiền khách I06
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend & frontend (BillingOperations.receivePayment, khóa hóa đơn, chống thu vượt, idempotency replay, UI InvoicesPage & PaymentsPage).
 - **Module/mốc:** M11 / G4.
 - **Đầu ra:** UC29; IN, khóa invoice, mã giao dịch, UI phiếu thu.
 - **Phụ thuộc:** TV4-06, TV1-06.
@@ -354,7 +354,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-08 Chi NCC và công nợ I06
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend & frontend (BillingOperations.paySupplier, kiểm tra hạn mức tín dụng khách hàng canCloseOrder, UI PaymentsPage & DebtLedgerPage).
 - **Module/mốc:** M11 / G4.
 - **Đầu ra:** UC30; OUT, khóa chứng từ; hai view; kiểm tra hạn mức khi bàn giao.
 - **Phụ thuộc:** TV4-03, TV4-07.
@@ -362,7 +362,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-09 Đối soát kho và giá vốn
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành backend & frontend (StockReconciliationController, so sánh parts vs inventory_transactions, UI StockReconciliationPage).
 - **Module/mốc:** M09 / G5.
 - **Đầu ra:** Truy vấn đối soát ledger, snapshot cost, tổng giữ, xuất/trả theo phiếu.
 - **Phụ thuộc:** TV4-05, TV4-06.
@@ -370,7 +370,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-10 Màn hình kho và tài chính tích hợp
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành (SuppliersPage, PartsPage, InventoryDocumentsPage, StockReconciliationPage, InvoicesPage, PaymentsPage, DebtLedgerPage tích hợp routing và navigation AppShell).
 - **Module/mốc:** M11 / G5.
 - **Đầu ra:** Hoàn thiện màn hình chứng từ, phiếu thu/chi, sổ công nợ và in.
 - **Phụ thuộc:** TV4-08.
@@ -378,7 +378,7 @@ M10 do TV3 điều phối QC, còn entity/repository `vehicle_checks` và `attac
 
 ### TV4-11 Kiểm thử tiền kho và bàn giao
 
-- [ ] Hoàn thành và được nghiệm thu.
+- [x] Hoàn thành (20 unit tests, 2 H2 integration tests, 51 vitest frontend tests passed 100%).
 - **Module/mốc:** M11 / G5.
 - **Đầu ra:** Test song song POST/thu/chi, đối soát báo cáo, tài liệu API.
 - **Phụ thuộc:** TV4-09, TV4-10.
