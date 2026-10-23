@@ -143,3 +143,27 @@ export const vehicleTimelineSchema = z.object({
   currentCustomerName: z.string(),
   historyEntries: z.array(vehicleHistoryEntrySchema),
 });
+
+export const serviceTypeSchema = z.enum(['SINGLE', 'PACKAGE']);
+
+export const serviceSchema = z.object({
+  id: idSchema,
+  serviceCode: z.string(),
+  serviceName: z.string(),
+  serviceType: serviceTypeSchema,
+  description: z.string().nullable(),
+  unit: z.string(),
+  unitPrice: decimal,
+  standardMinutes: z.number().int(),
+  requiredBayType: z.string().nullable(),
+  requiredSkillsJson: z.string().nullable(),
+  intervalKm: z.number().int().nullable(),
+  intervalMonths: z.number().int().nullable(),
+  warrantyDays: z.number().int(),
+  warrantyKm: z.number().int(),
+  warrantyTerms: z.string().nullable(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  version: z.string().regex(/^\d+$/),
+});

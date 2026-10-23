@@ -40,6 +40,11 @@ const VehiclesPage = lazy(() =>
     default: module.VehiclesPage,
   })),
 );
+const ServicesPage = lazy(() =>
+  import('../features/catalog/pages/ServicesPage').then((module) => ({
+    default: module.ServicesPage,
+  })),
+);
 const AuditPage = lazy(() =>
   import('../features/audit/pages/AuditPage').then((module) => ({
     default: module.AuditPage,
@@ -136,6 +141,7 @@ const router = createBrowserRouter([
               { index: true, element: <Home /> },
               { path: 'customers', element: <CustomersPage /> },
               { path: 'vehicles', element: <VehiclesPage /> },
+              { path: 'services', element: <ServicesPage /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'account/security', element: <AccountPage /> },
               {

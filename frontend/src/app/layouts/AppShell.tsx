@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Contact,
   History,
+  Layers,
   LogOut,
   Menu,
   ShieldCheck,
@@ -23,6 +24,7 @@ import { initials } from '../../shared/utils/format';
 const links = [
   { to: '/customers', label: 'Khách hàng', icon: Contact, admin: false },
   { to: '/vehicles', label: 'Phương tiện', icon: Car, admin: false },
+  { to: '/services', label: 'Dịch vụ & Tiền công', icon: Layers, admin: false },
   {
     to: '/admin/reports',
     label: 'Báo cáo',

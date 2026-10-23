@@ -156,6 +156,65 @@ export interface VehicleTimeline {
   historyEntries: VehicleHistoryEntry[];
 }
 
+export type ServiceType = 'SINGLE' | 'PACKAGE';
+export const serviceTypes: [ServiceType, ...ServiceType[]] = ['SINGLE', 'PACKAGE'];
+
+export interface Service {
+  id: string;
+  serviceCode: string;
+  serviceName: string;
+  serviceType: ServiceType;
+  description: string | null;
+  unit: string;
+  unitPrice: string;
+  standardMinutes: number;
+  requiredBayType: string | null;
+  requiredSkillsJson: string | null;
+  intervalKm: number | null;
+  intervalMonths: number | null;
+  warrantyDays: number;
+  warrantyKm: number;
+  warrantyTerms: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  version: string;
+}
+
+export interface ServiceCreate {
+  serviceCode?: string | null;
+  serviceName: string;
+  serviceType: ServiceType;
+  description?: string | null;
+  unit?: string;
+  unitPrice: number;
+  standardMinutes: number;
+  requiredBayType?: string | null;
+  requiredSkillsJson?: string | null;
+  intervalKm?: number | null;
+  intervalMonths?: number | null;
+  warrantyDays?: number;
+  warrantyKm?: number;
+  warrantyTerms?: string | null;
+}
+
+export interface ServiceUpdate {
+  serviceName?: string;
+  serviceType?: ServiceType;
+  description?: string | null;
+  unit?: string;
+  unitPrice?: number;
+  standardMinutes?: number;
+  requiredBayType?: string | null;
+  requiredSkillsJson?: string | null;
+  intervalKm?: number | null;
+  intervalMonths?: number | null;
+  warrantyDays?: number;
+  warrantyKm?: number;
+  warrantyTerms?: string | null;
+  isActive?: boolean;
+}
+
 export interface User {
   id: string;
   username: string;
