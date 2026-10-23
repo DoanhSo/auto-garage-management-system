@@ -1,5 +1,6 @@
 package com.Group13_65CNTT.AutoGarage.common.security;
 
+import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.dto.ApiResponse;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 
@@ -24,7 +25,7 @@ public class SecurityErrorWriter {
             throws IOException {
         response.setStatus(code.getHttpStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding("UTF-8");
+        response.setCharacterEncoding(SecurityConstants.UTF_8_ENCODING);
         objectMapper.writeValue(
                 response.getOutputStream(), ApiResponse.error(code, null, request.getRequestURI()));
     }

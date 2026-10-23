@@ -7,18 +7,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.Group13_65CNTT.AutoGarage.audit.service.AuditService;
+import com.Group13_65CNTT.AutoGarage.common.config.AuthProperties;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,13 +31,13 @@ import java.util.Map;
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
+@RequiredArgsConstructor
 class SecurityRollbackTests extends IntegrationTestSupport {
-    private static final String PASSWORD = "RollbackTest!123";
-    @Autowired MockMvc mvc;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired PasswordEncoder encoder;
-    @Autowired ObjectMapper json;
-    @Autowired UserRepository users;
+    private final MockMvc mvc;
+    private final JdbcTemplate jdbc;
+    private final ObjectMapper json;
+    private final UserRepository users;
+    private final AuthProperties properties;
     @MockitoBean AuditService audit;
 
     @BeforeEach
@@ -44,12 +45,10 @@ class SecurityRollbackTests extends IntegrationTestSupport {
         assertTrue(
                 jdbc.queryForObject("SELECT DATABASE()", String.class)
                         .startsWith("autogarage_test"));
-        String hash = encoder.encode(PASSWORD);
         jdbc.update(
-                "INSERT INTO users(id,username,password_hash,full_name,role)"
-                    + " VALUES(950001,'rollback.admin',?,'Admin','ADMIN'),(950002,'rollback.customer',?,'Customer','CUSTOMER')",
-                hash,
-                hash);
+                "INSERT INTO users(id,identity_id,username,full_name,role)"
+                    + " VALUES(950001,'550e8400-e29b-41d4-a716-446655950001','rollback.admin','Admin','ADMIN'),"
+                    + "(950002,'550e8400-e29b-41d4-a716-446655950002','rollback.customer','Customer','CUSTOMER')");
     }
 
     @AfterEach
@@ -59,7 +58,7 @@ class SecurityRollbackTests extends IntegrationTestSupport {
 
     @Test
     void accountCreationRollsBackWhenAuditFails() throws Exception {
-        String admin = login("rollback.admin");
+        String admin = token("rollback.admin");
         failAudit("USER_CREATED");
         mvc.perform(
                         post("/api/v1/admin/users")
@@ -73,9 +72,7 @@ class SecurityRollbackTests extends IntegrationTestSupport {
                                                         "fullName",
                                                         "Created",
                                                         "role",
-                                                        "CUSTOMER",
-                                                        "password",
-                                                        PASSWORD))))
+                                                        "CUSTOMER"))))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.message").value("Unable to complete the request"));
         assertTrue(users.findByIdentifier("rollback.created").isEmpty());
@@ -83,7 +80,7 @@ class SecurityRollbackTests extends IntegrationTestSupport {
 
     @Test
     void roleAndTokenVersionRollBackWhenAuditFails() throws Exception {
-        String admin = login("rollback.admin"), customer = login("rollback.customer");
+        String admin = token("rollback.admin"), customer = token("rollback.customer");
         var before = users.findById(950002L).orElseThrow();
         failAudit("USER_UPDATED");
         mvc.perform(
@@ -112,7 +109,7 @@ class SecurityRollbackTests extends IntegrationTestSupport {
 
     @Test
     void failedLogoutDoesNotPartiallyRevokeTokens() throws Exception {
-        String customer = login("rollback.customer");
+        String customer = token("rollback.customer");
         failAudit("AUTH_LOGOUT_ALL");
         mvc.perform(post("/api/v1/auth/logout").header("Authorization", "Bearer " + customer))
                 .andExpect(status().isInternalServerError());
@@ -127,23 +124,7 @@ class SecurityRollbackTests extends IntegrationTestSupport {
                 .record(any(), eq(action), any(), anyMap());
     }
 
-    private String login(String username) throws Exception {
-        var response =
-                mvc.perform(
-                                post("/api/v1/auth/login")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                json.writeValueAsString(
-                                                        Map.of(
-                                                                "identifier",
-                                                                username,
-                                                                "password",
-                                                                PASSWORD))))
-                        .andExpect(status().isOk())
-                        .andReturn();
-        return json.readTree(response.getResponse().getContentAsString())
-                .path("data")
-                .path("accessToken")
-                .asText();
+    private String token(String username) {
+        return issueKeycloakToken(properties, users.findByIdentifier(username).orElseThrow());
     }
 }

@@ -1,7 +1,25 @@
 package com.Group13_65CNTT.AutoGarage.billing.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 
@@ -9,28 +27,30 @@ import java.math.BigDecimal;
 @Table(name = "invoice_items")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class InvoiceItem {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "invoice_id", nullable = false)
-    private Long invoiceId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "invoice_id", nullable = false)
+    private Invoice invoice;
 
     @Column(name = "line_no", nullable = false)
     private Integer lineNo;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "item_type", nullable = false, length = 10)
-    private String itemType;
+    private InvoiceItemType itemType;
 
-    @Column(name = "repair_task_id")
+    @Column(name = "repair_task_id", unique = true)
     private Long repairTaskId;
 
-    @Column(name = "repair_order_part_id")
+    @Column(name = "repair_order_part_id", unique = true)
     private Long repairOrderPartId;
 
     @Column(name = "item_name", nullable = false, length = 150)
@@ -45,27 +65,27 @@ public class InvoiceItem {
     @Column(name = "unit_price", nullable = false, precision = 18, scale = 2)
     private BigDecimal unitPrice;
 
-    @Column(name = "unit_cost", nullable = false, precision = 18, scale = 2)
     @Builder.Default
+    @Column(name = "unit_cost", nullable = false, precision = 18, scale = 2)
     private BigDecimal unitCost = BigDecimal.ZERO;
 
-    @Column(name = "discount_amount", nullable = false, precision = 18, scale = 2)
     @Builder.Default
+    @Column(name = "discount_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
-    @Column(name = "tax_amount", nullable = false, precision = 18, scale = 2)
     @Builder.Default
+    @Column(name = "tax_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal taxAmount = BigDecimal.ZERO;
 
     @Column(name = "line_total", nullable = false, precision = 18, scale = 2)
     private BigDecimal lineTotal;
 
-    @Column(name = "warranty_days", nullable = false)
     @Builder.Default
+    @Column(name = "warranty_days", nullable = false)
     private Integer warrantyDays = 0;
 
-    @Column(name = "warranty_km", nullable = false)
     @Builder.Default
+    @Column(name = "warranty_km", nullable = false)
     private Integer warrantyKm = 0;
 
     @Column(name = "warranty_terms", columnDefinition = "TEXT")

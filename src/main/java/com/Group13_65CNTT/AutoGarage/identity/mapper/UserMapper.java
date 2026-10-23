@@ -25,6 +25,7 @@ public interface UserMapper {
 
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
+    @Mapping(target = "identityId", source = "identityId")
     @Mapping(target = "username", source = "username")
     @Mapping(target = "email", source = "email")
     @Mapping(target = "fullName", source = "fullName")

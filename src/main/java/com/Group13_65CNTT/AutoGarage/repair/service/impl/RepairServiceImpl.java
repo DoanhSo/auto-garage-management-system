@@ -86,9 +86,11 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
     private final BayScheduling bayScheduling;
 
     @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
     private BillingOperations billingOperations;
 
     @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
     private InventoryOperations inventoryOperations;
 
     @Autowired(required = false)

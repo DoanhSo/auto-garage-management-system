@@ -10,37 +10,38 @@ import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
 
+import lombok.RequiredArgsConstructor;
+
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
+@RequiredArgsConstructor
 class BootstrapIntegrationTests extends IntegrationTestSupport {
-    @Autowired BootstrapService bootstrap;
-    @Autowired UserRepository users;
-    @Autowired PasswordEncoder passwords;
-    @Autowired JdbcTemplate jdbc;
+    private final BootstrapService bootstrap;
+    private final UserRepository users;
+    private final JdbcTemplate jdbc;
 
     @Test
-    void disabledBootstrapCreatesNothing() throws Exception {
+    void disabledBootstrapCreatesNothing() {
         long count = jdbc.queryForObject("SELECT COUNT(*) FROM users", Long.class);
-        run(false, "bootstrap.disabled", "BootstrapPassword!123");
+        run(false, "bootstrap.disabled", "550e8400-e29b-41d4-a716-446655440001");
         assertEquals(count, jdbc.queryForObject("SELECT COUNT(*) FROM users", Long.class));
     }
 
     @Test
-    void explicitBootstrapCreatesAHashedFirstAdministrator() throws Exception {
-        run(true, "bootstrap.admin", "BootstrapPassword!123");
+    void explicitBootstrapCreatesFirstKeycloakAdministratorWithoutLocalPassword() {
+        run(true, "bootstrap.admin", "550e8400-e29b-41d4-a716-446655440002");
         var admin = users.findByIdentifier("bootstrap.admin").orElseThrow();
         assertEquals(Role.ADMIN, admin.getRole());
         assertTrue(admin.isActive());
-        assertTrue(passwords.matches("BootstrapPassword!123", admin.getPasswordHash()));
+        assertNull(admin.getPasswordHash());
+        assertEquals("550e8400-e29b-41d4-a716-446655440002", admin.getIdentityId());
         assertEquals(
                 1,
                 jdbc.queryForObject(
@@ -51,12 +52,13 @@ class BootstrapIntegrationTests extends IntegrationTestSupport {
     }
 
     @Test
-    void existingAdministratorPasswordIsNeverReset() throws Exception {
-        run(true, "bootstrap.admin", "BootstrapPassword!123");
-        String hash = users.findByIdentifier("bootstrap.admin").orElseThrow().getPasswordHash();
-        run(true, "bootstrap.admin", "DifferentPassword!123");
+    void existingAdministratorIsIdempotentlyPreserved() {
+        run(true, "bootstrap.admin", "550e8400-e29b-41d4-a716-446655440003");
+        String identityId = users.findByIdentifier("bootstrap.admin").orElseThrow().getIdentityId();
+        run(true, "bootstrap.admin", "550e8400-e29b-41d4-a716-446655440099");
         assertEquals(
-                hash, users.findByIdentifier("bootstrap.admin").orElseThrow().getPasswordHash());
+                identityId,
+                users.findByIdentifier("bootstrap.admin").orElseThrow().getIdentityId());
     }
 
     @Test
@@ -64,14 +66,13 @@ class BootstrapIntegrationTests extends IntegrationTestSupport {
         users.saveAndFlush(
                 User.builder()
                         .username("bootstrap.customer")
-                        .passwordHash(passwords.encode("BootstrapPassword!123"))
                         .fullName("Customer")
                         .role(Role.CUSTOMER)
                         .build());
         var failure =
                 assertThrows(
                         BusinessException.class,
-                        () -> run(true, "bootstrap.customer", "DifferentPassword!123"));
+                        () -> run(true, "bootstrap.customer", null));
         assertEquals(ResponseCode.BOOTSTRAP_ACCOUNT_CONFLICT, failure.getResponseCode());
         assertEquals(
                 Role.CUSTOMER,
@@ -79,20 +80,19 @@ class BootstrapIntegrationTests extends IntegrationTestSupport {
     }
 
     @Test
-    void bootstrapDoesNotCreateAnotherAccountWhenAnAdminAlreadyExists() throws Exception {
+    void bootstrapDoesNotCreateAnotherAccountWhenAnAdminAlreadyExists() {
         users.saveAndFlush(
                 User.builder()
                         .username("bootstrap.existing")
-                        .passwordHash(passwords.encode("BootstrapPassword!123"))
                         .fullName("Admin")
                         .role(Role.ADMIN)
                         .build());
-        run(true, "bootstrap.new", "BootstrapPassword!123");
+        run(true, "bootstrap.new", null);
         assertTrue(users.findByIdentifier("bootstrap.new").isEmpty());
     }
 
-    private void run(boolean enabled, String username, String password) throws Exception {
+    private void run(boolean enabled, String username, String identityId) {
         bootstrap.initialize(
-                new BootstrapProperties(enabled, username, "Bootstrap Admin", password));
+                new BootstrapProperties(enabled, username, "Bootstrap Admin", identityId));
     }
 }

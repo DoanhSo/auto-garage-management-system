@@ -13,7 +13,8 @@ import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
 import com.Group13_65CNTT.AutoGarage.vehicle.entity.Vehicle;
 import com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,16 +27,18 @@ public class ReceptionServiceImpl implements ReceptionService {
     private final VehicleRepository vehicleRepository;
     private final CustomerRepository customerRepository;
     private final BookingRepository bookingRepository;
-
-    @Autowired(required = false)
     private RepairWorkflow repairWorkflow;
 
-    public ReceptionServiceImpl(VehicleRepository vehicleRepository,
-                                CustomerRepository customerRepository,
-                                BookingRepository bookingRepository) {
+    public ReceptionServiceImpl(
+            VehicleRepository vehicleRepository,
+            CustomerRepository customerRepository,
+            BookingRepository bookingRepository,
+            ObjectProvider<RepairWorkflow> repairWorkflowProvider) {
         this.vehicleRepository = vehicleRepository;
         this.customerRepository = customerRepository;
         this.bookingRepository = bookingRepository;
+        this.repairWorkflow =
+                repairWorkflowProvider != null ? repairWorkflowProvider.getIfAvailable() : null;
     }
 
     public void setRepairWorkflow(RepairWorkflow repairWorkflow) {
@@ -44,18 +47,30 @@ public class ReceptionServiceImpl implements ReceptionService {
 
     @Override
     public CheckInVehicleResponse checkInVehicle(CheckInVehicleRequest request) {
-        Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + request.getVehicleId()));
+        Vehicle vehicle =
+                vehicleRepository
+                        .findById(request.getVehicleId())
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Không tìm thấy phương tiện với ID: "
+                                                        + request.getVehicleId()));
 
         if (!Boolean.TRUE.equals(vehicle.getIsActive())) {
             throw new BusinessRuleException("Phương tiện đang ở trạng thái ngừng hoạt động");
         }
 
-        Customer customer = customerRepository.findById(vehicle.getCustomerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chủ sở hữu của phương tiện"));
+        Customer customer =
+                customerRepository
+                        .findById(vehicle.getCustomerId())
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Không tìm thấy chủ sở hữu của phương tiện"));
 
         if (!Boolean.TRUE.equals(customer.getIsActive())) {
-            throw new BusinessRuleException("Khách hàng sở hữu xe đang ở trạng thái ngừng hoạt động");
+            throw new BusinessRuleException(
+                    "Khách hàng sở hữu xe đang ở trạng thái ngừng hoạt động");
         }
 
         if (request.getOdometerIn() == null || request.getOdometerIn() < 0) {
@@ -63,21 +78,38 @@ public class ReceptionServiceImpl implements ReceptionService {
         }
 
         if (vehicle.getOdometer() != null && request.getOdometerIn() < vehicle.getOdometer()) {
-            throw new BusinessRuleException("Số km tiếp nhận (" + request.getOdometerIn() +
-                    ") không được nhỏ hơn số km đã ghi nhận trước đó (" + vehicle.getOdometer() + ")");
+            throw new BusinessRuleException(
+                    "Số km tiếp nhận ("
+                            + request.getOdometerIn()
+                            + ") không được nhỏ hơn số km đã ghi nhận trước đó ("
+                            + vehicle.getOdometer()
+                            + ")");
         }
 
         Long bookingId = request.getBookingId();
         if (bookingId != null) {
-            Booking booking = bookingRepository.findById(bookingId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch hẹn với ID: " + bookingId));
+            Booking booking =
+                    bookingRepository
+                            .findById(bookingId)
+                            .orElseThrow(
+                                    () ->
+                                            new ResourceNotFoundException(
+                                                    "Không tìm thấy lịch hẹn với ID: "
+                                                            + bookingId));
 
             if (!booking.getVehicleId().equals(vehicle.getId())) {
-                throw new BusinessRuleException("Lịch hẹn " + booking.getBookingCode() + " không thuộc về xe " + vehicle.getLicensePlate());
+                throw new BusinessRuleException(
+                        "Lịch hẹn "
+                                + booking.getBookingCode()
+                                + " không thuộc về xe "
+                                + vehicle.getLicensePlate());
             }
 
-            if (booking.getStatus() == BookingStatus.CANCELLED || booking.getStatus() == BookingStatus.NO_SHOW) {
-                throw new BusinessRuleException("Không thể tiếp nhận xe với lịch hẹn đã bị hủy hoặc vắng mặt: " + booking.getStatus());
+            if (booking.getStatus() == BookingStatus.CANCELLED
+                    || booking.getStatus() == BookingStatus.NO_SHOW) {
+                throw new BusinessRuleException(
+                        "Không thể tiếp nhận xe với lịch hẹn đã bị hủy hoặc vắng mặt: "
+                                + booking.getStatus());
             }
 
             if (booking.getStatus() == BookingStatus.RECEIVED) {
@@ -94,7 +126,13 @@ public class ReceptionServiceImpl implements ReceptionService {
         long actor = request.getActorUserId() != null ? request.getActorUserId() : 1L;
         long repairOrderId;
         if (repairWorkflow != null) {
-            repairOrderId = repairWorkflow.receive(actor, bookingId, customer.getId(), vehicle.getId(), request.getOdometerIn());
+            repairOrderId =
+                    repairWorkflow.receive(
+                            actor,
+                            bookingId,
+                            customer.getId(),
+                            vehicle.getId(),
+                            request.getOdometerIn());
         } else {
             repairOrderId = System.currentTimeMillis();
         }

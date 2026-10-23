@@ -1,8 +1,8 @@
 package com.Group13_65CNTT.AutoGarage.estimate.service.impl;
 
-import com.Group13_65CNTT.AutoGarage.catalog.entity.Part;
+import com.Group13_65CNTT.AutoGarage.inventory.entity.Part;
 import com.Group13_65CNTT.AutoGarage.catalog.entity.ServiceEntity;
-import com.Group13_65CNTT.AutoGarage.catalog.repository.PartRepository;
+import com.Group13_65CNTT.AutoGarage.inventory.repository.PartRepository;
 import com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
 import com.Group13_65CNTT.AutoGarage.estimate.dto.request.EstimateCreateRequest;

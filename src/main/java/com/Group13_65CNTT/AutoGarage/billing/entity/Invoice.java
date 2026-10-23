@@ -1,21 +1,43 @@
 package com.Group13_65CNTT.AutoGarage.billing.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "invoices")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Invoice {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -29,29 +51,35 @@ public class Invoice {
     @Column(name = "customer_id", nullable = false)
     private Long customerId;
 
-    @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
-    private String status = "UNPAID";
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "status", nullable = false, length = 20)
+    private InvoiceStatus status = InvoiceStatus.UNPAID;
 
-    @Column(name = "customer_snapshot", nullable = false, columnDefinition = "JSON")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "customer_snapshot", nullable = false, columnDefinition = "json")
     private String customerSnapshot;
 
-    @Column(name = "vehicle_snapshot", nullable = false, columnDefinition = "JSON")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "vehicle_snapshot", nullable = false, columnDefinition = "json")
     private String vehicleSnapshot;
 
-    @Column(name = "subtotal", nullable = false, precision = 18, scale = 2)
-    private BigDecimal subtotal;
-
-    @Column(name = "discount_amount", nullable = false, precision = 18, scale = 2)
     @Builder.Default
+    @Column(name = "subtotal", nullable = false, precision = 18, scale = 2)
+    private BigDecimal subtotal = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "discount_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal discountAmount = BigDecimal.ZERO;
 
-    @Column(name = "tax_amount", nullable = false, precision = 18, scale = 2)
     @Builder.Default
+    @Column(name = "tax_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal taxAmount = BigDecimal.ZERO;
 
+    @Builder.Default
     @Column(name = "total_amount", nullable = false, precision = 18, scale = 2)
-    private BigDecimal totalAmount;
+    private BigDecimal totalAmount = BigDecimal.ZERO;
 
     @Column(name = "issued_by", nullable = false)
     private Long issuedBy;
@@ -75,13 +103,18 @@ public class Invoice {
     @Column(name = "version", nullable = false)
     private Long version;
 
+    @Builder.Default
+    @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("lineNo ASC")
+    private List<InvoiceItem> items = new ArrayList<>();
+
     @PrePersist
     protected void onCreate() {
-        if (this.issuedAt == null) {
-            this.issuedAt = Instant.now();
-        }
-        if (this.status == null) {
-            this.status = "UNPAID";
-        }
+        if (issuedAt == null) issuedAt = Instant.now();
+        if (status == null) status = InvoiceStatus.UNPAID;
+        if (subtotal == null) subtotal = BigDecimal.ZERO;
+        if (discountAmount == null) discountAmount = BigDecimal.ZERO;
+        if (taxAmount == null) taxAmount = BigDecimal.ZERO;
+        if (totalAmount == null) totalAmount = subtotal.subtract(discountAmount).add(taxAmount);
     }
 }

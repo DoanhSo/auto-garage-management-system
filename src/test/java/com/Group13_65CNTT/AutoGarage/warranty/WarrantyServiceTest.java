@@ -124,7 +124,7 @@ class WarrantyServiceTest {
     void createFromInvoice_Success() {
         InvoiceItem item1 = InvoiceItem.builder()
                 .id(51L)
-                .invoiceId(1L)
+                .invoice(mockInvoice)
                 .itemName("Thay má phanh trước")
                 .warrantyDays(90)
                 .warrantyKm(5000)
@@ -133,7 +133,7 @@ class WarrantyServiceTest {
 
         InvoiceItem item2 = InvoiceItem.builder()
                 .id(52L)
-                .invoiceId(1L)
+                .invoice(mockInvoice)
                 .itemName("Rửa xe")
                 .warrantyDays(0)
                 .warrantyKm(0)
