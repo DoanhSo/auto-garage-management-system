@@ -85,3 +85,61 @@ export const customerSchema = z.object({
   updatedAt: z.string(),
   version: z.string().regex(/^\d+$/),
 });
+
+export const vehicleSchema = z.object({
+  id: idSchema,
+  customerId: idSchema,
+  customerName: z.string(),
+  customerPhone: z.string(),
+  licensePlate: z.string(),
+  vin: z.string().nullable(),
+  engineNumber: z.string().nullable(),
+  brand: z.string(),
+  model: z.string(),
+  manufactureYear: z.number().int().nullable(),
+  color: z.string().nullable(),
+  fuelType: z.string().nullable(),
+  odometer: z.number().int().nonnegative(),
+  inspectionDueDate: z.string().nullable(),
+  isActive: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  version: z.string().regex(/^\d+$/),
+});
+
+export const technicalAttachmentSchema = z.object({
+  id: idSchema,
+  fileName: z.string(),
+  fileUrl: z.string(),
+  category: z.string(),
+  fileSize: z.number().optional(),
+  contentType: z.string().optional(),
+});
+
+export const vehicleHistoryEntrySchema = z.object({
+  repairOrderId: idSchema,
+  orderCode: z.string(),
+  receivedAt: z.string(),
+  completedAt: z.string().nullable(),
+  odometerIn: z.number().int().nonnegative(),
+  customerComplaint: z.string().nullable(),
+  diagnosis: z.string().nullable(),
+  status: z.string(),
+  orderCustomerId: idSchema,
+  isCurrentOwnerRecord: z.boolean(),
+  totalAmount: decimal.nullable(),
+  tasksDone: z.array(z.string()),
+  partsReplaced: z.array(z.string()),
+  technicalAttachments: z.array(technicalAttachmentSchema),
+});
+
+export const vehicleTimelineSchema = z.object({
+  vehicleId: idSchema,
+  licensePlate: z.string(),
+  brand: z.string(),
+  model: z.string(),
+  currentOdometer: z.number().int().nonnegative(),
+  currentCustomerId: idSchema,
+  currentCustomerName: z.string(),
+  historyEntries: z.array(vehicleHistoryEntrySchema),
+});

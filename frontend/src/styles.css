@@ -2296,3 +2296,33 @@ select.input {
   border-radius: 6px;
   border: 1px dashed #e5e7eb;
 }
+
+/* Vehicle Management Styles */
+.form-row-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .form-row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+.plate-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  font-size: 13px;
+  background-color: #f0f7ff;
+  color: #1e429f;
+  border: 1px solid #bfdbfe;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  display: inline-block;
+}
+.vehicle-card {
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.vehicle-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}

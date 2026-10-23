@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Bell,
+  Car,
   ChartNoAxesCombined,
   ChevronRight,
   Contact,
@@ -21,6 +22,7 @@ import { Button } from '../../shared/components/ui';
 import { initials } from '../../shared/utils/format';
 const links = [
   { to: '/customers', label: 'Khách hàng', icon: Contact, admin: false },
+  { to: '/vehicles', label: 'Phương tiện', icon: Car, admin: false },
   {
     to: '/admin/reports',
     label: 'Báo cáo',

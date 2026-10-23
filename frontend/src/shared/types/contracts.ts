@@ -67,6 +67,95 @@ export interface CustomerUpdate {
   isActive?: boolean;
 }
 
+export interface Vehicle {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  licensePlate: string;
+  vin: string | null;
+  engineNumber: string | null;
+  brand: string;
+  model: string;
+  manufactureYear: number | null;
+  color: string | null;
+  fuelType: string | null;
+  odometer: number;
+  inspectionDueDate: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  version: string;
+}
+
+export interface VehicleCreate {
+  customerId: string;
+  licensePlate: string;
+  vin?: string | null;
+  engineNumber?: string | null;
+  brand: string;
+  model: string;
+  manufactureYear?: number | null;
+  color?: string | null;
+  fuelType?: string | null;
+  odometer: number;
+  inspectionDueDate?: string | null;
+}
+
+export interface VehicleUpdate {
+  brand?: string;
+  model?: string;
+  manufactureYear?: number | null;
+  color?: string | null;
+  fuelType?: string | null;
+  odometer?: number;
+  inspectionDueDate?: string | null;
+  isActive?: boolean;
+}
+
+export interface TransferOwnership {
+  newCustomerId: string;
+  transferNote?: string | null;
+  transferOdometer?: number | null;
+}
+
+export interface TechnicalAttachment {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  category: string;
+  fileSize?: number;
+  contentType?: string;
+}
+
+export interface VehicleHistoryEntry {
+  repairOrderId: string;
+  orderCode: string;
+  receivedAt: string;
+  completedAt: string | null;
+  odometerIn: number;
+  customerComplaint: string | null;
+  diagnosis: string | null;
+  status: string;
+  orderCustomerId: string;
+  isCurrentOwnerRecord: boolean;
+  totalAmount: string | null;
+  tasksDone: string[];
+  partsReplaced: string[];
+  technicalAttachments: TechnicalAttachment[];
+}
+
+export interface VehicleTimeline {
+  vehicleId: string;
+  licensePlate: string;
+  brand: string;
+  model: string;
+  currentOdometer: number;
+  currentCustomerId: string;
+  currentCustomerName: string;
+  historyEntries: VehicleHistoryEntry[];
+}
+
 export interface User {
   id: string;
   username: string;
