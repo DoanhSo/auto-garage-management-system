@@ -1,6 +1,10 @@
 package com.Group13_65CNTT.AutoGarage.reception.entity;
 
 import jakarta.persistence.*;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
 
 @Entity
@@ -36,6 +40,7 @@ public class Attachment {
     private String sha256;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "category", nullable = false, length = 30)
     private AttachmentCategory category;
 
@@ -52,8 +57,7 @@ public class Attachment {
         }
     }
 
-    public Attachment() {
-    }
+    public Attachment() {}
 
     public Long getId() {
         return id;

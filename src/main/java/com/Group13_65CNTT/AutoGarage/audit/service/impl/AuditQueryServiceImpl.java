@@ -4,6 +4,7 @@ import com.Group13_65CNTT.AutoGarage.audit.dto.response.AuditEventResponse;
 import com.Group13_65CNTT.AutoGarage.audit.mapper.AuditEventMapper;
 import com.Group13_65CNTT.AutoGarage.audit.repository.AuditEventRepository;
 import com.Group13_65CNTT.AutoGarage.audit.service.AuditQueryService;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
 import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
@@ -31,7 +32,8 @@ public class AuditQueryServiceImpl implements AuditQueryService {
     @Transactional(readOnly = true)
     public Page<AuditEventResponse> searchEvents(Long actorId, String action, Pageable pageable) {
         pagination.validate(pageable);
-        if ((actorId != null && actorId <= 0) || (action != null && action.length() > 100)) {
+        if ((actorId != null && actorId <= 0)
+                || (action != null && action.length() > AuditConstants.ACTION_MAX_LENGTH)) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
         return repository

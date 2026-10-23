@@ -43,12 +43,10 @@ springdoc:
 
 security:
   auth:
-    secret-base64: ${AUTH_JWT_SECRET}
-    issuer: ${AUTH_JWT_ISSUER}
+    issuer: ${KEYCLOAK_ISSUER_URI}
     audience: ${AUTH_JWT_AUDIENCE}
-    ttl: ${AUTH_JWT_TTL}
+    jwk-set-uri: ${KEYCLOAK_JWKS_URI}
     clock-skew: ${AUTH_JWT_CLOCK_SKEW:0s}
-    bcrypt-strength: ${AUTH_BCRYPT_STRENGTH:12}
     allowed-origins: ${AUTH_CORS_ORIGINS:}
     cors-max-age: ${AUTH_CORS_MAX_AGE:1h}
   password:
@@ -57,7 +55,7 @@ security:
     enabled: ${AUTH_BOOTSTRAP_ENABLED:false}
     username: ${AUTH_BOOTSTRAP_USERNAME:}
     full-name: ${AUTH_BOOTSTRAP_FULL_NAME:}
-    password: ${AUTH_BOOTSTRAP_PASSWORD:}
+    identity-id: ${AUTH_BOOTSTRAP_IDENTITY_ID:}
 
 garage:
   pagination:

@@ -4,13 +4,11 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.Group13_65CNTT.AutoGarage.common.config.PaginationProperties;
-import com.Group13_65CNTT.AutoGarage.common.config.PasswordProperties;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
-import com.Group13_65CNTT.AutoGarage.common.util.PasswordPolicy;
 import com.Group13_65CNTT.AutoGarage.identity.dto.request.UserCreateRequest;
 import com.Group13_65CNTT.AutoGarage.identity.dto.request.UserUpdateRequest;
 import com.Group13_65CNTT.AutoGarage.identity.dto.response.UserResponse;
@@ -25,12 +23,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -41,16 +43,14 @@ import java.util.Optional;
 class UserServiceTest {
     @Mock UserRepository userRepository;
     @Mock UserMapper userMapper;
-    @Mock PasswordEncoder passwordEncoder;
     @Mock CurrentUserProvider currentUser;
     @Mock EntityManager entityManager;
-    @Spy PasswordPolicy passwordPolicy = new PasswordPolicy(new PasswordProperties());
     @Spy PaginationPolicy pagination = new PaginationPolicy(new PaginationProperties());
     @InjectMocks UserServiceImpl service;
 
     @BeforeEach
     void actor() {
-        when(currentUser.userId()).thenReturn(1L);
+        lenient().when(currentUser.userId()).thenReturn(1L);
     }
 
     @Test
@@ -87,7 +87,7 @@ class UserServiceTest {
     }
 
     @Test
-    void customerCannotCreateOrHashCredentials() {
+    void customerCannotCreateAccounts() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1, Role.CUSTOMER)));
         assertThatThrownBy(() -> service.createUser(createRequest()))
                 .isInstanceOfSatisfying(
@@ -95,38 +95,38 @@ class UserServiceTest {
                         error ->
                                 assertThat(error.getResponseCode())
                                         .isEqualTo(ResponseCode.FORBIDDEN));
-        verifyNoInteractions(passwordEncoder, userMapper);
+        verifyNoInteractions(userMapper);
         verify(userRepository, never()).saveAndFlush(any());
     }
 
     @Test
-    void invalidPasswordIsRejectedBeforeHashOrWrite() {
+    void invalidIdentityIdIsRejectedBeforeWrite() {
         administrator();
         UserCreateRequest request = createRequest();
-        request.setPassword("short");
+        request.setIdentityId("invalid identity id with spaces!");
         assertThatThrownBy(() -> service.createUser(request))
                 .isInstanceOfSatisfying(
                         BusinessException.class,
                         error ->
                                 assertThat(error.getResponseCode())
-                                        .isEqualTo(ResponseCode.INVALID_PASSWORD));
-        verifyNoInteractions(passwordEncoder, userMapper);
+                                        .isEqualTo(ResponseCode.BAD_REQUEST));
+        verifyNoInteractions(userMapper);
     }
 
     @Test
-    void createsCanonicalIdentityWithEncodedPasswordAndAuditorFields() {
+    void createsCanonicalIdentityWithKeycloakSubjectAndAuditorFields() {
         administrator();
         UserCreateRequest request = createRequest();
         User entity = user(2, Role.CUSTOMER);
         when(userMapper.toEntity(request)).thenReturn(entity);
-        when(passwordEncoder.encode(request.getPassword())).thenReturn("encoded-password");
         when(userRepository.saveAndFlush(entity)).thenReturn(entity);
         UserResponse response = UserResponse.builder().id(2L).role(Role.CUSTOMER).build();
         when(userMapper.toResponse(entity)).thenReturn(response);
         assertThat(service.createUser(request)).isSameAs(response);
+        assertThat(entity.getIdentityId()).isEqualTo("550e8400-e29b-41d4-a716-446655440022");
         assertThat(entity.getUsername()).isEqualTo("new.user");
         assertThat(entity.getEmail()).isEqualTo("user@example.test");
-        assertThat(entity.getPasswordHash()).isEqualTo("encoded-password");
+        assertThat(entity.getPasswordHash()).isNull();
         assertThat(entity.getCreatedBy()).isEqualTo(1L);
         assertThat(entity.getUpdatedBy()).isEqualTo(1L);
     }
@@ -137,7 +137,7 @@ class UserServiceTest {
         UserCreateRequest request = createRequest();
         request.setRole(null);
         assertThatThrownBy(() -> service.createUser(request)).isInstanceOf(BusinessException.class);
-        verifyNoInteractions(passwordEncoder, userMapper);
+        verifyNoInteractions(userMapper);
     }
 
     @Test
@@ -181,7 +181,7 @@ class UserServiceTest {
     }
 
     @Test
-    void duplicateUsernameDoesNotHashOrPersist() {
+    void duplicateUsernameOrIdentityIdDoesNotPersist() {
         administrator();
         when(userRepository.existsByUsername("new.user")).thenReturn(true);
         assertThatThrownBy(() -> service.createUser(createRequest()))
@@ -190,18 +190,47 @@ class UserServiceTest {
                         error ->
                                 assertThat(error.getResponseCode())
                                         .isEqualTo(ResponseCode.DUPLICATE_RESOURCE));
-        verifyNoInteractions(passwordEncoder, userMapper);
+        verifyNoInteractions(userMapper);
     }
 
     private void administrator() {
         when(userRepository.findById(1L)).thenReturn(Optional.of(user(1, Role.ADMIN)));
     }
 
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "passwordHash",
+                "authVersion",
+                "id desc; DROP TABLE users; --",
+                "LENGTH(username)"
+            })
+    void rejectsUnapprovedSortEvenWhenServiceIsCalledWithoutController(String property) {
+        administrator();
+        var pageable = PageRequest.of(0, 10, Sort.by("username").and(Sort.by(property)));
+        assertThatThrownBy(() -> service.searchUsers(null, null, pageable))
+                .isInstanceOfSatisfying(
+                        BusinessException.class,
+                        error ->
+                                assertThat(error.getResponseCode())
+                                        .isEqualTo(ResponseCode.BAD_REQUEST));
+        verify(userRepository, never()).searchUsers(any(), any(), any());
+    }
+
+    @Test
+    void allowsMultipleApprovedSortFieldsWithoutChangingBoundKeyword() {
+        administrator();
+        var pageable = PageRequest.of(0, 10, Sort.by("username").and(Sort.by("id")));
+        String keyword = "' OR 1=1 --";
+        when(userRepository.searchUsers(keyword, true, pageable)).thenReturn(Page.empty(pageable));
+        assertThat(service.searchUsers(keyword, true, pageable).isEmpty()).isTrue();
+        verify(userRepository).searchUsers(keyword, true, pageable);
+    }
+
     private User user(long id, Role role) {
         User user =
                 User.builder()
                         .username("user." + id)
-                        .passwordHash("internal-hash")
                         .fullName("User")
                         .role(role)
                         .build();
@@ -211,11 +240,11 @@ class UserServiceTest {
 
     private UserCreateRequest createRequest() {
         return UserCreateRequest.builder()
+                .identityId("550e8400-e29b-41d4-a716-446655440022")
                 .username("New.User")
                 .email(" USER@EXAMPLE.TEST ")
                 .fullName("User")
                 .role(Role.CUSTOMER)
-                .password("ValidPassword!123")
                 .build();
     }
 

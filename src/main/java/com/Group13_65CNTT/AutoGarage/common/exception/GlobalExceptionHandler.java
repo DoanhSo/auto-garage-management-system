@@ -4,6 +4,9 @@ import com.Group13_65CNTT.AutoGarage.common.dto.ApiResponse;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.util.DatabaseFailures;
 import com.Group13_65CNTT.AutoGarage.common.util.SafeFailureLog;
+import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
+import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
+import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -49,6 +52,24 @@ public class GlobalExceptionHandler {
             SafeFailureLog.error(log, "Business operation unavailable", failure);
         }
         return error(failure.getResponseCode(), request);
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> sharedNotFound(
+            ResourceNotFoundException failure, HttpServletRequest request) {
+        return error(ResponseCode.RESOURCE_NOT_FOUND, request);
+    }
+
+    @ExceptionHandler(BusinessRuleException.class)
+    public ResponseEntity<ApiResponse<Void>> sharedBusinessRule(
+            BusinessRuleException failure, HttpServletRequest request) {
+        return error(ResponseCode.BAD_REQUEST, request);
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> sharedConflict(
+            ConflictException failure, HttpServletRequest request) {
+        return error(ResponseCode.DUPLICATE_RESOURCE, request);
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
@@ -125,11 +146,12 @@ public class GlobalExceptionHandler {
         ResponseCode code = ResponseCode.METHOD_NOT_ALLOWED;
         return ResponseEntity.status(code.getHttpStatus())
                 .contentType(MediaType.APPLICATION_JSON)
-                .headers(headers -> {
-                    if (failure.getSupportedHttpMethods() != null) {
-                        headers.setAllow(failure.getSupportedHttpMethods());
-                    }
-                })
+                .headers(
+                        headers -> {
+                            if (failure.getSupportedHttpMethods() != null) {
+                                headers.setAllow(failure.getSupportedHttpMethods());
+                            }
+                        })
                 .body(ApiResponse.error(code, null, request.getRequestURI()));
     }
 

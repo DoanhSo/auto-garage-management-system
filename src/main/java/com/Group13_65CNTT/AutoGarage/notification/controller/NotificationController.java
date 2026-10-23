@@ -2,6 +2,7 @@ package com.Group13_65CNTT.AutoGarage.notification.controller;
 
 import com.Group13_65CNTT.AutoGarage.common.constant.ApiPaths;
 import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
+import com.Group13_65CNTT.AutoGarage.common.constant.UserQueryConstants;
 import com.Group13_65CNTT.AutoGarage.common.dto.ApiResponse;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
@@ -15,19 +16,26 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.*;
+import jakarta.validation.constraints.Min;
 
 import lombok.RequiredArgsConstructor;
 
-import org.springframework.data.domain.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ApiPaths.NOTIFICATIONS_BASE)
 @Tag(name = "Notifications")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class NotificationController {
     private final PaginationPolicy pagination;
     private final NotificationService notificationService;
@@ -46,17 +54,22 @@ public class NotificationController {
     @Operation(summary = "List own web notifications")
     public ApiResponse<Page<NotificationResponse>> inbox(
             @RequestParam(defaultValue = "false") boolean unread,
-            @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "${garage.pagination.default-size:20}") @Min(1) int size,
+            @RequestParam(defaultValue = UserQueryConstants.DEFAULT_PAGE) @Min(0) int page,
+            @RequestParam(defaultValue = UserQueryConstants.DEFAULT_SIZE_EXPRESSION) @Min(1)
+                    int size,
             HttpServletRequest http) {
         return ApiResponse.success(
                 ResponseCode.SUCCESS,
                 notificationService.inbox(
-                        unread, pagination.page(page, size, Sort.by("id").descending())),
+                        unread,
+                        pagination.page(
+                                page,
+                                size,
+                                Sort.by(UserQueryConstants.DEFAULT_SORT_BY).descending())),
                 http.getRequestURI());
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(ApiPaths.BY_ID)
     @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Read own notification")
     public ApiResponse<NotificationResponse> get(
@@ -67,7 +80,7 @@ public class NotificationController {
                 http.getRequestURI());
     }
 
-    @PostMapping("/{id}/read")
+    @PostMapping(ApiPaths.NOTIFICATION_READ)
     @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Mark own notification read")
     public ApiResponse<NotificationResponse> markRead(

@@ -2,6 +2,7 @@ package com.Group13_65CNTT.AutoGarage.identity.controller;
 
 import com.Group13_65CNTT.AutoGarage.common.constant.ApiPaths;
 import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
+import com.Group13_65CNTT.AutoGarage.common.constant.UserQueryConstants;
 import com.Group13_65CNTT.AutoGarage.common.dto.ApiResponse;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
@@ -35,16 +36,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.Set;
 
 @RestController
 @RequestMapping(ApiPaths.USERS_BASE)
 @RequiredArgsConstructor
 @Tag(name = "User Management", description = "Administrator account and role management")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class UserController {
-    private static final Set<String> SORT_FIELDS =
-            Set.of("id", "username", "fullName", "role", "active", "createdAt");
     private final PaginationPolicy pagination;
     private final UserService userService;
 
@@ -64,20 +62,25 @@ public class UserController {
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
     @Operation(summary = "Search and paginate users")
     public ApiResponse<Page<UserResponse>> searchUsers(
-            @RequestParam(required = false) @Size(max = 254) String keyword,
+            @RequestParam(required = false) @Size(max = SecurityConstants.EMAIL_MAX_LENGTH)
+                    String keyword,
             @RequestParam(required = false) Boolean active,
-            @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "${garage.pagination.default-size:20}") @Min(1) int size,
-            @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir,
+            @RequestParam(defaultValue = UserQueryConstants.DEFAULT_PAGE) @Min(0) int page,
+            @RequestParam(defaultValue = UserQueryConstants.DEFAULT_SIZE_EXPRESSION) @Min(1)
+                    int size,
+            @RequestParam(defaultValue = UserQueryConstants.DEFAULT_SORT_BY) String sortBy,
+            @RequestParam(defaultValue = UserQueryConstants.SORT_ASC) String sortDir,
             HttpServletRequest httpRequest) {
         Page<UserResponse> response =
                 userService.searchUsers(
-                        keyword, active, pagination.page(page, size, sortBy, sortDir, SORT_FIELDS));
+                        keyword,
+                        active,
+                        pagination.page(
+                                page, size, sortBy, sortDir, UserQueryConstants.SORT_FIELDS));
         return ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI());
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(ApiPaths.BY_ID)
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
     @Operation(summary = "Get user by ID")
     public ApiResponse<UserResponse> getUser(
@@ -86,7 +89,7 @@ public class UserController {
                 ResponseCode.SUCCESS, userService.getUser(id), httpRequest.getRequestURI());
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(ApiPaths.BY_ID)
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
     @Operation(
             summary = "Update user profile and role",
@@ -101,9 +104,12 @@ public class UserController {
                 httpRequest.getRequestURI());
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping(ApiPaths.BY_ID)
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
-    @Operation(summary = "Delete user", description = "Removes from management without deleting history; use PUT active=false to lock")
+    @Operation(
+            summary = "Delete user",
+            description =
+                    "Removes from management without deleting history; use PUT active=false to lock")
     public ApiResponse<Void> deleteUser(
             @PathVariable @Min(1) Long id,
             @RequestParam @Min(0) long version,

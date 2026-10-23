@@ -1,6 +1,10 @@
 package com.Group13_65CNTT.AutoGarage.reception.entity;
 
 import jakarta.persistence.*;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
 
 @Entity
@@ -33,6 +37,7 @@ public class Booking {
     private String requestDescription;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false, length = 20)
     private BookingStatus status = BookingStatus.PENDING;
 
@@ -71,8 +76,7 @@ public class Booking {
         this.updatedAt = Instant.now();
     }
 
-    public Booking() {
-    }
+    public Booking() {}
 
     public Long getId() {
         return id;

@@ -306,3 +306,84 @@ export function ReadOnlyField({ label, children }: { label: string; children: Re
     </div>
   );
 }
+
+export function Badge({
+  children,
+  variant = 'secondary',
+  className = '',
+}: {
+  children: ReactNode;
+  variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'outline';
+  className?: string;
+}) {
+  const variantClass = {
+    primary: 'badge-primary',
+    secondary: 'badge-neutral',
+    success: 'badge-success',
+    warning: 'badge-warning',
+    danger: 'badge-danger',
+    outline: 'badge-outline',
+  }[variant] || 'badge-neutral';
+
+  return <span className={`badge ${variantClass} ${className}`}>{children}</span>;
+}
+
+export function Modal({
+  open,
+  title,
+  children,
+  onOpenChange,
+  description = '',
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Sheet
+      open={open}
+      title={title}
+      description={description}
+      placement="center"
+      onClose={() => onOpenChange(false)}
+    >
+      {children}
+    </Sheet>
+  );
+}
+
+export function ConfirmModal({
+  open,
+  title,
+  description,
+  confirmLabel = 'Xác nhận',
+  variant = 'primary',
+  pending = false,
+  onConfirm,
+  onOpenChange,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  variant?: 'primary' | 'danger';
+  pending?: boolean;
+  onConfirm: () => void;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <ConfirmDialog
+      open={open}
+      title={title}
+      description={description}
+      confirmLabel={confirmLabel}
+      danger={variant === 'danger'}
+      pending={pending}
+      onConfirm={onConfirm}
+      onCancel={() => onOpenChange(false)}
+    />
+  );
+}
+

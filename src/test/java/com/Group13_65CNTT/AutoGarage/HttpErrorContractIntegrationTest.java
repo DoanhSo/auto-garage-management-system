@@ -2,16 +2,17 @@ package com.Group13_65CNTT.AutoGarage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.Group13_65CNTT.AutoGarage.common.enums.Role;
+import com.Group13_65CNTT.AutoGarage.common.config.AuthProperties;
 import com.Group13_65CNTT.AutoGarage.common.config.NotificationProperties;
+import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
 
+import lombok.RequiredArgsConstructor;
+
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -22,9 +23,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.security.SecureRandom;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.Map;
 
 @SpringBootTest(
@@ -41,12 +40,13 @@ import java.util.Map;
         })
 @ActiveProfiles("h2")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@RequiredArgsConstructor
 class HttpErrorContractIntegrationTest extends IntegrationTestSupport {
     @LocalServerPort int port;
-    @Autowired UserRepository users;
-    @Autowired PasswordEncoder passwords;
-    @Autowired ObjectMapper mapper;
-    @Autowired NotificationProperties notificationProperties;
+    private final UserRepository users;
+    private final AuthProperties authProperties;
+    private final ObjectMapper mapper;
+    private final NotificationProperties notificationProperties;
 
     @Test
     void realHttpServerUsesConfiguredPoliciesAndUnifiedErrors() throws Exception {
@@ -54,40 +54,54 @@ class HttpErrorContractIntegrationTest extends IntegrationTestSupport {
         assertThat(notificationProperties.isRemindersEnabled()).isFalse();
         assertThat(notificationProperties.isEmailEnabled()).isFalse();
         assertThat(notificationProperties.isSmsEnabled()).isFalse();
-        byte[] random = new byte[24];
-        new SecureRandom().nextBytes(random);
-        String password = Base64.getEncoder().encodeToString(random);
-        users.saveAndFlush(
-                User.builder()
-                        .username("http.errors.admin")
-                        .fullName("HTTP Admin")
-                        .passwordHash(passwords.encode(password))
-                        .role(Role.ADMIN)
-                        .build());
+        User admin =
+                users.saveAndFlush(
+                        User.builder()
+                                .identityId("550e8400-e29b-41d4-a716-446655000001")
+                                .username("http.errors.admin")
+                                .fullName("HTTP Admin")
+                                .role(Role.ADMIN)
+                                .build());
 
         try (HttpClient client = HttpClient.newHttpClient()) {
-            var policy = envelope(exchange(client, "GET", "/api/v1/public/ui-policy", null, null, Map.of()), 200, 1000).path("data");
+            var policy =
+                    envelope(
+                                    exchange(
+                                            client,
+                                            "GET",
+                                            "/api/v1/public/ui-policy",
+                                            null,
+                                            null,
+                                            Map.of()),
+                                    200,
+                                    1000)
+                            .path("data");
             assertThat(policy.path("passwordMinLength").asInt()).isEqualTo(20);
             assertThat(policy.path("passwordMaxUtf8Bytes").asInt()).isEqualTo(72);
             assertThat(policy.path("paginationDefaultSize").asInt()).isEqualTo(10);
             assertThat(policy.path("paginationMaxSize").asInt()).isEqualTo(25);
-            assertThat(policy.path("reportMaxPeriodSeconds").asLong()).isEqualTo(Duration.ofDays(30).toSeconds());
-            assertThat(policy.path("garageTimeZone").asString()).isEqualTo(notificationProperties.getZone());
+            assertThat(policy.path("reportMaxPeriodSeconds").asLong())
+                    .isEqualTo(Duration.ofDays(30).toSeconds());
+            assertThat(policy.path("garageTimeZone").asString())
+                    .isEqualTo(notificationProperties.getZone());
             assertThat(policy.size()).isEqualTo(7);
-            envelope(exchange(client, "POST", "/api/v1/public/ui-policy", null, null, Map.of()), 401, 3001);
+            envelope(
+                    exchange(client, "POST", "/api/v1/public/ui-policy", null, null, Map.of()),
+                    401,
+                    3001);
             envelope(exchange(client, "GET", "/api/v1/auth/me", null, null, Map.of()), 401, 3001);
             var accepted =
                     exchange(
                             client,
                             "OPTIONS",
-                            "/api/v1/auth/login",
+                            "/api/v1/auth/me",
                             null,
                             null,
                             Map.of(
                                     "Origin",
                                     "http://localhost:5173",
                                     "Access-Control-Request-Method",
-                                    "POST"));
+                                    "GET"));
             assertThat(accepted.statusCode()).isEqualTo(200);
             assertThat(accepted.headers().firstValue("Access-Control-Allow-Origin"))
                     .contains("http://localhost:5173");
@@ -97,23 +111,27 @@ class HttpErrorContractIntegrationTest extends IntegrationTestSupport {
                     exchange(
                             client,
                             "OPTIONS",
-                            "/api/v1/auth/login",
+                            "/api/v1/auth/me",
                             null,
                             null,
                             Map.of(
                                     "Origin",
                                     "https://untrusted.example",
                                     "Access-Control-Request-Method",
-                                    "POST")),
+                                    "GET")),
                     403,
                     3002);
+
+            String token = issueKeycloakToken(authProperties, admin);
+            assertThat(token).isNotBlank();
+
             envelope(
                     exchange(
                             client,
                             "POST",
-                            "/api/v1/auth/login",
+                            "/api/v1/admin/users",
                             "{",
-                            null,
+                            token,
                             Map.of("Content-Type", "application/json")),
                     400,
                     2004);
@@ -121,31 +139,12 @@ class HttpErrorContractIntegrationTest extends IntegrationTestSupport {
                     exchange(
                             client,
                             "POST",
-                            "/api/v1/auth/login",
+                            "/api/v1/admin/users",
                             "text",
-                            null,
+                            token,
                             Map.of("Content-Type", "text/plain")),
                     415,
                     2009);
-
-            String login =
-                    mapper.writeValueAsString(
-                            Map.of("identifier", "http.errors.admin", "password", password));
-            String token =
-                    envelope(
-                                    exchange(
-                                            client,
-                                            "POST",
-                                            "/api/v1/auth/login",
-                                            login,
-                                            null,
-                                            Map.of("Content-Type", "application/json")),
-                                    200,
-                                    1000)
-                            .path("data")
-                            .path("accessToken")
-                            .asString();
-            assertThat(token).isNotBlank();
 
             envelope(
                     exchange(client, "GET", "/api/v1/admin/users?size=26", null, token, Map.of()),
@@ -158,28 +157,26 @@ class HttpErrorContractIntegrationTest extends IntegrationTestSupport {
                             1000);
             assertThat(page.path("data").path("size").asInt()).isEqualTo(10);
 
-            String invalidPassword =
+            String invalidUser =
                     mapper.writeValueAsString(
                             Map.of(
                                     "username",
-                                    "http.errors.rejected",
+                                    "bad username",
                                     "fullName",
                                     "Rejected",
                                     "role",
-                                    "CUSTOMER",
-                                    "password",
-                                    "SixteenChars!123"));
+                                    "CUSTOMER"));
             envelope(
                     exchange(
                             client,
                             "POST",
                             "/api/v1/admin/users",
-                            invalidPassword,
+                            invalidUser,
                             token,
                             Map.of("Content-Type", "application/json")),
                     400,
-                    2007);
-            assertThat(users.existsByUsername("http.errors.rejected")).isFalse();
+                    2001);
+            assertThat(users.existsByUsername("bad username")).isFalse();
 
             envelope(
                     exchange(

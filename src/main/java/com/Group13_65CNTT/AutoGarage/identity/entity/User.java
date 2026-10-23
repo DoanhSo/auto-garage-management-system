@@ -1,5 +1,6 @@
 package com.Group13_65CNTT.AutoGarage.identity.entity;
 
+import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.entity.BaseEntity;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 
@@ -29,21 +30,24 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 public class User extends BaseEntity {
-    @Column(nullable = false, length = 100, updatable = false)
+    @Column(name = "identity_id", length = SecurityConstants.IDENTITY_ID_MAX_LENGTH, unique = true)
+    private String identityId;
+
+    @Column(nullable = false, length = SecurityConstants.USERNAME_MAX_LENGTH, updatable = false)
     private String username;
 
-    @Column(length = 254)
+    @Column(length = SecurityConstants.EMAIL_MAX_LENGTH)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", length = SecurityConstants.PASSWORD_HASH_MAX_LENGTH)
     private String passwordHash;
 
-    @Column(name = "full_name", nullable = false, length = 150)
+    @Column(name = "full_name", nullable = false, length = SecurityConstants.FULL_NAME_MAX_LENGTH)
     private String fullName;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
-    @Column(nullable = false, length = 30)
+    @Column(nullable = false, length = SecurityConstants.ROLE_MAX_LENGTH)
     private Role role;
 
     @Builder.Default

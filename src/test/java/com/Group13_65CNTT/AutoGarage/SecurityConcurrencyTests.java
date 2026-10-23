@@ -2,19 +2,19 @@ package com.Group13_65CNTT.AutoGarage;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.Group13_65CNTT.AutoGarage.common.config.AuthProperties;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
+
+import lombok.RequiredArgsConstructor;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -30,13 +30,13 @@ import java.util.concurrent.TimeUnit;
 @SpringBootTest
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
+@RequiredArgsConstructor
 class SecurityConcurrencyTests extends IntegrationTestSupport {
-    private static final String PASSWORD = "ConcurrentTest!123";
-    @Autowired MockMvc mvc;
-    @Autowired JdbcTemplate jdbc;
-    @Autowired PasswordEncoder encoder;
-    @Autowired ObjectMapper json;
-    @Autowired UserRepository users;
+    private final MockMvc mvc;
+    private final JdbcTemplate jdbc;
+    private final ObjectMapper json;
+    private final UserRepository users;
+    private final AuthProperties properties;
 
     @BeforeEach
     void fixtures() {
@@ -44,13 +44,11 @@ class SecurityConcurrencyTests extends IntegrationTestSupport {
                 jdbc.queryForObject("SELECT DATABASE()", String.class)
                         .startsWith("autogarage_test"),
                 "Concurrency fixtures require a dedicated test database");
-        String hash = encoder.encode(PASSWORD);
         jdbc.update(
-                "INSERT INTO users(id,username,password_hash,full_name,role)"
-                    + " VALUES(940001,'concurrency.admin_a',?,'A','ADMIN'),(940002,'concurrency.admin_b',?,'B','ADMIN'),(940003,'concurrency.customer',?,'C','CUSTOMER')",
-                hash,
-                hash,
-                hash);
+                "INSERT INTO users(id,identity_id,username,full_name,role)"
+                    + " VALUES(940001,'550e8400-e29b-41d4-a716-446655940001','concurrency.admin_a','A','ADMIN'),"
+                    + "(940002,'550e8400-e29b-41d4-a716-446655940002','concurrency.admin_b','B','ADMIN'),"
+                    + "(940003,'550e8400-e29b-41d4-a716-446655940003','concurrency.customer','C','CUSTOMER')");
     }
 
     @AfterEach
@@ -69,7 +67,7 @@ class SecurityConcurrencyTests extends IntegrationTestSupport {
 
     @Test
     void concurrentAdminDemotionsCannotRemoveTheLastAdministrator() throws Exception {
-        String a = login("concurrency.admin_a"), b = login("concurrency.admin_b");
+        String a = token("concurrency.admin_a"), b = token("concurrency.admin_b");
         long va = users.findById(940001L).orElseThrow().getVersion(),
                 vb = users.findById(940002L).orElseThrow().getVersion();
         List<Integer> statuses = race(() -> update(a, 940001, va), () -> update(b, 940002, vb));
@@ -83,7 +81,7 @@ class SecurityConcurrencyTests extends IntegrationTestSupport {
 
     @Test
     void concurrentUpdatesWithSameVersionHaveOnlyOneWinner() throws Exception {
-        String admin = login("concurrency.admin_a");
+        String admin = token("concurrency.admin_a");
         List<Integer> statuses =
                 race(() -> update(admin, 940003, 0), () -> update(admin, 940003, 0));
         assertEquals(List.of(200, 409), statuses.stream().sorted().toList());
@@ -92,7 +90,7 @@ class SecurityConcurrencyTests extends IntegrationTestSupport {
 
     @Test
     void concurrentDuplicateRegistrationCreatesOneAccountAndOneAudit() throws Exception {
-        String admin = login("concurrency.admin_a");
+        String admin = token("concurrency.admin_a");
         List<Integer> statuses = race(() -> create(admin), () -> create(admin));
         assertEquals(List.of(201, 409), statuses.stream().sorted().toList());
         assertEquals(
@@ -110,24 +108,8 @@ class SecurityConcurrencyTests extends IntegrationTestSupport {
                         created));
     }
 
-    private String login(String username) throws Exception {
-        var response =
-                mvc.perform(
-                                post("/api/v1/auth/login")
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .content(
-                                                json.writeValueAsString(
-                                                        Map.of(
-                                                                "identifier",
-                                                                username,
-                                                                "password",
-                                                                PASSWORD))))
-                        .andExpect(status().isOk())
-                        .andReturn();
-        return json.readTree(response.getResponse().getContentAsString())
-                .path("data")
-                .path("accessToken")
-                .asText();
+    private String token(String username) {
+        return issueKeycloakToken(properties, users.findByIdentifier(username).orElseThrow());
     }
 
     private int update(String token, long id, long version) throws Exception {
@@ -164,9 +146,7 @@ class SecurityConcurrencyTests extends IntegrationTestSupport {
                                                         "fullName",
                                                         "Created",
                                                         "role",
-                                                        "CUSTOMER",
-                                                        "password",
-                                                        PASSWORD))))
+                                                        "CUSTOMER"))))
                 .andReturn()
                 .getResponse()
                 .getStatus();

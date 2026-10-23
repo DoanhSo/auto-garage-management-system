@@ -7,8 +7,9 @@ import com.Group13_65CNTT.AutoGarage.notification.dto.request.NotificationCreate
 import com.Group13_65CNTT.AutoGarage.notification.service.*;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.NotificationAudit;
 
+import lombok.RequiredArgsConstructor;
+
 import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -25,12 +26,13 @@ import java.util.concurrent.*;
 @SpringBootTest
 @ActiveProfiles("test")
 @DisplayName("Committed MySQL outbox and idempotency transactions")
+@RequiredArgsConstructor
 class NotificationConcurrencyTests extends IntegrationTestSupport {
-    @Autowired JdbcTemplate jdbc;
-    @Autowired NotificationService notifications;
-    @Autowired OutboxService outbox;
-    @Autowired NotificationAudit replay;
-    @Autowired PlatformTransactionManager manager;
+    private final JdbcTemplate jdbc;
+    private final NotificationService notifications;
+    private final OutboxService outbox;
+    private final NotificationAudit replay;
+    private final PlatformTransactionManager manager;
     private static final String HASH = "a".repeat(64);
 
     @BeforeEach

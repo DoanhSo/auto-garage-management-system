@@ -11,13 +11,13 @@ import com.Group13_65CNTT.AutoGarage.identity.dto.request.*;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
 
+import lombok.RequiredArgsConstructor;
+
 import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
@@ -29,11 +29,11 @@ import java.util.List;
 @ActiveProfiles("h2")
 @Transactional
 @DisplayName("Layered UserService integration on H2")
+@RequiredArgsConstructor
 class UserIntegrationTest extends IntegrationTestSupport {
-    @Autowired UserService service;
-    @Autowired UserRepository users;
-    @Autowired AuditEventRepository audit;
-    @Autowired PasswordEncoder passwords;
+    private final UserService service;
+    private final UserRepository users;
+    private final AuditEventRepository audit;
     private Long adminId;
 
     @BeforeEach
@@ -41,16 +41,16 @@ class UserIntegrationTest extends IntegrationTestSupport {
         User admin =
                 users.saveAndFlush(
                         User.builder()
+                                .identityId("550e8400-e29b-41d4-a716-446655440010")
                                 .username("h2.admin")
                                 .fullName("Administrator")
-                                .passwordHash(passwords.encode("IntegrationTest!123"))
                                 .role(Role.ADMIN)
                                 .build());
         adminId = admin.getId();
         Jwt jwt =
                 Jwt.withTokenValue("test-only")
-                        .header("alg", "HS256")
-                        .subject(adminId.toString())
+                        .header("alg", "RS256")
+                        .subject("550e8400-e29b-41d4-a716-446655440010")
                         .build();
         SecurityContextHolder.getContext()
                 .setAuthentication(
@@ -64,10 +64,11 @@ class UserIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
-    void createPersistsHashBaseEntityAuditorsAndAspectAudit() {
+    void createPersistsKeycloakIdentityBaseEntityAuditorsAndAspectAudit() {
         var response = service.createUser(request());
         User stored = users.findById(response.getId()).orElseThrow();
-        assertThat(passwords.matches("IntegrationTest!123", stored.getPasswordHash())).isTrue();
+        assertThat(stored.getIdentityId()).isEqualTo("550e8400-e29b-41d4-a716-446655440011");
+        assertThat(stored.getPasswordHash()).isNull();
         assertThat(stored.getCreatedBy()).isEqualTo(adminId);
         assertThat(stored.getUpdatedBy()).isEqualTo(adminId);
         assertThat(stored.getCreatedAt()).isNotNull();
@@ -88,8 +89,7 @@ class UserIntegrationTest extends IntegrationTestSupport {
                                 .build());
         assertThat(updated.getEmail()).isNull();
         assertThat(updated.getVersion()).isGreaterThan(created.getVersion());
-        assertThat(users.findById(created.getId()).orElseThrow().getPasswordHash())
-                .startsWith("$2");
+        assertThat(updated.getIdentityId()).isEqualTo("550e8400-e29b-41d4-a716-446655440011");
     }
 
     @Test
@@ -113,11 +113,11 @@ class UserIntegrationTest extends IntegrationTestSupport {
 
     private UserCreateRequest request() {
         return UserCreateRequest.builder()
+                .identityId("550e8400-e29b-41d4-a716-446655440011")
                 .username("h2.customer")
                 .email("integration@example.test")
                 .fullName("Integration Customer")
                 .role(Role.CUSTOMER)
-                .password("IntegrationTest!123")
                 .build();
     }
 }

@@ -1,5 +1,6 @@
 package com.Group13_65CNTT.AutoGarage.identity.dto.request;
 
+import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 
 import jakarta.validation.constraints.Email;
@@ -22,11 +23,15 @@ import lombok.Setter;
 public class UserUpdateRequest {
 
     @Email(message = "Email must be valid")
-    @Size(max = 254, message = "Email must not exceed 254 characters")
+    @Size(
+            max = SecurityConstants.EMAIL_MAX_LENGTH,
+            message = "Email must not exceed 254 characters")
     private String email;
 
     @NotBlank(message = "Full name is required")
-    @Size(max = 150, message = "Full name must not exceed 150 characters")
+    @Size(
+            max = SecurityConstants.FULL_NAME_MAX_LENGTH,
+            message = "Full name must not exceed 150 characters")
     private String fullName;
 
     @NotNull(message = "Role is required")

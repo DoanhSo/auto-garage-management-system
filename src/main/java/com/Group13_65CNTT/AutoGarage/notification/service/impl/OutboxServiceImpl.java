@@ -1,6 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.notification.service.impl;
 
 import com.Group13_65CNTT.AutoGarage.common.config.NotificationProperties;
+import com.Group13_65CNTT.AutoGarage.common.constant.NotificationConstants;
 import com.Group13_65CNTT.AutoGarage.notification.entity.Notification;
 import com.Group13_65CNTT.AutoGarage.notification.repository.NotificationRepository;
 import com.Group13_65CNTT.AutoGarage.notification.service.OutboxService;
@@ -29,11 +30,11 @@ public class OutboxServiceImpl implements OutboxService {
         List<Notification> notices = repository.lockDue(clock.instant(), properties.getBatchSize());
         for (Notification notice : notices) {
             if (notice.getAttemptCount() >= properties.getMaxAttempts()) {
-                notice.setStatus("FAILED");
+                notice.setStatus(NotificationConstants.STATUS_FAILED);
                 release(notice);
                 continue;
             }
-            notice.setStatus("PROCESSING");
+            notice.setStatus(NotificationConstants.STATUS_PROCESSING);
             notice.setLockedBy(workerId);
             notice.setLockedUntil(clock.instant().plus(properties.getLease()));
             notice.setAttemptCount(notice.getAttemptCount() + 1);
@@ -42,7 +43,7 @@ public class OutboxServiceImpl implements OutboxService {
         return notices.stream()
                 .filter(
                         n ->
-                                "PROCESSING".equals(n.getStatus())
+                                NotificationConstants.STATUS_PROCESSING.equals(n.getStatus())
                                         && Objects.equals(n.getLockedBy(), workerId))
                 .toList();
     }
@@ -55,7 +56,7 @@ public class OutboxServiceImpl implements OutboxService {
                 .filter(n -> ownsLease(n, workerId))
                 .ifPresent(
                         notice -> {
-                            notice.setStatus("SENT");
+                            notice.setStatus(NotificationConstants.STATUS_SENT);
                             notice.setSentAt(clock.instant());
                             notice.setProviderReference(providerReference);
                             notice.setLastError(null);
@@ -74,18 +75,18 @@ public class OutboxServiceImpl implements OutboxService {
                         notice -> {
                             notice.setStatus(
                                     notice.getAttemptCount() >= properties.getMaxAttempts()
-                                            ? "FAILED"
-                                            : "PENDING");
+                                            ? NotificationConstants.STATUS_FAILED
+                                            : NotificationConstants.STATUS_PENDING);
                             notice.setNextAttemptAt(
                                     clock.instant().plus(properties.getRetryDelay()));
-                            notice.setLastError("Delivery failed; consult provider diagnostics");
+                            notice.setLastError(NotificationConstants.DELIVERY_FAILED_MESSAGE);
                             release(notice);
                             repository.saveAndFlush(notice);
                         });
     }
 
     private boolean ownsLease(Notification notice, String workerId) {
-        return "PROCESSING".equals(notice.getStatus())
+        return NotificationConstants.STATUS_PROCESSING.equals(notice.getStatus())
                 && Objects.equals(notice.getLockedBy(), workerId)
                 && notice.getLockedUntil() != null
                 && notice.getLockedUntil().isAfter(clock.instant());
