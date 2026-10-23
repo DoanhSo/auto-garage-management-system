@@ -4,6 +4,9 @@ import java.util.List;
 
 public final class SecurityConstants {
     public static final String HAS_ROLE_ADMIN = "hasRole('ADMIN')";
+    public static final String HAS_ROLE_WAREHOUSE_OR_ADMIN = "hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')";
+    public static final String HAS_ROLE_RECEPTION_OR_ADMIN = "hasAnyRole('ADMIN', 'RECEPTIONIST')";
+    public static final String HAS_ROLE_STAFF = "hasAnyRole('ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN')";
     public static final String HAS_ANY_ROLE = "isAuthenticated()";
 
     public static final String REALM_ACCESS_CLAIM = "realm_access";

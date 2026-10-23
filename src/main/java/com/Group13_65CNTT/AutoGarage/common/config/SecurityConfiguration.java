@@ -85,6 +85,10 @@ public class SecurityConfiguration {
                                             ApiPaths.NOTIFICATIONS_BASE,
                                             ApiPaths.NOTIFICATIONS_WILDCARD)
                                     .authenticated()
+                                    .requestMatchers(
+                                            "/api/v1/inventory/**",
+                                            "/api/v1/billing/**")
+                                    .authenticated()
                                     .anyRequest()
                                     .denyAll();
                         })
