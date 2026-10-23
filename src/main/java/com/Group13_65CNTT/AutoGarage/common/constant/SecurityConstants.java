@@ -9,16 +9,13 @@ public final class SecurityConstants {
     public static final String HAS_ROLE_WAREHOUSE_STAFF = "hasRole('WAREHOUSE_STAFF')";
     public static final String HAS_ROLE_WAREHOUSE_OR_ADMIN = "hasAnyRole('ADMIN', 'WAREHOUSE_STAFF')";
     public static final String HAS_ROLE_RECEPTION_OR_ADMIN = "hasAnyRole('ADMIN', 'RECEPTIONIST')";
+    public static final String HAS_ROLE_RECEPTIONIST_OR_ADMIN = "hasAnyRole('RECEPTIONIST', 'ADMIN')";
     public static final String HAS_ROLE_ADMIN_OR_RECEPTIONIST = "hasAnyRole('ADMIN', 'RECEPTIONIST')";
     public static final String HAS_ROLE_ADMIN_OR_TECHNICIAN = "hasAnyRole('ADMIN', 'TECHNICIAN')";
     public static final String HAS_ROLE_STAFF = "hasAnyRole('ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN')";
     public static final String HAS_ROLE_INTERNAL_STAFF = "hasAnyRole('ADMIN', 'RECEPTIONIST', 'TECHNICIAN', 'WAREHOUSE_STAFF')";
-    public static final String HAS_ANY_ROLE = "isAuthenticated()";
-    public static final String HAS_ROLE_RECEPTIONIST = "hasRole('RECEPTIONIST')";
-    public static final String HAS_ROLE_TECHNICIAN = "hasRole('TECHNICIAN')";
-    public static final String HAS_ROLE_RECEPTIONIST_OR_ADMIN = "hasAnyRole('RECEPTIONIST', 'ADMIN')";
-    public static final String HAS_ROLE_STAFF = "hasAnyRole('ADMIN', 'RECEPTIONIST', 'TECHNICIAN', 'WAREHOUSE_STAFF')";
     public static final String HAS_ROLE_RECEPTIONIST_OR_TECHNICIAN_OR_ADMIN = "hasAnyRole('ADMIN', 'RECEPTIONIST', 'TECHNICIAN')";
+    public static final String HAS_ANY_ROLE = "isAuthenticated()";
 
     public static final String REALM_ACCESS_CLAIM = "realm_access";
     public static final String ROLES_CLAIM = "roles";
@@ -59,9 +56,12 @@ public final class SecurityConstants {
 
     public static final List<String> CORS_ALLOWED_METHODS =
             List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+
     public static final List<String> CORS_ALLOWED_HEADERS =
-            List.of("Authorization", "Content-Type");
+            List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With");
+
     public static final List<String> CORS_EXPOSED_HEADERS = List.of("Location");
 
-    private SecurityConstants() {}
+    private SecurityConstants() {
+    }
 }
