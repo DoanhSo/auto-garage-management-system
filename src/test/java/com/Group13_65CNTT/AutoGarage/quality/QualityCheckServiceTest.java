@@ -38,6 +38,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class QualityCheckServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
+    @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
 
     @Mock
     private VehicleCheckRepository vehicleCheckRepository;
@@ -71,6 +73,35 @@ class QualityCheckServiceTest {
                 .userId(10L)
                 .canQc(true)
                 .build();
+    }
+
+    @Test
+    void missingEmployeeCannotRecordQc() {
+        QualityCheckCreateRequest request = QualityCheckCreateRequest.builder()
+                .repairOrderId(100L).result(CheckResult.PASSED).build();
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> qualityService.performQualityCheck(10L, request))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.FORBIDDEN);
+
+        verify(vehicleCheckRepository, never()).save(any());
+        verify(repairOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void qcAssignmentFailureIsCheckedBeforeAnyMutation() {
+        QualityCheckCreateRequest request = QualityCheckCreateRequest.builder()
+                .repairOrderId(100L).result(CheckResult.PASSED).build();
+        doThrow(new com.Group13_65CNTT.AutoGarage.common.exception.BusinessException(
+                com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.FORBIDDEN))
+                .when(objectAccess).requireQualityCheckAccess(10L, 100L);
+
+        assertThatThrownBy(() -> qualityService.performQualityCheck(10L, request))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class);
+
+        verifyNoInteractions(repairOrderRepository, vehicleCheckRepository, employeeRepository);
     }
 
     @Test
@@ -182,8 +213,8 @@ class QualityCheckServiceTest {
         when(employeeRepository.findByUserId(10L)).thenReturn(Optional.of(mockEmployee));
 
         assertThatThrownBy(() -> qualityService.performQualityCheck(10L, req))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("can_qc = false");
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.FORBIDDEN);
     }
 
     @Test

@@ -68,7 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stopRefreshTimer();
       refreshTokenRef.current = bundle.refreshToken;
       if (!bundle.refreshToken) return;
-      const delayMs = Math.max(15000, (bundle.expiresIn - 30) * 1000);
+      const refreshLeadSeconds = Math.min(30, bundle.expiresIn / 5);
+      const delayMs = Math.max(1, (bundle.expiresIn - refreshLeadSeconds) * 1000);
       refreshTimerRef.current = setTimeout(async () => {
         const currentRefreshToken = refreshTokenRef.current;
         if (!currentRefreshToken || sessionAttempt !== attempt.current) return;
@@ -124,6 +125,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [clearSession]);
 
+  useEffect(
+    () => () => {
+      attempt.current++;
+      stopRefreshTimer();
+      refreshTokenRef.current = null;
+    },
+    [stopRefreshTimer],
+  );
+
   const login = useCallback(
     async (values: { identifier: string; password: string }) => {
       const id = ++attempt.current;
@@ -145,6 +155,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     let confirmed = true;
     const activeRefreshToken = refreshTokenRef.current;
+    attempt.current++;
+    stopRefreshTimer();
     try {
       await authApi.logout(activeRefreshToken);
     } catch {
@@ -157,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
       channel.current?.postMessage('logout');
     }
-  }, [clearSession]);
+  }, [clearSession, stopRefreshTimer]);
 
   const setCurrentUser = useCallback(
     (next: User) => setUser((current) => (current?.id === next.id ? next : current)),

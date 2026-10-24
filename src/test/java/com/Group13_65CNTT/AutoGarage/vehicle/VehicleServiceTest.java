@@ -29,6 +29,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class VehicleServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
 
     @Mock
     private VehicleRepository vehicleRepository;
@@ -58,6 +59,28 @@ class VehicleServiceTest {
         createReq.setBrand("Toyota");
         createReq.setModel("Corolla Cross");
         createReq.setOdometer(15000);
+    }
+
+    @Test
+    void customerVehicleSearchBindsOwnScope() {
+        when(customerScope.customerIdForQuery(null)).thenReturn(10L);
+        when(vehicleRepository.searchVehicles(10L, null, true)).thenReturn(java.util.List.of());
+        assertTrue(vehicleService.searchVehicles(null, null, true).isEmpty());
+        verify(vehicleRepository).searchVehicles(10L, null, true);
+    }
+
+    @Test
+    void forbiddenVehicleIsNotReturned() {
+        doThrow(new com.Group13_65CNTT.AutoGarage.common.exception.BusinessException(
+                com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.FORBIDDEN))
+                .when(customerScope).requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.VEHICLE, 100L);
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(100L);
+        vehicle.setCustomerId(10L);
+        when(vehicleRepository.findById(100L)).thenReturn(Optional.of(vehicle));
+        assertThrows(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class,
+                () -> vehicleService.getVehicleById(100L));
+        verifyNoInteractions(customerRepository);
     }
 
     @Test

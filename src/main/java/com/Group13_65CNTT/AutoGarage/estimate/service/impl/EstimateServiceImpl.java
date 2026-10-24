@@ -5,6 +5,8 @@ import com.Group13_65CNTT.AutoGarage.catalog.entity.ServiceEntity;
 import com.Group13_65CNTT.AutoGarage.inventory.repository.PartRepository;
 import com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.estimate.dto.request.EstimateCreateRequest;
 import com.Group13_65CNTT.AutoGarage.estimate.dto.request.EstimateDecisionRequest;
 import com.Group13_65CNTT.AutoGarage.estimate.dto.request.EstimateItemCreateRequest;
@@ -273,15 +275,11 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
 
         // Ghi outbox thông báo nếu có NotificationAudit
         if (notificationAudit != null) {
-            try {
-                notificationAudit.enqueue(new NotificationAudit.Notice(
+            notificationAudit.enqueue(new NotificationAudit.Notice(
                         null, null, "ESTIMATE-" + estimate.getId(), null,
                         "ESTIMATE_SENT", NotificationAudit.Channel.WEB,
                         "{\"estimateId\":" + estimate.getId() + ",\"code\":\"" + estimate.getEstimateCode() + "\"}"
-                ));
-            } catch (Exception ex) {
-                log.warn("Không thể gửi thông báo báo giá: {}", ex.getMessage());
-            }
+            ));
         }
 
         return getEstimateById(id);
@@ -366,14 +364,14 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
 
                 // 2. Nếu là PART: Gọi I05 giữ hàng trong kho
                 if (item.getItemType() == ItemType.PART) {
-                    item.setReservedQuantity(item.getQuantity());
                     if (inventoryOperations != null) {
-                        try {
-                            inventoryOperations.reserve(actorUserId, item.getId(), item.getQuantity());
-                            log.info("Reserved part for estimate item #{}, quantity={}", item.getId(), item.getQuantity());
-                        } catch (Exception ex) {
-                            log.warn("Lỗi khi giữ hàng tồn kho qua I05: {}", ex.getMessage());
-                        }
+                        // Inventory reads approval_status through JDBC in this transaction.
+                        estimateItemRepository.flush();
+                        inventoryOperations.reserve(actorUserId, item.getId(), item.getQuantity());
+                        item.setReservedQuantity(item.getQuantity());
+                        log.info("Reserved part for estimate item #{}, quantity={}", item.getId(), item.getQuantity());
+                    } else {
+                        throw new BusinessException(ResponseCode.SERVICE_UNAVAILABLE);
                     }
                 }
             } else {

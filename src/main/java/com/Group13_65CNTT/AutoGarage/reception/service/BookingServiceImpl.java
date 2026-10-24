@@ -1,5 +1,9 @@
 package com.Group13_65CNTT.AutoGarage.reception.service;
 
+import com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties;
+import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
+import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
+import com.Group13_65CNTT.AutoGarage.common.security.ActorIds;
 import com.Group13_65CNTT.AutoGarage.catalog.entity.ServiceEntity;
 import com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository;
 import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
@@ -33,6 +37,8 @@ import java.util.Random;
 @Service
 @Transactional
 public class BookingServiceImpl implements BookingService {
+    private final WorkshopProperties workshop;
+    private final CustomerScope customerScope;
 
     private final BookingRepository bookingRepository;
     private final CustomerRepository customerRepository;
@@ -48,7 +54,9 @@ public class BookingServiceImpl implements BookingService {
             VehicleRepository vehicleRepository,
             ServiceRepository serviceRepository,
             BookingMapper bookingMapper,
-            ObjectProvider<BayScheduling> baySchedulingProvider) {
+            ObjectProvider<BayScheduling> baySchedulingProvider, CustomerScope customerScope, WorkshopProperties workshop) {
+        this.workshop = workshop;
+        this.customerScope = customerScope;
         this.bookingRepository = bookingRepository;
         this.customerRepository = customerRepository;
         this.vehicleRepository = vehicleRepository;
@@ -64,6 +72,8 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingResponse createBooking(CreateBookingRequest request) {
+        customerScope.requireResource(AccessResource.CUSTOMER, request.getCustomerId());
+        customerScope.requireResource(AccessResource.VEHICLE, request.getVehicleId());
         Customer customer =
                 customerRepository
                         .findById(request.getCustomerId())
@@ -107,7 +117,7 @@ public class BookingServiceImpl implements BookingService {
         int durationMinutes =
                 service.getStandardMinutes() != null && service.getStandardMinutes() > 0
                         ? service.getStandardMinutes()
-                        : 60;
+                        : workshop.getDefaultServiceMinutes();
         Instant expectedEndAt =
                 request.getAppointmentAt().plus(Duration.ofMinutes(durationMinutes));
 
@@ -128,7 +138,7 @@ public class BookingServiceImpl implements BookingService {
 
         Long reservedBayId = null;
         if (request.getBayId() != null && bayScheduling != null) {
-            long actorId = request.getCreatedBy() != null ? request.getCreatedBy() : 1L;
+            long actorId = ActorIds.require(request.getCreatedBy());
             bayScheduling.reserveBooking(
                     actorId,
                     saved.getId(),
@@ -143,6 +153,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingResponse confirmBooking(Long id, Long actorUserId) {
+        customerScope.requireFrontDesk();
         Booking booking =
                 bookingRepository
                         .findById(id)
@@ -164,6 +175,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingResponse rescheduleBooking(Long id, RescheduleBookingRequest request) {
+        customerScope.requireResource(AccessResource.BOOKING, id);
         Booking booking =
                 bookingRepository
                         .findById(id)
@@ -194,7 +206,7 @@ public class BookingServiceImpl implements BookingService {
         int durationMinutes =
                 service.getStandardMinutes() != null && service.getStandardMinutes() > 0
                         ? service.getStandardMinutes()
-                        : 60;
+                        : workshop.getDefaultServiceMinutes();
         Instant newExpectedEndAt =
                 request.getNewAppointmentAt().plus(Duration.ofMinutes(durationMinutes));
 
@@ -206,7 +218,7 @@ public class BookingServiceImpl implements BookingService {
             throw new ConflictException("Phương tiện đã có lịch hẹn khác trong khung giờ hẹn mới");
         }
 
-        long actor = request.getActorUserId() != null ? request.getActorUserId() : 1L;
+        long actor = ActorIds.require(request.getActorUserId());
         if (bayScheduling != null) {
             bayScheduling.releaseForBooking(actor, booking.getId());
             if (request.getNewBayId() != null) {
@@ -227,6 +239,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingResponse cancelBooking(Long id, CancelBookingRequest request) {
+        customerScope.requireResource(AccessResource.BOOKING, id);
         Booking booking =
                 bookingRepository
                         .findById(id)
@@ -243,7 +256,7 @@ public class BookingServiceImpl implements BookingService {
             throw new BusinessRuleException("Lịch hẹn này đã được hủy trước đó");
         }
 
-        long actor = request.getActorUserId() != null ? request.getActorUserId() : 1L;
+        long actor = ActorIds.require(request.getActorUserId());
         if (bayScheduling != null) {
             bayScheduling.releaseForBooking(actor, booking.getId());
         }
@@ -256,6 +269,7 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingResponse markNoShow(Long id, Long actorUserId) {
+        customerScope.requireFrontDesk();
         Booking booking =
                 bookingRepository
                         .findById(id)
@@ -271,7 +285,7 @@ public class BookingServiceImpl implements BookingService {
                             + booking.getStatus());
         }
 
-        long actor = actorUserId != null ? actorUserId : 1L;
+        long actor = ActorIds.require(actorUserId);
         if (bayScheduling != null) {
             bayScheduling.releaseForBooking(actor, booking.getId());
         }
@@ -284,6 +298,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional(readOnly = true)
     public BookingResponse getBookingById(Long id) {
+        customerScope.requireResource(AccessResource.BOOKING, id);
         Booking booking =
                 bookingRepository
                         .findById(id)
@@ -291,6 +306,7 @@ public class BookingServiceImpl implements BookingService {
                                 () ->
                                         new ResourceNotFoundException(
                                                 "Không tìm thấy lịch hẹn với ID: " + id));
+        customerScope.requireResource(AccessResource.BOOKING, booking.getId());
         return loadResponse(booking);
     }
 
@@ -304,6 +320,7 @@ public class BookingServiceImpl implements BookingService {
                                 () ->
                                         new ResourceNotFoundException(
                                                 "Không tìm thấy lịch hẹn với mã: " + code));
+        customerScope.requireResource(AccessResource.BOOKING, booking.getId());
         return loadResponse(booking);
     }
 
@@ -315,8 +332,9 @@ public class BookingServiceImpl implements BookingService {
             BookingStatus status,
             Instant fromTime,
             Instant toTime) {
+        Long scopedCustomerId = customerScope.customerIdForQuery(customerId);
         return bookingRepository
-                .searchBookings(customerId, vehicleId, status, fromTime, toTime)
+                .searchBookings(scopedCustomerId, vehicleId, status, fromTime, toTime)
                 .stream()
                 .map(this::loadResponse)
                 .toList();

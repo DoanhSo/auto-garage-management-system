@@ -277,6 +277,20 @@ class RepairWorkflowServiceTest {
     // =========================================================================
 
     @Test
+    void handOverBayReleaseFailurePropagatesAndDoesNotRecordCompletion() {
+        when(repairOrderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(mockOrder));
+        var failure = new org.springframework.dao.DataAccessResourceFailureException("private database details");
+        doThrow(failure).when(bayScheduling).releaseForRepair(10L, 50L);
+
+        assertThatThrownBy(() -> repairService.handOver(10L, 50L, 20600, "KEY"))
+                .isSameAs(failure);
+
+        verify(inventoryOperations, never()).releaseForOrder(anyLong(), anyLong());
+        verify(vehicleCheckRepository, never()).save(any());
+        verify(notificationAudit, never()).recordCompletedRequest(anyLong(), any(), any(), anyLong(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("I03.handOver: Bàn giao xe hợp lệ, đóng phiếu, giải phóng khoang, kho, lưu biên bản")
     void handOver_Success() {
         when(repairOrderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(mockOrder));

@@ -1,5 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.scheduling.service.impl;
 
+import com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties;
+import com.Group13_65CNTT.AutoGarage.common.security.ActorIds;
 import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
@@ -47,6 +49,7 @@ import java.util.Set;
 @Slf4j
 @RequiredArgsConstructor
 public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
+    private final WorkshopProperties workshop;
 
     private final EmployeeRepository employeeRepository;
     private final EmployeeShiftRepository employeeShiftRepository;
@@ -149,7 +152,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
         EmployeeShift shift = employeeShiftMapper.toEntity(request);
         shift.setStatus(ShiftStatus.ACTIVE);
-        shift.setCreatedBy(actorUserId != null ? actorUserId : 1L);
+        shift.setCreatedBy(ActorIds.require(actorUserId));
         EmployeeShift saved = employeeShiftRepository.save(shift);
         return employeeShiftMapper.toResponse(saved);
     }
@@ -249,7 +252,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
                 .startsAt(request.getStartsAt())
                 .endsAt(request.getEndsAt())
                 .notes(request.getNotes())
-                .createdBy(actorUserId != null ? actorUserId : 1L)
+                .createdBy(ActorIds.require(actorUserId))
                 .build();
 
         BayReservation saved = bayReservationRepository.save(reservation);
@@ -291,7 +294,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
                 .status(ReservationStatus.HELD)
                 .startsAt(startsAt)
                 .endsAt(endsAt)
-                .expiresAt(Instant.now().plus(Duration.ofMinutes(30)))
+                .expiresAt(Instant.now().plus(workshop.getReservationHold()))
                 .createdBy(actorUserId)
                 .build();
 

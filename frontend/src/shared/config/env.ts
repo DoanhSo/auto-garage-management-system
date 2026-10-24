@@ -28,13 +28,19 @@ const schema = z.object({
   keycloakClientId: z.string().min(1),
   notificationPollMs: z.coerce.number().int().min(15000).max(600000),
   requestTimeoutMs: z.coerce.number().int().min(1000).max(120000),
+  pkceSessionMaxAgeMs: z.coerce.number().int().min(60000).max(1800000),
+  googleLoginEnabled: z.enum(['true', 'false']).transform((value) => value === 'true'),
 });
 export const env = schema.parse({
   apiBase: import.meta.env.VITE_API_BASE_URL ?? '/api/v1',
   keycloakIssuer: import.meta.env.VITE_KEYCLOAK_ISSUER ?? '/realms/autogarage-realm',
   keycloakPublicOrigin:
-    import.meta.env.VITE_KEYCLOAK_PUBLIC_ORIGIN ?? 'http://localhost:8081/realms/autogarage-realm',
+    import.meta.env.VITE_KEYCLOAK_PUBLIC_ORIGIN ??
+    import.meta.env.VITE_KEYCLOAK_ISSUER ??
+    '/realms/autogarage-realm',
   keycloakClientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID ?? 'autogarage-frontend',
   notificationPollMs: import.meta.env.VITE_NOTIFICATION_POLL_MS ?? 60000,
   requestTimeoutMs: import.meta.env.VITE_REQUEST_TIMEOUT_MS ?? 20000,
+  pkceSessionMaxAgeMs: import.meta.env.VITE_PKCE_SESSION_MAX_AGE_MS ?? 600000,
+  googleLoginEnabled: import.meta.env.VITE_GOOGLE_LOGIN_ENABLED ?? 'false',
 });

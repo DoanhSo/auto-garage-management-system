@@ -40,7 +40,7 @@ public class RepairOrderController {
     public ResponseEntity<ApiResponse<RepairOrderResponse>> createRepairOrder(
             @Valid @RequestBody RepairOrderCreateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         RepairOrderResponse response = repairService.createRepairOrder(actorId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
@@ -89,7 +89,7 @@ public class RepairOrderController {
             @PathVariable Long id,
             @Valid @RequestBody RepairOrderUpdateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         RepairOrderResponse response = repairService.updateRepairOrder(actorId, id, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
     }
@@ -101,7 +101,7 @@ public class RepairOrderController {
             @PathVariable Long id,
             @Valid @RequestBody DiagnosisUpdateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         RepairOrderResponse response = repairService.updateDiagnosis(actorId, id, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
     }
@@ -113,7 +113,7 @@ public class RepairOrderController {
             @PathVariable Long id,
             @Valid @RequestBody RepairOrderStatusUpdateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         RepairOrderResponse response = repairService.transitionStatus(
                 actorId, id, request.getNewStatus(), request.getNote());
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
@@ -126,7 +126,7 @@ public class RepairOrderController {
             @PathVariable Long id,
             @Valid @RequestBody HandoverRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         RepairOrderResponse response = repairService.handOverOrder(actorId, id, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
@@ -148,7 +148,7 @@ public class RepairOrderController {
             @PathVariable Long id,
             @Valid @RequestBody RepairTaskCreateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         RepairTaskResponse response = repairService.createTask(actorId, id, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
@@ -161,7 +161,7 @@ public class RepairOrderController {
             @PathVariable Long taskId,
             @Valid @RequestBody RepairTaskUpdateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         RepairTaskResponse response = repairService.updateTask(actorId, taskId, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
     }
@@ -172,7 +172,7 @@ public class RepairOrderController {
     public ResponseEntity<ApiResponse<Void>> deleteTask(
             @PathVariable Long taskId,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         repairService.deleteTask(actorId, taskId);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.DELETED, null, httpRequest.getRequestURI()));
     }

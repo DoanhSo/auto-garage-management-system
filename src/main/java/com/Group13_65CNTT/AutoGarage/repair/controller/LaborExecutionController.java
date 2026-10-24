@@ -42,7 +42,7 @@ public class LaborExecutionController {
             @PathVariable Long taskId,
             @Valid @RequestBody TaskAssignmentRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         TaskAssignmentResponse response = laborExecutionService.assignTask(actorId, taskId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
@@ -54,7 +54,7 @@ public class LaborExecutionController {
     public ResponseEntity<ApiResponse<Void>> releaseAssignment(
             @PathVariable Long assignmentId,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         laborExecutionService.releaseAssignment(actorId, assignmentId);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, null, httpRequest.getRequestURI()));
     }
@@ -75,7 +75,7 @@ public class LaborExecutionController {
     public ResponseEntity<ApiResponse<LaborSessionResponse>> startTimer(
             @PathVariable Long assignmentId,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         LaborSessionResponse response = laborExecutionService.startTimer(actorId, assignmentId);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
@@ -88,7 +88,7 @@ public class LaborExecutionController {
             @PathVariable Long assignmentId,
             @Valid @RequestBody LaborSessionStopRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         LaborSessionResponse response = laborExecutionService.stopTimer(actorId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
@@ -110,7 +110,7 @@ public class LaborExecutionController {
             @PathVariable Long taskId,
             @RequestBody(required = false) TaskCompletionRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         TaskWorkSummaryResponse response = laborExecutionService.completeTask(actorId, taskId, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }

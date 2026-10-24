@@ -15,6 +15,13 @@ import { AppShell } from './layouts/AppShell';
 import { Button, Loading } from '../shared/components/ui';
 import { retryQuery } from '../shared/api/errors';
 import type { Role } from '../shared/types/contracts';
+import {
+  STAFF_ROLES,
+  WAREHOUSE_ROLES,
+  FINANCE_ROLES,
+  FRONT_DESK_ROLES,
+  BOOKING_ROLES,
+} from './access';
 
 const LoginPage = lazy(() =>
   import('../features/auth/pages/LoginPage').then((module) => ({
@@ -29,6 +36,26 @@ const AccountPage = lazy(() =>
 const UsersPage = lazy(() =>
   import('../features/identity/pages/UsersPage').then((module) => ({
     default: module.UsersPage,
+  })),
+);
+const CustomersPage = lazy(() =>
+  import('../features/customer/pages/CustomersPage').then((module) => ({
+    default: module.CustomersPage,
+  })),
+);
+const VehiclesPage = lazy(() =>
+  import('../features/vehicle/pages/VehiclesPage').then((module) => ({
+    default: module.VehiclesPage,
+  })),
+);
+const ServicesPage = lazy(() =>
+  import('../features/catalog/pages/ServicesPage').then((module) => ({
+    default: module.ServicesPage,
+  })),
+);
+const BookingsPage = lazy(() =>
+  import('../features/reception/pages/BookingsPage').then((module) => ({
+    default: module.BookingsPage,
   })),
 );
 const AuditPage = lazy(() =>
@@ -101,10 +128,6 @@ export function RequireAdmin() {
   return <RequireRoles allowedRoles={['ADMIN']} />;
 }
 
-const STAFF_ROLES: readonly Role[] = ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN'];
-const WAREHOUSE_ROLES: readonly Role[] = ['ADMIN', 'WAREHOUSE_STAFF'];
-const FINANCE_ROLES: readonly Role[] = ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF'];
-
 function Home() {
   const { user } = useAuth();
   if (user?.role === 'ADMIN') return <Navigate to="/admin/reports" replace />;
@@ -171,6 +194,18 @@ const router = createBrowserRouter([
             element: <AppShell />,
             children: [
               { index: true, element: <Home /> },
+              {
+                element: <RequireRoles allowedRoles={BOOKING_ROLES} />,
+                children: [
+                  { path: 'reception', element: <BookingsPage /> },
+                  { path: 'vehicles', element: <VehiclesPage /> },
+                ],
+              },
+              {
+                element: <RequireRoles allowedRoles={FRONT_DESK_ROLES} />,
+                children: [{ path: 'customers', element: <CustomersPage /> }],
+              },
+              { path: 'services', element: <ServicesPage /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'account/security', element: <AccountPage /> },
               {
@@ -191,9 +226,7 @@ const router = createBrowserRouter([
               },
               {
                 element: <RequireRoles allowedRoles={FINANCE_ROLES} />,
-                children: [
-                  { path: 'billing/debt-ledger', element: <DebtLedgerPage /> },
-                ],
+                children: [{ path: 'billing/debt-ledger', element: <DebtLedgerPage /> }],
               },
               {
                 element: <RequireAdmin />,

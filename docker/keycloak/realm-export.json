@@ -16,6 +16,18 @@
   "defaultRoles": [
     "CUSTOMER"
   ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"validations\":{\"length\":{\"min\":3,\"max\":100},\"username-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"email\",\"validations\":{\"email\":{},\"length\":{\"max\":254}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"firstName\",\"validations\":{\"length\":{\"max\":150}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"lastName\",\"validations\":{\"length\":{\"max\":150}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"auth_version\",\"multivalued\":false,\"validations\":{\"pattern\":{\"pattern\":\"[0-9]{1,19}\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}],\"unmanagedAttributePolicy\":\"DISABLED\"}"
+          ]
+        }
+      }
+    ]
+  },
   "roles": {
     "realm": [
       {
@@ -45,7 +57,7 @@
       "alias": "google",
       "displayName": "Google",
       "providerId": "google",
-      "enabled": true,
+      "enabled": false,
       "updateProfileFirstLoginMode": "missing",
       "trustEmail": true,
       "storeToken": false,
@@ -74,26 +86,6 @@
       }
     }
   ],
-  "users": [
-    {
-      "username": "garage.admin",
-      "enabled": true,
-      "emailVerified": true,
-      "firstName": "Garage",
-      "lastName": "Administrator",
-      "email": "admin@autogarage.local",
-      "credentials": [
-        {
-          "type": "password",
-          "value": "Admin@123456",
-          "temporary": false
-        }
-      ],
-      "realmRoles": [
-        "ADMIN"
-      ]
-    }
-  ],
   "clients": [
     {
       "clientId": "autogarage-frontend",
@@ -119,6 +111,21 @@
         "post.logout.redirect.uris": "http://localhost:5173/*##http://127.0.0.1:5173/*"
       },
       "protocolMappers": [
+        {
+          "name": "autogarage-auth-version",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "auth_version",
+            "claim.name": "auth_version",
+            "jsonType.label": "long",
+            "multivalued": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
         {
           "name": "autogarage-api-audience",
           "protocol": "openid-connect",

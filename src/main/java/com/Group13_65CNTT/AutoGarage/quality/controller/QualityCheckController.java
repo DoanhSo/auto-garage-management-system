@@ -32,12 +32,12 @@ public class QualityCheckController {
     private final CurrentUserProvider currentUserProvider;
 
     @PostMapping
-    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_TECHNICIAN)
     @Operation(summary = "Thực hiện kiểm tra chất lượng (QC) cho phiếu sửa chữa")
     public ResponseEntity<ApiResponse<QualityCheckResponse>> performQualityCheck(
             @Valid @RequestBody QualityCheckCreateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         QualityCheckResponse response = qualityService.performQualityCheck(actorId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));

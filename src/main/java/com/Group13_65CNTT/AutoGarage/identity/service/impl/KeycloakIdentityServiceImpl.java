@@ -1,19 +1,27 @@
 package com.Group13_65CNTT.AutoGarage.identity.service.impl;
 
+import com.Group13_65CNTT.AutoGarage.common.config.KeycloakAdminProperties;
+import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.common.util.SafeFailureLog;
 import com.Group13_65CNTT.AutoGarage.identity.service.KeycloakIdentityService;
 
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.net.URI;
+import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,41 +36,38 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
     private static final ParameterizedTypeReference<List<Map<String, Object>>> LIST_MAP_TYPE =
             new ParameterizedTypeReference<>() {};
 
-    private final boolean enabled;
+    private final KeycloakAdminProperties properties;
     private final String serverUrl;
     private final String realm;
-    private final String adminUsername;
-    private final String adminPassword;
     private final RestClient restClient;
 
     public KeycloakIdentityServiceImpl(
-            @Value("${security.keycloak-admin.enabled:true}") boolean enabled,
-            @Value("${security.keycloak-admin.server-url:http://localhost:8081}") String serverUrl,
-            @Value("${security.keycloak-admin.realm:autogarage-realm}") String realm,
-            @Value("${KEYCLOAK_ADMIN_USERNAME:admin}") String adminUsername,
-            @Value("${KEYCLOAK_ADMIN_PASSWORD:}") String adminPassword) {
-        this.enabled = enabled;
-        this.serverUrl = serverUrl.replaceAll("/+$", "");
-        this.realm = realm;
-        this.adminUsername = adminUsername;
-        this.adminPassword = adminPassword;
-        this.restClient = RestClient.builder().build();
+            KeycloakAdminProperties properties) {
+        this.properties = properties;
+        this.serverUrl = properties.getServerUrl() == null ? "" : properties.getServerUrl().replaceAll("/+$", "");
+        this.realm = properties.getRealm();
+        var factory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(properties.getConnectTimeout()).build());
+        factory.setReadTimeout(properties.getRequestTimeout());
+        this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
     @Override
     public Optional<String> createOrLinkUser(
             String username, String email, String fullName, Role role, String initialPassword) {
-        if (!isConfigured()) return Optional.empty();
+        if (!properties.isEnabled()) return Optional.empty();
         try {
             String token = acquireAdminToken();
-            if (token == null) return Optional.empty();
             String userId = findKeycloakUserIdByUsername(token, username);
+            // A public registration may already own this name. Never elevate it by name alone.
+            if (userId != null) throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
             String[] names = splitFullName(fullName);
             if (userId == null) {
                 Map<String, Object> payload = new HashMap<>();
                 payload.put("username", username);
                 payload.put("enabled", true);
-                payload.put("emailVerified", true);
+                payload.put("emailVerified", false);
+                payload.put("attributes", Map.of(SecurityConstants.AUTH_VERSION_CLAIM, List.of("0")));
                 payload.put("firstName", names[0]);
                 payload.put("lastName", names[1]);
                 if (email != null && !email.isBlank()) {
@@ -100,10 +105,15 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
             if (userId != null) {
                 assignSingleGarageRole(token, userId, role);
             }
-            return Optional.ofNullable(userId);
-        } catch (Exception ex) {
-            log.warn("Keycloak Admin sync skipped during user creation for {}: {}", username, ex.getMessage());
-            return Optional.empty();
+            if (userId == null || userId.isBlank()) throw unavailable();
+            return Optional.of(userId);
+        } catch (RestClientResponseException failure) {
+            if (failure.getStatusCode().value() == 409) {
+                throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE, failure);
+            }
+            throw unavailable(failure);
+        } catch (RestClientException failure) {
+            throw unavailable(failure);
         }
     }
 
@@ -115,15 +125,14 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
             String fullName,
             Role role,
             boolean active) {
-        if (!isConfigured()) return;
+        if (!properties.isEnabled()) return;
         try {
             String token = acquireAdminToken();
-            if (token == null) return;
             String userId =
                     identityId != null && !identityId.isBlank()
                             ? identityId
                             : findKeycloakUserIdByUsername(token, username);
-            if (userId == null) return;
+            if (userId == null) throw unavailable();
             String[] names = splitFullName(fullName);
             Map<String, Object> payload = new HashMap<>();
             payload.put("enabled", active);
@@ -142,22 +151,21 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
             if (!active) {
                 logoutKeycloakUser(token, userId);
             }
-        } catch (Exception ex) {
-            log.warn("Keycloak Admin sync skipped during user update for {}: {}", username, ex.getMessage());
+        } catch (RestClientException failure) {
+            throw unavailable(failure);
         }
     }
 
     @Override
     public void disableUser(String identityId, String username) {
-        if (!isConfigured()) return;
+        if (!properties.isEnabled()) return;
         try {
             String token = acquireAdminToken();
-            if (token == null) return;
             String userId =
                     identityId != null && !identityId.isBlank()
                             ? identityId
                             : findKeycloakUserIdByUsername(token, username);
-            if (userId == null) return;
+            if (userId == null) throw unavailable();
             restClient
                     .put()
                     .uri(serverUrl + "/admin/realms/" + realm + "/users/" + userId)
@@ -167,25 +175,56 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
                     .retrieve()
                     .toBodilessEntity();
             logoutKeycloakUser(token, userId);
-        } catch (Exception ex) {
-            log.warn("Keycloak Admin sync skipped during user disable for {}: {}", username, ex.getMessage());
+        } catch (RestClientException failure) {
+            throw unavailable(failure);
         }
     }
 
-    private boolean isConfigured() {
-        return enabled
-                && adminUsername != null
-                && !adminUsername.isBlank()
-                && adminPassword != null
-                && !adminPassword.isBlank();
+    @Override
+    public void syncAuthVersion(String identityId, String username, long authVersion) {
+        if (!properties.isEnabled()) return;
+        try {
+            String token = acquireAdminToken();
+            String userId = identityId != null && !identityId.isBlank()
+                    ? identityId : findKeycloakUserIdByUsername(token, username);
+            if (userId == null) throw unavailable();
+            String userUrl = serverUrl + "/admin/realms/" + realm + "/users/" + userId;
+            Map<String, Object> existing = restClient.get().uri(userUrl)
+                    .header("Authorization", SecurityConstants.BEARER_PREFIX + token)
+                    .retrieve().body(MAP_TYPE);
+            if (existing == null) throw unavailable();
+            Map<String, Object> attributes = new HashMap<>();
+            if (existing.get("attributes") instanceof Map<?, ?> previous) {
+                previous.forEach((key, value) -> {
+                    if (key instanceof String name) attributes.put(name, value);
+                });
+            }
+            attributes.put(SecurityConstants.AUTH_VERSION_CLAIM, List.of(Long.toString(authVersion)));
+            restClient.put().uri(userUrl)
+                    .header("Authorization", SecurityConstants.BEARER_PREFIX + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("attributes", attributes)).retrieve().toBodilessEntity();
+            logoutKeycloakUser(token, userId);
+        } catch (RestClientException failure) {
+            throw unavailable(failure);
+        }
+    }
+
+    private BusinessException unavailable(RestClientException failure) {
+        SafeFailureLog.error(log, "Keycloak admin operation failed", failure);
+        return new BusinessException(ResponseCode.AUTHENTICATION_UNAVAILABLE, failure);
+    }
+
+    private BusinessException unavailable() {
+        return new BusinessException(ResponseCode.AUTHENTICATION_UNAVAILABLE);
     }
 
     private String acquireAdminToken() {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "password");
         form.add("client_id", "admin-cli");
-        form.add("username", adminUsername);
-        form.add("password", adminPassword);
+        form.add("username", properties.getUsername());
+        form.add("password", properties.getPassword());
         Map<String, Object> res =
                 restClient
                         .post()
@@ -194,7 +233,10 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
                         .body(form)
                         .retrieve()
                         .body(MAP_TYPE);
-        return res != null && res.get("access_token") instanceof String token ? token : null;
+        if (res == null || !(res.get("access_token") instanceof String token) || token.isBlank()) {
+            throw unavailable();
+        }
+        return token;
     }
 
     private String findKeycloakUserIdByUsername(String token, String username) {
@@ -233,7 +275,9 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
         if (currentRoles != null) {
             for (Map<String, Object> r : currentRoles) {
                 Object name = r.get("name");
-                if (name instanceof String roleName && isGarageRole(roleName) && !roleName.equals(targetRole.name())) {
+                if (name instanceof String roleName
+                        && ((isGarageRole(roleName) && !roleName.equals(targetRole.name()))
+                        || (targetRole != Role.CUSTOMER && roleName.equals("default-roles-" + realm)))) {
                     toRemove.add(r);
                 }
             }
@@ -266,22 +310,21 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
                         .header("Authorization", "Bearer " + token)
                         .retrieve()
                         .body(MAP_TYPE);
-        if (roleRep != null) {
-            restClient
-                    .post()
-                    .uri(
-                            serverUrl
-                                    + "/admin/realms/"
-                                    + realm
-                                    + "/users/"
-                                    + userId
-                                    + "/role-mappings/realm")
-                    .header("Authorization", "Bearer " + token)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(List.of(roleRep))
-                    .retrieve()
-                    .toBodilessEntity();
-        }
+        if (roleRep == null) throw unavailable();
+        restClient
+                .post()
+                .uri(
+                        serverUrl
+                                + "/admin/realms/"
+                                + realm
+                                + "/users/"
+                                + userId
+                                + "/role-mappings/realm")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(List.of(roleRep))
+                .retrieve()
+                .toBodilessEntity();
     }
 
     private void logoutKeycloakUser(String token, String userId) {

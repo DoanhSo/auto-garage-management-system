@@ -74,7 +74,11 @@ export function InventoryDocumentsPage() {
     setLines(lines.filter((_, i) => i !== idx));
   };
 
-  const handleLineChange = (idx: number, field: keyof InventoryDocumentItemInput, value: any) => {
+  const handleLineChange = <K extends keyof InventoryDocumentItemInput>(
+    idx: number,
+    field: K,
+    value: InventoryDocumentItemInput[K],
+  ) => {
     const updated = [...lines];
     updated[idx] = { ...updated[idx], [field]: value };
     if (field === 'partId') {
@@ -91,7 +95,8 @@ export function InventoryDocumentsPage() {
     const payload: InventoryDocumentCreateInput = {
       documentType: docType,
       supplierId: docType === 'IN' && supplierId ? Number(supplierId) : undefined,
-      repairOrderId: (docType === 'OUT' || docType === 'RETURN') && orderId ? Number(orderId) : undefined,
+      repairOrderId:
+        (docType === 'OUT' || docType === 'RETURN') && orderId ? Number(orderId) : undefined,
       supplierInvoiceNumber: referenceNumber || undefined,
       reason: notes || undefined,
       items: lines.map((l) => ({
@@ -175,7 +180,11 @@ export function InventoryDocumentsPage() {
             Quản lý phiếu nhập kho, phiếu xuất phụ tùng sửa chữa và kiểm kê kho
           </p>
         </div>
-        <Button variant="primary" onClick={() => setCreating(true)} className="flex items-center gap-1.5">
+        <Button
+          variant="primary"
+          onClick={() => setCreating(true)}
+          className="flex items-center gap-1.5"
+        >
           <Plus size={16} />
           Tạo phiếu kho mới
         </Button>
@@ -186,7 +195,7 @@ export function InventoryDocumentsPage() {
         <select
           value={selectedType}
           onChange={(e) => {
-            setSelectedType(e.target.value as any);
+            setSelectedType(e.target.value as typeof selectedType);
             setPage(0);
           }}
           className="border rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -201,7 +210,7 @@ export function InventoryDocumentsPage() {
         <select
           value={selectedStatus}
           onChange={(e) => {
-            setSelectedStatus(e.target.value as any);
+            setSelectedStatus(e.target.value as typeof selectedStatus);
             setPage(0);
           }}
           className="border rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -241,13 +250,17 @@ export function InventoryDocumentsPage() {
               <tbody className="divide-y divide-gray-100 text-sm">
                 {data.content.map((doc) => (
                   <tr key={doc.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="py-3 px-4 font-mono font-medium text-gray-900">{doc.documentCode}</td>
+                    <td className="py-3 px-4 font-mono font-medium text-gray-900">
+                      {doc.documentCode}
+                    </td>
                     <td className="py-3 px-4">{renderTypeBadge(doc.documentType)}</td>
                     <td className="py-3 px-4 text-gray-700">
                       {doc.supplierName && <div>NCC: {doc.supplierName}</div>}
                       {doc.repairOrderId && <div>Lệnh sửa chữa: #{doc.repairOrderId}</div>}
                       {doc.supplierInvoiceNumber && (
-                        <div className="text-xs text-gray-400">Số HĐ/Tham chiếu: {doc.supplierInvoiceNumber}</div>
+                        <div className="text-xs text-gray-400">
+                          Số HĐ/Tham chiếu: {doc.supplierInvoiceNumber}
+                        </div>
                       )}
                     </td>
                     <td className="py-3 px-4 text-right font-medium text-blue-600">
@@ -321,7 +334,10 @@ export function InventoryDocumentsPage() {
 
       {/* Modal Tạo Phiếu Kho Mới */}
       <Modal open={creating} onOpenChange={setCreating} title="Lập Chứng từ Kho Mới">
-        <form onSubmit={handleCreateDocument} className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
+        <form
+          onSubmit={handleCreateDocument}
+          className="space-y-4 max-h-[80vh] overflow-y-auto pr-1"
+        >
           <div className="grid grid-cols-2 gap-4">
             <Field label="Loại chứng từ" required>
               <select
@@ -511,7 +527,9 @@ export function InventoryDocumentsPage() {
                       <td className="p-2 font-mono">{line.partSku}</td>
                       <td className="p-2">{line.partName}</td>
                       <td className="p-2 text-right font-medium">{line.quantity}</td>
-                      <td className="p-2 text-right">{Number(line.unitCost).toLocaleString('vi-VN')}</td>
+                      <td className="p-2 text-right">
+                        {Number(line.unitCost).toLocaleString('vi-VN')}
+                      </td>
                       <td className="p-2 text-right font-semibold text-gray-900">
                         {Number(line.lineTotal).toLocaleString('vi-VN')}
                       </td>

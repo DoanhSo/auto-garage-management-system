@@ -38,6 +38,18 @@ Xem đầy đủ biến trong `.env.example`. `scripts/import-local-env.ps1` đ�
 
 `SafeFailureLog` của ứng dụng ghi loại exception, chuỗi cause và tối đa 12 stack frame mỗi cause; bỏ message exception để tránh log SQL, credential hoặc nội dung provider. Response không chứa stack trace, password/hash, token, SQL hay thông tin kết nối. Không nuốt exception hoặc đổi mọi RuntimeException thành BAD_REQUEST; JSON chỉ bắt JacksonException tại boundary parse input.
 
+## Chính sách xưởng và quyền tiếp nhận (24/10/2026)
+
+- `WorkshopProperties` bind `garage.workshop`: `WORKSHOP_DEFAULT_SERVICE_MINUTES=60` là thời lượng khi dịch vụ chưa có thời lượng chuẩn; `WORKSHOP_RESERVATION_HOLD=30m` là thời hạn giữ khoang. Các giá trị phải dương.
+- `WORKSHOP_MAX_ATTACHMENT_BYTES=15728640` và `WORKSHOP_MAX_UPLOAD_REQUEST_BYTES=16777216` áp dụng cả service lẫn multipart HTTP. Giới hạn request phải lớn hơn giới hạn một tệp để chứa metadata. Vượt giới hạn multipart trả HTTP 413 / code 2013 với cùng ApiResponse; lỗi đọc/hash tệp trả 500 và giữ cause an toàn.
+- Các controller lịch ca/khoang/nhân viên dùng `PAGINATION_DEFAULT_SIZE` khi không truyền `size`, không tự cố định 20.
+- Actor ghi dữ liệu lấy từ principal; không còn fallback user ID 1. `GET /api/v1/customers/me` trả hồ sơ gắn với tài khoản; danh bạ khách hàng và sửa điều khoản tài chính chỉ dành ADMIN/RECEPTIONIST.
+- Danh sách xe/lịch hẹn của CUSTOMER được bind theo customer ID từ tài khoản. Truy cập ID/mã/timeline kiểm tra quyền đối tượng; role/customerId/actorUserId từ request không thay thế principal. Kỹ thuật viên tra cứu xe được phân công qua ID; danh sách xe toàn cục chỉ dành ADMIN/RECEPTIONIST, CUSTOMER có danh sách riêng.
+- QC phải qua `/api/v1/quality-checks`; endpoint ghi biên bản chung từ chối `checkType=QC` để không bỏ qua kiểm tra công việc, timer và phân công QC.
+- QC POST chỉ dành TECHNICIAN đang có hồ sơ nhân viên active, `can_qc=true` và phân công QC trên đúng phiếu. Không có hồ sơ hoặc phân công bị từ chối 403 trước mutation. Metadata tệp/biên bản kiểm tra kiểm tra ownership/assignment bằng ObjectAccessService; danh sách theo phiếu/biên bản cũng kiểm tra quyền trước truy vấn dữ liệu.
+- Hạ tầng giữ kho/thông báo/giải phóng khoang/bảo hành lỗi sẽ làm nghiệp vụ thất bại và rollback transaction, không giả vờ hoàn tất. Tiếp nhận thiếu RepairWorkflow trả 503 thay vì sinh ID phiếu giả.
+- Giới hạn hiện hữu: upload hiện chỉ ghi metadata, hash và storage key; chưa có implementation lưu/đọc nội dung tệp. Thay đổi này không triển khai một storage system mới.
+
 ## Kiểm chứng
 
 Các bài mới kiểm tra response thực qua MockMvc cho từng nhóm lỗi, object-level validation, input sai, format HTTP, nội dung nhạy cảm trong response/log, bind policy khác mặc định và cấu hình sai, provider cause/interruption, cùng việc không gọi fail khi DB complete lỗi. Bộ integration hiện có kiểm tra filter/CORS, RBAC, thu hồi token, audit rollback và cạnh tranh trên MySQL; xem kết quả thực tế trong `VALIDATION.md`.

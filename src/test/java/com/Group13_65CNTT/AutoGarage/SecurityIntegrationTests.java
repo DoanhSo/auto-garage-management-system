@@ -152,7 +152,7 @@ class SecurityIntegrationTests extends IntegrationTestSupport {
     }
 
     @Test
-    void keycloakBearerTokenAuthenticatesAndSynchronizesIdentityIdOnFirstAccess()
+    void customerRegistrationCannotClaimExistingUnboundAccountByUsername()
             throws Exception {
         jdbc.update(
                 "INSERT INTO users(id,identity_id,username,email,full_name,role)"
@@ -166,15 +166,16 @@ class SecurityIntegrationTests extends IntegrationTestSupport {
                         0L);
         perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + firstToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.id").value(920099))
+                .andExpect(jsonPath("$.data.id").value(org.hamcrest.Matchers.not(920099)))
                 .andExpect(
                         jsonPath("$.data.identityId")
                                 .value("550e8400-e29b-41d4-a716-446655920099"))
                 .andExpect(jsonPath("$.data.role").value("CUSTOMER"))
                 .andExpect(jsonPath("$.data.passwordHash").doesNotExist());
         var linked = users.findById(920099L).orElseThrow();
-        assertEquals("550e8400-e29b-41d4-a716-446655920099", linked.getIdentityId());
-        assertNotNull(linked.getLastLoginAt());
+        assertNull(linked.getIdentityId());
+        assertNull(linked.getLastLoginAt());
+        assertTrue(users.findByIdentityId("550e8400-e29b-41d4-a716-446655920099").isPresent());
     }
 
     @Test

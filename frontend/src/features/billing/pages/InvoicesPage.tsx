@@ -130,7 +130,11 @@ export function InvoicesPage() {
             Xuất hóa đơn dịch vụ sửa chữa, theo dõi thanh toán và công nợ khách hàng
           </p>
         </div>
-        <Button variant="primary" onClick={() => setIssuing(true)} className="flex items-center gap-1.5">
+        <Button
+          variant="primary"
+          onClick={() => setIssuing(true)}
+          className="flex items-center gap-1.5"
+        >
           <Plus size={16} />
           Xuất hóa đơn mới
         </Button>
@@ -155,7 +159,7 @@ export function InvoicesPage() {
         <select
           value={selectedStatus}
           onChange={(e) => {
-            setSelectedStatus(e.target.value as any);
+            setSelectedStatus(e.target.value as typeof selectedStatus);
             setPage(0);
           }}
           className="border rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -203,7 +207,9 @@ export function InvoicesPage() {
 
                   return (
                     <tr key={inv.id} className="hover:bg-gray-50/80 transition-colors">
-                      <td className="py-3 px-4 font-mono font-medium text-gray-900">{inv.invoiceCode}</td>
+                      <td className="py-3 px-4 font-mono font-medium text-gray-900">
+                        {inv.invoiceCode}
+                      </td>
                       <td className="py-3 px-4 font-mono text-gray-700">#{inv.repairOrderId}</td>
                       <td className="py-3 px-4">
                         <div className="font-medium text-gray-800">{custName}</div>
@@ -216,7 +222,9 @@ export function InvoicesPage() {
                         {paid.toLocaleString('vi-VN')}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <span className={`font-semibold ${bal > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                        <span
+                          className={`font-semibold ${bal > 0 ? 'text-red-600' : 'text-gray-400'}`}
+                        >
                           {bal.toLocaleString('vi-VN')}
                         </span>
                       </td>
@@ -288,7 +296,11 @@ export function InvoicesPage() {
       </div>
 
       {/* Modal Xuất Hóa Đơn Mới */}
-      <Modal open={issuing} onOpenChange={(open: boolean) => !open && setIssuing(false)} title="Xuất Hóa Đơn Sửa Chữa Mới">
+      <Modal
+        open={issuing}
+        onOpenChange={(open: boolean) => !open && setIssuing(false)}
+        title="Xuất Hóa Đơn Sửa Chữa Mới"
+      >
         <form onSubmit={handleIssue} className="space-y-4">
           <Field label="Mã lệnh sửa chữa (Repair Order ID)" required>
             <input
@@ -357,7 +369,9 @@ export function InvoicesPage() {
               </div>
               <div>
                 <span className="text-gray-500">Số điện thoại: </span>
-                <span className="font-semibold">{viewingInvoice.customerSnapshot?.phone || '—'}</span>
+                <span className="font-semibold">
+                  {viewingInvoice.customerSnapshot?.phone || '—'}
+                </span>
               </div>
             </div>
 
@@ -384,7 +398,9 @@ export function InvoicesPage() {
                       </td>
                       <td className="p-2 font-medium">{line.itemName}</td>
                       <td className="p-2 text-right">{line.quantity}</td>
-                      <td className="p-2 text-right">{Number(line.unitPrice).toLocaleString('vi-VN')}</td>
+                      <td className="p-2 text-right">
+                        {Number(line.unitPrice).toLocaleString('vi-VN')}
+                      </td>
                       <td className="p-2 text-right font-semibold">
                         {Number(line.lineTotal).toLocaleString('vi-VN')}
                       </td>
@@ -398,7 +414,9 @@ export function InvoicesPage() {
             <div className="space-y-1.5 text-sm bg-gray-50 p-3 rounded-lg border">
               <div className="flex justify-between">
                 <span className="text-gray-600">Tổng tiền trước thuế:</span>
-                <span className="font-medium">{Number(viewingInvoice.subtotal).toLocaleString('vi-VN')} VNĐ</span>
+                <span className="font-medium">
+                  {Number(viewingInvoice.subtotal).toLocaleString('vi-VN')} VNĐ
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Giảm giá:</span>
@@ -408,11 +426,15 @@ export function InvoicesPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Tiền thuế:</span>
-                <span className="font-medium">{Number(viewingInvoice.taxAmount).toLocaleString('vi-VN')} VNĐ</span>
+                <span className="font-medium">
+                  {Number(viewingInvoice.taxAmount).toLocaleString('vi-VN')} VNĐ
+                </span>
               </div>
               <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-bold text-gray-900">
                 <span>Tổng cộng:</span>
-                <span className="text-blue-600">{Number(viewingInvoice.totalAmount).toLocaleString('vi-VN')} VNĐ</span>
+                <span className="text-blue-600">
+                  {Number(viewingInvoice.totalAmount).toLocaleString('vi-VN')} VNĐ
+                </span>
               </div>
               <div className="flex justify-between text-xs pt-1">
                 <span className="text-green-600 font-medium">Đã thanh toán:</span>
@@ -444,7 +466,8 @@ export function InvoicesPage() {
         {payingInvoice && (
           <form onSubmit={handleReceivePayment} className="space-y-4">
             <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-900">
-              Khách hàng: <span className="font-bold">
+              Khách hàng:{' '}
+              <span className="font-bold">
                 {payingInvoice.customerSnapshot?.fullName || `KH #${payingInvoice.customerId}`}
               </span>
               <br />
@@ -517,8 +540,8 @@ export function InvoicesPage() {
       >
         <div className="space-y-4">
           <p className="text-sm text-gray-600">
-            Hóa đơn sẽ bị chuyển sang trạng thái <strong>VOID (Hủy)</strong> và toàn bộ công nợ liên quan sẽ được
-            hoàn nguyên. Vui lòng nhập lý do hủy:
+            Hóa đơn sẽ bị chuyển sang trạng thái <strong>VOID (Hủy)</strong> và toàn bộ công nợ liên
+            quan sẽ được hoàn nguyên. Vui lòng nhập lý do hủy:
           </p>
 
           <Field label="Lý do hủy" required>

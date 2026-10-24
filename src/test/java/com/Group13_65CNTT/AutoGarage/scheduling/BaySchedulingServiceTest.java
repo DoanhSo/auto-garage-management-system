@@ -31,6 +31,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class BaySchedulingServiceTest {
+    @org.mockito.Spy private com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties workshop = new com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties();
 
     @Mock
     private ServiceBayRepository serviceBayRepository;
@@ -64,6 +65,7 @@ class BaySchedulingServiceTest {
     @Test
     @DisplayName("I02: Giữ khoang cho lịch hẹn (reserveBooking) thành công")
     void reserveBooking_success() {
+        workshop.setReservationHold(Duration.ofMinutes(5));
         when(serviceBayRepository.findByIdWithLock(1L)).thenReturn(Optional.of(bay));
         when(bayReservationRepository.findOverlappingReservations(eq(1L), anyCollection(), eq(startsAt), eq(endsAt)))
                 .thenReturn(Collections.emptyList());
@@ -88,6 +90,8 @@ class BaySchedulingServiceTest {
                 r.getBookingId().equals(10L) &&
                 r.getReservationType() == ReservationType.BOOKING &&
                 r.getStatus() == ReservationStatus.HELD
+                && r.getExpiresAt().isAfter(now.plus(Duration.ofMinutes(4)))
+                && r.getExpiresAt().isBefore(Instant.now().plus(Duration.ofMinutes(6)))
         ));
     }
 

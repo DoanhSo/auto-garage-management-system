@@ -17,4 +17,6 @@ public interface KeycloakIdentityService {
             boolean active);
 
     void disableUser(String identityId, String username);
+
+    void syncAuthVersion(String identityId, String username, long authVersion);
 }

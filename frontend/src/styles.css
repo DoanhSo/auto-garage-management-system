@@ -1749,106 +1749,28 @@ select.input {
 }
 .login-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  place-items: center;
   min-height: 100dvh;
+  padding: 40px 20px;
+  background: #fafafa;
 }
-.login-story {
-  background: linear-gradient(155deg, #0f1f38 0%, #19325c 55%, #1e4280 100%);
-  border-right: 1px solid #1d355e;
-  color: #f8fafc;
-  padding: 16px 42px 32px;
-  display: flex;
-  flex-direction: column;
-}
-.login-story .brand {
-  padding-left: 0;
-  color: #ffffff;
-}
-.login-story .brand small {
-  color: #93b4e8;
-}
-.login-story-body {
-  max-width: 480px;
-  margin: auto;
-}
-.login-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #dbeafe;
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.8px;
-}
-.login-story-body .eyebrow {
-  color: #bfdbfe;
-  font-size: 10px;
-}
-.login-story-body h1 {
-  font-size: 38px;
-  line-height: 1.28;
-  letter-spacing: -1.2px;
-  color: #ffffff;
-  margin: 18px 0 20px;
-}
-.login-story-body > p:not(.eyebrow) {
-  font-size: 14px;
-  line-height: 1.85;
-  max-width: 410px;
-  color: #cbd5e1;
-}
-.story-features {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 38px;
-}
-.story-features span {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  color: #e2e8f0;
-  font-size: 13px;
-  padding: 11px 14px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-.story-features svg {
-  color: #60a5fa;
-  flex-shrink: 0;
-}
-.login-story-footer {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 40px;
-}
+
 .login-main {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: #f8fafc;
-  padding: 36px 28px;
+  width: 100%;
+  max-width: 420px;
 }
 .login-card {
   width: 100%;
-  max-width: 430px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 32px 30px;
-  box-shadow: 0 14px 40px rgba(15, 23, 42, 0.06);
+  padding: 32px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 .login-card-header .eyebrow {
   color: var(--primary);
   font-weight: 700;
 }
-.login-card h2 {
+.login-card h1 {
   font-size: 28px;
   letter-spacing: -0.7px;
   margin-top: 4px;
@@ -1909,14 +1831,12 @@ select.input {
   color: #243b5a;
 }
 .login-customer-box {
-  margin-top: 20px;
-  padding: 15px 16px;
-  border-radius: 12px;
-  background: #f0f6ff;
-  border: 1px solid #d5e4ff;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 12px;
 }
 .login-customer-text {
   display: flex;
@@ -1971,10 +1891,6 @@ select.input {
   }
   .metric-card {
     padding: 25px;
-  }
-  .login-story {
-    padding-left: 70px;
-    padding-right: 70px;
   }
 }
 @media (max-width: 1200px) {
@@ -2041,12 +1957,7 @@ select.input {
   .inbox-grid {
     grid-template-columns: minmax(270px, 0.9fr) minmax(300px, 1.1fr);
   }
-  .login-story {
-    padding: 20px 28px;
-  }
-  .login-story-body h1 {
-    font-size: 33px;
-  }
+
   .login-main {
     padding: 40px 30px;
   }
@@ -2291,18 +2202,7 @@ select.input {
     flex-direction: column;
     background: white;
   }
-  .login-story {
-    background: white;
-    border: 0;
-    padding: 13px 24px 0;
-  }
-  .login-story .brand {
-    padding: 16px 0 0;
-  }
-  .login-story-body,
-  .login-story-footer {
-    display: none;
-  }
+
   .login-main {
     padding: 55px 24px 28px;
     flex: 1;
@@ -2340,9 +2240,7 @@ select.input {
   }
 }
 
-/* ==========================================================================
-   ENTERPRISE UI/UX SYSTEM (Matt Pocock Skills: Prototype + Deep Modules)
-   ========================================================================== */
+/* Shared workspace components */
 
 /* Semantic Role Badges */
 .badge-role-admin {
@@ -2438,114 +2336,6 @@ select.input {
   padding: 16px 10px;
 }
 
-/* Variant A (Default): Modern Navy & Slate Enterprise */
-.app-layout[data-ui-variant='A'] .sidebar {
-  background: linear-gradient(180deg, #0f172a 0%, #172542 100%);
-  border-right-color: #1e293b;
-  color: #f8fafc;
-}
-.app-layout[data-ui-variant='A'] .brand {
-  color: #ffffff;
-}
-.app-layout[data-ui-variant='A'] .brand small {
-  color: #93c5fd;
-}
-.app-layout[data-ui-variant='A'] .nav-heading {
-  color: #64748b;
-}
-.app-layout[data-ui-variant='A'] .nav-item {
-  color: #cbd5e1;
-}
-.app-layout[data-ui-variant='A'] .nav-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
-}
-.app-layout[data-ui-variant='A'] .nav-item.active {
-  background: #2563eb;
-  color: #ffffff;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
-}
-.app-layout[data-ui-variant='A'] .nav-item.active .nav-count {
-  background: #ffffff;
-  color: #1d4ed8;
-  font-weight: 700;
-}
-.app-layout[data-ui-variant='A'] .sidebar-footer {
-  border-top-color: rgba(255, 255, 255, 0.09);
-}
-.app-layout[data-ui-variant='A'] .sidebar-footer strong {
-  color: #f8fafc;
-}
-.app-layout[data-ui-variant='A'] .sidebar-footer div > span {
-  color: #94a3b8;
-}
-.app-layout[data-ui-variant='A'] .sidebar-footer .avatar {
-  background: #1e3a8a;
-  border-color: #3b82f6;
-  color: #dbeafe;
-}
-
-/* Variant B: Clean Light Minimal (Linear / Notion aesthetic) */
-.app-layout[data-ui-variant='B'] {
-  background: #fcfcfd;
-}
-.app-layout[data-ui-variant='B'] .sidebar {
-  background: #ffffff;
-  border-right: 1px solid #e4e4e7;
-}
-.app-layout[data-ui-variant='B'] .sidebar-collapse-btn {
-  color: #64748b;
-}
-.app-layout[data-ui-variant='B'] .sidebar-collapse-btn:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-.app-layout[data-ui-variant='B'] .panel,
-.app-layout[data-ui-variant='B'] .metric-card {
-  box-shadow: none;
-  border-color: #e4e4e7;
-}
-
-/* Variant C: Automotive Industrial (Graphite & Amber) */
-.app-layout[data-ui-variant='C'] {
-  --primary: #d97706;
-  background: #f4f4f5;
-}
-.app-layout[data-ui-variant='C'] .sidebar {
-  background: #18181b;
-  border-right-color: #27272a;
-  color: #f4f4f5;
-}
-.app-layout[data-ui-variant='C'] .brand {
-  color: #ffffff;
-}
-.app-layout[data-ui-variant='C'] .brand-mark {
-  background: #d97706;
-}
-.app-layout[data-ui-variant='C'] .brand small {
-  color: #fbbf24;
-}
-.app-layout[data-ui-variant='C'] .nav-heading {
-  color: #71717a;
-}
-.app-layout[data-ui-variant='C'] .nav-item {
-  color: #a1a1aa;
-}
-.app-layout[data-ui-variant='C'] .nav-item:hover {
-  background: #27272a;
-  color: #fafafa;
-}
-.app-layout[data-ui-variant='C'] .nav-item.active {
-  background: #d97706;
-  color: #ffffff;
-}
-.app-layout[data-ui-variant='C'] .sidebar-footer {
-  border-top-color: #27272a;
-}
-.app-layout[data-ui-variant='C'] .sidebar-footer strong {
-  color: #fafafa;
-}
-
 /* Header User Pill & Sticky Topbar */
 .app-header {
   position: sticky;
@@ -2576,31 +2366,7 @@ select.input {
     transform 0.15s ease,
     box-shadow 0.15s ease;
 }
-.metric-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07);
-}
-.metric-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--primary);
-}
-.metric-tone-success::before {
-  background: #10b981;
-}
-.metric-tone-warning::before {
-  background: #f59e0b;
-}
-.metric-tone-danger::before {
-  background: #ef4444;
-}
-.metric-tone-info::before {
-  background: #0ea5e9;
-}
+
 .metric-icon {
   display: grid;
   place-items: center;
@@ -2855,7 +2621,7 @@ select.input {
   padding: 20px 24px;
   margin-bottom: 22px;
   max-width: 1050px;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: #fff;
 }
 .avatar-lg {
   width: 52px;
@@ -2897,44 +2663,200 @@ select.input {
   border-radius: 10px;
 }
 
-/* Prototype UI Switcher Floating Bar */
-.prototype-switcher {
-  position: fixed;
-  bottom: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 75;
-  display: inline-flex;
+/* Customer Module Styles */
+.code-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: #f1f4f9;
+  color: #3b4d66;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #e1e7f0;
+}
+.company-subtext {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #526278;
+  margin-top: 4px;
+}
+.contact-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #28374e;
+}
+.contact-item.subtext {
+  font-size: 11px;
+  color: #6a7c93;
+}
+.credit-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.credit-amount {
+  font-size: 12px;
+  color: #1a56db;
+  font-weight: 600;
+}
+.credit-days {
+  font-size: 11px;
+  color: #6a7c93;
+}
+.badge-primary {
+  background: #ebf5ff;
+  color: #1e429f;
+  border: 1px solid #c3ddfd;
+}
+.customer-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  font-size: 12px;
+  color: #4b5563;
+}
+.customer-card-details .info-row {
+  display: flex;
   align-items: center;
   gap: 8px;
+}
+.customer-card-details .credit-row {
+  background: #f9fafb;
   padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.28);
-  color: #f8fafc;
-  font-size: 12px;
-  font-weight: 600;
-  backdrop-filter: blur(8px);
+  border-radius: 6px;
+  border: 1px dashed #e5e7eb;
 }
-.prototype-switcher-icon {
-  color: #60a5fa;
-  margin-left: 4px;
-}
-.prototype-switcher-label {
-  padding: 0 6px;
-  white-space: nowrap;
-}
-.prototype-switcher-arrow {
+
+/* Vehicle Management Styles */
+.form-row-3 {
   display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
-  color: #f8fafc;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
 }
-.prototype-switcher-arrow:hover {
-  background: rgba(255, 255, 255, 0.2);
+@media (max-width: 640px) {
+  .form-row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+.plate-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  font-size: 13px;
+  background-color: #f0f7ff;
+  color: #1e429f;
+  border: 1px solid #bfdbfe;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  display: inline-block;
+}
+.vehicle-card {
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+.vehicle-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* A single minimal visual system for every workspace. */
+:root {
+  --primary: #245bdb;
+  --border: #e4e7ec;
+  --muted: #526278;
+  background: #fafafa;
+}
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+  font-size: 18px;
+  font-weight: 650;
+  color: #172338;
+}
+.login-brand svg {
+  color: var(--primary);
+}
+.login-divider {
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: 12px;
+}
+.panel,
+.metric-card {
+  box-shadow: none;
+}
+.metric-card {
+  transition: none;
+}
+.sidebar .main-navigation {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+.sidebar-collapse-btn {
+  color: var(--muted);
+}
+.sidebar-collapse-btn:hover {
+  color: #172338;
+  background: #f4f5f7;
+}
+.app-header {
+  background: #fff;
+  backdrop-filter: none;
+}
+.header-user-pill {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.button-small {
+  min-height: 32px;
+  padding: 5px 9px;
+}
+.mobile-nav .nav-item-label,
+.mobile-nav .nav-heading {
+  display: block;
+}
+.mobile-nav .nav-item {
+  justify-content: flex-start;
+  width: auto;
+}
+.select {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+@media (max-width: 640px) {
+  .login-layout {
+    padding: 24px 16px;
+  }
+  .login-card {
+    padding: 24px 20px;
+  }
+  .login-card h1 {
+    font-size: 24px;
+  }
+  .header-user-pill {
+    display: none;
+  }
+  .logout-label {
+    display: none;
+  }
 }

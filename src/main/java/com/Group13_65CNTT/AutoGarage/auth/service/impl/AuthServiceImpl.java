@@ -16,6 +16,7 @@ import com.Group13_65CNTT.AutoGarage.identity.dto.response.UserResponse;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.identity.mapper.UserMapper;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
+import com.Group13_65CNTT.AutoGarage.identity.service.KeycloakIdentityService;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -41,6 +42,7 @@ public class AuthServiceImpl implements AuthService {
     private final CurrentUserProvider currentUser;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final KeycloakIdentityService keycloakIdentityService;
 
     @Override
     @Transactional
@@ -82,6 +84,7 @@ public class AuthServiceImpl implements AuthService {
         user.setAuthVersion(user.getAuthVersion() + 1);
         user.setUpdatedBy(user.getId());
         userRepository.saveAndFlush(user);
+        keycloakIdentityService.syncAuthVersion(user.getIdentityId(), user.getUsername(), user.getAuthVersion());
     }
 
     private User provisionCustomerFromJwt() {
@@ -130,7 +133,11 @@ public class AuthServiceImpl implements AuthService {
                         .jwt()
                         .map(t -> t.getClaimAsBoolean(SecurityConstants.EMAIL_VERIFIED_CLAIM))
                         .orElse(Boolean.FALSE);
-        if (user.getEmail() != null && Boolean.TRUE.equals(emailVerified)) {
+        String verifiedTokenEmail = currentUser.jwt()
+                .map(token -> normalizeEmail(token.getClaimAsString(SecurityConstants.EMAIL_CLAIM)))
+                .orElse(null);
+        if (user.getEmail() != null && Boolean.TRUE.equals(emailVerified)
+                && user.getEmail().equalsIgnoreCase(verifiedTokenEmail)) {
             var existingByEmail =
                     customerRepository.findFirstByEmailIgnoreCaseAndUserIdIsNullOrderByIdAsc(
                             user.getEmail());

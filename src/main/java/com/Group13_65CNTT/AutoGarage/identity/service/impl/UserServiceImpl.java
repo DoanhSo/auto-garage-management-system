@@ -10,6 +10,7 @@ import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.util.DatabaseFailures;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
+import com.Group13_65CNTT.AutoGarage.common.util.PasswordPolicy;
 import com.Group13_65CNTT.AutoGarage.identity.dto.request.UserCreateRequest;
 import com.Group13_65CNTT.AutoGarage.identity.dto.request.UserUpdateRequest;
 import com.Group13_65CNTT.AutoGarage.identity.dto.response.UserResponse;
@@ -47,6 +48,7 @@ public class UserServiceImpl implements UserService {
     private final EntityManager entityManager;
     private final Clock clock;
     private final KeycloakIdentityService keycloakIdentityService;
+    private final PasswordPolicy passwordPolicy;
 
     @Override
     @Transactional
@@ -68,6 +70,7 @@ public class UserServiceImpl implements UserService {
             throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
         }
         if (identityId == null && keycloakIdentityService != null) {
+            passwordPolicy.validateNewPassword(request.getPassword());
             identityId =
                     keycloakIdentityService
                             .createOrLinkUser(
@@ -76,7 +79,7 @@ public class UserServiceImpl implements UserService {
                                     request.getFullName().strip(),
                                     request.getRole(),
                                     request.getPassword())
-                            .orElse(null);
+                            .orElseThrow(() -> new BusinessException(ResponseCode.AUTHENTICATION_UNAVAILABLE));
         }
         User user = userMapper.toEntity(request);
         user.setIdentityId(identityId);
@@ -162,7 +165,8 @@ public class UserServiceImpl implements UserService {
                 request.getActive(),
                 request.getVersion(),
                 administrators.size());
-        if (user.getRole() != request.getRole() || user.isActive() != request.getActive()) {
+        boolean revokeTokens = user.getRole() != request.getRole() || user.isActive() != request.getActive();
+        if (revokeTokens) {
             user.setAuthVersion(user.getAuthVersion() + 1);
         }
         userMapper.updateEntityFromRequest(request, user);
@@ -179,6 +183,9 @@ public class UserServiceImpl implements UserService {
                     saved.getFullName(),
                     saved.getRole(),
                     saved.isActive());
+            if (revokeTokens) {
+                keycloakIdentityService.syncAuthVersion(saved.getIdentityId(), saved.getUsername(), saved.getAuthVersion());
+            }
         }
         return userMapper.toResponse(saved);
     }

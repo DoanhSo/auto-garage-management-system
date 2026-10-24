@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation, useSearchParams } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Bell,
+  CalendarCheck,
+  Car,
   ChartNoAxesCombined,
-  ChevronLeft,
-  ChevronRight,
+  Contact,
   History,
+  Layers,
   LogOut,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
-  Sparkles,
   Users,
   Wrench,
   X,
@@ -29,14 +30,8 @@ import { useMeQuery, useLogoutMutation } from '../../features/auth/hooks/useAuth
 import { useUnreadCountQuery } from '../../features/notification/hooks/useNotifications';
 import { Button, RoleBadge } from '../../shared/components/ui';
 import { roles, type Role } from '../../shared/types/contracts';
+import { FRONT_DESK_ROLES, BOOKING_ROLES } from '../access';
 import { initials } from '../../shared/utils/format';
-
-const UI_VARIANTS = [
-  { key: 'A', label: 'A · Modern Navy & Slate' },
-  { key: 'B', label: 'B · Clean Light Minimal' },
-  { key: 'C', label: 'C · Automotive Industrial' },
-] as const;
-type UiVariantKey = (typeof UI_VARIANTS)[number]['key'];
 
 const links: ReadonlyArray<{
   to: string;
@@ -44,6 +39,20 @@ const links: ReadonlyArray<{
   icon: typeof Bell;
   allowedRoles: readonly Role[];
 }> = [
+  {
+    to: '/reception',
+    label: 'Tiếp nhận xe',
+    icon: CalendarCheck,
+    allowedRoles: BOOKING_ROLES,
+  },
+  {
+    to: '/customers',
+    label: 'Khách hàng',
+    icon: Contact,
+    allowedRoles: FRONT_DESK_ROLES,
+  },
+  { to: '/vehicles', label: 'Phương tiện', icon: Car, allowedRoles: BOOKING_ROLES },
+  { to: '/services', label: 'Dịch vụ', icon: Layers, allowedRoles: roles },
   {
     to: '/inventory/parts',
     label: 'Kho & Phụ tùng',
@@ -103,48 +112,9 @@ export function AppShell() {
   const logout = useLogoutMutation();
   const unread = useUnreadCountQuery();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [mobile, setMobile] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
-
-  const rawVariant = searchParams.get('variant')?.toUpperCase();
-  const variant: UiVariantKey = rawVariant === 'B' || rawVariant === 'C' ? rawVariant : 'A';
-
-  const setVariant = (next: UiVariantKey) => {
-    const updated = new URLSearchParams(searchParams);
-    if (next === 'A') updated.delete('variant');
-    else updated.set('variant', next);
-    setSearchParams(updated, { replace: true });
-  };
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      if (!event.altKey) return;
-      const index = UI_VARIANTS.findIndex((item) => item.key === variant);
-      if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        const prev = UI_VARIANTS[(index - 1 + UI_VARIANTS.length) % UI_VARIANTS.length];
-        setVariant(prev.key);
-      } else if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        const next = UI_VARIANTS[(index + 1) % UI_VARIANTS.length];
-        setVariant(next.key);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  });
 
   useEffect(() => {
     if (me.data) setCurrentUser(me.data);
@@ -185,11 +155,8 @@ export function AppShell() {
     </nav>
   );
 
-  const currentVariantIndex = UI_VARIANTS.findIndex((item) => item.key === variant);
-  const currentVariant = UI_VARIANTS[currentVariantIndex] ?? UI_VARIANTS[0];
-
   return (
-    <div className={`app-layout ${collapsed ? 'sidebar-collapsed' : ''}`} data-ui-variant={variant}>
+    <div className={`app-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="sidebar">
         <div className="sidebar-brand-row">
           <NavLink
@@ -200,7 +167,7 @@ export function AppShell() {
               <Wrench size={20} />
             </span>
             <span className="brand-text">
-              AutoGarage<small>ENTERPRISE WORKSPACE</small>
+              AutoGarage<small>Quản lý gara</small>
             </span>
           </NavLink>
           <button
@@ -226,16 +193,15 @@ export function AppShell() {
         <header className="app-header">
           <div className="breadcrumb">
             <Button
-              className="mobile-menu"
-              variant="ghost"
-              aria-label="Mở menu"
-              onClick={() => setMobile(true)}
               ref={trigger}
+              variant="ghost"
+              className="mobile-menu"
+              aria-label="Mở menu điều hướng"
+              aria-expanded={mobile}
+              onClick={() => setMobile(true)}
             >
               <Menu size={20} />
             </Button>
-            <span>Không gian làm việc</span>
-            <ChevronRight size={14} aria-hidden />
             <strong>{title}</strong>
           </div>
           <div className="header-actions">
@@ -255,80 +221,43 @@ export function AppShell() {
             </div>
             <Button
               variant="ghost"
-              pending={logout.isPending}
               onClick={() => logout.mutate()}
-              aria-label="Đăng xuất"
+              aria-label="Đăng xuất khỏi hệ thống"
+              pending={logout.isPending}
             >
               <LogOut size={17} />
               <span className="logout-label">Đăng xuất</span>
             </Button>
           </div>
         </header>
-        {me.error && (
-          <div className="session-banner" role="status">
-            Chưa thể kiểm tra lại thông tin tài khoản.{' '}
-            <button
-              type="button"
-              onClick={() => {
-                void me.refetch();
-              }}
-            >
-              Thử lại
-            </button>
-          </div>
-        )}
-        <main id="main-content" className="workspace">
+        <main className="workspace" id="main-content" tabIndex={-1}>
           <Outlet />
         </main>
       </div>
-      {import.meta.env.MODE !== 'production' && (
-        <div className="prototype-switcher" role="region" aria-label="Bộ chuyển giao diện mẫu">
-          <Sparkles size={14} className="prototype-switcher-icon" aria-hidden />
-          <button
-            type="button"
-            className="prototype-switcher-arrow"
-            aria-label="Giao diện trước"
-            onClick={() => {
-              const prev =
-                UI_VARIANTS[(currentVariantIndex - 1 + UI_VARIANTS.length) % UI_VARIANTS.length];
-              setVariant(prev.key);
-            }}
-          >
-            <ChevronLeft size={15} />
-          </button>
-          <span className="prototype-switcher-label">{currentVariant.label}</span>
-          <button
-            type="button"
-            className="prototype-switcher-arrow"
-            aria-label="Giao diện tiếp theo"
-            onClick={() => {
-              const next = UI_VARIANTS[(currentVariantIndex + 1) % UI_VARIANTS.length];
-              setVariant(next.key);
-            }}
-          >
-            <ChevronRight size={15} />
-          </button>
-        </div>
-      )}
       <Dialog.Root open={mobile} onOpenChange={setMobile}>
         <Dialog.Portal>
           <Dialog.Overlay className="overlay" />
           <Dialog.Content
             className="mobile-nav"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
+            aria-label="Thanh điều hướng di động"
+            onCloseAutoFocus={(e) => {
+              e.preventDefault();
               trigger.current?.focus();
             }}
           >
-            <div className="mobile-nav-header">
-              <Dialog.Title>AutoGarage</Dialog.Title>
+            <Dialog.Title className="sr-only">Điều hướng</Dialog.Title>
+            <Dialog.Description className="sr-only">Chọn chức năng của gara.</Dialog.Description>
+            <div className="drawer-header">
+              <span className="brand-mark">
+                <Wrench size={20} />
+              </span>
+              <span>AutoGarage</span>
               <Dialog.Close asChild>
-                <Button variant="ghost" aria-label="Đóng menu">
-                  <X size={20} />
+                <Button variant="ghost" aria-label="Đóng thanh điều hướng">
+                  <X size={18} />
                 </Button>
               </Dialog.Close>
             </div>
-            <Dialog.Description className="sr-only">Chọn phân hệ làm việc</Dialog.Description>
             {nav(() => setMobile(false))}
           </Dialog.Content>
         </Dialog.Portal>

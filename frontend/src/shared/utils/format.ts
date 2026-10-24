@@ -1,22 +1,49 @@
 import Decimal from 'decimal.js';
-export function money(value: string): string {
-  const decimal = new Decimal(value);
+
+export function money(value: string | number): string {
+  const decimal = new Decimal(value.toString());
   const [whole, fraction] = decimal.abs().toFixed(2).split('.');
   return `${decimal.isNegative() ? '-' : ''}${new Intl.NumberFormat('vi-VN').format(BigInt(whole))}${fraction === '00' ? '' : ',' + fraction} ₫`;
 }
+
 export function hours(value: string): string {
   return new Decimal(value).toFixed(2).replace('.', ',') + ' giờ';
 }
-export function dateTime(value: string, zone: string): string {
+
+export function dateTime(value: string, zone?: string): string {
   const date = new Date(value);
   return Number.isNaN(date.valueOf())
     ? 'Không xác định'
     : new Intl.DateTimeFormat('vi-VN', {
         dateStyle: 'short',
         timeStyle: 'short',
-        timeZone: zone,
+        ...(zone ? { timeZone: zone } : {}),
       }).format(date);
 }
+
+export function formatDate(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf())
+    ? ''
+    : new Intl.DateTimeFormat('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(date);
+}
+
+export function formatDateTime(value?: string | null): string {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf())
+    ? ''
+    : new Intl.DateTimeFormat('vi-VN', {
+        dateStyle: 'short',
+        timeStyle: 'short',
+      }).format(date);
+}
+
 export function initials(name: string): string {
   return name
     .split(/\s+/)
@@ -26,9 +53,11 @@ export function initials(name: string): string {
     .join('')
     .toLocaleUpperCase('vi');
 }
+
 function hasUnsafeCharacters(value: string) {
   return Array.from(value).some((char) => char === '\\' || char.charCodeAt(0) < 32);
 }
+
 export function safeReturnTo(value: unknown, fallback: string): string {
   if (
     typeof value !== 'string' ||

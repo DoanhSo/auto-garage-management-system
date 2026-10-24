@@ -38,6 +38,7 @@ public enum ResponseCode {
             2012,
             "Configured bootstrap account is not an active administrator",
             HttpStatus.CONFLICT),
+    UPLOAD_TOO_LARGE(2013, "Upload exceeds the configured size limit", HttpStatus.PAYLOAD_TOO_LARGE),
     UNAUTHORIZED(3001, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),
     FORBIDDEN(3002, "You do not have permission for this operation", HttpStatus.FORBIDDEN),
     INVALID_TOKEN(3003, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),

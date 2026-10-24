@@ -1,5 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.vehicle.service;
 
+import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
+import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
 import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
 import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
@@ -20,6 +22,7 @@ import java.util.List;
 @Service
 @Transactional
 public class VehicleServiceImpl implements VehicleService {
+    private final CustomerScope customerScope;
 
     private final VehicleRepository vehicleRepository;
     private final CustomerRepository customerRepository;
@@ -27,7 +30,8 @@ public class VehicleServiceImpl implements VehicleService {
 
     public VehicleServiceImpl(VehicleRepository vehicleRepository,
                               CustomerRepository customerRepository,
-                              VehicleMapper vehicleMapper) {
+                              VehicleMapper vehicleMapper, CustomerScope customerScope) {
+        this.customerScope = customerScope;
         this.vehicleRepository = vehicleRepository;
         this.customerRepository = customerRepository;
         this.vehicleMapper = vehicleMapper;
@@ -35,6 +39,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public VehicleResponse createVehicle(CreateVehicleRequest request) {
+        customerScope.requireFrontDesk();
         Customer customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng sở hữu với ID: " + request.getCustomerId()));
 
@@ -68,6 +73,7 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleResponse getVehicleById(Long id) {
         Vehicle vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + id));
+        customerScope.requireResource(AccessResource.VEHICLE, vehicle.getId());
         Customer customer = customerRepository.findById(vehicle.getCustomerId()).orElse(null);
         return vehicleMapper.toResponse(vehicle,
                 customer != null ? customer.getFullName() : null,
@@ -80,6 +86,7 @@ public class VehicleServiceImpl implements VehicleService {
         String normalizedPlate = normalizePlate(plate);
         Vehicle vehicle = vehicleRepository.findByLicensePlate(normalizedPlate)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với biển số: " + plate));
+        customerScope.requireResource(AccessResource.VEHICLE, vehicle.getId());
         Customer customer = customerRepository.findById(vehicle.getCustomerId()).orElse(null);
         return vehicleMapper.toResponse(vehicle,
                 customer != null ? customer.getFullName() : null,
@@ -90,7 +97,8 @@ public class VehicleServiceImpl implements VehicleService {
     @Transactional(readOnly = true)
     public List<VehicleResponse> searchVehicles(Long customerId, String search, Boolean isActive) {
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
-        return vehicleRepository.searchVehicles(customerId, cleanSearch, isActive)
+        Long scopedCustomerId = customerScope.customerIdForQuery(customerId);
+        return vehicleRepository.searchVehicles(scopedCustomerId, cleanSearch, isActive)
                 .stream()
                 .map(v -> {
                     Customer c = customerRepository.findById(v.getCustomerId()).orElse(null);
@@ -103,6 +111,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public VehicleResponse updateVehicle(Long id, UpdateVehicleRequest request) {
+        customerScope.requireFrontDesk();
         Vehicle vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + id));
 
@@ -142,6 +151,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public VehicleResponse transferOwnership(Long vehicleId, TransferOwnershipRequest request) {
+        customerScope.requireFrontDesk();
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + vehicleId));
 
@@ -160,6 +170,7 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public void deactivateVehicle(Long id) {
+        customerScope.requireFrontDesk();
         Vehicle vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + id));
         vehicle.setIsActive(false);
@@ -184,6 +195,7 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     private com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse buildTimeline(Vehicle vehicle, Long requestingCustomerId, String userRole) {
+        customerScope.requireResource(AccessResource.VEHICLE, vehicle.getId());
         if ("CUSTOMER".equalsIgnoreCase(userRole)) {
             if (requestingCustomerId == null || !requestingCustomerId.equals(vehicle.getCustomerId())) {
                 throw new BusinessRuleException("Bạn không có quyền truy cập lịch sử của phương tiện này (BR02)");

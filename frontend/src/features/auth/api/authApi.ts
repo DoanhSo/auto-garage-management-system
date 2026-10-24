@@ -1,6 +1,7 @@
 import { request } from '../../../shared/api/client';
 import { ApiError } from '../../../shared/api/errors';
 import { env } from '../../../shared/config/env';
+import { safeReturnTo } from '../../../shared/utils/format';
 import type { OidcTokenBundle } from '../../../shared/types/contracts';
 import { oidcTokenSchema, userSchema } from '../../../shared/types/schemas';
 
@@ -10,6 +11,7 @@ export interface PkceSessionState {
   verifier: string;
   state: string;
   redirectUri: string;
+  createdAt: number;
   returnTo?: string;
 }
 
@@ -28,6 +30,43 @@ function randomUrlSafe(byteLength = 32): string {
 async function computeS256Challenge(verifier: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   return base64UrlEncode(new Uint8Array(digest));
+}
+
+interface PkceOptions {
+  returnTo?: string;
+  idpHint?: string;
+  mode?: 'auth' | 'registrations';
+}
+
+export async function createPkceAuthorizationRequest(opts: PkceOptions = {}) {
+  const verifier = randomUrlSafe(32);
+  const state = randomUrlSafe(24);
+  const challenge = await computeS256Challenge(verifier);
+  const redirectUri = `${window.location.origin}/login`;
+  const session: PkceSessionState = {
+    verifier,
+    state,
+    redirectUri,
+    createdAt: Date.now(),
+    returnTo: safeReturnTo(opts.returnTo, '/'),
+  };
+  const endpoint = opts.mode === 'registrations' ? 'registrations' : 'auth';
+  const url = new URL(
+    `${env.keycloakPublicOrigin.replace(/\/$/, '')}/protocol/openid-connect/${endpoint}`,
+    window.location.origin,
+  );
+  url.search = new URLSearchParams({
+    client_id: env.keycloakClientId,
+    response_type: 'code',
+    scope: 'openid',
+    redirect_uri: redirectUri,
+    state,
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+  }).toString();
+  if (endpoint === 'auth') url.searchParams.set('prompt', 'login');
+  if (opts.idpHint) url.searchParams.set('kc_idp_hint', opts.idpHint);
+  return { url: url.toString(), session };
 }
 
 async function exchangeOidcToken(params: Record<string, string>): Promise<OidcTokenBundle> {
@@ -96,53 +135,36 @@ export const authApi = {
       client_id: env.keycloakClientId,
       refresh_token: refreshToken,
     }),
-  startPkceRedirect: async (
-    options?:
-      | string
-      | {
-          returnTo?: string;
-          idpHint?: string;
-          mode?: 'auth' | 'registrations';
-        },
-  ) => {
+  startPkceRedirect: async (options?: string | PkceOptions) => {
     const opts = typeof options === 'string' ? { returnTo: options } : (options ?? {});
-    const verifier = randomUrlSafe(32);
-    const state = randomUrlSafe(24);
-    const challenge = await computeS256Challenge(verifier);
-    const redirectUri = `${window.location.origin}/login`;
-    const payload: PkceSessionState = { verifier, state, redirectUri, returnTo: opts.returnTo };
-    sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify(payload));
-    const endpoint = opts.mode === 'registrations' ? 'registrations' : 'auth';
-    const authorizeUrl = new URL(
-      `${env.keycloakPublicOrigin.replace(/\/$/, '')}/protocol/openid-connect/${endpoint}`,
-      window.location.origin,
-    );
-    authorizeUrl.searchParams.set('client_id', env.keycloakClientId);
-    authorizeUrl.searchParams.set('response_type', 'code');
-    authorizeUrl.searchParams.set('scope', 'openid');
-    authorizeUrl.searchParams.set('redirect_uri', redirectUri);
-    authorizeUrl.searchParams.set('state', state);
-    authorizeUrl.searchParams.set('code_challenge', challenge);
-    authorizeUrl.searchParams.set('code_challenge_method', 'S256');
-    if (endpoint === 'auth') {
-      authorizeUrl.searchParams.set('prompt', 'login');
-    }
-    if (opts.idpHint) {
-      authorizeUrl.searchParams.set('kc_idp_hint', opts.idpHint);
-    }
-    window.location.assign(authorizeUrl.toString());
+    const { url, session } = await createPkceAuthorizationRequest(opts);
+    sessionStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify(session));
+    window.location.assign(url);
   },
   startGoogleRedirect: async (returnTo?: string) =>
     authApi.startPkceRedirect({ returnTo, idpHint: 'google', mode: 'auth' }),
   startRegistrationRedirect: async (returnTo?: string) =>
     authApi.startPkceRedirect({ returnTo, mode: 'registrations' }),
   consumePkceState: (state: string | null): PkceSessionState | null => {
-    const raw = sessionStorage.getItem(PKCE_STORAGE_KEY);
-    sessionStorage.removeItem(PKCE_STORAGE_KEY);
-    if (!raw || !state) return null;
     try {
-      const parsed = JSON.parse(raw) as PkceSessionState;
-      return parsed.state === state && parsed.verifier && parsed.redirectUri ? parsed : null;
+      const raw = sessionStorage.getItem(PKCE_STORAGE_KEY);
+      sessionStorage.removeItem(PKCE_STORAGE_KEY);
+      if (!raw || !state) return null;
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const candidate = parsed as Partial<PkceSessionState>;
+      if (
+        candidate.state !== state ||
+        typeof candidate.verifier !== 'string' ||
+        !/^[A-Za-z0-9_-]{43,128}$/.test(candidate.verifier) ||
+        candidate.redirectUri !== `${window.location.origin}/login` ||
+        typeof candidate.createdAt !== 'number' ||
+        !Number.isFinite(candidate.createdAt) ||
+        Date.now() < candidate.createdAt ||
+        Date.now() - candidate.createdAt > env.pkceSessionMaxAgeMs
+      )
+        return null;
+      return { ...candidate, returnTo: safeReturnTo(candidate.returnTo, '/') } as PkceSessionState;
     } catch {
       return null;
     }
@@ -150,22 +172,38 @@ export const authApi = {
   me: async (signal?: AbortSignal) =>
     userSchema.parse(await request<unknown>('/auth/me', { signal })),
   logout: async (refreshToken?: string | null) => {
-    await request<null>('/auth/logout', { method: 'POST' });
+    let failure: unknown;
+    try {
+      await request<null>('/auth/logout', { method: 'POST' });
+    } catch (error) {
+      failure = error;
+    }
+    if (!failure) return;
     if (refreshToken) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), env.requestTimeoutMs);
       try {
-        await fetch(`${env.keycloakIssuer.replace(/\/$/, '')}/protocol/openid-connect/logout`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            client_id: env.keycloakClientId,
-            refresh_token: refreshToken,
-          }).toString(),
-          credentials: 'omit',
-          cache: 'no-store',
-        });
-      } catch {
-        // Resource server auth_version is already incremented; ignore best-effort OIDC end-session failure.
+        const response = await fetch(
+          `${env.keycloakIssuer.replace(/\/$/, '')}/protocol/openid-connect/logout`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              client_id: env.keycloakClientId,
+              refresh_token: refreshToken,
+            }).toString(),
+            credentials: 'omit',
+            cache: 'no-store',
+            signal: controller.signal,
+          },
+        );
+        if (!response.ok) throw new ApiError(503, 4002);
+      } catch (error) {
+        failure ??= error;
+      } finally {
+        clearTimeout(timeout);
       }
     }
+    if (failure) throw failure;
   },
 };

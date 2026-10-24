@@ -40,7 +40,7 @@ public class EstimateController {
     public ResponseEntity<ApiResponse<EstimateResponse>> createEstimate(
             @Valid @RequestBody EstimateCreateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         EstimateResponse response = estimateService.createEstimate(actorId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
@@ -98,7 +98,7 @@ public class EstimateController {
     public ResponseEntity<ApiResponse<EstimateResponse>> sendEstimate(
             @PathVariable Long id,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         EstimateResponse response = estimateService.sendEstimate(actorId, id);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
@@ -110,7 +110,7 @@ public class EstimateController {
             @PathVariable Long id,
             @Valid @RequestBody EstimateDecisionRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         EstimateResponse response = estimateService.decideEstimate(actorId, id, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }

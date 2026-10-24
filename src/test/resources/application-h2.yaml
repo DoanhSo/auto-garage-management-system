@@ -9,6 +9,8 @@ spring:
     hibernate:
       ddl-auto: create-drop
 security:
+  keycloak-admin:
+    enabled: false
   auth:
     issuer: http://localhost:8081/realms/autogarage-h2
     audience: autogarage-h2-api

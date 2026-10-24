@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.Group13_65CNTT.AutoGarage.common.config.PaginationProperties;
+import com.Group13_65CNTT.AutoGarage.common.config.PasswordProperties;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
+import com.Group13_65CNTT.AutoGarage.common.util.PasswordPolicy;
 import com.Group13_65CNTT.AutoGarage.identity.dto.request.UserCreateRequest;
 import com.Group13_65CNTT.AutoGarage.identity.dto.request.UserUpdateRequest;
 import com.Group13_65CNTT.AutoGarage.identity.dto.response.UserResponse;
@@ -45,7 +47,9 @@ class UserServiceTest {
     @Mock UserMapper userMapper;
     @Mock CurrentUserProvider currentUser;
     @Mock EntityManager entityManager;
+    @Mock KeycloakIdentityService keycloakIdentityService;
     @Spy PaginationPolicy pagination = new PaginationPolicy(new PaginationProperties());
+    @Spy PasswordPolicy passwordPolicy = new PasswordPolicy(new PasswordProperties());
     @InjectMocks UserServiceImpl service;
 
     @BeforeEach
@@ -96,6 +100,33 @@ class UserServiceTest {
                                 assertThat(error.getResponseCode())
                                         .isEqualTo(ResponseCode.FORBIDDEN));
         verifyNoInteractions(userMapper);
+        verify(userRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void newIdentityMustSatisfyPasswordPolicyBeforeCallingKeycloak() {
+        administrator();
+        var request = createRequest();
+        request.setIdentityId(null);
+        request.setPassword("short");
+        assertThatThrownBy(() -> service.createUser(request))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        failure -> assertThat(failure.getResponseCode()).isEqualTo(ResponseCode.INVALID_PASSWORD));
+        verifyNoInteractions(keycloakIdentityService);
+        verify(userRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void missingKeycloakIdentityCannotBeReportedAsSuccessfullyCreatedAccount() {
+        administrator();
+        var request = createRequest();
+        request.setIdentityId(null);
+        request.setPassword("test-password-123");
+        when(keycloakIdentityService.createOrLinkUser(anyString(), anyString(), anyString(), any(), anyString()))
+                .thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.createUser(request))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        failure -> assertThat(failure.getResponseCode()).isEqualTo(ResponseCode.AUTHENTICATION_UNAVAILABLE));
         verify(userRepository, never()).saveAndFlush(any());
     }
 

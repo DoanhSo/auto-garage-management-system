@@ -12,6 +12,8 @@ public interface CustomerService {
 
     CustomerResponse getCustomerById(Long id);
 
+    CustomerResponse getCurrentCustomer();
+
     CustomerResponse getCustomerByCode(String code);
 
     List<CustomerResponse> searchCustomers(String search, Boolean isActive);

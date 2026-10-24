@@ -21,6 +21,8 @@ public final class SecurityConstants {
             "hasAnyRole('ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN')";
     public static final String HAS_ROLE_INTERNAL_STAFF =
             "hasAnyRole('ADMIN', 'RECEPTIONIST', 'TECHNICIAN', 'WAREHOUSE_STAFF')";
+    public static final String HAS_ROLE_RECEPTIONIST_OR_ADMIN = HAS_ROLE_ADMIN_OR_RECEPTIONIST;
+    public static final String HAS_ROLE_RECEPTIONIST_OR_TECHNICIAN_OR_ADMIN = "hasAnyRole('ADMIN','RECEPTIONIST','TECHNICIAN')";
     public static final String HAS_ANY_ROLE = "isAuthenticated()";
     public static final String HAS_STAFF_OR_ADMIN =
             "hasAnyRole('ADMIN','RECEPTIONIST','WAREHOUSE_STAFF','TECHNICIAN')";

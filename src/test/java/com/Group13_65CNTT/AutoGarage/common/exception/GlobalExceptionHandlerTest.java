@@ -53,6 +53,9 @@ class GlobalExceptionHandlerTest {
     static Stream<Arguments> failures() {
         return Stream.of(
                 Arguments.of("business", 404, 2002),
+                Arguments.of("shared-rule-forbidden", 403, 3002),
+                Arguments.of("shared-conflict-stale", 409, 2005),
+                Arguments.of("upload-too-large", 413, 2013),
                 Arguments.of("credentials", 401, 3005),
                 Arguments.of("username", 401, 3005),
                 Arguments.of("unauthenticated", 401, 3001),
@@ -165,6 +168,9 @@ class GlobalExceptionHandlerTest {
         ApiResponse<Void> failure(@RequestParam String kind) throws BindException {
             throw switch (kind) {
                 case "business" -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND);
+                case "shared-rule-forbidden" -> new com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException(ResponseCode.FORBIDDEN);
+                case "shared-conflict-stale" -> new com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException(ResponseCode.STALE_USER_VERSION);
+                case "upload-too-large" -> new org.springframework.web.multipart.MaxUploadSizeExceededException(100);
                 case "credentials" -> new BadCredentialsException(SENSITIVE);
                 case "username" -> new UsernameNotFoundException(SENSITIVE);
                 case "unauthenticated" -> new InsufficientAuthenticationException(SENSITIVE);

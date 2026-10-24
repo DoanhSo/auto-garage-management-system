@@ -4,9 +4,6 @@ import com.Group13_65CNTT.AutoGarage.common.dto.ApiResponse;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.util.DatabaseFailures;
 import com.Group13_65CNTT.AutoGarage.common.util.SafeFailureLog;
-import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
-import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
-import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -38,6 +35,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -52,24 +50,6 @@ public class GlobalExceptionHandler {
             SafeFailureLog.error(log, "Business operation unavailable", failure);
         }
         return error(failure.getResponseCode(), request);
-    }
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiResponse<Void>> sharedNotFound(
-            ResourceNotFoundException failure, HttpServletRequest request) {
-        return error(ResponseCode.RESOURCE_NOT_FOUND, request);
-    }
-
-    @ExceptionHandler(BusinessRuleException.class)
-    public ResponseEntity<ApiResponse<Void>> sharedBusinessRule(
-            BusinessRuleException failure, HttpServletRequest request) {
-        return error(ResponseCode.BAD_REQUEST, request);
-    }
-
-    @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<ApiResponse<Void>> sharedConflict(
-            ConflictException failure, HttpServletRequest request) {
-        return error(ResponseCode.DUPLICATE_RESOURCE, request);
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})
@@ -202,6 +182,12 @@ public class GlobalExceptionHandler {
             Exception failure, HttpServletRequest request) {
         SafeFailureLog.error(log, "Unexpected request failure", failure);
         return error(ResponseCode.INTERNAL_SERVER_ERROR, request);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> uploadTooLarge(
+            MaxUploadSizeExceededException failure, HttpServletRequest request) {
+        return error(ResponseCode.UPLOAD_TOO_LARGE, request);
     }
 
     private ResponseEntity<ApiResponse<Void>> error(ResponseCode code, HttpServletRequest request) {

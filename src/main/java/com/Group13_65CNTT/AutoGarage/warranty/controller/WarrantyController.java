@@ -82,7 +82,7 @@ public class WarrantyController {
     public ResponseEntity<ApiResponse<WarrantyClaimResponse>> openClaim(
             @Valid @RequestBody WarrantyClaimOpenRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         WarrantyClaimResponse response = warrantyService.openClaim(actorId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
@@ -95,7 +95,7 @@ public class WarrantyController {
             @PathVariable Long claimId,
             @Valid @RequestBody WarrantyClaimDecideRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         WarrantyClaimResponse response = warrantyService.decideClaim(actorId, claimId, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
     }

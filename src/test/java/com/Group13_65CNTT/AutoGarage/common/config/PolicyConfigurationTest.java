@@ -43,6 +43,7 @@ class PolicyConfigurationTest {
                                     .isInstanceOf(BusinessException.class);
                             var paging =
                                     new PaginationPolicy(c.getBean(PaginationProperties.class));
+                            assertThat(paging.defaultSize()).isEqualTo(10);
                             assertThat(paging.page(50, 30, Sort.unsorted()).getPageSize())
                                     .isEqualTo(30);
                             assertThatThrownBy(() -> paging.page(0, 31, Sort.unsorted()))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decodeJson, encodeJson, numericVersion } from '../api/json';
-import { dateRange, reportFileName } from './dates';
+import { dateRange, reportFileName, dateTimeInput } from './dates';
 import { money, safeReturnTo } from './format';
 import {
   loginSchema,
@@ -12,6 +12,26 @@ import { safeAuditDetails } from '../../features/audit/pages/AuditPage';
 import { notificationMessage } from '../../features/notification/pages/NotificationsPage';
 import { policy } from '../../test/fixtures';
 describe('Exact transport and reporting', () => {
+  it('round-trips an appointment through a local date/time input without shifting hours', () => {
+    const instant = '2026-10-24T03:30:00.000Z';
+    expect(new Date(dateTimeInput(instant)).toISOString()).toBe(instant);
+    expect(dateTimeInput('invalid')).toBe('');
+  });
+  it('keeps reception foreign keys and service prices exact for schema validation', () => {
+    expect(
+      decodeJson(
+        '{"vehicleId":9223372036854775807,"serviceId":4,"bayId":5,"createdBy":6,"checkedBy":7,"unitPrice":9999999999999999.99,"odometer":200}',
+      ),
+    ).toEqual({
+      vehicleId: '9223372036854775807',
+      serviceId: '4',
+      bayId: '5',
+      createdBy: '6',
+      checkedBy: '7',
+      unitPrice: '9999999999999999.99',
+      odometer: 200,
+    });
+  });
   it('names CSV using the garage date rather than the previous UTC date', () =>
     expect(
       reportFileName(

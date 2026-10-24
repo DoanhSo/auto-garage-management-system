@@ -92,7 +92,7 @@ export function PartsPage() {
     setDeletingId(null);
   };
 
-  const displayList = onlyLowStock ? (lowStockParts || []) : (data?.content || []);
+  const displayList = onlyLowStock ? lowStockParts || [] : data?.content || [];
 
   return (
     <div className="page-container p-6 max-w-7xl mx-auto space-y-6">
@@ -116,7 +116,11 @@ export function PartsPage() {
             <AlertTriangle size={16} className={onlyLowStock ? 'text-white' : 'text-amber-500'} />
             Cảnh báo tồn thấp ({lowStockParts?.length || 0})
           </Button>
-          <Button variant="primary" onClick={() => setCreating(true)} className="flex items-center gap-1.5">
+          <Button
+            variant="primary"
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-1.5"
+          >
             <Plus size={16} />
             Thêm phụ tùng mới
           </Button>
@@ -128,7 +132,10 @@ export function PartsPage() {
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center justify-between">
           <div className="flex items-center gap-3 flex-1 min-w-[280px]">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
               <input
                 type="text"
                 placeholder="Tìm theo SKU, tên phụ tùng..."
@@ -211,7 +218,9 @@ export function PartsPage() {
                       <td className="py-3 px-4 text-right">
                         <span
                           className={`font-semibold ${
-                            isLow ? 'text-red-600 flex items-center justify-end gap-1' : 'text-gray-800'
+                            isLow
+                              ? 'text-red-600 flex items-center justify-end gap-1'
+                              : 'text-gray-800'
                           }`}
                         >
                           {isLow && <AlertTriangle size={14} className="text-red-500" />}
@@ -313,7 +322,10 @@ export function PartsPage() {
           </Field>
 
           <Field label="Nhà cung cấp ưu tiên">
-            <select name="preferredSupplierId" className="w-full border rounded-lg px-3 py-2 bg-white">
+            <select
+              name="preferredSupplierId"
+              className="w-full border rounded-lg px-3 py-2 bg-white"
+            >
               <option value="">-- Chưa chỉ định --</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -398,7 +410,11 @@ export function PartsPage() {
       </Modal>
 
       {/* Modal Sửa */}
-      <Modal open={!!editing} onOpenChange={(open: boolean) => !open && setEditing(null)} title="Cập nhật Phụ tùng">
+      <Modal
+        open={!!editing}
+        onOpenChange={(open: boolean) => !open && setEditing(null)}
+        title="Cập nhật Phụ tùng"
+      >
         {editing && (
           <form onSubmit={handleUpdate} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

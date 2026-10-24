@@ -1,5 +1,36 @@
 # Kết quả kiểm chứng backend TV1 — 15/10/2026
 
+## Cập nhật kiểm chứng ngày 24/10/2026
+
+Các số liệu 15/10 phía dưới là lịch sử. Đợt 24/10 rà soát backend, lỗi HTTP, chính sách xưởng, Keycloak và quyền sở hữu tiếp nhận.
+
+Kết quả cuối ngày 24/10: **BUILD SUCCESS; 266 tests, 0 failures, 0 errors, 0 skipped**, có thực thi test và đóng gói Spring Boot jar `target/AutoGarage-0.0.1-SNAPSHOT.jar` (67.498.100 byte). Lệnh `package` bên dưới hoàn tất trong 1 phút 39 giây lúc 20:17:42 Asia/Bangkok; log local `.codex-backend-local.log`. Vòng riêng ownership/QC trước đó đạt 21 tests; không cộng lặp vào tổng 266.
+
+Môi trường hiện tại có JDK 21.0.10 và Maven dependencies trong cache. MySQL test hiện không kết nối được; `mvnw.cmd -o test` đã chạy nhưng lỗi khởi tạo MySQL với `Connection refused`. Không dùng H2 để kết luận Flyway/MySQL locking/concurrency đã đạt. Các bài unit và H2 được chạy độc lập bằng lệnh PowerShell sau, tại thư mục chứa `pom.xml`:
+
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Java\jdk-21.0.10'
+$localTests = Get-ChildItem src/test/java -Recurse -Filter '*.java' |
+    Where-Object {
+        $_.Name -match 'Tests?\.java$' -and
+        -not ([IO.File]::ReadAllText($_.FullName).Contains('@ActiveProfiles("test")'))
+    } |
+    ForEach-Object BaseName
+.\mvnw.cmd -o ("-Dtest=" + ($localTests -join ',')) package
+```
+
+Lệnh chọn toàn bộ unit/H2, bao gồm `AuthConfigurationTests`, `HttpErrorContractIntegrationTest`, `UserIntegrationTest`, `TV4IntegrationTests` và `ReceptionOwnershipIntegrationTest`; không dùng skipTests. Chín lớp dùng profile MySQL `test` được giữ nguyên để chạy lại `mvnw.cmd test` khi MySQL test hoạt động: AutoGarageApplicationTests, BootstrapIntegrationTests, MigrationSchemaTests, NotificationConcurrencyTests, SecurityConcurrencyTests, SecurityInfrastructureTests, SecurityIntegrationTests, SecurityRollbackTests, TV1IntegrationTests.
+
+Regression mới kiểm tra actor giả, ownership customer/vehicle/booking/attachment/check qua filter/JWT/DB thật H2, QC assignment/can_qc fail closed, lỗi dependency không bị đổi thành BAD_REQUEST hoặc nuốt mất, cause an toàn, upload 413 và policy khác mặc định/sai cấu hình.
+
+Giới hạn: chưa xác minh MySQL thật hoặc luồng browser với Keycloak thật trong lượt này. Upload hiện lưu metadata/hash/storage key, chưa có storage implementation lưu/đọc nội dung tệp.
+
+Frontend ngày 24/10: `npm run check` đạt lint (không warning), **77 tests pass** và `tsc -b && vite build` thành công. Regression gồm PKCE S256/state/expiry/replay/redirect, logout và refresh chạy đồng thời, token thời hạn ngắn, multipart giữ nguyên bytes, ID/giá chính xác, editor không tự đóng, tạo dịch vụ với trường tùy chọn trống, và khách hàng đặt lịch qua `/customers/me` không tải danh bạ.
+
+Đã xem giao diện đăng nhập/workspace trong Chromium ở desktop 1440×1000 và mobile 390×844; dữ liệu API dùng fixture tại trình duyệt, không thay thế nghiệm thu Keycloak/backend thật. Giao diện dùng một kiểu tối giản, bỏ bộ chọn prototype, giữ điều hướng thu gọn/mobile và ẩn thao tác theo role. Ảnh kiểm tra nằm trong `frontend/output/playwright/` (Git ignore).
+
+Tham chiếu cấu hình OIDC/PKCE: [Keycloak JavaScript adapter](https://www.keycloak.org/securing-apps/javascript-adapter). Trước triển khai, làm theo [KEYCLOAK_SETUP.md](KEYCLOAK_SETUP.md) để cập nhật mapper/profile cho realm đã tồn tại và cấu hình public realm URL.
+
 Source đã viết lại theo kiến trúc 7 tầng: common/auth/identity/audit/notification/reporting, JPA, MapStruct, Lombok, Service/ServiceImpl, AOP audit, Swagger và numeric ApiResponse. Kết quả dưới đây dành cho source sau refactor.
 
 ## Lệnh và kết quả

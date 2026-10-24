@@ -27,6 +27,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class VehicleCheckServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
 
     @Mock
     private VehicleCheckRepository vehicleCheckRepository;
@@ -51,6 +52,21 @@ class VehicleCheckServiceTest {
         checkInReq.setOdometer(25000);
         checkInReq.setNotes("Xe co tray xuoc cua trai");
         checkInReq.setCheckedBy(2L);
+    }
+
+    @Test
+    void forbiddenCheckReadDoesNotLoadAttachments() {
+        VehicleCheck check = new VehicleCheck();
+        check.setId(1L);
+        check.setRepairOrderId(100L);
+        when(vehicleCheckRepository.findById(1L)).thenReturn(Optional.of(check));
+        doThrow(new com.Group13_65CNTT.AutoGarage.common.exception.BusinessException(
+                com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.FORBIDDEN))
+                .when(customerScope).requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.REPAIR_ORDER, 100L);
+
+        assertThrows(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class,
+                () -> vehicleCheckService.getVehicleCheckById(1L));
+        verifyNoInteractions(attachmentRepository);
     }
 
     @Test

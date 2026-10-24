@@ -93,8 +93,14 @@ public final class AccountTokenValidator implements OAuth2TokenValidator<Jwt> {
         Optional<User> byIdentity = users.findByIdentityId(subject);
         if (byIdentity.isPresent()) return byIdentity;
         if (subject.matches(SecurityConstants.POSITIVE_LONG_ID_PATTERN)) {
+            final long id;
+            try {
+                id = Long.parseLong(subject);
+            } catch (NumberFormatException invalidIdentifier) {
+                return Optional.empty();
+            }
             Optional<User> byId =
-                    users.findById(Long.parseLong(subject))
+                    users.findById(id)
                             .filter(
                                     u ->
                                             u.getIdentityId() == null
@@ -104,6 +110,11 @@ public final class AccountTokenValidator implements OAuth2TokenValidator<Jwt> {
         String preferredUsername =
                 token.getClaimAsString(SecurityConstants.PREFERRED_USERNAME_CLAIM);
         if (preferredUsername != null && !preferredUsername.isBlank()) {
+            // Customer usernames are self-service input in Keycloak. Matching an unbound local
+            // customer by name would let a new registration take over that customer's records.
+            if (KeycloakJwtAuthenticationConverter.extractSingleRole(token).orElse(null) == Role.CUSTOMER) {
+                return Optional.empty();
+            }
             return users.findByUsername(preferredUsername.strip().toLowerCase(Locale.ROOT))
                     .filter(u -> u.getIdentityId() == null || u.getIdentityId().equals(subject));
         }

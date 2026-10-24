@@ -1,4 +1,10 @@
 import { Temporal } from '@js-temporal/polyfill';
+export function dateTimeInput(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const twoDigits = (number: number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}T${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`;
+}
 export interface ReportRange {
   from: string;
   until: string;

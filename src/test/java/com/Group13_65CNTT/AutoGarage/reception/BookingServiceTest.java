@@ -37,6 +37,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class BookingServiceTest {
+    @org.mockito.Spy private com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties workshop = new com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties();
+    @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
 
     @Mock
     private BookingRepository bookingRepository;
@@ -99,6 +101,31 @@ class BookingServiceTest {
         createReq.setAppointmentAt(futureTime);
         createReq.setRequestDescription("Kiem tra dinh ky");
         createReq.setCreatedBy(2L);
+    }
+
+    @Test
+    void customerSearchUsesOwnCustomerScope() {
+        when(customerScope.customerIdForQuery(null)).thenReturn(10L);
+        when(bookingRepository.searchBookings(10L, null, null, null, null)).thenReturn(java.util.List.of());
+        assertTrue(bookingService.searchBookings(null, null, null, null, null).isEmpty());
+        verify(bookingRepository).searchBookings(10L, null, null, null, null);
+    }
+
+    @Test
+    void defaultDurationUsesConfiguredMinutes() {
+        workshop.setDefaultServiceMinutes(45);
+        service.setStandardMinutes(null);
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
+            Booking booking = invocation.getArgument(0);
+            booking.setId(500L);
+            return booking;
+        });
+
+        BookingResponse response = bookingService.createBooking(createReq);
+        assertEquals(futureTime.plus(Duration.ofMinutes(45)), response.getExpectedEndAt());
     }
 
     @Test

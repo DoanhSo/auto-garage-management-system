@@ -19,6 +19,10 @@ import java.util.Set;
 public class PaginationPolicy {
     private final PaginationProperties properties;
 
+    public int defaultSize() {
+        return properties.getDefaultSize();
+    }
+
     public PageRequest page(int page, int size, Sort sort) {
         if (page < 0
                 || page > properties.getMaxPage()

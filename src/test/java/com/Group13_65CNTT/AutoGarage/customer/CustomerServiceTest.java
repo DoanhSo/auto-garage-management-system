@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CustomerServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
 
     @Mock
     private CustomerRepository customerRepository;
