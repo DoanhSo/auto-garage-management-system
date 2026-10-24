@@ -69,5 +69,13 @@ public final class ApiPaths {
     public static final String QUALITY_CHECKS_BASE = "/api/v1/quality-checks";
     public static final String WARRANTIES_BASE = "/api/v1/warranties";
 
+    public static final String CUSTOMERS_BASE = "/api/v1/customers";
+    public static final String VEHICLES_BASE = "/api/v1/vehicles";
+    public static final String SERVICES_BASE = "/api/v1/services";
+    public static final String BOOKINGS_BASE = "/api/v1/bookings";
+    public static final String RECEPTION_BASE = "/api/v1/reception";
+    public static final String VEHICLE_CHECKS_BASE = "/api/v1/vehicle-checks";
+    public static final String ATTACHMENTS_BASE = "/api/v1/attachments";
+
     private ApiPaths() {}
 }

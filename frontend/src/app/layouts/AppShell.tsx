@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   Bell,
+  CalendarCheck,
+  Car,
   ChartNoAxesCombined,
   ChevronRight,
+  Contact,
   History,
+  Layers,
   LogOut,
   Menu,
   ShieldCheck,
@@ -27,6 +31,13 @@ import { Button } from '../../shared/components/ui';
 import { initials } from '../../shared/utils/format';
 
 const links = [
+  // TV2: Tiếp nhận xe, Khách hàng, Phương tiện, Dịch vụ & Tiền công
+  { to: '/reception', label: 'Tiếp nhận xe', icon: CalendarCheck, admin: false },
+  { to: '/customers', label: 'Khách hàng', icon: Contact, admin: false },
+  { to: '/vehicles', label: 'Phương tiện', icon: Car, admin: false },
+  { to: '/services', label: 'Dịch vụ & Tiền công', icon: Layers, admin: false },
+
+  // TV4: Kho phụ tùng & Tài chính hóa đơn
   { to: '/inventory/parts', label: 'Kho & Phụ tùng', icon: Package, admin: false },
   { to: '/inventory/suppliers', label: 'Nhà cung cấp', icon: Building2, admin: false },
   { to: '/inventory/documents', label: 'Chứng từ kho', icon: FileText, admin: false },
@@ -34,6 +45,8 @@ const links = [
   { to: '/billing/invoices', label: 'Hóa đơn dịch vụ', icon: Receipt, admin: false },
   { to: '/billing/payments', label: 'Sổ quỹ Thu / Chi', icon: DollarSign, admin: false },
   { to: '/billing/debt-ledger', label: 'Sổ nợ & Tín dụng', icon: CreditCard, admin: false },
+
+  // TV1: Báo cáo, Quản trị người dùng & Nhật ký
   {
     to: '/admin/reports',
     label: 'Báo cáo',
@@ -44,6 +57,7 @@ const links = [
   { to: '/admin/audit', label: 'Nhật ký', icon: History, admin: true },
   { to: '/notifications', label: 'Thông báo', icon: Bell, admin: false },
 ];
+
 export function AppShell() {
   const { user, setCurrentUser } = useAuth();
   const me = useMeQuery();
@@ -52,12 +66,15 @@ export function AppShell() {
   const location = useLocation();
   const [mobile, setMobile] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     if (me.data) setCurrentUser(me.data);
   }, [me.data, setCurrentUser]);
+
   const allowed = links.filter((link) => !link.admin || user?.role === 'ADMIN');
   const title =
     links.find((link) => location.pathname.startsWith(link.to))?.label ?? 'Tài khoản cá nhân';
+
   const nav = (close?: () => void) => (
     <nav className="main-navigation" aria-label="Điều hướng chính">
       <span className="nav-heading">KHÔNG GIAN LÀM VIỆC</span>
@@ -86,6 +103,7 @@ export function AppShell() {
       </NavLink>
     </nav>
   );
+
   return (
     <div className="app-layout">
       <aside className="sidebar">
@@ -113,77 +131,59 @@ export function AppShell() {
         <header className="app-header">
           <div className="breadcrumb">
             <Button
-              className="mobile-menu"
-              variant="ghost"
-              aria-label="Mở menu"
-              onClick={() => setMobile(true)}
               ref={trigger}
+              variant="ghost"
+              className="menu-button"
+              aria-label="Mở menu điều hướng"
+              aria-expanded={mobile}
+              onClick={() => setMobile(true)}
             >
               <Menu size={20} />
             </Button>
-            <span>Không gian làm việc</span>
-            <ChevronRight size={14} aria-hidden />
-            <strong>{title}</strong>
+            <span>{title}</span>
           </div>
           <div className="header-actions">
-            <NavLink
-              className="bell-button"
-              to="/notifications"
-              aria-label={`Thông báo${unread.data ? ' — ' + unread.data + ' chưa đọc' : ''}`}
-            >
-              <Bell size={20} />
-              {unread.data !== undefined && BigInt(unread.data) > 0n && (
-                <span className="bell-dot" />
-              )}
-            </NavLink>
-            <span className="header-name">{user?.fullName}</span>
+            <span className="avatar-chip">
+              <span className="avatar">{initials(user?.fullName ?? '')}</span>
+              <span>{user?.fullName}</span>
+            </span>
             <Button
               variant="ghost"
-              pending={logout.isPending}
               onClick={() => logout.mutate()}
-              aria-label="Đăng xuất"
+              aria-label="Đăng xuất khỏi hệ thống"
+              pending={logout.isPending}
             >
-              <LogOut size={18} />
-              <span className="logout-label">Đăng xuất</span>
+              <LogOut size={16} />
+              <span>Đăng xuất</span>
             </Button>
           </div>
         </header>
-        {me.error && (
-          <div className="session-banner" role="status">
-            Chưa thể kiểm tra lại thông tin tài khoản.{' '}
-            <button
-              type="button"
-              onClick={() => {
-                void me.refetch();
-              }}
-            >
-              Thử lại
-            </button>
-          </div>
-        )}
-        <main id="main-content" className="workspace">
+        <main className="main-viewport" id="main-content" tabIndex={-1}>
           <Outlet />
         </main>
       </div>
       <Dialog.Root open={mobile} onOpenChange={setMobile}>
         <Dialog.Portal>
-          <Dialog.Overlay className="overlay" />
+          <Dialog.Overlay className="dialog-backdrop" />
           <Dialog.Content
-            className="mobile-nav"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
+            className="mobile-drawer"
+            aria-label="Thanh điều hướng di động"
+            onCloseAutoFocus={(e) => {
+              e.preventDefault();
               trigger.current?.focus();
             }}
           >
-            <div className="mobile-nav-header">
-              <Dialog.Title>AutoGarage</Dialog.Title>
+            <div className="drawer-header">
+              <span className="brand-mark">
+                <Wrench size={20} />
+              </span>
+              <span>AutoGarage</span>
               <Dialog.Close asChild>
-                <Button variant="ghost" aria-label="Đóng menu">
-                  <X size={20} />
+                <Button variant="ghost" aria-label="Đóng thanh điều hướng">
+                  <X size={18} />
                 </Button>
               </Dialog.Close>
             </div>
-            <Dialog.Description className="sr-only">Chọn phân hệ làm việc</Dialog.Description>
             {nav(() => setMobile(false))}
           </Dialog.Content>
         </Dialog.Portal>

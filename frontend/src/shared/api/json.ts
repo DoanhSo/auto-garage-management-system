@@ -7,6 +7,7 @@ const exactFields = new Set([
   'entityId',
   'version',
   'totalElements',
+  'creditLimit',
   'revenue',
   'cashIn',
   'cashOut',

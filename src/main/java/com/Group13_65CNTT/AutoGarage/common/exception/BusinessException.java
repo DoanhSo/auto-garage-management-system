@@ -13,6 +13,11 @@ public class BusinessException extends RuntimeException {
         this.responseCode = responseCode;
     }
 
+    public BusinessException(ResponseCode responseCode, String message) {
+        super(message != null ? message : responseCode.getMessage());
+        this.responseCode = responseCode;
+    }
+
     public BusinessException(ResponseCode responseCode, Throwable cause) {
         super(responseCode.getMessage(), cause);
         this.responseCode = responseCode;
