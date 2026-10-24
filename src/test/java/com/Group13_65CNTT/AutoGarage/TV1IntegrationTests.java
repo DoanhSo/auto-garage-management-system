@@ -341,7 +341,7 @@ class TV1IntegrationTests extends IntegrationTestSupport {
                                 .content(
                                         json.writeValueAsString(
                                                 Map.of(
-                                                        "username", "tv1.quoted",
+                                                        "identityId", "tv1-quoted", "username", "tv1.quoted",
                                                         "fullName", fullName,
                                                         "role", "CUSTOMER"))))
                 .andExpect(status().isCreated())

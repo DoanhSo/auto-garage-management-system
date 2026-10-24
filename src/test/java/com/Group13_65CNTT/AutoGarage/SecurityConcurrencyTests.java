@@ -141,6 +141,7 @@ class SecurityConcurrencyTests extends IntegrationTestSupport {
                                 .content(
                                         json.writeValueAsString(
                                                 Map.of(
+                                                        "identityId", "concurrency-created",
                                                         "username",
                                                         "concurrency.created",
                                                         "fullName",

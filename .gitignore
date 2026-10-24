@@ -43,3 +43,5 @@ frontend/output/playwright/
 frontend/.playwright-cli/
 .DS_Store
 *.DS_Store
+.docker-local/
+release/

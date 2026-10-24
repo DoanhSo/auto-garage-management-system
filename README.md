@@ -10,6 +10,17 @@ Hệ thống quản lý gara một chi nhánh, Java 21/Spring Boot 4.1.1/MySQL 8
 - [Thiết lập Keycloak, quản trị viên đầu tiên và nâng cấp realm đã tồn tại](docs/KEYCLOAK_SETUP.md).
 - [Database](docs/DATABASE.md), [data dictionary](docs/DATA_DICTIONARY.md), [I01–I08](docs/SERVICE_CONTRACTS.md), [T01–T38](docs/ACCEPTANCE_TESTS.md).
 - [Kết quả kiểm chứng thực tế](docs/VALIDATION.md).
+- [Bộ Docker chạy ngay, tài khoản và dữ liệu DEMO](docs/DOCKER.md).
+
+## Xem ngay giao diện bằng Docker
+
+Nhận `AutoGarage-Docker.zip`, giải nén và chạy `start-docker.cmd`. Bộ này có sẵn
+image, tự sinh mật khẩu riêng, khởi tạo Keycloak/quản trị viên/dữ liệu DEMO rồi mở
+trình duyệt. Máy nhận không cần Java hoặc Node.js. Xem [hướng dẫn Docker](docs/DOCKER.md).
+
+Từ source, chạy `scripts/build-docker.ps1`, `scripts/start-docker.ps1` rồi
+`scripts/export-docker.ps1` để tạo lại bộ phân phối. Stack demo tách riêng khỏi
+project Docker đang chạy; credential nằm trong `.docker-local/credentials.txt`.
 
 ## Chạy local trên PowerShell
 

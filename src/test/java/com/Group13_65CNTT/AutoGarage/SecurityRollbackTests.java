@@ -67,6 +67,7 @@ class SecurityRollbackTests extends IntegrationTestSupport {
                                 .content(
                                         json.writeValueAsString(
                                                 Map.of(
+                                                        "identityId", "rollback-created",
                                                         "username",
                                                         "rollback.created",
                                                         "fullName",

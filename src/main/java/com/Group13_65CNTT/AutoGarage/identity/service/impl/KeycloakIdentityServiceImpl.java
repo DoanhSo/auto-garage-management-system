@@ -134,14 +134,19 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
                             : findKeycloakUserIdByUsername(token, username);
             if (userId == null) throw unavailable();
             String[] names = splitFullName(fullName);
-            Map<String, Object> payload = new HashMap<>();
+            String userUrl = serverUrl + "/admin/realms/" + realm + "/users/" + userId;
+            Map<String, Object> existing = readUser(token, userUrl);
+            Map<String, Object> payload = profileUpdate(existing);
             payload.put("enabled", active);
             payload.put("firstName", names[0]);
             payload.put("lastName", names[1]);
             payload.put("email", email != null ? email : "");
+            if (!java.util.Objects.equals(existing.get("email"), email)) {
+                payload.put("emailVerified", false);
+            }
             restClient
                     .put()
-                    .uri(serverUrl + "/admin/realms/" + realm + "/users/" + userId)
+                    .uri(userUrl)
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(payload)
@@ -166,12 +171,15 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
                             ? identityId
                             : findKeycloakUserIdByUsername(token, username);
             if (userId == null) throw unavailable();
+            String userUrl = serverUrl + "/admin/realms/" + realm + "/users/" + userId;
+            Map<String, Object> payload = profileUpdate(readUser(token, userUrl));
+            payload.put("enabled", false);
             restClient
                     .put()
-                    .uri(serverUrl + "/admin/realms/" + realm + "/users/" + userId)
+                    .uri(userUrl)
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("enabled", false))
+                    .body(payload)
                     .retrieve()
                     .toBodilessEntity();
             logoutKeycloakUser(token, userId);
@@ -189,10 +197,7 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
                     ? identityId : findKeycloakUserIdByUsername(token, username);
             if (userId == null) throw unavailable();
             String userUrl = serverUrl + "/admin/realms/" + realm + "/users/" + userId;
-            Map<String, Object> existing = restClient.get().uri(userUrl)
-                    .header("Authorization", SecurityConstants.BEARER_PREFIX + token)
-                    .retrieve().body(MAP_TYPE);
-            if (existing == null) throw unavailable();
+            Map<String, Object> existing = readUser(token, userUrl);
             Map<String, Object> attributes = new HashMap<>();
             if (existing.get("attributes") instanceof Map<?, ?> previous) {
                 previous.forEach((key, value) -> {
@@ -200,14 +205,35 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
                 });
             }
             attributes.put(SecurityConstants.AUTH_VERSION_CLAIM, List.of(Long.toString(authVersion)));
+            Map<String, Object> payload = profileUpdate(existing);
+            payload.put("attributes", attributes);
             restClient.put().uri(userUrl)
                     .header("Authorization", SecurityConstants.BEARER_PREFIX + token)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("attributes", attributes)).retrieve().toBodilessEntity();
+                    .body(payload).retrieve().toBodilessEntity();
             logoutKeycloakUser(token, userId);
         } catch (RestClientException failure) {
             throw unavailable(failure);
         }
+    }
+
+    private Map<String, Object> readUser(String token, String userUrl) {
+        Map<String, Object> user = restClient.get().uri(userUrl)
+                .header("Authorization", SecurityConstants.BEARER_PREFIX + token)
+                .retrieve().body(MAP_TYPE);
+        if (user == null) throw unavailable();
+        return user;
+    }
+
+    private Map<String, Object> profileUpdate(Map<String, Object> existing) {
+        // Keycloak's PUT replaces profile fields. Omitted names/email would be cleared even
+        // when only attributes or enabled are being changed; preserve the editable profile.
+        Map<String, Object> payload = new HashMap<>();
+        for (String field : List.of("username", "email", "emailVerified", "firstName", "lastName",
+                "enabled", "attributes", "requiredActions")) {
+            if (existing.containsKey(field)) payload.put(field, existing.get(field));
+        }
+        return payload;
     }
 
     private BusinessException unavailable(RestClientException failure) {

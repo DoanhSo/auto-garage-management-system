@@ -22,7 +22,7 @@
         "providerId": "declarative-user-profile",
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\":[{\"name\":\"username\",\"validations\":{\"length\":{\"min\":3,\"max\":100},\"username-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"email\",\"validations\":{\"email\":{},\"length\":{\"max\":254}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"firstName\",\"validations\":{\"length\":{\"max\":150}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"lastName\",\"validations\":{\"length\":{\"max\":150}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"auth_version\",\"multivalued\":false,\"validations\":{\"pattern\":{\"pattern\":\"[0-9]{1,19}\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}],\"unmanagedAttributePolicy\":\"DISABLED\"}"
+            "{\"attributes\":[{\"name\":\"username\",\"validations\":{\"length\":{\"min\":3,\"max\":100},\"username-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"email\",\"validations\":{\"email\":{},\"length\":{\"max\":254}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"firstName\",\"validations\":{\"length\":{\"max\":150}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"lastName\",\"validations\":{\"length\":{\"max\":150}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"auth_version\",\"multivalued\":false,\"validations\":{\"pattern\":{\"pattern\":\"[0-9]{1,19}\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}]}"
           ]
         }
       }
@@ -100,15 +100,17 @@
       "protocol": "openid-connect",
       "redirectUris": [
         "http://localhost:5173/*",
-        "http://127.0.0.1:5173/*"
+        "http://127.0.0.1:5173/*",
+        "${AUTOGARAGE_FRONTEND_URL}/login"
       ],
       "webOrigins": [
         "http://localhost:5173",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "${AUTOGARAGE_FRONTEND_URL}"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:5173/*##http://127.0.0.1:5173/*"
+        "post.logout.redirect.uris": "http://localhost:5173/*##http://127.0.0.1:5173/*##${AUTOGARAGE_FRONTEND_URL}/*"
       },
       "protocolMappers": [
         {

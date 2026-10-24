@@ -652,6 +652,7 @@ class SecurityIntegrationTests extends IntegrationTestSupport {
                                     .content(
                                             body(
                                                     Map.of(
+                                                            "identityId", java.util.UUID.randomUUID().toString(),
                                                             "username",
                                                             "role_" + role,
                                                             "fullName",
@@ -721,6 +722,7 @@ class SecurityIntegrationTests extends IntegrationTestSupport {
     private String createBody(String name) {
         return body(
                 Map.of(
+                        "identityId", java.util.UUID.randomUUID().toString(),
                         "username",
                         name,
                         "email",

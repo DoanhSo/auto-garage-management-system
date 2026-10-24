@@ -54,7 +54,36 @@ class KeycloakIdentityServiceTest {
         var body = json.readTree(update.body());
         assertThat(body.path("attributes").path("auth_version").get(0).asString()).isEqualTo("3");
         assertThat(body.path("attributes").path("other").get(0).asString()).isEqualTo("keep");
+        assertThat(body.path("email").asString()).isEqualTo("customer@example.test");
+        assertThat(body.path("firstName").asString()).isEqualTo("Customer");
+        assertThat(body.path("lastName").asString()).isEqualTo("One");
+        assertThat(body.path("emailVerified").asBoolean()).isTrue();
+        assertThat(body.path("enabled").asBoolean()).isTrue();
         assertThat(requests).anyMatch(r -> r.method().equals("POST") && r.path().endsWith("/identity-1/logout"));
+    }
+
+    @Test
+    void disablingAccountPreservesProfileAndRevocationAttributes() throws Exception {
+        service.disableUser("identity-1", "customer.one");
+        Request update = requests.stream().filter(r -> r.method().equals("PUT")).findFirst().orElseThrow();
+        var body = json.readTree(update.body());
+        assertThat(body.path("enabled").asBoolean()).isFalse();
+        assertThat(body.path("email").asString()).isEqualTo("customer@example.test");
+        assertThat(body.path("firstName").asString()).isEqualTo("Customer");
+        assertThat(body.path("attributes").path("auth_version").get(0).asString()).isEqualTo("1");
+    }
+
+    @Test
+    void profileUpdatePreservesAttributesAndDoesNotVerifyAChangedEmail() throws Exception {
+        service.syncUserUpdate("identity-1", "customer.one", "updated@example.test", "Updated Person", Role.TECHNICIAN, true);
+        Request update = requests.stream().filter(r -> r.method().equals("PUT")).findFirst().orElseThrow();
+        var body = json.readTree(update.body());
+        assertThat(body.path("email").asString()).isEqualTo("updated@example.test");
+        assertThat(body.path("emailVerified").asBoolean()).isFalse();
+        assertThat(body.path("firstName").asString()).isEqualTo("Updated");
+        assertThat(body.path("lastName").asString()).isEqualTo("Person");
+        assertThat(body.path("attributes").path("other").get(0).asString()).isEqualTo("keep");
+        assertThat(body.path("attributes").path("auth_version").get(0).asString()).isEqualTo("1");
     }
 
     @Test
@@ -112,7 +141,7 @@ class KeycloakIdentityServiceTest {
         }
         else if (path.endsWith("/role-mappings/realm") && method.equals("GET")) response = "[{\"id\":\"default-role\",\"name\":\"default-roles-garage\"}]";
         else if (path.endsWith("/roles/TECHNICIAN")) response = "{\"id\":\"technician-role\",\"name\":\"TECHNICIAN\"}";
-        else if (path.endsWith("/users/identity-1") && method.equals("GET")) response = "{\"attributes\":{\"other\":[\"keep\"]}}";
+        else if (path.endsWith("/users/identity-1") && method.equals("GET")) response = "{\"username\":\"customer.one\",\"email\":\"customer@example.test\",\"emailVerified\":true,\"firstName\":\"Customer\",\"lastName\":\"One\",\"enabled\":true,\"attributes\":{\"other\":[\"keep\"],\"auth_version\":[\"1\"]}}";
         else { status = 204; response = ""; }
         exchange.getResponseHeaders().set("Content-Type", "application/json");
         byte[] bytes = response.getBytes(StandardCharsets.UTF_8);

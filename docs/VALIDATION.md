@@ -2,6 +2,36 @@
 
 ## Cập nhật kiểm chứng ngày 24/10/2026
 
+### Bộ Docker chạy ngay (kiểm chứng bổ sung)
+
+Docker Desktop đã hoạt động trong lượt đóng gói tiếp theo. `scripts/build-docker.ps1 -OfflineMaven`
+đạt **354 tests backend, 0 failure/error/skip**, gồm toàn bộ MySQL/H2, và package;
+frontend đạt **79 tests**, lint và Vite/TypeScript build. Database test riêng, không
+dùng dữ liệu của stack `autogarage` đang chạy.
+
+Stack preview mới đã khởi tạo từ volume mới: MySQL, PostgreSQL, Keycloak 26.0,
+setup quản trị viên, backend, frontend. Đã sửa import user-profile không tương thích
+26.0; bootstrap dùng ID thực do Keycloak cấp qua volume riêng. PUT hồ sơ Keycloak
+giữ email/tên/verification/attributes khi thu hồi phiên hoặc khóa tài khoản; hai
+regression mới bảo vệ hành vi này. Fixture của 5 bài MySQL tạo user đã bổ sung
+identity ID phù hợp contract OIDC, giữ nguyên assertion rollback/race/quyền.
+
+API thật qua Nginx đã xác nhận login ADMIN, 3 khách hàng DEMO/3 xe/2 dịch vụ/3 lịch
+hẹn, logout làm token cũ trả 401, login lại thành công và runtime realm URL đúng.
+Chromium đã đăng ký CUSTOMER trên Keycloak thật, hoàn tất PKCE callback và login
+SSO lại sau logout; thuộc tính `auth_version` không xuất hiện trên form đăng ký.
+
+Launcher trong bộ phân phối chạy đạt bằng **Windows PowerShell 5.1**, bao gồm chạy
+lại trên dữ liệu đã có mà không tạo trùng DEMO hoặc reset mật khẩu. `images.tar`
+trong ZIP đã được đọc stream vào `docker load` và nạp đủ 5 image thành công. Bộ ZIP
+không chứa `.env`, credentials, volume, log hoặc fixture trình duyệt; mỗi máy nhận
+tự sinh secret và tự chọn cổng frontend còn trống.
+
+Chi tiết chạy/nhận bộ đóng gói: [DOCKER.md](DOCKER.md). Giới hạn upload chỉ lưu
+metadata/hash vẫn giữ nguyên; chưa triển khai storage nội dung tệp.
+
+### Kiểm chứng trước khi Docker được bật
+
 Các số liệu 15/10 phía dưới là lịch sử. Đợt 24/10 rà soát backend, lỗi HTTP, chính sách xưởng, Keycloak và quyền sở hữu tiếp nhận.
 
 Kết quả cuối ngày 24/10: **BUILD SUCCESS; 266 tests, 0 failures, 0 errors, 0 skipped**, có thực thi test và đóng gói Spring Boot jar `target/AutoGarage-0.0.1-SNAPSHOT.jar` (67.498.100 byte). Lệnh `package` bên dưới hoàn tất trong 1 phút 39 giây lúc 20:17:42 Asia/Bangkok; log local `.codex-backend-local.log`. Vòng riêng ownership/QC trước đó đạt 21 tests; không cộng lặp vào tổng 266.

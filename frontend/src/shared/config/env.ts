@@ -1,4 +1,9 @@
 import { z } from 'zod';
+declare global {
+  interface Window {
+    __AUTOGARAGE_CONFIG__?: { keycloakPublicOrigin?: string };
+  }
+}
 const urlOrRelativePath = z.string().refine((value) => {
   if (
     value.startsWith('/') &&
@@ -35,6 +40,7 @@ export const env = schema.parse({
   apiBase: import.meta.env.VITE_API_BASE_URL ?? '/api/v1',
   keycloakIssuer: import.meta.env.VITE_KEYCLOAK_ISSUER ?? '/realms/autogarage-realm',
   keycloakPublicOrigin:
+    window.__AUTOGARAGE_CONFIG__?.keycloakPublicOrigin ??
     import.meta.env.VITE_KEYCLOAK_PUBLIC_ORIGIN ??
     import.meta.env.VITE_KEYCLOAK_ISSUER ??
     '/realms/autogarage-realm',

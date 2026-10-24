@@ -1,0 +1,15 @@
+{
+  "name": "autogarage-auth-version",
+  "protocol": "openid-connect",
+  "protocolMapper": "oidc-usermodel-attribute-mapper",
+  "consentRequired": false,
+  "config": {
+    "user.attribute": "auth_version",
+    "claim.name": "auth_version",
+    "jsonType.label": "long",
+    "multivalued": "false",
+    "access.token.claim": "true",
+    "id.token.claim": "false",
+    "userinfo.token.claim": "false"
+  }
+}
