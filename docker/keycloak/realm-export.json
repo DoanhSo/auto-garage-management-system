@@ -1,7 +1,7 @@
 {
   "realm": "autogarage-realm",
   "enabled": true,
-  "registrationAllowed": true,
+  "registrationAllowed": false,
   "resetPasswordAllowed": true,
   "rememberMe": false,
   "loginWithEmailAllowed": true,
@@ -22,7 +22,7 @@
         "providerId": "declarative-user-profile",
         "config": {
           "kc.user.profile.config": [
-            "{\"attributes\":[{\"name\":\"username\",\"validations\":{\"length\":{\"min\":3,\"max\":100},\"username-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"email\",\"validations\":{\"email\":{},\"length\":{\"max\":254}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"firstName\",\"validations\":{\"length\":{\"max\":150}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"lastName\",\"validations\":{\"length\":{\"max\":150}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"auth_version\",\"multivalued\":false,\"validations\":{\"pattern\":{\"pattern\":\"[0-9]{1,19}\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}]}"
+            "{\"attributes\":[{\"name\":\"username\",\"validations\":{\"length\":{\"min\":3,\"max\":254},\"username-prohibited-characters\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"email\",\"validations\":{\"email\":{},\"length\":{\"max\":254}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"firstName\",\"validations\":{\"length\":{\"max\":150}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"lastName\",\"validations\":{\"length\":{\"max\":150}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]}},{\"name\":\"auth_version\",\"multivalued\":false,\"validations\":{\"pattern\":{\"pattern\":\"[0-9]{1,19}\"}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]}}]}"
           ]
         }
       }
@@ -165,5 +165,7 @@
       "directAccessGrantsEnabled": false,
       "protocol": "openid-connect"
     }
-  ]
+  ],
+  "registrationEmailAsUsername": false,
+  "loginTheme": "keycloak"
 }

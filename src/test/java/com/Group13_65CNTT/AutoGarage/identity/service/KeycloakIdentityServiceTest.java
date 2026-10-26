@@ -29,6 +29,7 @@ class KeycloakIdentityServiceTest {
     private KeycloakIdentityService service;
     private boolean unavailable;
     private boolean existingUsername;
+    private boolean roleAssignmentUnavailable;
     private final ObjectMapper json = new ObjectMapper();
 
     @BeforeEach
@@ -117,6 +118,13 @@ class KeycloakIdentityServiceTest {
         assertThat(requests).anyMatch(r -> r.method().equals("POST") && r.path().endsWith("/role-mappings/realm") && r.body().contains("TECHNICIAN"));
     }
 
+    @Test
+    void failedRoleAssignmentRemovesOnlyTheIdentityCreatedByThisRequest() {
+        roleAssignmentUnavailable = true;
+        assertUnavailable(() -> service.createOrLinkUser("staff.one", "staff@example.test", "Staff One", Role.TECHNICIAN, "test-password"));
+        assertThat(requests).anyMatch(r -> r.method().equals("DELETE") && r.path().endsWith("/users/identity-1"));
+    }
+
     private void assertUnavailable(org.assertj.core.api.ThrowableAssert.ThrowingCallable operation) {
         assertThatThrownBy(operation).isInstanceOfSatisfying(BusinessException.class, failure -> {
             assertThat(failure.getResponseCode()).isEqualTo(ResponseCode.AUTHENTICATION_UNAVAILABLE);
@@ -140,6 +148,7 @@ class KeycloakIdentityServiceTest {
             exchange.getResponseHeaders().set("Location", properties.getServerUrl() + "/admin/realms/garage/users/identity-1");
         }
         else if (path.endsWith("/role-mappings/realm") && method.equals("GET")) response = "[{\"id\":\"default-role\",\"name\":\"default-roles-garage\"}]";
+        else if (path.endsWith("/roles/TECHNICIAN") && roleAssignmentUnavailable) { status = 503; response = "private-provider-detail"; }
         else if (path.endsWith("/roles/TECHNICIAN")) response = "{\"id\":\"technician-role\",\"name\":\"TECHNICIAN\"}";
         else if (path.endsWith("/users/identity-1") && method.equals("GET")) response = "{\"username\":\"customer.one\",\"email\":\"customer@example.test\",\"emailVerified\":true,\"firstName\":\"Customer\",\"lastName\":\"One\",\"enabled\":true,\"attributes\":{\"other\":[\"keep\"],\"auth_version\":[\"1\"]}}";
         else { status = 204; response = ""; }

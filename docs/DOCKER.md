@@ -24,9 +24,18 @@ Co san 3 khach hang, 3 xe, 2 dich vu va 3 lich hen mang nhan DEMO. Lan chay tiep
 theo giu du lieu, tai khoan va mat khau; khong xoa/reset volume. Co the dung
 `-NoDemoData` de bo qua tao du lieu mau va `-NoBrowser` de khong mo trinh duyet.
 
-Dung `localhost` cho giao dien/Keycloak khi thu SSO. Dang nhap bang mat khau hoac
-nut Keycloak va dang ky khach hang deu dung Keycloak that. Google chi hoat dong
-khi duoc cau hinh OAuth rieng; mac dinh an.
+Dung `localhost` cho giao dien/Keycloak khi thu SSO. Dang nhap bang username/email va mat khau ngay tren AutoGarage;
+Keycloak xu ly phia sau. Dang ky bang email cung nhap trong AutoGarage. Google OAuth duoc de sau, chua hien o giao dien.
+
+Ban 26/10/2026.1 dang nhap bang form username/email + mat khau ngay tren
+AutoGarage. Dia chi Gmail dung mat khau rieng cua tai khoan gara, khong phai mat
+khau Google. Dang ky cung nhap trong AutoGarage, backend tao CUSTOMER trong
+Keycloak roi frontend tu dang nhap; khong bat giao dien Keycloak. Nut Google
+de sau, khong hien o man hinh nay. OTP/link email can SMTP va chua bat.
+
+Bundle doi chieu image ID trong manifest va tu cap nhat image tag khi dung lai
+`.docker-local`, giu mat khau/port/database. Du lieu DEMO khoi tao bang helper
+PKCE rieng cho admin local; sau khi bat MFA, chay voi `-NoDemoData`.
 
 ## Bat/tat va xem log
 
@@ -45,15 +54,15 @@ Stack source dung `.env` o thu muc goc; launcher bundle dung `.docker-local/.env
 Day la hai project Docker rieng. Khong dung credential cua stack demo de dang nhap
 vao stack source da co tai khoan.
 
-Compose mac dinh chon image da kiem thu `2026.10.24`, khong dung tag `latest` cu.
-Neu `.env` da dat `AUTOGARAGE_IMAGE_TAG`, doi thanh `2026.10.24` va chay:
+Compose mac dinh chon image da kiem thu `2026.10.26.1`, khong dung tag `latest` cu.
+Neu `.env` da dat `AUTOGARAGE_IMAGE_TAG`, doi thanh `2026.10.26.1` va chay:
 
 ```powershell
 docker compose --env-file .env up -d --no-build --pull never --wait
 docker compose --env-file .env images
 ```
 
-Kiem tra frontend/backend deu dung tag `2026.10.24`. Thao tac cap nhat giu volume,
+Kiem tra frontend/backend deu dung tag `2026.10.26.1`. Thao tac cap nhat giu volume,
 tai khoan va mat khau cu. Voi realm da co, `keycloak-setup` van cap nhat redirect
 URI, web origin, user profile va token mapper khi khong tao admin tu dong.
 Sau cap nhat, mo `http://localhost:3000/login` va Ctrl+F5 de nap giao dien moi.

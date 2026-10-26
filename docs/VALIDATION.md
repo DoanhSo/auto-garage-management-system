@@ -1,5 +1,41 @@
 # Kết quả kiểm chứng backend TV1 — 15/10/2026
 
+## Form đăng nhập/đăng ký trong AutoGarage — 26/10/2026
+
+Theo luồng cuối cùng được yêu cầu, người dùng nhập username hoặc email và mật
+khẩu ngay trên AutoGarage. Không có nút mở trang Keycloak hay Google. `/register`
+nhận họ tên/email/mật khẩu/xác nhận; backend `POST /api/v1/auth/register` chỉ cấp
+CUSTOMER trong Keycloak, không nhận role/identityId. Frontend tự đăng nhập bằng
+email sau khi tạo thành công; `/auth/me` JIT tạo User/Customer theo cơ chế sẵn có.
+Email được chuẩn hóa, mật khẩu giữ nguyên và kiểm tra PasswordPolicy/UTF-8 byte
+limit. Danh tính trùng không được liên kết/nâng quyền. Nếu gán role thất bại,
+adapter cố xóa đúng danh tính vừa tạo, không đụng tài khoản đã tồn tại.
+
+`scripts/build-docker.ps1 -OfflineMaven` đạt **365 tests backend, 0 failure/error/
+skip**, gồm MySQL thật và H2, package thành công; frontend đạt **83 tests**, lint
+và TypeScript/Vite build. Test mới bao phủ đăng ký anonymous, role/identity mass
+assignment, email/mật khẩu không hợp lệ, duplicate 409, upstream 503 an toàn,
+cleanup khi gán role lỗi, frontend tự login và trường hợp tạo được tài khoản
+nhưng tự login thất bại. Database test tách khỏi stack cổng 3000.
+
+Chromium trên stack Docker riêng đã kiểm tra đăng ký ngay trong app với địa chỉ
+Gmail tổng hợp, tự vào workspace CUSTOMER, đăng nhập lại bằng email/mật khẩu,
+mật khẩu sai, email trùng, API admin 403 và token cũ 401 sau logout. Theo dõi
+navigation xác nhận không chuyển khỏi origin AutoGarage trong toàn bộ luồng.
+
+Image mới là `2026.10.26.1`. Launcher giữ credential/volume, đối chiếu image ID
+trong manifest và cập nhật tag khi dùng lại cấu hình cũ; seed DEMO dùng PKCE local.
+Realm giữ `registrationEmailAsUsername=false` để không đổi username nhân viên;
+`registrationAllowed=false` tắt form đăng ký Keycloak, Admin API của backend vẫn
+hoạt động. Password grant bật cho web client theo trải nghiệm được chọn. Google
+OAuth, OTP/link email và SMTP không thuộc phần triển khai này.
+
+ZIP bản cuối đã đối chiếu manifest/image ID và stream nạp lại đủ 5 images. Đã chạy
+launcher được phân phối bằng Windows PowerShell 5.1 trên project mới, cả MySQL/
+Keycloak/PostgreSQL/volume đều trống: bootstrap garage.admin, backend healthy,
+seed DEMO và UI đều đạt. Credential không có trong ZIP, được tạo riêng tại máy
+nhận. Stack kiểm tra đã được tách khỏi dữ liệu cổng 3000.
+
 ## Sửa stack cổng 3000 ngày 26/10/2026
 
 Container `autogarage` dùng image `latest` cũ: Nginx không proxy `/realms`, POST

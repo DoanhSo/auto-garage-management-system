@@ -5,7 +5,7 @@
       "validations": {
         "length": {
           "min": 3,
-          "max": 100
+          "max": 254
         },
         "username-prohibited-characters": {}
       },

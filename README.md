@@ -22,6 +22,12 @@ Từ source, chạy `scripts/build-docker.ps1`, `scripts/start-docker.ps1` rồi
 `scripts/export-docker.ps1` để tạo lại bộ phân phối. Stack demo tách riêng khỏi
 project Docker đang chạy; credential nằm trong `.docker-local/credentials.txt`.
 
+Đăng nhập ngay trên AutoGarage bằng **username hoặc email và mật khẩu riêng**;
+frontend gửi thông tin đến token endpoint Keycloak qua proxy, không mở giao diện
+Keycloak. `/register` tạo tài khoản khách hàng bằng họ tên/email/mật khẩu qua
+backend rồi tự đăng nhập. Backend chỉ cấp CUSTOMER, không nhận role từ trình
+duyệt. Google OAuth chưa được đưa vào giao diện của đợt này.
+
 ## Chạy local trên PowerShell
 
 Từ thư mục chứa `pom.xml`; cần JDK 21 và Docker đang chạy:

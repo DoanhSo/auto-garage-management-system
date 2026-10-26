@@ -109,13 +109,15 @@ async function exchangeOidcToken(params: Record<string, string>): Promise<OidcTo
 }
 
 export const authApi = {
+  register: (values: { fullName: string; email: string; password: string }) =>
+    request<null>('/auth/register', { method: 'POST', body: values, authenticated: false }),
   loginWithPassword: (values: { identifier: string; password: string }) =>
     exchangeOidcToken({
       grant_type: 'password',
       client_id: env.keycloakClientId,
       username: values.identifier.trim(),
       password: values.password,
-      scope: 'openid',
+      scope: 'openid profile email',
     }),
   exchangeAuthorizationCode: (values: {
     code: string;

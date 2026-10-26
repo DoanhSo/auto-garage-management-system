@@ -6,6 +6,8 @@ public final class ApiPaths {
     public static final String AUTH_WILDCARD = AUTH_BASE + "/**";
     public static final String ME = "/me";
     public static final String LOGOUT = "/logout";
+    public static final String REGISTER = "/register";
+    public static final String REGISTRATION = AUTH_BASE + REGISTER;
 
     public static final String USERS_BASE = "/api/v1/admin/users";
     public static final String USERS_WILDCARD = USERS_BASE + "/**";

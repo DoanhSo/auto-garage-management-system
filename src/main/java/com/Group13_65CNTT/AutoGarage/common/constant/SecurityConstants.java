@@ -3,6 +3,7 @@ package com.Group13_65CNTT.AutoGarage.common.constant;
 import java.util.List;
 
 public final class SecurityConstants {
+    public static final String PERMIT_ALL = "permitAll()";
     public static final String HAS_ROLE_ADMIN = "hasRole('ADMIN')";
     public static final String HAS_ROLE_RECEPTIONIST = "hasRole('RECEPTIONIST')";
     public static final String HAS_ROLE_TECHNICIAN = "hasRole('TECHNICIAN')";

@@ -70,6 +70,8 @@ public class SecurityConfiguration {
                                         .permitAll();
                             a.requestMatchers(HttpMethod.GET, ApiPaths.UI_POLICY)
                                     .permitAll()
+                                    .requestMatchers(HttpMethod.POST, ApiPaths.REGISTRATION)
+                                    .permitAll()
                                     .requestMatchers(ApiPaths.AUTH_WILDCARD)
                                     .authenticated()
                                     .requestMatchers(ApiPaths.USERS_BASE, ApiPaths.USERS_WILDCARD)

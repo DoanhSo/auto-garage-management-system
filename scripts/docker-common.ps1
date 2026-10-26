@@ -50,7 +50,7 @@ function New-DockerConfiguration {
     $settings = @(
         '# Generated locally. Do not share this file.',
         'COMPOSE_PROJECT_NAME=autogarage-demo',
-        'AUTOGARAGE_IMAGE_TAG=2026.10.24',
+        'AUTOGARAGE_IMAGE_TAG=2026.10.26.1',
         'PUBLIC_HOST=localhost',
         "FRONTEND_PORT=$frontend", "BACKEND_PORT=$backend", "KEYCLOAK_PORT=$keycloak", "MYSQL_PORT=$mysql",
         'DB_USERNAME=autogarage', ('DB_PASSWORD=' + (New-DockerSecret)),

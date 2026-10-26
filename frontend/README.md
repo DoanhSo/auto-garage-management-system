@@ -22,6 +22,7 @@ Policy mật khẩu, phân trang, kỳ báo cáo, múi giờ lấy từ **GET `/
 ## Chức năng
 
 - `/login`: username/email, validation, safe returnTo, lỗi credential an toàn.
+- `/register`: họ tên/email/mật khẩu/xác nhận trên AutoGarage; backend chỉ tạo CUSTOMER trong Keycloak, sau đó tự đăng nhập qua token endpoint. Không mở giao diện Keycloak; Google OAuth để sau.
 - `/account/security`: thông tin cá nhân, thu hồi phiên và mở cổng Keycloak để quản lý mật khẩu, mọi role đã đăng nhập.
 - `/admin/users`: ADMIN tìm/lọc/sort/phân trang, thêm/sửa, đổi role, khóa/mở khóa và xóa. Khóa/Mở khóa dùng cùng nút đổi theo trạng thái; xóa loại khỏi danh sách quản trị, giữ lịch sử và không thể khôi phục qua Sửa. PUT chỉ gửi field allowlist và version; email trống gửi null. 409 giữ draft, chỉ thay bằng bản server sau lựa chọn rõ ràng. Có lỗi last-admin và xác nhận đổi quyền chính mình.
 - `/notifications`: WEB inbox của principal, lọc chưa đọc, chi tiết text và lưu đã đọc. Badge dùng tổng unread từ server; polling dừng ở tab ẩn, chậm lại sau lỗi.

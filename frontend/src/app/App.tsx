@@ -33,6 +33,11 @@ const AccountPage = lazy(() =>
     default: module.AccountPage,
   })),
 );
+const RegistrationPage = lazy(() =>
+  import('../features/auth/pages/RegistrationPage').then((module) => ({
+    default: module.RegistrationPage,
+  })),
+);
 const UsersPage = lazy(() =>
   import('../features/identity/pages/UsersPage').then((module) => ({
     default: module.UsersPage,
@@ -187,6 +192,7 @@ const router = createBrowserRouter([
     errorElement: <RouteError />,
     children: [
       { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegistrationPage /> },
       {
         element: <RequireAuth />,
         children: [

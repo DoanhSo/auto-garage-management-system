@@ -48,13 +48,13 @@ async function login() {
 }
 beforeEach(() => server.use(...baseHandlers()));
 describe('Forms against HTTP contracts', () => {
-  it('shows a recoverable error if opening the Keycloak login portal fails', async () => {
-    vi.spyOn(authApi, 'startPkceRedirect').mockRejectedValue(new Error('storage blocked'));
+  it('logs in from the local credentials form without opening the Keycloak portal', async () => {
+    const redirect = vi.spyOn(authApi, 'startPkceRedirect');
     app();
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Đăng nhập với Keycloak' }));
-    expect(await screen.findByText('Chưa thể mở cổng đăng nhập. Vui lòng thử lại.')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Đăng nhập với Keycloak' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /Keycloak/ })).not.toBeInTheDocument();
+    await login();
+    expect(await screen.findByRole('button', { name: 'Thêm tài khoản' })).toBeVisible();
+    expect(redirect).not.toHaveBeenCalled();
   });
 
   it('keeps a new service editor open and submits with optional maintenance fields empty', async () => {

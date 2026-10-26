@@ -14,7 +14,7 @@ try {
         TEST_DB_URL='jdbc:mysql://127.0.0.1:3308/autogarage_test?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true';
         TEST_DB_USERNAME='autogarage'; TEST_DB_PASSWORD='autogarage_test';
         VITE_API_BASE_URL='/api/v1'; VITE_KEYCLOAK_ISSUER='/realms/autogarage-realm';
-        VITE_KEYCLOAK_CLIENT_ID='autogarage-frontend'; VITE_GOOGLE_LOGIN_ENABLED='false'
+        VITE_KEYCLOAK_CLIENT_ID='autogarage-frontend'
     }.GetEnumerator()) {
         $previousTest[$entry.Key] = [Environment]::GetEnvironmentVariable($entry.Key,'Process')
         [Environment]::SetEnvironmentVariable($entry.Key,$entry.Value,'Process')

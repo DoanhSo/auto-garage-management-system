@@ -12,9 +12,11 @@ kc() { /opt/keycloak/bin/kcadm.sh "$@" --config "$work/admin.config"; }
 kc config credentials --server http://keycloak:8080 --realm master \
     --user "$KEYCLOAK_ADMIN_USERNAME" --password "$KEYCLOAK_ADMIN_PASSWORD" >/dev/null
 realm=autogarage-realm
+kc update "realms/$realm" -s registrationAllowed=false -s registrationEmailAsUsername=false \
+    -s loginWithEmailAllowed=true -s duplicateEmailsAllowed=false -s loginTheme=keycloak
 client=$(kc get clients -r "$realm" -q clientId=autogarage-frontend --fields id --format csv --noquotes | tail -n 1 | tr -d '\r')
 [[ "$client" =~ ^[a-f0-9-]{36}$ ]] || { echo 'Frontend client is missing' >&2; exit 1; }
-printf '{"redirectUris":["%s/login","http://localhost:5173/*","http://127.0.0.1:5173/*"],"webOrigins":["%s","http://localhost:5173","http://127.0.0.1:5173"]}' \
+printf '{"standardFlowEnabled":true,"implicitFlowEnabled":false,"directAccessGrantsEnabled":true,"attributes":{"pkce.code.challenge.method":"S256"},"redirectUris":["%s/login","http://localhost:5173/*","http://127.0.0.1:5173/*"],"webOrigins":["%s","http://localhost:5173","http://127.0.0.1:5173"]}' \
     "$FRONTEND_PUBLIC_URL" "$FRONTEND_PUBLIC_URL" > "$work/client.json"
 kc update "clients/$client" -r "$realm" -f "$work/client.json"
 kc update users/profile -r "$realm" -f /opt/autogarage/user-profile.json

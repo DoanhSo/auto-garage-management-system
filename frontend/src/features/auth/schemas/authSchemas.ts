@@ -18,6 +18,26 @@ export function validNewPassword(value: string, policy: UiPolicy) {
 export function passwordRequirement(policy: UiPolicy) {
   return `Ít nhất ${policy.passwordMinLength} ký tự, tối đa ${policy.passwordMaxUtf8Bytes} byte UTF-8.`;
 }
+export function registrationSchema(policy: UiPolicy) {
+  return z
+    .object({
+      fullName: z.string().trim().min(1, 'Nhập họ và tên.').max(150, 'Tối đa 150 ký tự.'),
+      email: z
+        .string()
+        .trim()
+        .min(1, 'Nhập email.')
+        .email('Email không hợp lệ.')
+        .max(254, 'Tối đa 254 ký tự.'),
+      password: z
+        .string()
+        .refine((value) => validNewPassword(value, policy), passwordRequirement(policy)),
+      confirmPassword: z.string(),
+    })
+    .refine((value) => value.password === value.confirmPassword, {
+      path: ['confirmPassword'],
+      message: 'Mật khẩu xác nhận chưa khớp.',
+    });
+}
 export function passwordChangeSchema(policy: UiPolicy) {
   return z
     .object({

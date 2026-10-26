@@ -1,5 +1,35 @@
 # Keycloak: đăng ký, đăng nhập và thu hồi phiên
 
+## Form đăng nhập và đăng ký trên AutoGarage
+
+`/login` nhận username hoặc email (bao gồm Gmail) và mật khẩu riêng của tài khoản
+AutoGarage. Frontend gửi password grant đến Keycloak qua proxy `/realms`, sau đó
+gọi `/api/v1/auth/me` bằng bearer token. Không điều hướng sang trang Keycloak.
+Client `autogarage-frontend` cần bật **Direct Access Grants** cho luồng này.
+Luồng này được chọn theo trải nghiệm yêu cầu; không hỗ trợ đầy đủ các bước MFA/
+challenge của luồng browser. Nếu sau này cần MFA, chuyển sang Authorization Code
++ PKCE thay vì tự bỏ qua bước xác thực.
+
+`POST /api/v1/auth/register` là endpoint công khai với DTO chỉ gồm fullName, email,
+password. Backend kiểm tra PasswordPolicy rồi gọi Keycloak Admin API để tạo danh
+tính **CUSTOMER**, emailVerified=false. Không liên kết/nâng quyền tài khoản trùng.
+Không lưu mật khẩu vào database gara; sau khi đăng ký, frontend tự đăng nhập,
+và `/auth/me` dùng cơ chế JIT sẵn có để tạo User/Customer trong gara. Nếu tạo vai
+trò Keycloak thất bại, adapter cố xóa danh tính vừa tạo; lỗi hạ tầng trả 503.
+`registrationAllowed=false` tắt form đăng ký công khai của Keycloak; Admin API
+vẫn tạo tài khoản qua backend, nên không thể bỏ qua PasswordPolicy bằng form cũ.
+
+Giữ `registrationEmailAsUsername=false` và `loginWithEmailAllowed=true`. Username
+của khách hàng đăng ký qua app được backend lấy từ email; tài khoản nhân viên vẫn
+giữ username riêng. Bật Email as username cho cả realm sẽ khiến Keycloak đổi tên
+tài khoản khi Admin API tạo/sửa profile, làm sai luồng quản trị nhân viên.
+`keycloak-setup` đồng bộ các thiết lập này cho realm đã tồn tại, không reset
+password/volume. Không đưa credential quản trị Keycloak vào frontend.
+
+Google OAuth để sau; nhập địa chỉ Gmail vào form hiện tại không đăng nhập Google
+và không sử dụng mật khẩu Google. OTP/link/xác minh email cần SMTP của Keycloak,
+chưa bật trong bộ local này.
+
 Backend yêu cầu `KEYCLOAK_ADMIN_SERVER_URL`, `KEYCLOAK_ADMIN_REALM`,
 `KEYCLOAK_ADMIN_USERNAME` và `KEYCLOAK_ADMIN_PASSWORD` khi
 `KEYCLOAK_ADMIN_ENABLED=true` (mặc định). Cấu hình thiếu dừng khởi động; lỗi Admin
@@ -48,9 +78,9 @@ Console hoặc Admin REST API trước khi sử dụng bản code này:
   tài khoản đã từng logout/đổi quyền cần được đồng bộ về version hiện tại trước lần
   đăng nhập tiếp theo. Không đặt lại database version về 0 vì sẽ làm token cũ hợp lệ.
 - Kiểm tra redirect URI và web origin của client khớp URL frontend thực tế. Google
-  IdP tắt trong template. Muốn sử dụng, cấu hình OAuth client thật và secret qua môi
-  trường Keycloak, bật Google IdP trong Admin Console và đặt
-  `VITE_GOOGLE_LOGIN_ENABLED=true` cho frontend. Không dùng các placeholder trong
+  IdP tắt trong template. Luồng Google OAuth trong giao diện để triển khai sau;
+  khi triển khai cần OAuth client thật và secret tại Keycloak rồi bật IdP.
+  Giao diện hiện tại không hiển thị nút Google. Không dùng các placeholder trong
   template làm credential hoạt động.
 
 Với Keycloak chạy riêng, frontend cần đặt `VITE_KEYCLOAK_PUBLIC_ORIGIN` thành URL

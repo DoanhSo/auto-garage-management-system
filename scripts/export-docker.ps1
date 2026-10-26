@@ -15,14 +15,20 @@ $compose = [regex]::Replace($compose, '(?m)^    build:\n(?:      [^\n]*\n)+', ''
 [IO.File]::WriteAllText((Join-Path $output 'compose.yaml'), $compose, [Text.UTF8Encoding]::new($false))
 Copy-Item -LiteralPath (Join-Path $root 'start-docker.cmd') -Destination $output
 Copy-Item -LiteralPath (Join-Path $root 'docs/DOCKER.md') -Destination (Join-Path $output 'README.md')
-foreach ($name in @('docker-common.ps1','start-docker.ps1','seed-demo.ps1')) {
+foreach ($name in @('docker-common.ps1','docker-oidc.ps1','start-docker.ps1','seed-demo.ps1')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $output 'scripts')
 }
 foreach ($name in @('realm-export.json','healthcheck.sh','setup.sh','user-profile.json','auth-version-mapper.json')) {
     Copy-Item -LiteralPath (Join-Path $root "docker/keycloak/$name") -Destination (Join-Path $output 'docker/keycloak')
 }
 $images = @("autogarage-backend:$($settings.AUTOGARAGE_IMAGE_TAG)","autogarage-frontend:$($settings.AUTOGARAGE_IMAGE_TAG)",'mysql:8.4','postgres:16-alpine','quay.io/keycloak/keycloak:26.0')
-$manifest = [ordered]@{ createdAt=[DateTime]::UtcNow.ToString('o'); platform='linux/amd64'; images=$images; includesSecrets=$false }
+$imageIds = [ordered]@{}
+foreach ($image in $images) {
+    $id = & docker image inspect $image --format '{{.Id}}'
+    if ($LASTEXITCODE -ne 0 -or $id -notmatch '^sha256:[a-f0-9]{64}$') { throw ('Cannot inspect bundled image: ' + $image) }
+    $imageIds[$image] = $id.Trim()
+}
+$manifest = [ordered]@{ createdAt=[DateTime]::UtcNow.ToString('o'); platform='linux/amd64'; images=$images; imageIds=$imageIds; includesSecrets=$false }
 [IO.File]::WriteAllText((Join-Path $output 'manifest.json'), ($manifest | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem

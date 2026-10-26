@@ -103,7 +103,21 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
                 }
             }
             if (userId != null) {
-                assignSingleGarageRole(token, userId, role);
+                try {
+                    assignSingleGarageRole(token, userId, role);
+                } catch (RestClientException | BusinessException failure) {
+                    // This invocation created the identity; never remove an existing account.
+                    try {
+                        restClient.delete()
+                                .uri(serverUrl + "/admin/realms/" + realm + "/users/" + userId)
+                                .header("Authorization", SecurityConstants.BEARER_PREFIX + token)
+                                .retrieve().toBodilessEntity();
+                    } catch (RestClientException cleanupFailure) {
+                        failure.addSuppressed(cleanupFailure);
+                        SafeFailureLog.error(log, "Unable to remove incomplete Keycloak registration", cleanupFailure);
+                    }
+                    throw failure;
+                }
             }
             if (userId == null || userId.isBlank()) throw unavailable();
             return Optional.of(userId);

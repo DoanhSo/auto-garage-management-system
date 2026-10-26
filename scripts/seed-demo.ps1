@@ -2,12 +2,10 @@
 param([Parameter(Mandatory=$true)][string]$ConfigPath)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'docker-common.ps1')
+. (Join-Path $PSScriptRoot 'docker-oidc.ps1')
 $settings = Read-DockerSettings $ConfigPath
 $api = "http://localhost:$($settings.BACKEND_PORT)/api/v1"
-$issuer = "http://localhost:$($settings.KEYCLOAK_PORT)/realms/autogarage-realm"
-$token = Invoke-RestMethod -Method Post -Uri "$issuer/protocol/openid-connect/token" -Body @{
-    grant_type='password'; client_id='autogarage-frontend'; username=$settings.AUTH_BOOTSTRAP_USERNAME; password=$settings.GARAGE_ADMIN_PASSWORD; scope='openid'
-}
+$token = Get-DockerAdminToken $settings
 $headers = @{ Authorization = 'Bearer ' + $token.access_token }
 function Invoke-DemoApi([string]$Path, [string]$Method = 'Get', $Body = $null) {
     $arguments = @{ Uri = $api + $Path; Method=$Method; Headers=$headers; ContentType='application/json' }
