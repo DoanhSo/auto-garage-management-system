@@ -39,6 +39,25 @@ docker compose --env-file .docker-local/.env stop
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-docker.ps1
 ```
 
+## Cap nhat stack source dang chay tai cong 3000
+
+Stack source dung `.env` o thu muc goc; launcher bundle dung `.docker-local/.env`.
+Day la hai project Docker rieng. Khong dung credential cua stack demo de dang nhap
+vao stack source da co tai khoan.
+
+Compose mac dinh chon image da kiem thu `2026.10.24`, khong dung tag `latest` cu.
+Neu `.env` da dat `AUTOGARAGE_IMAGE_TAG`, doi thanh `2026.10.24` va chay:
+
+```powershell
+docker compose --env-file .env up -d --no-build --pull never --wait
+docker compose --env-file .env images
+```
+
+Kiem tra frontend/backend deu dung tag `2026.10.24`. Thao tac cap nhat giu volume,
+tai khoan va mat khau cu. Voi realm da co, `keycloak-setup` van cap nhat redirect
+URI, web origin, user profile va token mapper khi khong tao admin tu dong.
+Sau cap nhat, mo `http://localhost:3000/login` va Ctrl+F5 de nap giao dien moi.
+
 Khong chay `down -v` neu muon giu du lieu. Khong gui `.docker-local` cho nguoi
 khac: thu muc nay chua credential va cau hinh rieng cua may. Khong doi secret
 database sau khi khoi tao volume neu chua doi credential trong database.

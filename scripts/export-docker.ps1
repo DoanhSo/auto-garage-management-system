@@ -24,6 +24,7 @@ foreach ($name in @('realm-export.json','healthcheck.sh','setup.sh','user-profil
 $images = @("autogarage-backend:$($settings.AUTOGARAGE_IMAGE_TAG)","autogarage-frontend:$($settings.AUTOGARAGE_IMAGE_TAG)",'mysql:8.4','postgres:16-alpine','quay.io/keycloak/keycloak:26.0')
 $manifest = [ordered]@{ createdAt=[DateTime]::UtcNow.ToString('o'); platform='linux/amd64'; images=$images; includesSecrets=$false }
 [IO.File]::WriteAllText((Join-Path $output 'manifest.json'), ($manifest | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zipPath = $output + '.zip'
 if (Test-Path -LiteralPath $zipPath) { throw 'Zip already exists; previous archive preserved.' }

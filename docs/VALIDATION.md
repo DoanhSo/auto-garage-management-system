@@ -1,5 +1,26 @@
 # Kết quả kiểm chứng backend TV1 — 15/10/2026
 
+## Sửa stack cổng 3000 ngày 26/10/2026
+
+Container `autogarage` dùng image `latest` cũ: Nginx không proxy `/realms`, POST
+token trả HTTP 405 HTML; client Keycloak chỉ cho redirect về cổng 5173. Đã tái
+hiện bằng HTTP probe endpoint token trước sửa. Compose nay mặc định chọn image
+đã kiểm thử `2026.10.24`; cập nhật stack tại chỗ bằng `--no-build --pull never`.
+Image ID container đã đối chiếu khớp backend `7828e2b03526` và frontend
+`f6716dc38050`. Các service healthy; probe sau sửa nhận JSON Keycloak HTTP 401
+cho credential cố ý không hợp lệ, thay vì HTML 405.
+
+Chromium mở được form Keycloak với redirect về `http://localhost:3000/login`;
+token endpoint trả đúng CORS origin và public UI policy trả HTTP 200. Alias
+`latest` local cũng đã đồng bộ về hai image đã kiểm thử. Bộ ZIP được xuất lại bằng
+Windows PowerShell 5.1 và stream `images.tar` vào `docker load` đạt đủ 5 images.
+
+`keycloak-setup` luôn đồng bộ cấu hình client/profile/mapper cho realm có sẵn,
+kể cả khi không tạo quản trị viên tự động. Hai tài khoản và auth version hiện có
+giữ nguyên; không reset mật khẩu hay volume. Không thay Java/TypeScript nên
+không chạy lại bộ 354/79 tests đã ghi ở đợt đóng gói; kiểm tra lượt này tập trung
+vào image thực chạy, proxy token, runtime URL và redirect trên trình duyệt.
+
 ## Cập nhật kiểm chứng ngày 24/10/2026
 
 ### Bộ Docker chạy ngay (kiểm chứng bổ sung)
