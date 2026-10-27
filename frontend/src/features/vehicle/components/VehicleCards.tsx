@@ -5,7 +5,6 @@ import {
   ArrowRightLeft,
   SquarePen,
   Trash2,
-  User,
   Fuel,
 } from 'lucide-react';
 import type { Vehicle } from '../../../shared/types/contracts';
@@ -22,7 +21,7 @@ export function VehicleCards({
 }: {
   canManage?: boolean;
   vehicles: Vehicle[];
-  onEdit: (id: string) => void;
+  onEdit: (id: string, trigger: HTMLElement) => void;
   onTransfer: (vehicle: Vehicle) => void;
   onTimeline: (id: string) => void;
   onDeactivate: (vehicle: Vehicle) => void;
@@ -47,109 +46,99 @@ export function VehicleCards({
           v.inspectionDueDate && new Date(v.inspectionDueDate).getTime() < Date.now();
 
         return (
-          <li
-            key={v.id}
-            className="vehicle-card border border-border rounded-lg p-4 bg-card shadow-sm space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-base font-bold bg-primary/10 text-primary px-2.5 py-1 rounded border border-primary/20">
-                  {v.licensePlate}
-                </span>
-                <span className="text-xs font-semibold text-muted-foreground">
+          <li key={v.id}>
+            <div className="user-card-top">
+              <span className="plate-badge">{v.licensePlate}</span>
+              <div>
+                <strong>
                   {v.brand} {v.model}
+                </strong>
+                <span className="muted">
+                  {v.customerName} ({v.customerPhone})
                 </span>
               </div>
               <StatusBadge active={v.isActive} />
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <User size={13} className="shrink-0" />
-                <span className="truncate">
-                  {v.customerName} ({v.customerPhone})
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <Gauge size={13} className="shrink-0" />
-                <span>{v.odometer.toLocaleString('vi-VN')} km</span>
+            <div className="customer-card-details">
+              <div className="info-row">
+                <Gauge size={14} aria-hidden />
+                <span>Odo: {v.odometer.toLocaleString('vi-VN')} km</span>
               </div>
 
               {v.fuelType && (
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Fuel size={13} className="shrink-0" />
-                  <span>{v.fuelType}</span>
+                <div className="info-row">
+                  <Fuel size={14} aria-hidden />
+                  <span>Nhiên liệu: {v.fuelType}</span>
                 </div>
               )}
 
               {v.inspectionDueDate && (
-                <div
-                  className={`flex items-center gap-1.5 ${
-                    isExpired
-                      ? 'text-red-500 font-medium'
-                      : isExpiringSoon
-                        ? 'text-amber-500 font-medium'
-                        : 'text-muted-foreground'
-                  }`}
-                >
-                  <Calendar size={13} className="shrink-0" />
-                  <span>Đăng kiểm: {formatDate(v.inspectionDueDate)}</span>
+                <div className="info-row">
+                  <Calendar size={14} aria-hidden />
+                  <span
+                    className={
+                      isExpired ? 'badge badge-danger' : isExpiringSoon ? 'badge badge-warning' : ''
+                    }
+                  >
+                    Đăng kiểm: {formatDate(v.inspectionDueDate)}
+                    {isExpired ? ' (Đã hết hạn)' : isExpiringSoon ? ' (Sắp hết hạn)' : ''}
+                  </span>
+                </div>
+              )}
+
+              {v.vin && (
+                <div className="info-row">
+                  <span className="code-tag">VIN: {v.vin}</span>
                 </div>
               )}
             </div>
 
-            {v.vin && (
-              <div className="text-[11px] font-mono text-muted-foreground bg-muted/50 px-2 py-0.5 rounded">
-                VIN: {v.vin}
+            <div className="user-card-bottom">
+              <div className="row-actions">
+                <Button
+                  variant="ghost"
+                  aria-label={`Lịch sử kỹ thuật xe ${v.licensePlate}`}
+                  onClick={() => onTimeline(v.id)}
+                >
+                  <History size={16} />
+                  Lịch sử
+                </Button>
+
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    aria-label={`Chuyển nhượng xe ${v.licensePlate}`}
+                    onClick={() => onTransfer(v)}
+                  >
+                    <ArrowRightLeft size={16} />
+                    Đổi chủ
+                  </Button>
+                )}
+
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    aria-label={`Sửa thông tin xe ${v.licensePlate}`}
+                    onClick={(e) => onEdit(v.id, e.currentTarget)}
+                  >
+                    <SquarePen size={16} />
+                    Sửa
+                  </Button>
+                )}
+
+                {canManage && v.isActive && (
+                  <Button
+                    variant="ghost"
+                    className="delete-action"
+                    aria-label={`Ngừng hoạt động xe ${v.licensePlate}`}
+                    onClick={() => onDeactivate(v)}
+                  >
+                    <Trash2 size={16} />
+                    Ngừng HĐ
+                  </Button>
+                )}
               </div>
-            )}
-
-            <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-border">
-              <Button
-                variant="ghost"
-                className="button-small h-8 px-2 text-xs"
-                onClick={() => onTimeline(v.id)}
-                title="Lịch sử sửa chữa"
-              >
-                <History size={14} className="mr-1" />
-                Lịch sử
-              </Button>
-
-              {canManage && (
-                <Button
-                  variant="ghost"
-                  className="button-small h-8 px-2 text-xs"
-                  onClick={() => onTransfer(v)}
-                  title="Chuyển nhượng chủ xe"
-                >
-                  <ArrowRightLeft size={14} className="mr-1 text-amber-500" />
-                  Đổi chủ
-                </Button>
-              )}
-
-              {canManage && (
-                <Button
-                  variant="ghost"
-                  className="button-small h-8 px-2 text-xs"
-                  onClick={() => onEdit(v.id)}
-                  title="Sửa xe"
-                >
-                  <SquarePen size={14} className="mr-1" />
-                  Sửa
-                </Button>
-              )}
-
-              {canManage && (
-                <Button
-                  variant="ghost"
-                  className="button-small h-8 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                  onClick={() => onDeactivate(v)}
-                  title="Ngừng hoạt động"
-                >
-                  <Trash2 size={14} />
-                </Button>
-              )}
             </div>
           </li>
         );

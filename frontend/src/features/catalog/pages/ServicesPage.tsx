@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Plus, SquarePen, Trash2, Clock, ShieldCheck, RotateCw, Box } from 'lucide-react';
+import { Plus, SquarePen, Trash2, Clock, ShieldCheck, RotateCw, Box, Layers } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -77,9 +77,7 @@ export function ServicesPage() {
         id: 'serviceCode',
         header: 'Mã DV',
         cell: ({ row }) => (
-          <span className="font-mono text-xs font-semibold bg-muted text-muted-foreground px-2 py-0.5 rounded border border-border">
-            {row.original.serviceCode}
-          </span>
+          <span className="code-tag">{row.original.serviceCode}</span>
         ),
       },
       {
@@ -87,9 +85,9 @@ export function ServicesPage() {
         header: 'Tên dịch vụ / Hạng mục',
         cell: ({ row }) => (
           <div>
-            <div className="font-semibold text-foreground text-sm">{row.original.serviceName}</div>
+            <strong>{row.original.serviceName}</strong>
             {row.original.description && (
-              <div className="text-xs text-muted-foreground mt-0.5 max-w-sm line-clamp-1">
+              <div className="muted nowrap" style={{ marginTop: 2 }}>
                 {row.original.description}
               </div>
             )}
@@ -103,11 +101,7 @@ export function ServicesPage() {
           const isPackage = row.original.serviceType === 'PACKAGE';
           return (
             <span
-              className={`badge text-xs px-2 py-0.5 rounded font-medium ${
-                isPackage
-                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
-                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-              }`}
+              className={`badge ${isPackage ? 'badge-primary' : 'badge-neutral'}`}
             >
               {isPackage ? 'Gói bảo dưỡng' : 'Dịch vụ lẻ'}
             </span>
@@ -119,8 +113,8 @@ export function ServicesPage() {
         header: 'Đơn giá tiền công',
         cell: ({ row }) => (
           <div>
-            <span className="font-bold text-sm text-primary">{money(row.original.unitPrice)}</span>
-            <span className="text-xs text-muted-foreground ml-1">/ {row.original.unit}</span>
+            <strong className="credit-amount">{money(row.original.unitPrice)}</strong>
+            <span className="muted"> / {row.original.unit}</span>
           </div>
         ),
       },
@@ -131,7 +125,7 @@ export function ServicesPage() {
           const mins = row.original.standardMinutes;
           const hrs = (mins / 60).toFixed(1);
           return (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1 muted">
               <Clock size={13} />
               <span>
                 {mins} phút (~{hrs}h)
@@ -146,20 +140,20 @@ export function ServicesPage() {
         cell: ({ row }) => {
           const s = row.original;
           return (
-            <div className="text-xs space-y-0.5">
+            <div className="muted nowrap" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {s.requiredBayType ? (
-                <div className="flex items-center gap-1 text-muted-foreground">
+                <div className="flex items-center gap-1">
                   <Box size={12} />
                   <span>{s.requiredBayType}</span>
                 </div>
               ) : (
-                <span className="text-muted-foreground">Khoang tự do</span>
+                <span>Khoang tự do</span>
               )}
 
               {(s.warrantyDays > 0 || s.warrantyKm > 0) && (
-                <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                <div className="flex items-center gap-1">
                   <ShieldCheck size={12} />
-                  <span>
+                  <span className="badge badge-success">
                     BH: {s.warrantyDays > 0 ? `${s.warrantyDays} ngày` : ''}
                     {s.warrantyDays > 0 && s.warrantyKm > 0 ? ' / ' : ''}
                     {s.warrantyKm > 0 ? `${s.warrantyKm.toLocaleString('vi-VN')} km` : ''}
@@ -168,7 +162,7 @@ export function ServicesPage() {
               )}
 
               {s.serviceType === 'PACKAGE' && (s.intervalKm || s.intervalMonths) && (
-                <div className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400">
+                <div className="flex items-center gap-1">
                   <RotateCw size={12} />
                   <span>
                     {s.intervalKm ? `${s.intervalKm.toLocaleString('vi-VN')} km` : ''}
@@ -188,30 +182,33 @@ export function ServicesPage() {
       },
       {
         id: 'actions',
-        header: () => <span className="sr-only">Thao tác</span>,
+        header: 'Thao tác',
         cell: ({ row }) => {
           const service = row.original;
           if (!isAdmin) return null;
 
           return (
-            <div className="row-actions flex items-center justify-end gap-1">
+            <div className="row-actions">
               <Button
                 variant="ghost"
-                className="button-small h-8 w-8 p-0"
-                title="Chỉnh sửa dịch vụ"
+                aria-label={`Sửa dịch vụ ${service.serviceName}`}
                 onClick={() => handleOpenEdit(service.id)}
               >
-                <SquarePen size={14} />
+                <SquarePen size={16} />
+                Sửa
               </Button>
 
-              <Button
-                variant="ghost"
-                className="button-small h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                title="Ngừng áp dụng"
-                onClick={() => setDeactivatingService(service)}
-              >
-                <Trash2 size={14} />
-              </Button>
+              {service.isActive && (
+                <Button
+                  variant="ghost"
+                  className="delete-action"
+                  aria-label={`Ngừng áp dụng dịch vụ ${service.serviceName}`}
+                  onClick={() => setDeactivatingService(service)}
+                >
+                  <Trash2 size={16} />
+                  Ngừng áp dụng
+                </Button>
+              )}
             </div>
           );
         },
@@ -221,52 +218,62 @@ export function ServicesPage() {
   );
 
   return (
-    <div className="page-shell">
+    <>
       <PageHeader
-        title="Danh mục Dịch vụ & Tiền công"
+        eyebrow="TIẾP NHẬN & DỊCH VỤ · M04"
+        title="Bảng giá & Dịch vụ"
         description="Quản lý bảng giá tiền công kỹ thuật, định mức thời gian tiêu chuẩn và cấu hình các gói bảo dưỡng định kỳ."
         actions={
           isAdmin ? (
             <Button ref={createTrigger} variant="primary" onClick={handleOpenCreate}>
-              <Plus size={16} />
+              <Plus size={16} aria-hidden />
               Thêm dịch vụ mới
             </Button>
           ) : undefined
         }
       />
 
-      <ServiceFilters
-        search={search}
-        serviceType={serviceType}
-        isActive={isActive}
-        onSearchChange={setSearch}
-        onTypeChange={setServiceType}
-        onStatusChange={setIsActive}
-        onReset={() => {
-          setSearch('');
-          setServiceType('ALL');
-          setIsActive('ALL');
-        }}
-      />
+      <div className="info-strip">
+        <Layers size={18} />
+        <span>
+          Bảng giá tiền công tiêu chuẩn, thời gian định mức và chu kỳ bảo dưỡng định kỳ (Quản trị viên quản lý, Nhân viên tra cứu).
+        </span>
+      </div>
 
-      {isLoading ? (
-        <Loading label="Đang tải danh mục dịch vụ…" />
-      ) : isError ? (
-        <QueryError error={error} retry={() => refetch()} />
-      ) : compact ? (
-        <ServiceCards
-          canManage={isAdmin}
-          services={services}
-          onEdit={handleOpenEdit}
-          onDeactivate={setDeactivatingService}
+      <section className="panel table-panel">
+        <ServiceFilters
+          search={search}
+          serviceType={serviceType}
+          isActive={isActive}
+          onSearchChange={setSearch}
+          onTypeChange={setServiceType}
+          onStatusChange={setIsActive}
+          onReset={() => {
+            setSearch('');
+            setServiceType('ALL');
+            setIsActive('ALL');
+          }}
         />
-      ) : (
-        <DataTable<Service>
-          columns={columns}
-          data={services}
-          caption="Không tìm thấy dịch vụ nào."
-        />
-      )}
+
+        {isLoading ? (
+          <Loading label="Đang tải danh mục dịch vụ…" />
+        ) : isError ? (
+          <QueryError error={error} retry={() => refetch()} />
+        ) : compact ? (
+          <ServiceCards
+            canManage={isAdmin}
+            services={services}
+            onEdit={handleOpenEdit}
+            onDeactivate={setDeactivatingService}
+          />
+        ) : (
+          <DataTable<Service>
+            columns={columns}
+            data={services}
+            caption="Danh sách dịch vụ & tiền công"
+          />
+        )}
+      </section>
 
       {editorOpen && (
         <ServiceEditor
@@ -288,7 +295,7 @@ export function ServicesPage() {
         onConfirm={handleConfirmDeactivate}
         onCancel={() => setDeactivatingService(null)}
       />
-    </div>
+    </>
   );
 }
 

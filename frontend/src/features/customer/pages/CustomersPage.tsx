@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Plus, SquarePen, UserX, Phone, Mail, Building2 } from 'lucide-react';
+import { Plus, SquarePen, UserX, Phone, Mail, Building2, Contact } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
 import {
@@ -189,7 +189,7 @@ export function CustomersPage() {
   );
 
   return (
-    <div className="page-shell">
+    <>
       <PageHeader
         eyebrow="TIẾP NHẬN & DỊCH VỤ · M02"
         title="Quản lý khách hàng"
@@ -202,39 +202,48 @@ export function CustomersPage() {
         }
       />
 
-      <CustomerFilters
-        search={search}
-        customerType={customerType}
-        isActive={isActive}
-        onSearchChange={setSearch}
-        onTypeChange={setCustomerType}
-        onStatusChange={setIsActive}
-        onReset={() => {
-          setSearch('');
-          setCustomerType('ALL');
-          setIsActive('ALL');
-        }}
-      />
+      <div className="info-strip">
+        <Contact size={18} />
+        <span>
+          Quản lý thông tin liên hệ, phân loại cá nhân hoặc doanh nghiệp và theo dõi hạn mức công nợ theo chuẩn TV1.
+        </span>
+      </div>
 
-      {isLoading && <Loading label="Đang tải danh sách khách hàng…" />}
+      <section className="panel table-panel">
+        <CustomerFilters
+          search={search}
+          customerType={customerType}
+          isActive={isActive}
+          onSearchChange={setSearch}
+          onTypeChange={setCustomerType}
+          onStatusChange={setIsActive}
+          onReset={() => {
+            setSearch('');
+            setCustomerType('ALL');
+            setIsActive('ALL');
+          }}
+        />
 
-      {isError && <QueryError error={error} retry={() => refetch()} />}
+        {isLoading && <Loading label="Đang tải danh sách khách hàng…" />}
 
-      {!isLoading &&
-        !isError &&
-        (compact ? (
-          <CustomerCards
-            customers={filteredCustomers}
-            onEdit={handleOpenEdit}
-            onDeactivate={setDeactivatingCustomer}
-          />
-        ) : (
-          <DataTable<Customer>
-            data={filteredCustomers}
-            columns={columns}
-            caption="Danh sách khách hàng"
-          />
-        ))}
+        {isError && <QueryError error={error} retry={() => refetch()} />}
+
+        {!isLoading &&
+          !isError &&
+          (compact ? (
+            <CustomerCards
+              customers={filteredCustomers}
+              onEdit={handleOpenEdit}
+              onDeactivate={setDeactivatingCustomer}
+            />
+          ) : (
+            <DataTable<Customer>
+              data={filteredCustomers}
+              columns={columns}
+              caption="Danh sách khách hàng"
+            />
+          ))}
+      </section>
 
       <CustomerEditor
         customerId={editingId}
@@ -253,6 +262,6 @@ export function CustomersPage() {
         onConfirm={handleConfirmDeactivate}
         onCancel={() => setDeactivatingCustomer(null)}
       />
-    </div>
+    </>
   );
 }

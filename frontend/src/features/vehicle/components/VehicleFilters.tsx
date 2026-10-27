@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { Search, SlidersHorizontal, RotateCcw } from 'lucide-react';
+import { Search, SlidersHorizontal, RotateCcw, X } from 'lucide-react';
 import { Button } from '../../../shared/components/ui';
 
 export function VehicleFilters({
@@ -38,12 +38,10 @@ export function VehicleFilters({
       </div>
 
       <div className="user-filter-grid">
-        <div className="field">
-          <label className="field-label" htmlFor={`${id}-search`}>
-            Tìm kiếm phương tiện
-          </label>
-          <span className="search-input">
-            <Search size={16} aria-hidden />
+        <div className="user-filter-field">
+          <label htmlFor={`${id}-search`}>Tìm kiếm phương tiện</label>
+          <div className="user-search">
+            <Search size={17} aria-hidden />
             <input
               id={`${id}-search`}
               type="search"
@@ -52,13 +50,21 @@ export function VehicleFilters({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
             />
-          </span>
+            {search && (
+              <button
+                type="button"
+                className="search-clear"
+                aria-label="Xóa từ khóa tìm kiếm"
+                onClick={() => onSearchChange('')}
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="field">
-          <label className="field-label" htmlFor={`${id}-status`}>
-            Trạng thái hoạt động
-          </label>
+        <div className="user-filter-field">
+          <label htmlFor={`${id}-status`}>Trạng thái hoạt động</label>
           <select
             id={`${id}-status`}
             className="select"

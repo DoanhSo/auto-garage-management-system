@@ -10,6 +10,7 @@ import {
   Calendar,
   Gauge,
   User,
+  Car,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
@@ -105,12 +106,10 @@ export function VehiclesPage() {
         header: 'Biển số & Định danh',
         cell: ({ row }) => (
           <div>
-            <span className="font-mono font-bold text-sm bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20 inline-block">
-              {row.original.licensePlate}
-            </span>
+            <span className="plate-badge">{row.original.licensePlate}</span>
             {row.original.vin && (
-              <div className="text-[11px] font-mono text-muted-foreground mt-1">
-                VIN: {row.original.vin}
+              <div className="muted nowrap" style={{ marginTop: 4 }}>
+                <span className="code-tag">VIN: {row.original.vin}</span>
               </div>
             )}
           </div>
@@ -121,10 +120,10 @@ export function VehiclesPage() {
         header: 'Thông số xe',
         cell: ({ row }) => (
           <div>
-            <div className="font-medium text-foreground">
+            <strong>
               {row.original.brand} {row.original.model}
-            </div>
-            <div className="text-xs text-muted-foreground mt-0.5">
+            </strong>
+            <div className="muted nowrap">
               {[
                 row.original.manufactureYear ? `Năm ${row.original.manufactureYear}` : null,
                 row.original.color,
@@ -141,10 +140,10 @@ export function VehiclesPage() {
         header: 'Chủ sở hữu hiện tại',
         cell: ({ row }) => (
           <div>
-            <div className="font-medium text-foreground">{row.original.customerName}</div>
-            <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+            <strong>{row.original.customerName}</strong>
+            <div className="muted nowrap flex items-center gap-1" style={{ marginTop: 2 }}>
               <User size={12} />
-              {row.original.customerPhone}
+              <span>{row.original.customerPhone}</span>
             </div>
           </div>
         ),
@@ -153,8 +152,8 @@ export function VehiclesPage() {
         id: 'odometer',
         header: 'Số ODO',
         cell: ({ row }) => (
-          <div className="flex items-center gap-1 text-sm font-medium">
-            <Gauge size={14} className="text-muted-foreground" />
+          <div className="flex items-center gap-1">
+            <Gauge size={14} className="muted" />
             <span>{row.original.odometer.toLocaleString('vi-VN')} km</span>
           </div>
         ),
@@ -164,20 +163,22 @@ export function VehiclesPage() {
         header: 'Hạn đăng kiểm',
         cell: ({ row }) => {
           const date = row.original.inspectionDueDate;
-          if (!date) return <span className="text-muted-foreground text-xs">—</span>;
+          if (!date) return <span className="muted">—</span>;
 
           const time = new Date(date).getTime();
           const isExpired = time < Date.now();
           const isExpiringSoon = time - Date.now() < 15 * 86400000 && !isExpired;
 
           return (
-            <div
-              className={`flex items-center gap-1 text-xs font-medium ${
-                isExpired ? 'text-red-500' : isExpiringSoon ? 'text-amber-500' : 'text-foreground'
-              }`}
-            >
-              <Calendar size={13} />
-              <span>{formatDate(date)}</span>
+            <div className="flex items-center gap-1">
+              <Calendar size={13} className="muted" />
+              <span
+                className={
+                  isExpired ? 'badge badge-danger' : isExpiringSoon ? 'badge badge-warning' : 'muted nowrap'
+                }
+              >
+                {formatDate(date)}
+              </span>
             </div>
           );
         },
@@ -189,29 +190,27 @@ export function VehiclesPage() {
       },
       {
         id: 'actions',
-        header: () => <span className="sr-only">Thao tác</span>,
+        header: 'Thao tác',
         cell: ({ row }) => {
           const vehicle = row.original;
           return (
-            <div className="row-actions flex items-center justify-end gap-1">
+            <div className="row-actions">
               <Button
                 variant="ghost"
-                className="button-small h-8 px-2 text-xs"
-                title="Lịch sử bảo dưỡng sửa chữa"
+                aria-label={`Lịch sử kỹ thuật xe ${vehicle.licensePlate}`}
                 onClick={() => handleOpenTimeline(vehicle.id)}
               >
-                <History size={14} className="mr-1 text-primary" />
+                <History size={16} />
                 Lịch sử
               </Button>
 
               {canManage && (
                 <Button
                   variant="ghost"
-                  className="button-small h-8 px-2 text-xs"
-                  title="Chuyển nhượng quyền sở hữu"
+                  aria-label={`Chuyển nhượng quyền sở hữu xe ${vehicle.licensePlate}`}
                   onClick={() => handleOpenTransfer(vehicle)}
                 >
-                  <ArrowRightLeft size={14} className="mr-1 text-amber-500" />
+                  <ArrowRightLeft size={16} />
                   Đổi chủ
                 </Button>
               )}
@@ -219,22 +218,23 @@ export function VehiclesPage() {
               {canManage && (
                 <Button
                   variant="ghost"
-                  className="button-small h-8 w-8 p-0"
-                  title="Chỉnh sửa thông tin"
+                  aria-label={`Sửa thông tin xe ${vehicle.licensePlate}`}
                   onClick={() => handleOpenEdit(vehicle.id)}
                 >
-                  <SquarePen size={14} />
+                  <SquarePen size={16} />
+                  Sửa
                 </Button>
               )}
 
-              {canManage && (
+              {canManage && vehicle.isActive && (
                 <Button
                   variant="ghost"
-                  className="button-small h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  title="Ngừng hoạt động"
+                  className="delete-action"
+                  aria-label={`Ngừng hoạt động xe ${vehicle.licensePlate}`}
                   onClick={() => setDeactivatingVehicle(vehicle)}
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={16} />
+                  Ngừng HĐ
                 </Button>
               )}
             </div>
@@ -246,51 +246,61 @@ export function VehiclesPage() {
   );
 
   return (
-    <div className="page-shell">
+    <>
       <PageHeader
-        title="Quản lý Phương tiện"
-        description="Quản lý danh sách phương tiện, theo dõi số ODO, chuyển nhượng quyền sở hữu và tra cứu lịch sử sửa chữa."
+        eyebrow="TIẾP NHẬN & DỊCH VỤ · M03"
+        title="Quản lý phương tiện"
+        description="Quản lý danh sách phương tiện, theo dõi số ODO, chuyển nhượng quyền sở hữu (BR04) và tra cứu lịch sử sửa chữa (UC38)."
         actions={
           canManage && (
             <Button ref={createTrigger} variant="primary" onClick={handleOpenCreate}>
-              <Plus size={16} />
+              <Plus size={16} aria-hidden />
               Đăng ký xe mới
             </Button>
           )
         }
       />
 
-      <VehicleFilters
-        search={search}
-        isActive={isActive}
-        onSearchChange={setSearch}
-        onStatusChange={setIsActive}
-        onReset={() => {
-          setSearch('');
-          setIsActive('ALL');
-        }}
-      />
+      <div className="info-strip">
+        <Car size={18} />
+        <span>
+          Đăng ký thông tin phương tiện, theo dõi số ODO, chuyển nhượng quyền sở hữu (BR04) và tra cứu cây lịch sử sửa chữa (UC38).
+        </span>
+      </div>
 
-      {isLoading ? (
-        <Loading label="Đang tải danh sách phương tiện…" />
-      ) : isError ? (
-        <QueryError error={error} retry={() => refetch()} />
-      ) : compact ? (
-        <VehicleCards
-          canManage={canManage}
-          vehicles={vehicles}
-          onEdit={handleOpenEdit}
-          onTransfer={handleOpenTransfer}
-          onTimeline={handleOpenTimeline}
-          onDeactivate={setDeactivatingVehicle}
+      <section className="panel table-panel">
+        <VehicleFilters
+          search={search}
+          isActive={isActive}
+          onSearchChange={setSearch}
+          onStatusChange={setIsActive}
+          onReset={() => {
+            setSearch('');
+            setIsActive('ALL');
+          }}
         />
-      ) : (
-        <DataTable<Vehicle>
-          columns={columns}
-          data={vehicles}
-          caption="Không tìm thấy phương tiện nào."
-        />
-      )}
+
+        {isLoading ? (
+          <Loading label="Đang tải danh sách phương tiện…" />
+        ) : isError ? (
+          <QueryError error={error} retry={() => refetch()} />
+        ) : compact ? (
+          <VehicleCards
+            canManage={canManage}
+            vehicles={vehicles}
+            onEdit={handleOpenEdit}
+            onTransfer={handleOpenTransfer}
+            onTimeline={handleOpenTimeline}
+            onDeactivate={setDeactivatingVehicle}
+          />
+        ) : (
+          <DataTable<Vehicle>
+            columns={columns}
+            data={vehicles}
+            caption="Danh sách phương tiện"
+          />
+        )}
+      </section>
 
       {editorOpen && (
         <VehicleEditor
@@ -334,7 +344,7 @@ export function VehiclesPage() {
         onConfirm={handleConfirmDeactivate}
         onCancel={() => setDeactivatingVehicle(null)}
       />
-    </div>
+    </>
   );
 }
 

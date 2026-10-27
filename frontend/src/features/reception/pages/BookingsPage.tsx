@@ -1,7 +1,16 @@
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { FRONT_DESK_ROLES } from '../../../app/access';
 import { useMemo, useRef, useState, useCallback } from 'react';
-import { Plus, LogIn, CheckCircle, CalendarClock, CalendarX, UserX, Calendar } from 'lucide-react';
+import {
+  Plus,
+  LogIn,
+  CheckCircle,
+  CalendarClock,
+  CalendarX,
+  UserX,
+  Calendar,
+  CalendarCheck,
+} from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
 import {
@@ -27,7 +36,7 @@ import { CheckInModal } from '../components/CheckInModal';
 import { RescheduleModal } from '../components/RescheduleModal';
 import { CancelBookingDialog } from '../components/CancelBookingDialog';
 import { VehicleCheckModal } from '../components/VehicleCheckModal';
-import { BookingCards } from '../components/BookingCards';
+import { BookingCards, BookingStatusBadge } from '../components/BookingCards';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 
 export function BookingsPage() {
@@ -113,59 +122,22 @@ export function BookingsPage() {
     }
   };
 
-  const getStatusBadge = (bStatus: BookingStatus) => {
-    switch (bStatus) {
-      case 'PENDING':
-        return (
-          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-            Chờ xác nhận
-          </span>
-        );
-      case 'CONFIRMED':
-        return (
-          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-            Đã xác nhận
-          </span>
-        );
-      case 'RECEIVED':
-        return (
-          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-            Đã vào xưởng
-          </span>
-        );
-      case 'CANCELLED':
-        return (
-          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
-            Đã hủy
-          </span>
-        );
-      case 'NO_SHOW':
-        return (
-          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300">
-            Vắng mặt
-          </span>
-        );
-    }
-  };
-
   const columns = useMemo<ColumnDef<Booking>[]>(
     () => [
       {
         id: 'bookingCode',
         header: 'Mã hẹn',
         cell: ({ row }) => (
-          <span className="font-mono text-xs font-semibold bg-muted text-muted-foreground px-2 py-0.5 rounded border border-border">
-            #{row.original.bookingCode}
-          </span>
+          <span className="code-tag">#{row.original.bookingCode}</span>
         ),
       },
       {
         id: 'appointmentAt',
         header: 'Thời gian hẹn',
         cell: ({ row }) => (
-          <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-            <Calendar size={13} className="text-primary" />
-            <span>{formatDateTime(row.original.appointmentAt)}</span>
+          <div className="flex items-center gap-1">
+            <Calendar size={13} className="muted" />
+            <strong className="nowrap">{formatDateTime(row.original.appointmentAt)}</strong>
           </div>
         ),
       },
@@ -174,8 +146,8 @@ export function BookingsPage() {
         header: 'Khách hàng',
         cell: ({ row }) => (
           <div>
-            <div className="font-semibold text-foreground text-sm">{row.original.customerName}</div>
-            <div className="text-xs text-muted-foreground">{row.original.customerPhone}</div>
+            <strong>{row.original.customerName}</strong>
+            <div className="muted nowrap">{row.original.customerPhone}</div>
           </div>
         ),
       },
@@ -184,11 +156,9 @@ export function BookingsPage() {
         header: 'Phương tiện',
         cell: ({ row }) => (
           <div>
-            <span className="font-mono font-bold text-xs bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20 inline-block">
-              {row.original.licensePlate}
-            </span>
+            <span className="plate-badge">{row.original.licensePlate}</span>
             {row.original.vehicleModel && (
-              <div className="text-xs text-muted-foreground mt-0.5">
+              <div className="muted nowrap" style={{ marginTop: 2 }}>
                 {row.original.vehicleModel}
               </div>
             )}
@@ -199,12 +169,10 @@ export function BookingsPage() {
         id: 'service',
         header: 'Dịch vụ yêu cầu',
         cell: ({ row }) => (
-          <div className="text-xs">
-            <span className="font-medium text-foreground">
-              {row.original.serviceName || 'Khám tổng quát'}
-            </span>
+          <div>
+            <span>{row.original.serviceName || 'Khám tổng quát'}</span>
             {row.original.requestDescription && (
-              <div className="text-muted-foreground line-clamp-1 mt-0.5">
+              <div className="muted nowrap" style={{ marginTop: 2 }}>
                 {row.original.requestDescription}
               </div>
             )}
@@ -214,23 +182,22 @@ export function BookingsPage() {
       {
         id: 'status',
         header: 'Trạng thái',
-        cell: ({ row }) => getStatusBadge(row.original.status),
+        cell: ({ row }) => <BookingStatusBadge status={row.original.status} />,
       },
       {
         id: 'actions',
-        header: () => <span className="sr-only">Thao tác</span>,
+        header: 'Thao tác',
         cell: ({ row }) => {
           const b = row.original;
           return (
-            <div className="row-actions flex items-center justify-end gap-1">
+            <div className="row-actions">
               {canManage && b.status === 'PENDING' && (
                 <Button
                   variant="primary"
-                  className="button-small h-8 px-2 text-xs"
+                  aria-label={`Xác nhận lịch hẹn ${b.bookingCode}`}
                   onClick={() => handleConfirm(b)}
-                  title="Xác nhận lịch hẹn"
                 >
-                  <CheckCircle size={13} className="mr-1" />
+                  <CheckCircle size={16} />
                   Xác nhận
                 </Button>
               )}
@@ -238,14 +205,13 @@ export function BookingsPage() {
               {canManage && b.status === 'CONFIRMED' && (
                 <Button
                   variant="primary"
-                  className="button-small h-8 px-2 text-xs bg-emerald-600 hover:bg-emerald-700"
+                  aria-label={`Tiếp nhận xe ${b.licensePlate} vào xưởng`}
                   onClick={() => {
                     setCheckInBooking(b);
                     setCheckInOpen(true);
                   }}
-                  title="Tiếp nhận xe vào gara"
                 >
-                  <LogIn size={13} className="mr-1" />
+                  <LogIn size={16} />
                   Tiếp nhận
                 </Button>
               )}
@@ -254,37 +220,38 @@ export function BookingsPage() {
                 <>
                   <Button
                     variant="ghost"
-                    className="button-small h-8 w-8 p-0"
-                    title="Dời lịch hẹn"
+                    aria-label={`Dời lịch hẹn ${b.bookingCode}`}
                     onClick={() => {
                       setRescheduleBooking(b);
                       setRescheduleOpen(true);
                     }}
                   >
-                    <CalendarClock size={14} className="text-amber-500" />
+                    <CalendarClock size={16} />
+                    Dời lịch
                   </Button>
 
                   {canManage && b.status === 'CONFIRMED' && (
                     <Button
                       variant="ghost"
-                      className="button-small h-8 w-8 p-0 text-slate-600"
-                      title="Khách không đến (No-show)"
+                      aria-label={`Đánh dấu vắng mặt lịch hẹn ${b.bookingCode}`}
                       onClick={() => setNoShowBooking(b)}
                     >
-                      <UserX size={14} />
+                      <UserX size={16} />
+                      Vắng mặt
                     </Button>
                   )}
 
                   <Button
                     variant="ghost"
-                    className="button-small h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                    title="Hủy lịch hẹn"
+                    className="delete-action"
+                    aria-label={`Hủy lịch hẹn ${b.bookingCode}`}
                     onClick={() => {
                       setCancelBooking(b);
                       setCancelOpen(true);
                     }}
                   >
-                    <CalendarX size={14} />
+                    <CalendarX size={16} />
+                    Hủy
                   </Button>
                 </>
               )}
@@ -297,12 +264,13 @@ export function BookingsPage() {
   );
 
   return (
-    <div className="page-shell">
+    <>
       <PageHeader
+        eyebrow="TIẾP NHẬN & DỊCH VỤ · M05"
         title="Lịch hẹn & Tiếp nhận xe"
-        description="Quản lý lịch hẹn dịch vụ, tiếp nhận xe vào gara, ghi nhận hiện trạng và khởi tạo lệnh sửa chữa."
+        description="Quản lý lịch hẹn dịch vụ, thực hiện quy trình tiếp nhận xe vào xưởng (Check-in) và lập biên bản kiểm tra tình trạng xe."
         actions={
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {canManage && (
               <Button
                 variant="secondary"
@@ -316,55 +284,63 @@ export function BookingsPage() {
               </Button>
             )}
             <Button ref={createTrigger} variant="primary" onClick={() => setEditorOpen(true)}>
-              <Plus size={16} />
+              <Plus size={16} aria-hidden />
               Đặt lịch hẹn mới
             </Button>
           </div>
         }
       />
 
-      <BookingFilters
-        search={search}
-        status={status}
-        onSearchChange={setSearch}
-        onStatusChange={setStatus}
-        onReset={() => {
-          setSearch('');
-          setStatus('ALL');
-        }}
-      />
+      <div className="info-strip">
+        <CalendarCheck size={18} />
+        <span>
+          Quy trình tiếp nhận xe: Đặt hẹn → Xác nhận → Tiếp nhận vào xưởng (TV2-07) → Lập biên bản kiểm tra & đính kèm ảnh (TV2-08, BR16).
+        </span>
+      </div>
 
-      {isLoading ? (
-        <Loading label="Đang tải danh sách lịch hẹn…" />
-      ) : isError ? (
-        <QueryError error={error} retry={() => refetch()} />
-      ) : compact ? (
-        <BookingCards
-          canManage={canManage}
-          bookings={bookings}
-          onConfirm={handleConfirm}
-          onCheckIn={(b) => {
-            setCheckInBooking(b);
-            setCheckInOpen(true);
+      <section className="panel table-panel">
+        <BookingFilters
+          search={search}
+          status={status}
+          onSearchChange={setSearch}
+          onStatusChange={setStatus}
+          onReset={() => {
+            setSearch('');
+            setStatus('ALL');
           }}
-          onReschedule={(b) => {
-            setRescheduleBooking(b);
-            setRescheduleOpen(true);
-          }}
-          onCancel={(b) => {
-            setCancelBooking(b);
-            setCancelOpen(true);
-          }}
-          onNoShow={setNoShowBooking}
-          onVehicleCheck={() => {}}
         />
-      ) : (
-        <DataTable<Booking>
-          columns={columns}
-          data={bookings}
-          caption="Không tìm thấy lịch hẹn nào."
-        />
-      )}
+
+        {isLoading ? (
+          <Loading label="Đang tải danh sách lịch hẹn…" />
+        ) : isError ? (
+          <QueryError error={error} retry={() => refetch()} />
+        ) : compact ? (
+          <BookingCards
+            canManage={canManage}
+            bookings={bookings}
+            onConfirm={handleConfirm}
+            onCheckIn={(b) => {
+              setCheckInBooking(b);
+              setCheckInOpen(true);
+            }}
+            onReschedule={(b) => {
+              setRescheduleBooking(b);
+              setRescheduleOpen(true);
+            }}
+            onCancel={(b) => {
+              setCancelBooking(b);
+              setCancelOpen(true);
+            }}
+            onNoShow={setNoShowBooking}
+          />
+        ) : (
+          <DataTable<Booking>
+            columns={columns}
+            data={bookings}
+            caption="Danh sách lịch hẹn & tiếp nhận"
+          />
+        )}
+      </section>
 
       {editorOpen && <BookingEditor open={editorOpen} onClose={() => setEditorOpen(false)} />}
 
@@ -426,7 +402,7 @@ export function BookingsPage() {
         onConfirm={handleMarkNoShow}
         onCancel={() => setNoShowBooking(null)}
       />
-    </div>
+    </>
   );
 }
 
