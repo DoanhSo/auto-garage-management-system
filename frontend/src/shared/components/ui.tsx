@@ -195,7 +195,7 @@ export function Sheet({
   onClose,
   pending = false,
   onRestoreFocus,
-  placement = 'side',
+  placement = 'center',
 }: {
   open: boolean;
   title: string;
