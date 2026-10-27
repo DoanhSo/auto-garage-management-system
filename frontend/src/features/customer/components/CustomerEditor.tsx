@@ -115,7 +115,7 @@ function CustomerForm({
       >
         <FormError message={generalError ? errorMessage(generalError) : undefined} />
 
-        <div className="form-section-label">THÔNG TIN CƠ BẢN</div>
+        <div className="form-section-label">THÔNG TIN KHÁCH HÀNG</div>
         <Field label="Họ và tên khách hàng" error={errors.fullName?.message} required>
           <input
             {...register('fullName')}
@@ -144,7 +144,7 @@ function CustomerForm({
           </select>
         </Field>
 
-        <Field label="Địa chỉ Email" error={errors.email?.message}>
+        <Field label="Địa chỉ Email" error={errors.email?.message} hint="Không bắt buộc. Xóa nội dung để gỡ email.">
           <input
             {...register('email')}
             type="email"
@@ -154,15 +154,17 @@ function CustomerForm({
           />
         </Field>
 
-        <Field label="Địa chỉ liên hệ / Nơi cư trú" error={errors.address?.message}>
-          <input
-            {...register('address')}
-            type="text"
-            className="input"
-            placeholder="Số nhà, đường phố, quận huyện, tỉnh thành..."
-            disabled={busy}
-          />
-        </Field>
+        <div className="full-width-field">
+          <Field label="Địa chỉ liên hệ / Nơi cư trú" error={errors.address?.message}>
+            <input
+              {...register('address')}
+              type="text"
+              className="input"
+              placeholder="Số nhà, đường phố, quận huyện, tỉnh thành..."
+              disabled={busy}
+            />
+          </Field>
+        </div>
 
         {selectedType === 'BUSINESS' && (
           <>
@@ -283,10 +285,10 @@ export function CustomerEditor({
     [],
   );
 
-  const title = isEditing ? 'Chỉnh sửa hồ sơ khách hàng' : 'Thêm mới khách hàng';
+  const title = isEditing ? 'Chỉnh sửa hồ sơ khách hàng' : 'Thêm khách hàng';
   const description = isEditing
     ? 'Cập nhật thông tin liên hệ, loại hình khách hàng và chính sách công nợ.'
-    : 'Nhập thông tin cá nhân hoặc doanh nghiệp để tạo hồ sơ khách hàng mới.';
+    : 'Cấp quyền và quản lý thông tin khách hàng mới trong hệ thống gara.';
 
   return (
     <Sheet
@@ -298,9 +300,9 @@ export function CustomerEditor({
         else onClose();
       }}
       onRestoreFocus={onRestoreFocus}
-      placement="side"
+      placement="center"
     >
-      {isEditing && detailQuery.isLoading && <Loading label="Đang tải thông tin khách hàng…" />}
+      {isEditing && detailQuery.isLoading && <Loading label="Đang lấy phiên bản mới nhất…" />}
       {isEditing && detailQuery.isError && (
         <QueryError error={detailQuery.error} retry={() => detailQuery.refetch()} />
       )}

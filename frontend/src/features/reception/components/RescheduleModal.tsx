@@ -2,7 +2,7 @@ import { dateTimeInput } from '../../../shared/utils/dates';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError } from '../../../shared/api/errors';
+import { applyFormError, errorMessage } from '../../../shared/api/errors';
 import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
 import type { Booking } from '../../../shared/types/contracts';
 import { useRescheduleBookingMutation } from '../hooks/useReception';
@@ -61,6 +61,8 @@ export function RescheduleModal({
     }
   }
 
+  const generalError = reschedule.error;
+
   return (
     <Sheet
       open={open}
@@ -74,28 +76,33 @@ export function RescheduleModal({
         noValidate
         className="editor-form account-editor-form"
       >
-        <FormError message={errors.root?.server?.message} />
+        <FormError message={generalError ? errorMessage(generalError) : undefined} />
 
-        <Field
-          label="Thời gian hẹn mới *"
-          error={errors.newAppointmentAt?.message}
-          hint="Chọn ngày giờ tiếp nhận mới"
-        >
-          <input
-            type="datetime-local"
-            className="input"
-            disabled={reschedule.isPending}
-            {...register('newAppointmentAt')}
-          />
-        </Field>
+        <div className="form-section-label">THỜI GIAN TIẾP NHẬN MỚI</div>
+
+        <div className="full-width-field">
+          <Field
+            label="Thời gian hẹn mới"
+            required
+            error={errors.newAppointmentAt?.message}
+            hint="Chọn lại ngày và giờ dự kiến tiếp nhận xe vào xưởng"
+          >
+            <input
+              type="datetime-local"
+              className="input"
+              disabled={reschedule.isPending}
+              {...register('newAppointmentAt')}
+            />
+          </Field>
+        </div>
 
         <div className="form-actions account-editor-actions">
-          <Button type="button" variant="ghost" disabled={reschedule.isPending} onClick={onClose}>
+          <Button disabled={reschedule.isPending} onClick={onClose}>
             Hủy
           </Button>
-          <Button type="submit" variant="primary" disabled={reschedule.isPending}>
-            <CalendarClock size={16} className="mr-1" />
-            {reschedule.isPending ? 'Đang cập nhật...' : 'Xác nhận dời lịch'}
+          <Button type="submit" variant="primary" pending={reschedule.isPending}>
+            <CalendarClock size={16} />
+            {reschedule.isPending ? 'Đang cập nhật…' : 'Xác nhận dời lịch'}
           </Button>
         </div>
       </form>

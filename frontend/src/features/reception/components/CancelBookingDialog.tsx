@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError } from '../../../shared/api/errors';
+import { applyFormError, errorMessage } from '../../../shared/api/errors';
 import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
 import type { Booking } from '../../../shared/types/contracts';
 import { useCancelBookingMutation } from '../hooks/useReception';
@@ -53,6 +53,8 @@ export function CancelBookingDialog({
     }
   }
 
+  const generalError = cancel.error;
+
   return (
     <Sheet
       open={open}
@@ -66,33 +68,37 @@ export function CancelBookingDialog({
         noValidate
         className="editor-form account-editor-form"
       >
-        <FormError message={errors.root?.server?.message} />
+        <FormError message={generalError ? errorMessage(generalError) : undefined} />
 
-        <Field
-          label="Lý do hủy lịch hẹn *"
-          error={errors.cancellationReason?.message}
-          hint="Ghi nhận lý do hủy (Khách bận, xe đã sửa nơi khác, hoãn lịch...)"
-        >
-          <textarea
-            className="input min-h-[85px] resize-none"
-            placeholder="Nhập lý do khách hàng hủy hẹn..."
-            disabled={cancel.isPending}
-            {...register('cancellationReason')}
-          />
-        </Field>
+        <div className="form-section-label">LÝ DO HỦY LỊCH HẸN</div>
+
+        <div className="full-width-field">
+          <Field
+            label="Lý do hủy lịch hẹn"
+            required
+            error={errors.cancellationReason?.message}
+            hint="Ghi nhận lý do hủy (Khách bận, đã sửa nơi khác, muốn dời lịch dài hạn...)"
+          >
+            <textarea
+              className="input min-h-[85px] resize-none"
+              placeholder="Nhập lý do khách hàng hủy hẹn..."
+              disabled={cancel.isPending}
+              {...register('cancellationReason')}
+            />
+          </Field>
+        </div>
 
         <div className="form-actions account-editor-actions">
-          <Button type="button" variant="ghost" disabled={cancel.isPending} onClick={onClose}>
+          <Button disabled={cancel.isPending} onClick={onClose}>
             Đóng
           </Button>
           <Button
             type="submit"
-            variant="primary"
-            className="bg-red-600 hover:bg-red-700"
-            disabled={cancel.isPending}
+            variant="danger"
+            pending={cancel.isPending}
           >
-            <CalendarX size={16} className="mr-1" />
-            {cancel.isPending ? 'Đang hủy...' : 'Xác nhận hủy hẹn'}
+            <CalendarX size={16} />
+            {cancel.isPending ? 'Đang hủy…' : 'Xác nhận hủy hẹn'}
           </Button>
         </div>
       </form>

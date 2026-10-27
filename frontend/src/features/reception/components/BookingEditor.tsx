@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError } from '../../../shared/api/errors';
+import { applyFormError, errorMessage } from '../../../shared/api/errors';
 import { Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/components/ui';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -58,11 +58,13 @@ function BookingForm({
   });
 
   useEffect(() => {
-    if (isCustomer && ownProfile.data) setValue('customerId', ownProfile.data.id);
+    if (isCustomer && ownProfile.data?.id) {
+      setValue('customerId', ownProfile.data.id);
+    }
   }, [isCustomer, ownProfile.data, setValue]);
+
   const selectedCustomerId = watch('customerId');
 
-  // Lọc xe theo khách hàng đã chọn
   const customerVehicles = useMemo(() => {
     if (!selectedCustomerId) return [];
     return allVehicles.filter((v) => v.customerId === selectedCustomerId);
@@ -82,9 +84,8 @@ function BookingForm({
   async function onSubmit(values: BookingFormValues) {
     if (busy) return;
     try {
-      // Chuyển đổi định dạng ISO string cho appointmentAt
-      const date = new Date(values.appointmentAt);
-      if (isNaN(date.getTime())) {
+      const appointmentDate = new Date(values.appointmentAt);
+      if (isNaN(appointmentDate.getTime())) {
         setError('appointmentAt', { message: 'Thời gian hẹn không hợp lệ' });
         return;
       }
@@ -92,9 +93,9 @@ function BookingForm({
       await create.mutateAsync({
         customerId: values.customerId,
         vehicleId: values.vehicleId,
+        appointmentAt: appointmentDate.toISOString(),
         serviceId: values.serviceId || null,
         bayId: values.bayId || null,
-        appointmentAt: date.toISOString(),
         requestDescription: values.requestDescription?.trim() || null,
       });
 
@@ -105,6 +106,8 @@ function BookingForm({
     }
   }
 
+  const generalError = create.error;
+
   return (
     <>
       <form
@@ -112,46 +115,50 @@ function BookingForm({
         onSubmit={handleSubmit(onSubmit)}
         noValidate
       >
-        <FormError message={errors.root?.server?.message} />
+        <FormError message={generalError ? errorMessage(generalError) : undefined} />
 
-        <div className="form-section-label">Thông tin khách hàng & Phương tiện</div>
+        <div className="form-section-label">THÔNG TIN KHÁCH HÀNG & PHƯƠNG TIỆN</div>
 
-        <Field
-          label="Khách hàng đặt hẹn"
-          required
-          error={errors.customerId?.message}
-          hint="Chọn khách hàng từ hệ thống"
-        >
-          <select
-            className="select"
-            disabled={isLoadingCustomers || isCustomer}
-            {...register('customerId', {
-              onChange: () => setValue('vehicleId', ''),
-            })}
-          >
-            <option value="">-- Chọn khách hàng --</option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.customerCode ? `[${c.customerCode}] ` : ''}
-                {c.fullName} - {c.phone}
-              </option>
-            ))}
-          </select>
+        <Field label="Khách hàng đặt hẹn" required error={errors.customerId?.message} hint="Chọn hồ sơ khách hàng đã có trên hệ thống">
+          {isCustomer ? (
+            <input
+              type="text"
+              className="input"
+              value={user?.fullName ?? 'Hồ sơ cá nhân của bạn'}
+              disabled
+            />
+          ) : (
+            <select
+              className="select"
+              disabled={isLoadingCustomers || busy}
+              {...register('customerId')}
+            >
+              <option value="">-- Chọn khách hàng --</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.customerCode ? `[${c.customerCode}] ` : ''}
+                  {c.fullName} - {c.phone}
+                </option>
+              ))}
+            </select>
+          )}
         </Field>
 
         <Field
-          label="Phương tiện hẹn sửa chữa"
+          label="Phương tiện dịch vụ"
           required
           error={errors.vehicleId?.message}
           hint={
-            selectedCustomerId && customerVehicles.length === 0
-              ? 'Khách hàng này chưa có xe đăng ký trong hệ thống. Hãy đăng ký xe trước.'
-              : undefined
+            !selectedCustomerId
+              ? 'Vui lòng chọn khách hàng trước'
+              : customerVehicles.length === 0
+                ? 'Khách hàng này chưa có xe đăng ký trên hệ thống'
+                : 'Chọn xe cần bảo dưỡng / sửa chữa'
           }
         >
           <select
             className="select"
-            disabled={isLoadingVehicles || !selectedCustomerId}
+            disabled={!selectedCustomerId || customerVehicles.length === 0 || isLoadingVehicles || busy}
             {...register('vehicleId')}
           >
             <option value="">-- Chọn xe --</option>
@@ -163,43 +170,50 @@ function BookingForm({
           </select>
         </Field>
 
-        <div className="form-section-label">Thời gian & Dịch vụ yêu cầu</div>
+        <div className="form-section-label">THỜI GIAN & HẠNG MỤC DỊCH VỤ</div>
 
         <Field
           label="Thời gian hẹn tiếp nhận"
           required
           error={errors.appointmentAt?.message}
-          hint="Thời gian khách hàng dự kiến đưa xe vào xưởng"
+          hint="Chọn ngày giờ tiếp nhận xe vào gara"
         >
-          <input type="datetime-local" className="input" {...register('appointmentAt')} />
+          <input
+            type="datetime-local"
+            className="input"
+            disabled={busy}
+            {...register('appointmentAt')}
+          />
         </Field>
 
-        <Field label="Hạng mục / Gói dịch vụ đăng ký" error={errors.serviceId?.message}>
-          <select className="select" disabled={isLoadingServices} {...register('serviceId')}>
-            <option value="">-- Khám tổng quát / Chưa xác định dịch vụ cụ thể --</option>
+        <Field label="Dịch vụ yêu cầu chính" error={errors.serviceId?.message} hint="Gói bảo dưỡng hoặc dịch vụ dự kiến">
+          <select className="select" disabled={isLoadingServices || busy} {...register('serviceId')}>
+            <option value="">Khám & Chẩn đoán tổng quát</option>
             {services.map((s) => (
               <option key={s.id} value={s.id}>
-                [{s.serviceCode}] {s.serviceName} ({s.standardMinutes} phút)
+                {s.serviceName} ({s.serviceType === 'PACKAGE' ? 'Gói BD' : 'Lẻ'})
               </option>
             ))}
           </select>
         </Field>
 
-        <Field
-          label="Mô tả hiện tượng / Yêu cầu của khách hàng"
-          error={errors.requestDescription?.message}
-        >
-          <textarea
-            className="input min-h-[80px] resize-none"
-            placeholder="Khách báo xe phát ra tiếng ồn khi tăng tốc, có mùi khét, cần thay nhớt..."
-            {...register('requestDescription')}
-          />
-        </Field>
+        <div className="full-width-field">
+          <Field
+            label="Mô tả hiện tượng / Yêu cầu cụ thể"
+            error={errors.requestDescription?.message}
+            hint="Mô tả rõ yêu cầu của khách hàng hoặc triệu chứng hư hỏng của xe"
+          >
+            <textarea
+              className="input min-h-[75px] resize-none"
+              placeholder="Ví dụ: Xe kêu cọt kẹt khi qua gờ giảm tốc, bảo dưỡng định kỳ mốc 20.000 km..."
+              disabled={busy}
+              {...register('requestDescription')}
+            />
+          </Field>
+        </div>
 
         <div className="form-actions account-editor-actions">
           <Button
-            type="button"
-            variant="ghost"
             disabled={busy}
             onClick={() => {
               if (isDirty) setDiscard(true);
@@ -208,39 +222,40 @@ function BookingForm({
           >
             Hủy
           </Button>
-          <Button type="submit" variant="primary" disabled={busy}>
-            {busy ? 'Đang lưu...' : 'Xác nhận đặt lịch'}
+          <Button type="submit" variant="primary" pending={busy}>
+            {busy ? 'Đang lưu…' : 'Xác nhận đặt lịch'}
           </Button>
         </div>
       </form>
 
       <ConfirmDialog
-        open={discard}
-        title="Hủy đặt lịch hẹn?"
-        description="Dữ liệu lịch hẹn chưa lưu sẽ bị mất nếu bạn đóng biểu mẫu này."
+        open={discard || blocker.state === 'blocked'}
+        title="Bỏ thay đổi chưa lưu?"
+        description="Nội dung lịch hẹn chưa lưu sẽ bị xóa nếu bạn đóng biểu mẫu này."
         confirmLabel="Bỏ thay đổi"
-        danger
         onConfirm={() => {
           setDiscard(false);
-          onSaved();
+          if (blocker.state === 'blocked') blocker.proceed?.();
+          else onSaved();
         }}
-        onCancel={() => setDiscard(false)}
-      />
-
-      <ConfirmDialog
-        open={blocker.state === 'blocked'}
-        title="Rời khỏi trang?"
-        description="Bạn có thay đổi chưa lưu trên biểu mẫu đặt lịch hẹn."
-        confirmLabel="Rời đi"
-        danger
-        onConfirm={() => blocker.proceed?.()}
-        onCancel={() => blocker.reset?.()}
+        onCancel={() => {
+          setDiscard(false);
+          blocker.reset?.();
+        }}
       />
     </>
   );
 }
 
-export function BookingEditor({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function BookingEditor({
+  open,
+  onClose,
+  onRestoreFocus,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onRestoreFocus?: () => void;
+}) {
   const [closeHandler, setCloseHandler] = useState<(() => void) | null>(null);
   const registerCloseHandler = useCallback(
     (handler: () => void) => setCloseHandler(() => handler),
@@ -254,9 +269,10 @@ export function BookingEditor({ open, onClose }: { open: boolean; onClose: () =>
         if (closeHandler) closeHandler();
         else onClose();
       }}
+      onRestoreFocus={onRestoreFocus}
       title="Đặt lịch hẹn dịch vụ mới"
       description="Ghi nhận lịch hẹn bảo dưỡng, sửa chữa cho khách hàng và phân bổ khoang dự kiến."
-      placement="side"
+      placement="center"
     >
       <BookingForm onSaved={onClose} onRequestClose={registerCloseHandler} />
     </Sheet>

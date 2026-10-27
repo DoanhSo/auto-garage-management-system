@@ -1100,6 +1100,8 @@ select.input {
 .account-editor-form > .checkbox-field,
 .account-editor-form > .alert,
 .account-editor-form > .conflict-panel,
+.account-editor-form > .info-strip,
+.account-editor-form > .full-width-field,
 .account-editor-actions {
   grid-column: 1 / -1;
 }

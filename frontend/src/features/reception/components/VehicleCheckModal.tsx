@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError } from '../../../shared/api/errors';
+import { applyFormError, errorMessage } from '../../../shared/api/errors';
 import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
 import { useRecordVehicleCheckMutation, useUploadAttachmentMutation } from '../hooks/useReception';
 import { vehicleCheckFormSchema, type VehicleCheckFormValues } from '../schemas/receptionSchema';
@@ -61,27 +61,25 @@ export function VehicleCheckModal({
         warningLights: values.warningLights?.trim() || 'Không có đèn báo lỗi',
       };
 
-      const checkResponse = await recordCheck.mutateAsync({
+      const checkRecord = await recordCheck.mutateAsync({
         repairOrderId: values.repairOrderId,
         checkType: values.checkType,
+        odometer: Number(values.odometer) || null,
         checklistJson: JSON.stringify(checklistObj),
-        odometer: Number.isFinite(values.odometer) ? Number(values.odometer) : null,
         notes: values.notes?.trim() || null,
       });
 
-      // Nếu có tệp đính kèm, upload từng tệp (BR16)
       if (selectedFiles.length > 0) {
         for (const file of selectedFiles) {
           const formData = new FormData();
           formData.append('file', file);
-          formData.append('repairOrderId', values.repairOrderId);
-          formData.append('vehicleCheckId', checkResponse.id);
-          formData.append('category', values.checkType);
+          formData.append('vehicleCheckId', checkRecord.id);
+          formData.append('attachmentType', 'CHECK_PHOTO');
           await uploadAttachment.mutateAsync(formData);
         }
       }
 
-      notify('Ghi nhận biên bản kiểm tra xe thành công');
+      notify('Lập biên bản kiểm tra tình trạng xe thành công');
       reset();
       setSelectedFiles([]);
       onClose();
@@ -93,45 +91,49 @@ export function VehicleCheckModal({
   }
 
   const busy = recordCheck.isPending || isUploading;
+  const generalError = recordCheck.error || uploadAttachment.error;
 
   return (
     <Sheet
       open={open}
       onClose={onClose}
       placement="center"
-      title={`Biên bản kiểm tra xe ${orderCode ? '#' + orderCode : ''}`}
-      description="Kiểm tra hiện trạng ngoại thất, nội thất, đèn báo và chụp ảnh bằng chứng ban đầu."
+      title={`Biên bản kiểm tra xe ${orderCode ? `#${orderCode}` : ''}`}
+      description="Ghi nhận hiện trạng ngoại thất, nội thất, đèn cảnh báo và ảnh chụp bằng chứng (BR16)."
     >
       <form
         onSubmit={handleSubmit(onSubmit)}
         noValidate
         className="editor-form account-editor-form"
       >
-        <FormError message={errors.root?.server?.message} />
+        <FormError message={generalError ? errorMessage(generalError) : undefined} />
 
-        <div className="form-row-2">
-          <Field label="Loại biên bản kiểm tra" required error={errors.checkType?.message}>
-            <select className="select" disabled={busy} {...register('checkType')}>
-              <option value="CHECK_IN">Kiểm tra tiếp nhận ban đầu (Check-in)</option>
-              <option value="HANDOVER">Kiểm tra bàn giao xe khách (Handover)</option>
-            </select>
-          </Field>
+        <div className="form-section-label">THÔNG SỐ & LOẠI KIỂM TRA</div>
 
-          <Field label="Số ODO kiểm tra" error={errors.odometer?.message}>
-            <input
-              type="number"
-              className="input"
-              min={0}
-              placeholder="15000"
-              disabled={busy}
-              {...register('odometer')}
-            />
-          </Field>
-        </div>
+        <Field label="Loại kiểm tra" required error={errors.checkType?.message}>
+          <select className="select" disabled={busy} {...register('checkType')}>
+            <option value="CHECK_IN">Kiểm tra tiếp nhận (Check-in)</option>
+            <option value="CHECK_OUT">Kiểm tra xuất xưởng (Check-out)</option>
+            <option value="PERIODIC">Kiểm định định kỳ</option>
+          </select>
+        </Field>
+
+        <Field label="Số ODO kiểm tra (km)" error={errors.odometer?.message} hint="Số km tại thời điểm bàn giao kiểm tra">
+          <input
+            type="number"
+            className="input"
+            min={0}
+            placeholder="15000"
+            disabled={busy}
+            {...register('odometer')}
+          />
+        </Field>
+
+        <div className="form-section-label">TÌNH TRẠNG HIỆN TRƯỜNG PHƯƠNG TIỆN</div>
 
         <Field
           label="Tình trạng ngoại thất (Vết trầy xước, móp méo)"
-          hint="Ví dụ: Xước nhẹ cản sau bên phụ, móp nhẹ vè cua lốp trước..."
+          hint="Ví dụ: Xước nhẹ cản sau bên phụ, móp nhẹ vè cua lốp..."
         >
           <input
             type="text"
@@ -156,7 +158,7 @@ export function VehicleCheckModal({
         </Field>
 
         <Field
-          label="Đèn cảnh báo trên bảng taplo"
+          label="Đèn cảnh báo trên bảng táp-lô"
           hint="Kiểm tra các đèn Check Engine, ABS, Túi khí, Áp suất lốp..."
         >
           <input
@@ -168,41 +170,47 @@ export function VehicleCheckModal({
           />
         </Field>
 
-        <Field label="Ghi chú tổng kết của người kiểm tra" error={errors.notes?.message}>
-          <textarea
-            className="input min-h-[70px] resize-none"
-            placeholder="Ghi chú thêm về tiếng ồn bất thường, rò rỉ dung dịch dưới gầm..."
+        <Field label="Ghi chú tổng kết của người kiểm tra" error={errors.notes?.message} hint="Ghi chú thêm về tiếng ồn bất thường, rò rỉ dung dịch...">
+          <input
+            type="text"
+            className="input"
+            placeholder="Ghi chú kết luận..."
             disabled={busy}
             {...register('notes')}
           />
         </Field>
 
-        <div className="p-3 border border-dashed border-border rounded-lg bg-muted/30 space-y-2">
-          <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 cursor-pointer">
-            <Upload size={14} className="text-primary" />
-            <span>Tải lên ảnh chụp hiện trạng / Biên bản giấy (BR16)</span>
+        <div className="full-width-field">
+          <div className="info-strip" style={{ marginBottom: 8 }}>
+            <Upload size={18} />
+            <span>
+              <strong>Tải lên ảnh chụp hiện trạng / Biên bản giấy (BR16):</strong> Hình ảnh được băm SHA-256 chống giả mạo và lưu trữ an toàn cùng lệnh sửa chữa.
+            </span>
+          </div>
+
+          <label className="button button-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <Upload size={16} />
+            <span>Chọn tệp ảnh hoặc PDF</span>
             <input
               type="file"
               multiple
               accept="image/jpeg,image/png,image/webp,application/pdf"
-              className="hidden"
+              className="sr-only"
               onChange={handleFileChange}
               disabled={busy}
             />
           </label>
-          <p className="text-[11px] text-muted-foreground">
-            Chấp nhận định dạng: JPG, PNG, WEBP, PDF. Ảnh chụp hiện trạng sẽ tự động lưu trữ bảo mật
-            và gắn với lệnh sửa chữa.
-          </p>
+
           {selectedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
               {selectedFiles.map((f, idx) => (
                 <span
                   key={idx}
-                  className="inline-flex items-center gap-1 text-xs bg-card px-2 py-0.5 rounded border border-border"
+                  className="badge badge-neutral"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
                 >
-                  <Image size={11} className="text-primary" />
-                  <span className="truncate max-w-[150px]">{f.name}</span>
+                  <Image size={13} />
+                  <span>{f.name}</span>
                 </span>
               ))}
             </div>
@@ -210,12 +218,12 @@ export function VehicleCheckModal({
         </div>
 
         <div className="form-actions account-editor-actions">
-          <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
+          <Button disabled={busy} onClick={onClose}>
             Hủy
           </Button>
-          <Button type="submit" variant="primary" disabled={busy}>
-            <ClipboardCheck size={16} className="mr-1" />
-            {busy ? 'Đang lưu biên bản...' : 'Lưu biên bản kiểm tra'}
+          <Button type="submit" variant="primary" pending={busy}>
+            <ClipboardCheck size={16} />
+            {busy ? 'Đang lưu biên bản…' : 'Lưu biên bản kiểm tra'}
           </Button>
         </div>
       </form>

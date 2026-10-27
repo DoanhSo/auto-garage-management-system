@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError } from '../../../shared/api/errors';
+import { applyFormError, errorMessage } from '../../../shared/api/errors';
 import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
 import type { Vehicle } from '../../../shared/types/contracts';
 import { useCustomersQuery } from '../../customer/hooks/useCustomers';
@@ -11,7 +11,7 @@ import {
   transferOwnershipSchema,
   type TransferOwnershipFormValues,
 } from '../schemas/vehicleSchema';
-import { AlertTriangle } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 
 export function TransferOwnershipDialog({
   vehicle,
@@ -73,6 +73,8 @@ export function TransferOwnershipDialog({
     }
   }
 
+  const generalError = transfer.error;
+
   return (
     <Sheet
       open={open}
@@ -86,16 +88,16 @@ export function TransferOwnershipDialog({
         noValidate
         className="editor-form account-editor-form"
       >
-        <FormError message={errors.root?.server?.message} />
+        <FormError message={generalError ? errorMessage(generalError) : undefined} />
 
-        <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
-          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-          <div>
-            <strong>Quy tắc bảo mật lịch sử (UC05/BR04):</strong> Lịch sử sửa chữa kỹ thuật trước
-            đây vẫn được lưu trữ trên phương tiện, nhưng toàn bộ dữ liệu tài chính (chi phí dịch vụ)
-            của chủ cũ sẽ tự động ẩn đối với chủ xe mới.
-          </div>
+        <div className="info-strip">
+          <ShieldAlert size={18} />
+          <span>
+            <strong>Quy tắc bảo mật lịch sử (BR04):</strong> Lịch sử sửa chữa kỹ thuật trước đây vẫn được lưu trữ trên phương tiện, nhưng toàn bộ dữ liệu tài chính của chủ cũ sẽ tự động ẩn đối với chủ mới.
+          </span>
         </div>
+
+        <div className="form-section-label">THÔNG TIN CHUYỂN NHƯỢNG SỞ HỮU</div>
 
         <Field label="Chủ sở hữu hiện tại">
           <input
@@ -110,7 +112,7 @@ export function TransferOwnershipDialog({
           label="Chủ sở hữu mới"
           required
           error={errors.newCustomerId?.message}
-          hint="Chọn khách hàng tiếp nhận quyền sở hữu phương tiện"
+          hint="Chọn khách hàng tiếp nhận quyền sở hữu"
         >
           <select
             className="select"
@@ -142,21 +144,22 @@ export function TransferOwnershipDialog({
           />
         </Field>
 
-        <Field label="Ghi chú chuyển nhượng" error={errors.transferNote?.message}>
-          <textarea
-            className="input min-h-[70px] resize-none"
-            placeholder="Nhập lý do chuyển nhượng, số hợp đồng mua bán hoặc giấy tờ liên quan..."
+        <Field label="Ghi chú chuyển nhượng" error={errors.transferNote?.message} hint="Số hợp đồng mua bán hoặc giấy tờ liên quan">
+          <input
+            type="text"
+            className="input"
+            placeholder="Số HĐ mua bán, ủy quyền..."
             disabled={transfer.isPending}
             {...register('transferNote')}
           />
         </Field>
 
         <div className="form-actions account-editor-actions">
-          <Button type="button" variant="ghost" disabled={transfer.isPending} onClick={onClose}>
+          <Button disabled={transfer.isPending} onClick={onClose}>
             Hủy
           </Button>
-          <Button type="submit" variant="primary" disabled={transfer.isPending}>
-            {transfer.isPending ? 'Đang chuyển giao...' : 'Xác nhận chuyển nhượng'}
+          <Button variant="primary" type="submit" pending={transfer.isPending}>
+            {transfer.isPending ? 'Đang chuyển giao…' : 'Xác nhận chuyển nhượng'}
           </Button>
         </div>
       </form>
