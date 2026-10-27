@@ -194,6 +194,8 @@ export function Sheet({
   pending = false,
   onRestoreFocus,
   placement = 'side',
+  size,
+  className,
 }: {
   open: boolean;
   title: string;
@@ -203,6 +205,8 @@ export function Sheet({
   pending?: boolean;
   onRestoreFocus?: () => void;
   placement?: 'side' | 'center';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
 }) {
   return (
     <Dialog.Root
@@ -214,7 +218,7 @@ export function Sheet({
       <Dialog.Portal>
         <Dialog.Overlay className="overlay" />
         <Dialog.Content
-          className={`sheet ${placement === 'center' ? 'centered-dialog' : ''}`}
+          className={`sheet ${placement === 'center' ? 'centered-dialog' : ''} ${size ? `sheet-${size}` : ''} ${className ?? ''}`.trim()}
           onCloseAutoFocus={(event) => {
             if (onRestoreFocus) {
               event.preventDefault();

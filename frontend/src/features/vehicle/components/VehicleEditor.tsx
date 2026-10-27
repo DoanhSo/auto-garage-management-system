@@ -116,7 +116,7 @@ function VehicleForm({
   return (
     <>
       <form
-        className="editor-form account-editor-form"
+        className="editor-form account-editor-form grid-3col"
         onSubmit={handleSubmit(onSubmit)}
         noValidate
       >
@@ -124,93 +124,102 @@ function VehicleForm({
 
         <div className="form-section-label">THÔNG TIN SỞ HỮU & ĐỊNH DANH</div>
 
-        <Field
-          label="Chủ sở hữu phương tiện"
-          required={!existing}
-          error={errors.customerId?.message}
-          hint={
-            existing
-              ? 'Chủ xe được cố định. Để đổi chủ, hãy dùng tính năng Đổi chủ.'
-              : 'Chọn khách hàng đứng tên chủ xe'
-          }
-        >
-          {existing ? (
-            <input
-              type="text"
-              className="input"
-              value={`${existing.customerName} (${existing.customerPhone})`}
-              disabled
-            />
-          ) : (
-            <select className="select" disabled={isLoadingCustomers || busy} {...register('customerId')}>
-              <option value="">-- Chọn khách hàng chủ xe --</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.customerCode ? `[${c.customerCode}] ` : ''}
-                  {c.fullName} - {c.phone}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
+        <div className="col-span-2">
+          <Field
+            label="Chủ sở hữu phương tiện"
+            required={!existing}
+            error={errors.customerId?.message}
+            hint={
+              existing
+                ? 'Chủ xe cố định. Để đổi chủ, hãy dùng tính năng Đổi chủ.'
+                : undefined
+            }
+          >
+            {existing ? (
+              <input
+                type="text"
+                className="input"
+                value={`${existing.customerName} (${existing.customerPhone})`}
+                disabled
+              />
+            ) : (
+              <select className="select" disabled={isLoadingCustomers || busy} {...register('customerId')}>
+                <option value="">-- Chọn khách hàng chủ xe --</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.customerCode ? `[${c.customerCode}] ` : ''}
+                    {c.fullName} - {c.phone}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
+        </div>
 
         <Field
           label="Biển số xe"
           required={!existing}
           error={errors.licensePlate?.message}
-          hint={
-            existing
-              ? 'Biển số xe cố định sau khi đăng ký'
-              : 'Ví dụ: 30A-12345, 51K-99999'
-          }
         >
           <input
             type="text"
             className="input"
-            placeholder="30A-12345"
+            placeholder="Ví dụ: 30A-12345, 51K-99999"
             disabled={Boolean(existing) || busy}
             {...register('licensePlate')}
           />
         </Field>
 
-        <Field label="Số khung (VIN)" error={errors.vin?.message} hint="17 ký tự chuẩn quốc tế (không bắt buộc)">
+        <Field label="Số khung (VIN)" error={errors.vin?.message}>
           <input
             type="text"
             className="input"
-            placeholder="1HGCR2F83HA000000"
+            placeholder="17 ký tự chuẩn quốc tế"
             disabled={busy}
             maxLength={17}
             {...register('vin')}
           />
         </Field>
 
-        <Field label="Số máy (Engine No)" error={errors.engineNumber?.message} hint="Số hiệu động cơ trên đăng kiểm">
+        <Field label="Số máy (Engine No)" error={errors.engineNumber?.message}>
           <input
             type="text"
             className="input"
-            placeholder="2AR-FE-1234567"
+            placeholder="Số hiệu động cơ trên đăng kiểm"
             disabled={busy}
             {...register('engineNumber')}
           />
         </Field>
 
+        <Field
+          label="Hạn đăng kiểm tiếp theo"
+          error={errors.inspectionDueDate?.message}
+        >
+          <input
+            type="date"
+            className="input"
+            disabled={busy}
+            {...register('inspectionDueDate')}
+          />
+        </Field>
+
         <div className="form-section-label">THÔNG SỐ KỸ THUẬT PHƯƠNG TIỆN</div>
 
-        <Field label="Hãng sản xuất" required error={errors.brand?.message} hint="Toyota, Honda, Mazda, Hyundai, Kia, VinFast...">
+        <Field label="Hãng sản xuất" required error={errors.brand?.message}>
           <input
             type="text"
             className="input"
-            placeholder="Toyota"
+            placeholder="Toyota, Honda, Mazda, Hyundai, VinFast..."
             disabled={busy}
             {...register('brand')}
           />
         </Field>
 
-        <Field label="Dòng xe (Model)" required error={errors.model?.message} hint="Camry, Civic, CX-5, SantaFe, VF8...">
+        <Field label="Dòng xe (Model)" required error={errors.model?.message}>
           <input
             type="text"
             className="input"
-            placeholder="Camry 2.5Q"
+            placeholder="Camry, Civic, CX-5, VF8..."
             disabled={busy}
             {...register('model')}
           />
@@ -220,7 +229,7 @@ function VehicleForm({
           <input
             type="number"
             className="input"
-            placeholder="2022"
+            placeholder="Ví dụ: 2022"
             min="1990"
             max={new Date().getFullYear() + 1}
             disabled={busy}
@@ -253,32 +262,17 @@ function VehicleForm({
           label="Số ODO hiện tại (km)"
           required
           error={errors.odometer?.message}
-          hint="Số km công-tơ-mét ghi nhận thực tế"
         >
           <input
             type="number"
             className="input"
+            placeholder="Số km công-tơ-mét thực tế"
             min="0"
             step="100"
             disabled={busy}
             {...register('odometer')}
           />
         </Field>
-
-        <div className="full-width-field">
-          <Field
-            label="Hạn đăng kiểm tiếp theo"
-            error={errors.inspectionDueDate?.message}
-            hint="Ngày hết hạn trên tem đăng kiểm dán kính lái"
-          >
-            <input
-              type="date"
-              className="input"
-              disabled={busy}
-              {...register('inspectionDueDate')}
-            />
-          </Field>
-        </div>
 
         <div className="form-actions account-editor-actions">
           <Button
@@ -357,6 +351,7 @@ export function VehicleEditor({
       title={title}
       description={description}
       placement="center"
+      size="lg"
     >
       {isEditing && detail.isLoading ? (
         <Loading label="Đang lấy phiên bản mới nhất…" />

@@ -1085,6 +1085,12 @@ select.input {
   box-shadow: 0 18px 70px #15233929;
   animation: none;
 }
+.sheet.centered-dialog.sheet-lg {
+  width: min(1000px, calc(100vw - 32px));
+}
+.sheet.centered-dialog.sheet-xl {
+  width: min(1140px, calc(100vw - 32px));
+}
 .centered-dialog .sheet-header {
   position: static;
   padding: 20px 24px 16px;
@@ -1095,6 +1101,23 @@ select.input {
   gap: 12px 22px;
   padding: 18px 24px 20px;
   flex: none;
+}
+.centered-dialog .account-editor-form.grid-3col {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 20px;
+  padding: 16px 24px 20px;
+}
+.account-editor-form.grid-3col .col-span-2 {
+  grid-column: span 2;
+}
+@media (max-width: 860px) {
+  .centered-dialog .account-editor-form.grid-3col {
+    grid-template-columns: 1fr;
+    gap: 10px 14px;
+  }
+  .account-editor-form.grid-3col .col-span-2 {
+    grid-column: auto;
+  }
 }
 .account-editor-form > .form-section-label,
 .account-editor-form > .checkbox-field,
