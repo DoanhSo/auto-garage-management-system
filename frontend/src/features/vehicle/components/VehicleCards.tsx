@@ -5,7 +5,6 @@ import {
   ArrowRightLeft,
   SquarePen,
   Trash2,
-  User,
   Fuel,
 } from 'lucide-react';
 import type { Vehicle } from '../../../shared/types/contracts';

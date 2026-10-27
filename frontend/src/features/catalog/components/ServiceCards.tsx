@@ -67,23 +67,34 @@ export function ServiceCards({
                 </div>
               )}
 
-              {isPackage && (
+              {isPackage && (s.intervalKm || s.intervalMonths) && (
                 <div className="info-row">
                   <RotateCw size={14} aria-hidden />
                   <span>
-                    Chu kỳ: {s.periodKm?.toLocaleString('vi-VN')} km hoặc {s.periodMonths} tháng
+                    Chu kỳ:{' '}
+                    {s.intervalKm ? `${s.intervalKm.toLocaleString('vi-VN')} km` : ''}
+                    {s.intervalKm && s.intervalMonths ? ' hoặc ' : ''}
+                    {s.intervalMonths ? `${s.intervalMonths} tháng` : ''}
                   </span>
                 </div>
               )}
 
-              {s.warrantyMonths ? (
+              {(s.warrantyDays > 0 || s.warrantyKm > 0) && (
                 <div className="info-row">
                   <ShieldCheck size={14} aria-hidden />
-                  <span>Bảo hành: {s.warrantyMonths} tháng</span>
+                  <span>
+                    Bảo hành: {s.warrantyDays > 0 ? `${s.warrantyDays} ngày` : ''}
+                    {s.warrantyDays > 0 && s.warrantyKm > 0 ? ' / ' : ''}
+                    {s.warrantyKm > 0 ? `${s.warrantyKm.toLocaleString('vi-VN')} km` : ''}
+                  </span>
                 </div>
-              ) : null}
+              )}
 
-              {s.description && <p className="muted" style={{ marginTop: 4 }}>{s.description}</p>}
+              {s.description && (
+                <p className="muted" style={{ marginTop: 4 }}>
+                  {s.description}
+                </p>
+              )}
             </div>
 
             <div className="user-card-bottom">
