@@ -298,7 +298,7 @@ export function CustomerEditor({
         else onClose();
       }}
       onRestoreFocus={onRestoreFocus}
-      placement="side"
+      placement="center"
     >
       {isEditing && detailQuery.isLoading && <Loading label="Đang tải thông tin khách hàng…" />}
       {isEditing && detailQuery.isError && (
