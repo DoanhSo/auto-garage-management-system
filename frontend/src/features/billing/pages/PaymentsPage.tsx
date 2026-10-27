@@ -1,13 +1,55 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  DollarSign,
+  Plus,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { useToast } from '../../../app/providers/ToastProvider';
+import {
+  Badge,
+  Button,
+  Field,
+  Loading,
+  Modal,
+  PageHeader,
+} from '../../../shared/components/ui';
+import { DataTable } from '../../../shared/components/DataTable';
+import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
+import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
+import { errorMessage } from '../../../shared/api/errors';
 import { usePaymentsQuery, usePaySupplierMutation } from '../hooks/useBilling';
 import { useSuppliersQuery, useDocumentsQuery } from '../../inventory/hooks/useInventory';
-import type { PaymentDirection, PaymentMethod, SupplierPaymentInput } from '../types/billing';
-import { Button, Field, Modal, Badge, Loading } from '../../../shared/components/ui';
-import { DollarSign, Plus, Search, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import type {
+  Payment,
+  PaymentDirection,
+  PaymentMethod,
+  SupplierPaymentInput,
+} from '../types/billing';
+
+const sortOptions = [
+  ['id:desc', 'Mã giao dịch · Mới nhất'],
+  ['id:asc', 'Mã giao dịch · Cũ nhất'],
+  ['paidAt:desc', 'Ngày thu chi · Mới nhất'],
+  ['paidAt:asc', 'Ngày thu chi · Cũ nhất'],
+  ['amount:desc', 'Số tiền · Cao nhất'],
+  ['amount:asc', 'Số tiền · Thấp nhất'],
+];
 
 export function PaymentsPage() {
-  const [direction, setDirection] = useState<PaymentDirection | ''>('');
+  const compact = useMediaQuery('(max-width: 640px)');
+  const notify = useToast();
+
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
+  const [direction, setDirection] = useState<PaymentDirection | ''>('');
+  const [sortField, setSortField] = useState('id');
+  const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(0);
 
   // Modal Chi trả NCC
@@ -19,6 +61,8 @@ export function PaymentsPage() {
   const [payReference, setPayReference] = useState('');
   const [payNotes, setPayNotes] = useState('');
 
+  const createTrigger = useRef<HTMLButtonElement>(null);
+
   const { data: suppliersData } = useSuppliersQuery({ size: 100, active: true });
   const suppliers = suppliersData?.content || [];
 
@@ -29,20 +73,34 @@ export function PaymentsPage() {
   });
   const supplierDocuments = documentsData?.content || [];
 
-  const { data, isLoading } = usePaymentsQuery({
+  const { data, isLoading, isFetching } = usePaymentsQuery({
     direction: direction || undefined,
-    query: query || undefined,
+    query: debouncedQuery.trim() || undefined,
     page,
     size: 20,
-    sortBy: 'id',
-    sortDir: 'desc',
+    sortBy: sortField,
+    sortDir,
   });
 
   const paySupplierMutation = usePaySupplierMutation();
 
+  const filterCount = (query.trim() ? 1 : 0) + (direction !== '' ? 1 : 0);
+  const isFiltered = query.length > 0 || direction !== '' || sortField !== 'id' || sortDir !== 'desc';
+
+  const handleResetFilters = () => {
+    setQuery('');
+    setDirection('');
+    setSortField('id');
+    setSortDir('desc');
+    setPage(0);
+  };
+
   const handlePaySupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDocumentId || payAmount <= 0) return;
+    if (!selectedDocumentId || payAmount <= 0) {
+      notify('Vui lòng chọn chứng từ nhập kho và nhập số tiền thanh toán hợp lệ.');
+      return;
+    }
 
     const payload: SupplierPaymentInput = {
       inventoryDocumentId: Number(selectedDocumentId),
@@ -52,14 +110,18 @@ export function PaymentsPage() {
       notes: payNotes || undefined,
     };
 
-    await paySupplierMutation.mutateAsync(payload);
-    setPayingSupplier(false);
-    // Reset form
-    setSelectedSupplierId('');
-    setSelectedDocumentId('');
-    setPayAmount(0);
-    setPayReference('');
-    setPayNotes('');
+    try {
+      await paySupplierMutation.mutateAsync(payload);
+      notify(`Đã lập phiếu chi trả ${payAmount.toLocaleString('vi-VN')} đ cho nhà cung cấp.`);
+      setPayingSupplier(false);
+      setSelectedSupplierId('');
+      setSelectedDocumentId('');
+      setPayAmount(0);
+      setPayReference('');
+      setPayNotes('');
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Lập phiếu chi thất bại.');
+    }
   };
 
   const renderMethodBadge = (method: PaymentMethod) => {
@@ -75,177 +137,357 @@ export function PaymentsPage() {
     }
   };
 
-  return (
-    <div className="page-container p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <DollarSign className="text-blue-600" size={28} />
-            Sổ Quỹ & Giao dịch Thu / Chi (UC24)
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Quản lý dòng tiền vào (thu tiền hóa đơn khách) và dòng tiền ra (chi trả tiền nhập hàng
-            NCC)
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          onClick={() => setPayingSupplier(true)}
-          className="flex items-center gap-1.5"
-        >
-          <Plus size={16} />
-          Lập phiếu chi trả NCC
-        </Button>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Tìm theo mã phiếu, mã tham chiếu..."
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(0);
-            }}
-            className="w-full pl-9 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <select
-          value={direction}
-          onChange={(e) => {
-            setDirection(e.target.value as typeof direction);
-            setPage(0);
-          }}
-          className="border rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Tất cả giao dịch (Thu & Chi)</option>
-          <option value="IN">Dòng tiền VÀO - Thu tiền khách (IN)</option>
-          <option value="OUT">Dòng tiền RA - Chi trả NCC (OUT)</option>
-        </select>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {isLoading ? (
-          <div className="py-12 flex justify-center">
-            <Loading />
-          </div>
-        ) : !data?.content || data.content.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <DollarSign size={48} className="mx-auto text-gray-300 mb-2" />
-            <p>Không có giao dịch thanh toán nào</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase">
-                  <th className="py-3 px-4">Mã giao dịch</th>
-                  <th className="py-3 px-4">Loại giao dịch</th>
-                  <th className="py-3 px-4">Đối tượng & Chứng từ liên quan</th>
-                  <th className="py-3 px-4">Hình thức</th>
-                  <th className="py-3 px-4 text-right">Số tiền (VNĐ)</th>
-                  <th className="py-3 px-4">Mã tham chiếu ngân hàng</th>
-                  <th className="py-3 px-4">Ngày giao dịch</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
-                {data.content.map((pay) => (
-                  <tr key={pay.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="py-3 px-4 font-mono font-medium text-gray-900">
-                      {pay.transactionCode}
-                    </td>
-                    <td className="py-3 px-4">
-                      {pay.direction === 'IN' ? (
-                        <Badge variant="success" className="inline-flex items-center gap-1">
-                          <ArrowDownLeft size={12} /> Thu tiền khách
-                        </Badge>
-                      ) : (
-                        <Badge variant="danger" className="inline-flex items-center gap-1">
-                          <ArrowUpRight size={12} /> Chi trả NCC
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-gray-700">
-                      {pay.invoiceCode && (
-                        <div>
-                          Hóa đơn: <span className="font-mono font-medium">{pay.invoiceCode}</span>
-                        </div>
-                      )}
-                      {pay.documentCode && (
-                        <div>
-                          Phiếu kho:{' '}
-                          <span className="font-mono font-medium">{pay.documentCode}</span>
-                        </div>
-                      )}
-                      {pay.notes && <div className="text-xs text-gray-400">{pay.notes}</div>}
-                    </td>
-                    <td className="py-3 px-4">{renderMethodBadge(pay.paymentMethod)}</td>
-                    <td className="py-3 px-4 text-right font-bold">
-                      <span className={pay.direction === 'IN' ? 'text-green-600' : 'text-red-600'}>
-                        {pay.direction === 'IN' ? '+' : '-'}
-                        {Number(pay.amount).toLocaleString('vi-VN')}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-xs text-gray-500">
-                      {pay.providerReference || '—'}
-                    </td>
-                    <td className="py-3 px-4 text-gray-500 text-xs">
-                      {new Date(pay.paidAt).toLocaleDateString('vi-VN')}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Pagination */}
-        {data && data.totalPages > 1 && (
-          <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-t border-gray-100">
-            <span className="text-xs text-gray-500">
-              Trang {page + 1} / {data.totalPages} (Tổng {data.totalElements} giao dịch)
+  const columns = useMemo<ColumnDef<Payment>[]>(
+    () => [
+      {
+        id: 'transaction',
+        header: 'Giao dịch',
+        cell: ({ row }) => {
+          const isIncome = row.original.direction === 'IN';
+          return (
+            <div className="account-cell">
+              <span
+                className="avatar"
+                style={{
+                  background: isIncome ? '#ecfdf5' : '#fff1f2',
+                  color: isIncome ? '#059669' : '#b42335',
+                  fontWeight: 700,
+                }}
+              >
+                {isIncome ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+              </span>
+              <div>
+                <strong style={{ color: '#172338', fontFamily: 'monospace' }}>
+                  {row.original.transactionCode}
+                </strong>
+                <div style={{ marginTop: '2px' }}>
+                  <Badge variant={isIncome ? 'success' : 'danger'}>
+                    {isIncome ? 'Thu tiền (IN)' : 'Chi tiền (OUT)'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'reference',
+        header: 'Tham chiếu chứng từ',
+        cell: ({ row }) => {
+          const p = row.original;
+          return (
+            <div style={{ fontSize: '13px' }}>
+              {p.invoiceCode && (
+                <div style={{ fontWeight: 600, color: '#245bdb' }}>HĐ: {p.invoiceCode}</div>
+              )}
+              {p.documentCode && (
+                <div style={{ fontWeight: 600, color: '#36485f' }}>Phiếu kho: {p.documentCode}</div>
+              )}
+              {p.providerReference && (
+                <div className="muted font-mono" style={{ fontSize: '11px' }}>
+                  Mã GD: {p.providerReference}
+                </div>
+              )}
+              {!p.invoiceCode && !p.documentCode && <span className="muted">—</span>}
+            </div>
+          );
+        },
+      },
+      {
+        id: 'amount',
+        header: 'Số tiền (VNĐ)',
+        cell: ({ row }) => {
+          const isIncome = row.original.direction === 'IN';
+          return (
+            <span
+              style={{
+                fontSize: '14px',
+                fontWeight: 700,
+                color: isIncome ? '#059669' : '#b42335',
+              }}
+            >
+              {isIncome ? '+' : '-'}{Number(row.original.amount).toLocaleString('vi-VN')} đ
             </span>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                disabled={page === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
+          );
+        },
+      },
+      {
+        accessorKey: 'paymentMethod',
+        header: 'Phương thức',
+        cell: ({ row }) => renderMethodBadge(row.original.paymentMethod),
+      },
+      {
+        accessorKey: 'paidAt',
+        header: 'Thời gian',
+        cell: ({ row }) => (
+          <span className="muted" style={{ fontSize: '12px' }}>
+            {new Date(row.original.paidAt).toLocaleDateString('vi-VN', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'notes',
+        header: 'Ghi chú / Người lập',
+        cell: ({ row }) => (
+          <div style={{ fontSize: '12px' }}>
+            <div style={{ color: '#172338' }}>{row.original.notes || '—'}</div>
+            {row.original.recordedByName && (
+              <div className="muted" style={{ fontSize: '11px' }}>
+                Bởi: {row.original.recordedByName}
+              </div>
+            )}
+          </div>
+        ),
+      },
+    ],
+    [],
+  );
+
+  const paymentsList = data?.content || [];
+  const totalElements = data?.totalElements || 0;
+  const totalPages = data?.totalPages || 1;
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="QUẢN LÝ TÀI CHÍNH & THANH TOÁN"
+        title="Sổ quỹ Thu / Chi"
+        description="Nhật ký giao dịch thu tiền khách hàng và thanh toán tiền hàng nhà cung cấp."
+        actions={
+          <Button
+            variant="primary"
+            ref={createTrigger}
+            onClick={() => setPayingSupplier(true)}
+          >
+            <Plus size={18} />
+            <span>Lập phiếu chi trả NCC</span>
+          </Button>
+        }
+      />
+
+      <div className="info-strip">
+        <DollarSign size={18} />
+        <span>
+          Mọi giao dịch thu tiền (IN) và chi trả (OUT) đều phát sinh mã giao dịch duy nhất bất biến và khóa tham chiếu chứng từ tương ứng, chống thanh toán vượt hoặc lặp giao dịch.
+        </span>
+      </div>
+
+      <section className="panel table-panel">
+        {/* Bộ lọc sổ quỹ */}
+        <div className="user-filters" role="search" aria-label="Bộ lọc sổ quỹ">
+          <div className="user-filters-heading">
+            <div>
+              <SlidersHorizontal size={16} aria-hidden />
+              <h2>Bộ lọc sổ quỹ</h2>
+              {filterCount > 0 && <span className="filter-count">{filterCount} đang áp dụng</span>}
+            </div>
+            <Button
+              variant="ghost"
+              className="filter-reset"
+              disabled={!isFiltered}
+              onClick={handleResetFilters}
+            >
+              <RotateCcw size={14} />
+              Đặt lại
+            </Button>
+          </div>
+
+          <div
+            className="user-filter-grid"
+            style={{
+              gridTemplateColumns: 'minmax(220px, 1.4fr) minmax(280px, 1.4fr) minmax(200px, 1fr)',
+            }}
+          >
+            {/* Ô tìm kiếm */}
+            <div className="user-filter-field">
+              <label htmlFor="pay-search-input">Tìm kiếm</label>
+              <div className="user-search">
+                <Search size={17} aria-hidden />
+                <input
+                  id="pay-search-input"
+                  className="input"
+                  placeholder="Nhập mã giao dịch, số tham chiếu..."
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setPage(0);
+                  }}
+                />
+                {query && (
+                  <button
+                    type="button"
+                    className="search-clear"
+                    aria-label="Xóa từ khóa tìm kiếm"
+                    onClick={() => {
+                      setQuery('');
+                      setPage(0);
+                    }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Dòng tiền Segments */}
+            <fieldset className="user-filter-field status-filter">
+              <legend>Dòng tiền</legend>
+              <div className="status-segments">
+                {[
+                  { value: '', label: 'Tất cả' },
+                  { value: 'IN', label: 'Thu tiền (IN)' },
+                  { value: 'OUT', label: 'Chi trả (OUT)' },
+                ].map((opt) => (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    className={direction === opt.value ? 'selected' : ''}
+                    onClick={() => {
+                      setDirection(opt.value as PaymentDirection | '');
+                      setPage(0);
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            {/* Sắp xếp */}
+            <div className="user-filter-field">
+              <label htmlFor="pay-sort-select">Sắp xếp theo</label>
+              <select
+                id="pay-sort-select"
+                className="input"
+                value={`${sortField}:${sortDir}`}
+                onChange={(e) => {
+                  const [f, d] = e.target.value.split(':');
+                  setSortField(f);
+                  setSortDir(d);
+                  setPage(0);
+                }}
               >
-                Trước
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={page >= data.totalPages - 1}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Sau
-              </Button>
+                {sortOptions.map(([val, label]) => (
+                  <option key={val} value={val}>
+                    {label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Modal Lập Phiếu Chi Trả NCC */}
+        {/* Nội dung bảng */}
+        {isLoading ? (
+          <Loading label="Đang tải dữ liệu sổ quỹ…" />
+        ) : compact ? (
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {paymentsList.map((p) => {
+              const isIncome = p.direction === 'IN';
+              return (
+                <div
+                  key={p.id}
+                  style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: '10px',
+                    padding: '14px',
+                    background: 'white',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <strong style={{ fontSize: '15px', fontFamily: 'monospace' }}>{p.transactionCode}</strong>
+                      <div className="muted" style={{ fontSize: '12px' }}>{p.invoiceCode || p.documentCode}</div>
+                    </div>
+                    <Badge variant={isIncome ? 'success' : 'danger'}>
+                      {isIncome ? '+ Thu tiền' : '- Chi tiền'}
+                    </Badge>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span
+                      style={{
+                        fontSize: '16px',
+                        fontWeight: 700,
+                        color: isIncome ? '#059669' : '#b42335',
+                      }}
+                    >
+                      {Number(p.amount).toLocaleString('vi-VN')} đ
+                    </span>
+                    {renderMethodBadge(p.paymentMethod)}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', paddingTop: '6px', borderTop: '1px solid #f0f2f5' }}>
+                    <span>{new Date(p.paidAt).toLocaleString('vi-VN')}</span>
+                    <span>{p.recordedByName || ''}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <DataTable
+            caption="Sổ quỹ và nhật ký thanh toán"
+            columns={columns}
+            data={paymentsList}
+            busy={isFetching}
+          />
+        )}
+
+        {/* Phân trang */}
+        <div className="pagination" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="pagination-info">
+            Hiển thị <strong>{paymentsList.length > 0 ? 1 : 0}–{paymentsList.length}</strong> trong <strong>{totalElements}</strong> kết quả
+            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>Trang {page + 1} / {totalPages}</span>
+          </div>
+          <div className="pagination-controls">
+            <Button
+              variant="secondary"
+              disabled={page === 0 || isFetching}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Trang trước
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={page >= totalPages - 1 || isFetching}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Trang sau
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Modal Lập phiếu chi trả NCC */}
       <Modal
         open={payingSupplier}
-        onOpenChange={(open: boolean) => !open && setPayingSupplier(false)}
-        title="Lập Phiếu Chi Tiền Trả Nhà Cung Cấp"
+        onOpenChange={setPayingSupplier}
+        title="Lập phiếu chi trả nhà cung cấp"
+        description="Thanh toán tiền hàng cho đối tác cung ứng dựa trên chứng từ nhập kho đã ghi sổ."
       >
-        <form onSubmit={handlePaySupplier} className="space-y-4">
-          <Field label="Nhà cung cấp nhận thanh toán" required>
+        <form onSubmit={handlePaySupplier} className="modal-form">
+          <div className="form-section-label">THÔNG TIN THANH TOÁN</div>
+
+          <Field label="Nhà cung cấp" required>
             <select
+              className="input"
               value={selectedSupplierId}
-              onChange={(e) => setSelectedSupplierId(e.target.value)}
+              onChange={(e) => {
+                setSelectedSupplierId(e.target.value);
+                setSelectedDocumentId('');
+              }}
               required
-              className="w-full border rounded-lg px-3 py-2 bg-white"
+              autoFocus
             >
-              <option value="">-- Chọn nhà cung cấp --</option>
+              <option value="">Chọn nhà cung cấp</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.supplierName} ({s.supplierCode})
@@ -254,79 +496,79 @@ export function PaymentsPage() {
             </select>
           </Field>
 
-          {selectedSupplierId && (
-            <Field label="Gán vào phiếu nhập kho" required>
-              <select
-                value={selectedDocumentId}
-                onChange={(e) => setSelectedDocumentId(e.target.value)}
-                required
-                className="w-full border rounded-lg px-3 py-2 bg-white"
-              >
-                <option value="">-- Chọn phiếu nhập kho --</option>
-                {supplierDocuments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.documentCode} - {Number(d.totalAmount).toLocaleString('vi-VN')} VNĐ
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
+          <Field label="Chứng từ nhập kho cần thanh toán" required>
+            <select
+              className="input"
+              value={selectedDocumentId}
+              onChange={(e) => {
+                setSelectedDocumentId(e.target.value);
+                const doc = supplierDocuments.find((d) => String(d.id) === e.target.value);
+                if (doc) setPayAmount(Number(doc.totalAmount || 0));
+              }}
+              required
+              disabled={!selectedSupplierId}
+            >
+              <option value="">Chọn chứng từ nhập kho (POSTED)</option>
+              {supplierDocuments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.documentCode} · {Number(d.totalAmount).toLocaleString('vi-VN')} đ
+                </option>
+              ))}
+            </select>
+          </Field>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Số tiền chi (VNĐ)" required>
-              <input
-                type="number"
-                min="1000"
-                value={payAmount}
-                onChange={(e) => setPayAmount(Number(e.target.value))}
-                required
-                className="w-full border rounded-lg px-3 py-2 font-bold text-lg text-red-600"
-              />
-            </Field>
-
-            <Field label="Phương thức chi" required>
-              <select
-                value={payMethod}
-                onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
-                className="w-full border rounded-lg px-3 py-2 bg-white"
-              >
-                <option value="BANK_TRANSFER">Chuyển khoản công ty</option>
-                <option value="CASH">Tiền mặt tại quỹ</option>
-                <option value="CARD">Thẻ công ty</option>
-                <option value="VIETQR">Mã VietQR</option>
-              </select>
-            </Field>
-          </div>
-
-          <Field label="Mã giao dịch ngân hàng / Uỷ nhiệm chi">
+          <Field label="Số tiền chi trả (VNĐ)" required>
             <input
+              type="number"
+              min="1"
+              step="1000"
+              value={payAmount}
+              onChange={(e) => setPayAmount(Number(e.target.value))}
+              className="input font-bold"
+              required
+            />
+          </Field>
+
+          <Field label="Phương thức thanh toán" required>
+            <select
+              className="input"
+              value={payMethod}
+              onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
+            >
+              <option value="BANK_TRANSFER">Chuyển khoản ngân hàng</option>
+              <option value="CASH">Tiền mặt</option>
+              <option value="VIETQR">Quét mã VietQR</option>
+            </select>
+          </Field>
+
+          <Field label="Mã giao dịch ngân hàng / Ủy nhiệm chi" hint="Bắt buộc nếu chuyển khoản">
+            <input
+              className="input font-mono"
+              placeholder="VD: FT2629810239"
               value={payReference}
               onChange={(e) => setPayReference(e.target.value)}
-              placeholder="VD: UNC-20241022-091"
-              className="w-full border rounded-lg px-3 py-2"
             />
           </Field>
 
-          <Field label="Ghi chú chi tiền">
-            <textarea
+          <Field label="Ghi chú phiếu chi">
+            <input
+              className="input"
+              placeholder="Thanh toán tiền phụ tùng theo hợp đồng..."
               value={payNotes}
               onChange={(e) => setPayNotes(e.target.value)}
-              rows={2}
-              placeholder="Nội dung thanh toán..."
-              className="w-full border rounded-lg px-3 py-2"
             />
           </Field>
 
-          <div className="flex justify-end gap-3 pt-3">
-            <Button variant="ghost" onClick={() => setPayingSupplier(false)}>
+          <div className="modal-form-actions">
+            <Button variant="secondary" onClick={() => setPayingSupplier(false)} disabled={paySupplierMutation.isPending}>
               Hủy
             </Button>
             <Button variant="primary" type="submit" pending={paySupplierMutation.isPending}>
-              Xác nhận chi tiền
+              Xác nhận chi trả
             </Button>
           </div>
         </form>
       </Modal>
-    </div>
+    </>
   );
 }
