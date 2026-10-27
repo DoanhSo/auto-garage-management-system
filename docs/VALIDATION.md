@@ -1,5 +1,70 @@
 # Kết quả kiểm chứng backend TV1 — 15/10/2026
 
+## Username riêng khi đăng ký — 27/10/2026
+
+Form đăng ký có họ tên, username, email, mật khẩu và xác nhận. Username bắt buộc
+theo `SecurityConstants.USERNAME_PATTERN` (3–100 ký tự ASCII/chấm/gạch dưới/gạch
+ngang), chuẩn hóa chữ thường trước khi tạo CUSTOMER trong Keycloak. Frontend
+dùng schema username chung với màn quản lý tài khoản. API không tự dùng email
+thay username nữa; tài khoản cũ không bị đổi tên hoặc reset. Không thay schema DB.
+
+Maven package: **375 tests**, 0 failure/error/skip; frontend lint, **91 tests**,
+TypeScript và Vite build đạt. Kiểm tra thêm validation username thiếu/sai/quá dài,
+normalization, payload allowlist và lỗi field từ backend.
+
+Trình duyệt thật trên project Docker riêng `autogarage-username-check`/DB mới:
+đăng ký username viết hoa được chuẩn hóa, tự đăng nhập CUSTOMER; đăng nhập lại
+bằng username và email cùng trả về một identity, reload giữ phiên. Username trùng
+với email mới và email trùng với username mới đều trả 409. Không tạo dữ liệu kiểm
+thử trong database cổng 3000. Form hai cột ở 1440×900 và 1280×768 (vừa viewport),
+một cột ở 390×844; không tràn ngang/cuộn nội bộ. Test stack được dọn sau kiểm tra.
+Root Docker và gói phát hành cập nhật tag `2026.10.27.4`.
+
+## Giữ phiên khi refresh trang — 27/10/2026
+
+Nguyên nhân: AuthProvider chỉ giữ token trong memory và không có bước khôi phục
+trước router. Repro Chromium trước sửa: `/admin/reports -> /login` sau reload.
+Đã thêm session bridge HttpOnly cookie, kiểm tra JWT/subject/Origin, giữ API
+nghiệp vụ Bearer-only. Frontend chờ refresh cookie và `/auth/me`, không lưu token
+vào localStorage/sessionStorage. Marker logout không chứa secret ngăn phiên
+sống lại sau logout mất mạng. Không thay schema/migration hoặc reset tài khoản.
+
+Maven package: **373 tests**, 0 failure/error/skip, gồm 8 test HTTP session mới.
+Frontend `npm run check`: lint, **89 tests**, TypeScript và Vite build đạt.
+Regression kiểm tra bootstrap, StrictMode không xoay hai lần, 503/retry, expired
+cookie, identity bị thu hồi, logout mất mạng và refresh đang chờ khi logout.
+
+Chromium với Docker thật: repro cũ đã xanh; reload 5 lần liên tiếp giữ nguyên
+route/query, cookie HttpOnly/SameSite Strict được xoay, storage không có token.
+Giả lập 503 khi reload giữ route, Thử lại khôi phục thành công. DELETE session
+xóa cookie; reload sau đó yêu cầu đăng nhập. Container backend/frontend tag
+`2026.10.27.3` healthy, gói Docker đã xuất lại cùng image được kiểm tra. Sau nâng
+cấp từ bản memory-only, cần đăng nhập một lần để tạo cookie mới.
+
+## Cập nhật đăng nhập/đăng ký trắng–xanh — 27/10/2026
+
+Hai trang dùng chung `AuthLayout` và CSS auth, nền sáng/form trắng/nút xanh;
+ảnh gara nằm trong panel phụ trên desktop. Đăng ký chia hai cột, về một cột ở
+mobile. Trạng thái tải/lỗi policy giữ cùng layout. Đã bỏ CSS cinematic cũ.
+`npm run check`: lint, 83 test, TypeScript và Vite build đạt. Kiểm tra Chromium
+ở chiều rộng 1440/768/390/320 px: không tràn ngang, không có cuộn nội bộ form,
+validation hiển thị đúng. Kiểm tra thêm thứ tự Tab, hiện/ẩn mật khẩu, lỗi policy
+503 và retry thành công, viewport thấp 1280×620. Container frontend đã rebuild,
+healthy; HTML tại localhost:3000 khớp build mới. Gói ZIP phát hành trước đó chưa
+được xuất lại trong lần cập nhật này.
+
+## Giao diện đăng nhập hai cột — 27/10/2026
+
+Trang đăng nhập dùng ảnh JPG do người dùng cung cấp làm nền bên trái và form bên
+phải. Lớp phủ tối giữ chữ dễ đọc; ảnh chuyển lên trên form khi dùng điện thoại.
+Trang đăng ký giữ bố cục cũ.
+`npm run check`: lint, 83 test, TypeScript và Vite build đạt. Kiểm tra Chromium
+thực tế tại 1440×960 và 390×844; đăng nhập quản trị thành công qua form tại cổng
+3000. Image frontend được build mới với tag `2026.10.27.2`; backend cùng tag tái
+sử dụng nguyên image đã kiểm thử trước đó, không thay đổi Java/schema. Cả hai
+container đã cập nhật và healthy. Credential chỉ cập nhật trong môi trường local,
+không đưa vào source hoặc gói Docker chia sẻ.
+
 ## Form đăng nhập/đăng ký trong AutoGarage — 26/10/2026
 
 Theo luồng cuối cùng được yêu cầu, người dùng nhập username hoặc email và mật

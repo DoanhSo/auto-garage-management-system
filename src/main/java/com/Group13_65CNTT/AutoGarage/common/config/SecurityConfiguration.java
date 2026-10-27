@@ -53,8 +53,7 @@ public class SecurityConfiguration {
         KeycloakJwtAuthenticationConverter authentication =
                 new KeycloakJwtAuthenticationConverter();
         http.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .csrf(csrf -> csrf.disable()) // Authorization: Bearer only; no session/cookie
-                // authentication
+                .csrf(csrf -> csrf.disable()) // APIs use Bearer; cookie bridge enforces Origin + SameSite Strict.
                 .cors(Customizer.withDefaults())
                 .httpBasic(b -> b.disable())
                 .formLogin(f -> f.disable())
@@ -71,6 +70,10 @@ public class SecurityConfiguration {
                             a.requestMatchers(HttpMethod.GET, ApiPaths.UI_POLICY)
                                     .permitAll()
                                     .requestMatchers(HttpMethod.POST, ApiPaths.REGISTRATION)
+                                    .permitAll()
+                                    .requestMatchers(HttpMethod.POST, ApiPaths.BROWSER_SESSION_REFRESH)
+                                    .permitAll()
+                                    .requestMatchers(HttpMethod.DELETE, ApiPaths.BROWSER_SESSION)
                                     .permitAll()
                                     .requestMatchers(ApiPaths.AUTH_WILDCARD)
                                     .authenticated()
@@ -243,6 +246,10 @@ public class SecurityConfiguration {
         cors.setAllowCredentials(false);
         cors.setMaxAge(properties.corsMaxAge().toSeconds());
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration browserSessionCors = new CorsConfiguration(cors);
+        browserSessionCors.setAllowCredentials(true);
+        source.registerCorsConfiguration(ApiPaths.BROWSER_SESSION, browserSessionCors);
+        source.registerCorsConfiguration(ApiPaths.BROWSER_SESSION_WILDCARD, browserSessionCors);
         source.registerCorsConfiguration(ApiPaths.API_CORS_PATTERN, cors);
         return source;
     }

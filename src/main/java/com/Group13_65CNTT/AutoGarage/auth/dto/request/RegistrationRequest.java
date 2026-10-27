@@ -4,6 +4,7 @@ import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.util.PasswordPolicy;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,6 +12,11 @@ import lombok.Setter;
 @Getter
 @Setter
 public class RegistrationRequest {
+    @NotBlank(message = "Username is required")
+    @Pattern(regexp = SecurityConstants.USERNAME_PATTERN,
+            message = "Username requires 3-100 ASCII letters, digits, dots, underscores or hyphens")
+    private String username;
+
     @NotBlank(message = "Full name is required")
     @Size(max = SecurityConstants.FULL_NAME_MAX_LENGTH, message = "Full name is too long")
     private String fullName;

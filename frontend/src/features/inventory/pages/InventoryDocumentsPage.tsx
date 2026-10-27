@@ -1,4 +1,33 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CheckCircle2,
+  Eye,
+  FileText,
+  Plus,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  X,
+  XCircle,
+} from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { useToast } from '../../../app/providers/ToastProvider';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  Field,
+  Loading,
+  Modal,
+  PageHeader,
+} from '../../../shared/components/ui';
+import { DataTable } from '../../../shared/components/DataTable';
+import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
+import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
+import { errorMessage } from '../../../shared/api/errors';
 import {
   useDocumentsQuery,
   useCreateDocumentMutation,
@@ -14,28 +43,32 @@ import type {
   DocumentType,
   DocumentStatus,
 } from '../types/inventory';
-import { Button, Field, Modal, ConfirmModal, Badge, Loading } from '../../../shared/components/ui';
-import {
-  FileText,
-  Plus,
-  CheckCircle,
-  XCircle,
-  Eye,
-  Trash2,
-  ArrowDownLeft,
-  ArrowUpRight,
-  RotateCcw,
-  Sliders,
-} from 'lucide-react';
+
+const sortOptions = [
+  ['id:desc', 'Mã chứng từ · Mới nhất'],
+  ['id:asc', 'Mã chứng từ · Cũ nhất'],
+  ['createdAt:desc', 'Ngày tạo · Mới nhất'],
+  ['createdAt:asc', 'Ngày tạo · Cũ nhất'],
+  ['totalAmount:desc', 'Tổng tiền · Cao nhất'],
+  ['totalAmount:asc', 'Tổng tiền · Thấp nhất'],
+];
 
 export function InventoryDocumentsPage() {
+  const compact = useMediaQuery('(max-width: 640px)');
+  const notify = useToast();
+
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
   const [selectedType, setSelectedType] = useState<DocumentType | ''>('');
   const [selectedStatus, setSelectedStatus] = useState<DocumentStatus | ''>('');
+  const [sortField, setSortField] = useState('id');
+  const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(0);
+
   const [viewingDoc, setViewingDoc] = useState<InventoryDocument | null>(null);
   const [creating, setCreating] = useState(false);
-  const [postingId, setPostingId] = useState<string | number | null>(null);
-  const [cancellingId, setCancellingId] = useState<string | number | null>(null);
+  const [postingDoc, setPostingDoc] = useState<InventoryDocument | null>(null);
+  const [cancellingDoc, setCancellingDoc] = useState<InventoryDocument | null>(null);
 
   // Form states for creating document
   const [docType, setDocType] = useState<DocumentType>('IN');
@@ -47,30 +80,55 @@ export function InventoryDocumentsPage() {
     { partId: 0, quantity: 1, unitCost: 0, notes: '' },
   ]);
 
+  const createTrigger = useRef<HTMLButtonElement>(null);
+
   const { data: suppliersData } = useSuppliersQuery({ size: 100, active: true });
   const suppliers = suppliersData?.content || [];
 
   const { data: partsData } = usePartsQuery({ size: 200, active: true });
   const parts = partsData?.content || [];
 
-  const { data, isLoading } = useDocumentsQuery({
+  const { data, isLoading, isFetching } = useDocumentsQuery({
     type: selectedType || undefined,
     status: selectedStatus || undefined,
+    query: debouncedQuery.trim() || undefined,
     page,
     size: 20,
-    sortBy: 'id',
-    sortDir: 'desc',
+    sortBy: sortField,
+    sortDir,
   });
 
   const createMutation = useCreateDocumentMutation();
   const postMutation = usePostDocumentMutation();
   const cancelMutation = useCancelDocumentMutation();
 
+  const filterCount =
+    (query.trim() ? 1 : 0) +
+    (selectedType !== '' ? 1 : 0) +
+    (selectedStatus !== '' ? 1 : 0);
+
+  const isFiltered =
+    query.length > 0 ||
+    selectedType !== '' ||
+    selectedStatus !== '' ||
+    sortField !== 'id' ||
+    sortDir !== 'desc';
+
+  const handleResetFilters = () => {
+    setQuery('');
+    setSelectedType('');
+    setSelectedStatus('');
+    setSortField('id');
+    setSortDir('desc');
+    setPage(0);
+  };
+
   const handleAddLine = () => {
     setLines([...lines, { partId: 0, quantity: 1, unitCost: 0, notes: '' }]);
   };
 
   const handleRemoveLine = (idx: number) => {
+    if (lines.length <= 1) return;
     setLines(lines.filter((_, i) => i !== idx));
   };
 
@@ -84,7 +142,7 @@ export function InventoryDocumentsPage() {
     if (field === 'partId') {
       const selectedPart = parts.find((p) => p.id === String(value));
       if (selectedPart) {
-        updated[idx].unitCost = selectedPart.purchasePrice;
+        updated[idx].unitCost = Number(selectedPart.purchasePrice || 0);
       }
     }
     setLines(updated);
@@ -92,6 +150,11 @@ export function InventoryDocumentsPage() {
 
   const handleCreateDocument = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (lines.some((l) => !l.partId || Number(l.quantity) <= 0)) {
+      notify('Vui lòng chọn phụ tùng và nhập số lượng lớn hơn 0 cho tất cả các dòng.');
+      return;
+    }
+
     const payload: InventoryDocumentCreateInput = {
       documentType: docType,
       supplierId: docType === 'IN' && supplierId ? Number(supplierId) : undefined,
@@ -107,24 +170,38 @@ export function InventoryDocumentsPage() {
       })),
     };
 
-    await createMutation.mutateAsync(payload);
-    setCreating(false);
-    // Reset form
-    setLines([{ partId: 0, quantity: 1, unitCost: 0, notes: '' }]);
-    setReferenceNumber('');
-    setNotes('');
+    try {
+      await createMutation.mutateAsync(payload);
+      notify('Đã tạo chứng từ kho ở trạng thái Bản nháp (DRAFT).');
+      setCreating(false);
+      setLines([{ partId: 0, quantity: 1, unitCost: 0, notes: '' }]);
+      setReferenceNumber('');
+      setNotes('');
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Lỗi khi tạo chứng từ kho.');
+    }
   };
 
   const handlePost = async () => {
-    if (!postingId) return;
-    await postMutation.mutateAsync({ id: postingId });
-    setPostingId(null);
+    if (!postingDoc) return;
+    try {
+      await postMutation.mutateAsync({ id: postingDoc.id });
+      notify(`Đã ghi sổ chứng từ ${postingDoc.documentCode} thành công. Tồn kho đã được cập nhật.`);
+      setPostingDoc(null);
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Ghi sổ chứng từ thất bại.');
+    }
   };
 
   const handleCancel = async () => {
-    if (!cancellingId) return;
-    await cancelMutation.mutateAsync(cancellingId);
-    setCancellingId(null);
+    if (!cancellingDoc) return;
+    try {
+      await cancelMutation.mutateAsync(cancellingDoc.id);
+      notify(`Đã hủy chứng từ ${cancellingDoc.documentCode}.`);
+      setCancellingDoc(null);
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Hủy chứng từ thất bại.');
+    }
   };
 
   const renderTypeBadge = (type: DocumentType) => {
@@ -132,13 +209,13 @@ export function InventoryDocumentsPage() {
       case 'IN':
         return (
           <Badge variant="primary" className="flex items-center gap-1">
-            <ArrowDownLeft size={12} /> Nhập kho
+            <ArrowDownLeft size={12} /> Nhập mua
           </Badge>
         );
       case 'OUT':
         return (
           <Badge variant="warning" className="flex items-center gap-1">
-            <ArrowUpRight size={12} /> Xuất kho
+            <ArrowUpRight size={12} /> Xuất sửa chữa
           </Badge>
         );
       case 'RETURN':
@@ -148,11 +225,9 @@ export function InventoryDocumentsPage() {
           </Badge>
         );
       case 'ADJUSTMENT':
-        return (
-          <Badge variant="outline" className="flex items-center gap-1">
-            <Sliders size={12} /> Kiểm kê / Điều chỉnh
-          </Badge>
-        );
+        return <Badge variant="outline">Điều chỉnh</Badge>;
+      case 'OPENING':
+        return <Badge variant="secondary">Tồn đầu kỳ</Badge>;
     }
   };
 
@@ -161,377 +236,640 @@ export function InventoryDocumentsPage() {
       case 'DRAFT':
         return <Badge variant="secondary">Bản nháp</Badge>;
       case 'POSTED':
-        return <Badge variant="success">Đã ghi sổ</Badge>;
+        return (
+          <Badge variant="success" className="flex items-center gap-1">
+            <CheckCircle2 size={12} /> Đã ghi sổ
+          </Badge>
+        );
       case 'CANCELLED':
-        return <Badge variant="danger">Đã hủy</Badge>;
+        return (
+          <Badge variant="danger" className="flex items-center gap-1">
+            <XCircle size={12} /> Đã hủy
+          </Badge>
+        );
     }
   };
 
-  return (
-    <div className="page-container p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <FileText className="text-blue-600" size={28} />
-            Chứng từ Kho & Nhập / Xuất phụ tùng
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Quản lý phiếu nhập kho, phiếu xuất phụ tùng sửa chữa và kiểm kê kho
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          onClick={() => setCreating(true)}
-          className="flex items-center gap-1.5"
-        >
-          <Plus size={16} />
-          Tạo phiếu kho mới
-        </Button>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center">
-        <select
-          value={selectedType}
-          onChange={(e) => {
-            setSelectedType(e.target.value as typeof selectedType);
-            setPage(0);
-          }}
-          className="border rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Tất cả loại chứng từ</option>
-          <option value="IN">Phiếu Nhập kho (IN)</option>
-          <option value="OUT">Phiếu Xuất kho (OUT)</option>
-          <option value="RETURN">Phiếu Trả hàng (RETURN)</option>
-          <option value="ADJUSTMENT">Phiếu Kiểm kê (ADJUSTMENT)</option>
-        </select>
-
-        <select
-          value={selectedStatus}
-          onChange={(e) => {
-            setSelectedStatus(e.target.value as typeof selectedStatus);
-            setPage(0);
-          }}
-          className="border rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="DRAFT">Bản nháp (DRAFT)</option>
-          <option value="POSTED">Đã ghi sổ (POSTED)</option>
-          <option value="CANCELLED">Đã hủy (CANCELLED)</option>
-        </select>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {isLoading ? (
-          <div className="py-12 flex justify-center">
-            <Loading />
-          </div>
-        ) : !data?.content || data.content.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <FileText size={48} className="mx-auto text-gray-300 mb-2" />
-            <p>Không có chứng từ nào</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase">
-                  <th className="py-3 px-4">Số chứng từ</th>
-                  <th className="py-3 px-4">Loại phiếu</th>
-                  <th className="py-3 px-4">Đối tác / Đơn liên quan</th>
-                  <th className="py-3 px-4 text-right">Tổng tiền (VNĐ)</th>
-                  <th className="py-3 px-4 text-center">Trạng thái</th>
-                  <th className="py-3 px-4">Ngày tạo</th>
-                  <th className="py-3 px-4 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
-                {data.content.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="py-3 px-4 font-mono font-medium text-gray-900">
-                      {doc.documentCode}
-                    </td>
-                    <td className="py-3 px-4">{renderTypeBadge(doc.documentType)}</td>
-                    <td className="py-3 px-4 text-gray-700">
-                      {doc.supplierName && <div>NCC: {doc.supplierName}</div>}
-                      {doc.repairOrderId && <div>Lệnh sửa chữa: #{doc.repairOrderId}</div>}
-                      {doc.supplierInvoiceNumber && (
-                        <div className="text-xs text-gray-400">
-                          Số HĐ/Tham chiếu: {doc.supplierInvoiceNumber}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right font-medium text-blue-600">
-                      {Number(doc.totalAmount || 0).toLocaleString('vi-VN')}
-                    </td>
-                    <td className="py-3 px-4 text-center">{renderStatusBadge(doc.status)}</td>
-                    <td className="py-3 px-4 text-gray-500 text-xs">
-                      {new Date(doc.createdAt).toLocaleDateString('vi-VN')}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex justify-end items-center gap-1.5">
-                        <button
-                          onClick={() => setViewingDoc(doc)}
-                          className="p-1.5 text-gray-500 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                          title="Xem chi tiết"
-                        >
-                          <Eye size={16} />
-                        </button>
-                        {doc.status === 'DRAFT' && (
-                          <>
-                            <button
-                              onClick={() => setPostingId(doc.id)}
-                              className="p-1.5 text-green-600 hover:text-green-700 rounded-lg hover:bg-green-50 transition-colors"
-                              title="Ghi sổ kho"
-                            >
-                              <CheckCircle size={16} />
-                            </button>
-                            <button
-                              onClick={() => setCancellingId(doc.id)}
-                              className="p-1.5 text-red-500 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                              title="Hủy phiếu"
-                            >
-                              <XCircle size={16} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Pagination */}
-        {data && data.totalPages > 1 && (
-          <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-t border-gray-100">
-            <span className="text-xs text-gray-500">
-              Trang {page + 1} / {data.totalPages} (Tổng {data.totalElements} chứng từ)
+  const columns = useMemo<ColumnDef<InventoryDocument>[]>(
+    () => [
+      {
+        id: 'document',
+        header: 'Chứng từ kho',
+        cell: ({ row }) => (
+          <div className="account-cell">
+            <span
+              className="avatar"
+              style={{
+                background: '#edf3ff',
+                color: '#245bdb',
+                fontWeight: 700,
+              }}
+            >
+              <FileText size={16} />
             </span>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                disabled={page === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                Trước
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={page >= data.totalPages - 1}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Sau
-              </Button>
+            <div>
+              <strong style={{ color: '#172338', fontFamily: 'monospace' }}>
+                {row.original.documentCode}
+              </strong>
+              <div style={{ marginTop: '2px' }}>{renderTypeBadge(row.original.documentType)}</div>
             </div>
           </div>
-        )}
+        ),
+      },
+      {
+        id: 'reference',
+        header: 'Đối tác / Tham chiếu',
+        cell: ({ row }) => {
+          const doc = row.original;
+          return (
+            <div style={{ fontSize: '13px' }}>
+              {doc.supplierName && (
+                <div style={{ fontWeight: 600, color: '#172338' }}>{doc.supplierName}</div>
+              )}
+              {doc.repairOrderId && (
+                <div style={{ fontWeight: 600, color: '#245bdb' }}>Phiếu: #{doc.repairOrderId}</div>
+              )}
+              {doc.supplierInvoiceNumber && (
+                <div className="muted" style={{ fontSize: '12px' }}>
+                  HĐ số: {doc.supplierInvoiceNumber}
+                </div>
+              )}
+              {!doc.supplierName && !doc.repairOrderId && !doc.supplierInvoiceNumber && (
+                <span className="muted">—</span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        id: 'quantityAndAmount',
+        header: 'Số lượng & Giá trị',
+        cell: ({ row }) => (
+          <div style={{ fontSize: '13px' }}>
+            <div style={{ fontWeight: 650, color: '#172338' }}>
+              {Number(row.original.totalAmount || 0).toLocaleString('vi-VN')} đ
+            </div>
+            <div className="muted" style={{ fontSize: '11px' }}>
+              {row.original.items?.length || 0} mặt hàng
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'status',
+        header: 'Trạng thái',
+        cell: ({ row }) => renderStatusBadge(row.original.status),
+      },
+      {
+        accessorKey: 'createdAt',
+        header: 'Ngày lập',
+        cell: ({ row }) => (
+          <span className="muted" style={{ fontSize: '12px' }}>
+            {new Date(row.original.createdAt).toLocaleDateString('vi-VN', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: 'Thao tác',
+        cell: ({ row }) => {
+          const doc = row.original;
+          return (
+            <div className="row-actions">
+              <Button
+                variant="ghost"
+                aria-label={`Xem chi tiết ${doc.documentCode}`}
+                onClick={() => setViewingDoc(doc)}
+              >
+                <Eye size={16} />
+                <span>Xem</span>
+              </Button>
+              {doc.status === 'DRAFT' && (
+                <>
+                  <Button
+                    variant="ghost"
+                    aria-label={`Ghi sổ chứng từ ${doc.documentCode}`}
+                    onClick={() => setPostingDoc(doc)}
+                    style={{ color: '#245bdb' }}
+                  >
+                    <CheckCircle2 size={16} />
+                    <span>Ghi sổ</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="delete-action"
+                    aria-label={`Hủy chứng từ ${doc.documentCode}`}
+                    onClick={() => setCancellingDoc(doc)}
+                  >
+                    <XCircle size={16} />
+                    <span>Hủy</span>
+                  </Button>
+                </>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    [],
+  );
+
+  const documentsList = data?.content || [];
+  const totalElements = data?.totalElements || 0;
+  const totalPages = data?.totalPages || 1;
+
+  const totalCalculated = lines.reduce(
+    (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitCost) || 0),
+    0,
+  );
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="QUẢN LÝ KHO & VẬT TƯ"
+        title="Chứng từ kho"
+        description="Quản lý phiếu nhập mua, xuất kho sửa chữa, trả hàng nhà cung cấp và điều chỉnh tồn kho."
+        actions={
+          <Button
+            variant="primary"
+            ref={createTrigger}
+            onClick={() => setCreating(true)}
+          >
+            <Plus size={18} />
+            <span>Lập chứng từ kho</span>
+          </Button>
+        }
+      />
+
+      <div className="info-strip">
+        <FileText size={18} />
+        <span>
+          Chứng từ ở trạng thái Bản nháp (DRAFT) chưa làm thay đổi số lượng tồn kho. Khi nhấn Ghi sổ (POST), số tồn kho và giá trị bình quân gia quyền (MAC) được ghi nhận bất biến vào sổ kho.
+        </span>
       </div>
 
-      {/* Modal Tạo Phiếu Kho Mới */}
-      <Modal open={creating} onOpenChange={setCreating} title="Lập Chứng từ Kho Mới">
-        <form
-          onSubmit={handleCreateDocument}
-          className="space-y-4 max-h-[80vh] overflow-y-auto pr-1"
-        >
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Loại chứng từ" required>
-              <select
-                value={docType}
-                onChange={(e) => setDocType(e.target.value as DocumentType)}
-                className="w-full border rounded-lg px-3 py-2 bg-white"
-              >
-                <option value="IN">Phiếu Nhập kho (IN)</option>
-                <option value="OUT">Phiếu Xuất kho (OUT)</option>
-                <option value="RETURN">Phiếu Trả hàng (RETURN)</option>
-                <option value="ADJUSTMENT">Phiếu Kiểm kê / Điều chỉnh (ADJUSTMENT)</option>
-              </select>
-            </Field>
+      <section className="panel table-panel">
+        {/* Bộ lọc chứng từ */}
+        <div className="user-filters" role="search" aria-label="Bộ lọc chứng từ kho">
+          <div className="user-filters-heading">
+            <div>
+              <SlidersHorizontal size={16} aria-hidden />
+              <h2>Bộ lọc chứng từ kho</h2>
+              {filterCount > 0 && <span className="filter-count">{filterCount} đang áp dụng</span>}
+            </div>
+            <Button
+              variant="ghost"
+              className="filter-reset"
+              disabled={!isFiltered}
+              onClick={handleResetFilters}
+            >
+              <RotateCcw size={14} />
+              Đặt lại
+            </Button>
+          </div>
 
-            {docType === 'IN' ? (
-              <Field label="Nhà cung cấp" required>
-                <select
-                  value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
-                  required
-                  className="w-full border rounded-lg px-3 py-2 bg-white"
-                >
-                  <option value="">-- Chọn nhà cung cấp --</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.supplierName} ({s.supplierCode})
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            ) : (
-              <Field label="Mã lệnh sửa chữa">
+          <div
+            className="user-filter-grid"
+            style={{
+              gridTemplateColumns: 'minmax(220px, 1.4fr) minmax(260px, 1.3fr) minmax(180px, 1fr) minmax(200px, 1fr)',
+            }}
+          >
+            {/* Ô tìm kiếm */}
+            <div className="user-filter-field">
+              <label htmlFor="doc-search-input">Tìm kiếm</label>
+              <div className="user-search">
+                <Search size={17} aria-hidden />
                 <input
-                  type="number"
-                  placeholder="ID Lệnh sửa chữa"
-                  value={orderId}
-                  onChange={(e) => setOrderId(e.target.value)}
-                  className="w-full border rounded-lg px-3 py-2"
+                  id="doc-search-input"
+                  className="input"
+                  placeholder="Nhập mã chứng từ, hóa đơn..."
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setPage(0);
+                  }}
                 />
-              </Field>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Số hóa đơn / Số tham chiếu">
-              <input
-                value={referenceNumber}
-                onChange={(e) => setReferenceNumber(e.target.value)}
-                placeholder="VD: HĐ-002941"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </Field>
-            <Field label="Ghi chú">
-              <input
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ghi chú chứng từ..."
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </Field>
-          </div>
-
-          {/* Chi tiết phụ tùng */}
-          <div className="border-t border-gray-100 pt-4 space-y-3">
-            <div className="flex justify-between items-center">
-              <h4 className="font-semibold text-gray-800 text-sm">Danh mục phụ tùng</h4>
-              <Button variant="ghost" onClick={handleAddLine} className="text-blue-600 text-xs">
-                + Thêm dòng
-              </Button>
+                {query && (
+                  <button
+                    type="button"
+                    className="search-clear"
+                    aria-label="Xóa từ khóa tìm kiếm"
+                    onClick={() => {
+                      setQuery('');
+                      setPage(0);
+                    }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
             </div>
 
-            {lines.map((line, idx) => (
-              <div key={idx} className="flex gap-2 items-center bg-gray-50 p-2.5 rounded-lg border">
-                <div className="flex-1">
-                  <select
-                    value={line.partId}
-                    onChange={(e) => handleLineChange(idx, 'partId', Number(e.target.value))}
-                    required
-                    className="w-full border rounded-lg px-2 py-1.5 text-xs bg-white"
+            {/* Loại chứng từ Segments */}
+            <fieldset className="user-filter-field status-filter">
+              <legend>Loại chứng từ</legend>
+              <div className="status-segments">
+                {[
+                  { value: '', label: 'Tất cả' },
+                  { value: 'IN', label: 'Nhập mua' },
+                  { value: 'OUT', label: 'Xuất kho' },
+                  { value: 'RETURN', label: 'Trả hàng' },
+                ].map((opt) => (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    className={selectedType === opt.value ? 'selected' : ''}
+                    onClick={() => {
+                      setSelectedType(opt.value as DocumentType | '');
+                      setPage(0);
+                    }}
                   >
-                    <option value={0}>-- Chọn phụ tùng --</option>
-                    {parts.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.sku} - {p.partName} (Tồn: {p.stockQuantity} {p.unit})
-                      </option>
-                    ))}
-                  </select>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            {/* Trạng thái */}
+            <div className="user-filter-field">
+              <label htmlFor="doc-status-select">Trạng thái ghi sổ</label>
+              <select
+                id="doc-status-select"
+                className="input"
+                value={selectedStatus}
+                onChange={(e) => {
+                  setSelectedStatus(e.target.value as DocumentStatus | '');
+                  setPage(0);
+                }}
+              >
+                <option value="">Tất cả trạng thái</option>
+                <option value="DRAFT">Bản nháp (DRAFT)</option>
+                <option value="POSTED">Đã ghi sổ (POSTED)</option>
+                <option value="CANCELLED">Đã hủy (CANCELLED)</option>
+              </select>
+            </div>
+
+            {/* Sắp xếp */}
+            <div className="user-filter-field">
+              <label htmlFor="doc-sort-select">Sắp xếp theo</label>
+              <select
+                id="doc-sort-select"
+                className="input"
+                value={`${sortField}:${sortDir}`}
+                onChange={(e) => {
+                  const [f, d] = e.target.value.split(':');
+                  setSortField(f);
+                  setSortDir(d);
+                  setPage(0);
+                }}
+              >
+                {sortOptions.map(([val, label]) => (
+                  <option key={val} value={val}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Bảng danh sách */}
+        {isLoading ? (
+          <Loading label="Đang tải danh sách chứng từ kho…" />
+        ) : compact ? (
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {documentsList.map((doc) => (
+              <div
+                key={doc.id}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  background: 'white',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <strong style={{ fontSize: '15px', fontFamily: 'monospace' }}>
+                      {doc.documentCode}
+                    </strong>
+                    <div style={{ marginTop: '4px' }}>{renderTypeBadge(doc.documentType)}</div>
+                  </div>
+                  {renderStatusBadge(doc.status)}
                 </div>
-                <div className="w-24">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    placeholder="Số lượng"
-                    value={line.quantity}
-                    onChange={(e) => handleLineChange(idx, 'quantity', Number(e.target.value))}
-                    required
-                    className="w-full border rounded-lg px-2 py-1.5 text-xs"
-                  />
+                <div style={{ fontSize: '13px', color: '#526278' }}>
+                  {doc.supplierName && <div>NCC: <strong>{doc.supplierName}</strong></div>}
+                  {doc.repairOrderId && <div>Phiếu: <strong>#{doc.repairOrderId}</strong></div>}
                 </div>
-                <div className="w-28">
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="Đơn giá"
-                    value={line.unitCost}
-                    onChange={(e) => handleLineChange(idx, 'unitCost', Number(e.target.value))}
-                    required
-                    className="w-full border rounded-lg px-2 py-1.5 text-xs text-right"
-                  />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #f0f2f5' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 650, color: '#172338' }}>
+                    {Number(doc.totalAmount || 0).toLocaleString('vi-VN')} đ
+                  </span>
+                  <div className="row-actions">
+                    <Button variant="ghost" onClick={() => setViewingDoc(doc)}>
+                      <Eye size={15} /> Xem
+                    </Button>
+                    {doc.status === 'DRAFT' && (
+                      <Button variant="ghost" onClick={() => setPostingDoc(doc)} style={{ color: '#245bdb' }}>
+                        <CheckCircle2 size={15} /> Ghi sổ
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  disabled={lines.length === 1}
-                  onClick={() => handleRemoveLine(idx)}
-                  className="p-1.5 text-gray-400 hover:text-red-500 disabled:opacity-30"
-                >
-                  <Trash2 size={16} />
-                </button>
               </div>
             ))}
           </div>
+        ) : (
+          <DataTable
+            caption="Danh sách chứng từ kho"
+            columns={columns}
+            data={documentsList}
+            busy={isFetching}
+          />
+        )}
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-            <Button variant="ghost" onClick={() => setCreating(false)}>
+        {/* Phân trang */}
+        <div className="pagination" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="pagination-info">
+            Hiển thị <strong>{documentsList.length > 0 ? 1 : 0}–{documentsList.length}</strong> trong <strong>{totalElements}</strong> kết quả
+            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>Trang {page + 1} / {totalPages}</span>
+          </div>
+          <div className="pagination-controls">
+            <Button
+              variant="secondary"
+              disabled={page === 0 || isFetching}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Trang trước
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={page >= totalPages - 1 || isFetching}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Trang sau
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Modal Lập chứng từ kho mới */}
+      <Modal
+        open={creating}
+        onOpenChange={setCreating}
+        title="Lập chứng từ kho mới"
+        description="Tạo phiếu nhập mua, xuất kho hoặc trả hàng (chứng từ tạo mới ở trạng thái DRAFT)."
+      >
+        <form onSubmit={handleCreateDocument} className="modal-form">
+          <div className="form-section-label">THÔNG TIN CHỨNG TỪ</div>
+
+          <Field label="Loại chứng từ" required>
+            <select
+              className="input"
+              value={docType}
+              onChange={(e) => setDocType(e.target.value as DocumentType)}
+            >
+              <option value="IN">Nhập mua phụ tùng (IN)</option>
+              <option value="OUT">Xuất kho sửa chữa (OUT)</option>
+              <option value="RETURN">Trả hàng nhà cung cấp (RETURN)</option>
+              <option value="ADJUSTMENT">Điều chỉnh kiểm kê (ADJUSTMENT)</option>
+              <option value="OPENING">Khai báo tồn đầu kỳ (OPENING)</option>
+            </select>
+          </Field>
+
+          {docType === 'IN' && (
+            <Field label="Nhà cung cấp" required>
+              <select
+                className="input"
+                value={supplierId}
+                onChange={(e) => setSupplierId(e.target.value)}
+                required
+              >
+                <option value="">Chọn nhà cung cấp</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.supplierName} ({s.supplierCode})
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          {(docType === 'OUT' || docType === 'RETURN') && (
+            <Field label="Mã phiếu sửa chữa (Repair Order ID)" required>
+              <input
+                className="input font-mono"
+                placeholder="VD: 101"
+                value={orderId}
+                onChange={(e) => setOrderId(e.target.value)}
+                required
+              />
+            </Field>
+          )}
+
+          <Field label="Số hóa đơn NCC / Chứng từ gốc">
+            <input
+              className="input"
+              placeholder="VD: HD-001928"
+              value={referenceNumber}
+              onChange={(e) => setReferenceNumber(e.target.value)}
+            />
+          </Field>
+
+          <Field label="Lý do / Diễn giải chứng từ" className="full-width">
+            <input
+              className="input"
+              placeholder="Ghi chú nghiệp vụ..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </Field>
+
+          {/* Danh sách mặt hàng chi tiết */}
+          <div style={{ gridColumn: '1 / -1', marginTop: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#36485f', letterSpacing: '0.4px' }}>
+                CHI TIẾT DANH MỤC PHỤ TÙNG
+              </span>
+              <Button variant="secondary" onClick={handleAddLine} style={{ minHeight: '30px', padding: '4px 10px', fontSize: '12px' }}>
+                <Plus size={14} /> Thêm dòng
+              </Button>
+            </div>
+
+            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600 }}>
+                  <tr>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Phụ tùng</th>
+                    <th style={{ padding: '8px 12px', width: '100px', textAlign: 'right' }}>Số lượng</th>
+                    <th style={{ padding: '8px 12px', width: '140px', textAlign: 'right' }}>Đơn giá (đ)</th>
+                    <th style={{ padding: '8px 12px', width: '140px', textAlign: 'right' }}>Thành tiền</th>
+                    <th style={{ padding: '8px 12px', width: '50px', textAlign: 'center' }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lines.map((line, idx) => {
+                    const rowTotal = (Number(line.quantity) || 0) * (Number(line.unitCost) || 0);
+                    return (
+                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '8px 12px' }}>
+                          <select
+                            className="input"
+                            value={line.partId}
+                            onChange={(e) => handleLineChange(idx, 'partId', Number(e.target.value))}
+                            required
+                          >
+                            <option value={0}>Chọn phụ tùng...</option>
+                            {parts.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.partName} ({p.sku})
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <input
+                            type="number"
+                            min="1"
+                            className="input"
+                            style={{ textAlign: 'right' }}
+                            value={line.quantity}
+                            onChange={(e) => handleLineChange(idx, 'quantity', Number(e.target.value))}
+                            required
+                          />
+                        </td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            step="1000"
+                            className="input"
+                            style={{ textAlign: 'right' }}
+                            value={line.unitCost}
+                            onChange={(e) => handleLineChange(idx, 'unitCost', Number(e.target.value))}
+                            required
+                          />
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
+                          {rowTotal.toLocaleString('vi-VN')} đ
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                          {lines.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLine(idx)}
+                              style={{ background: 'transparent', border: 0, color: 'var(--danger)', cursor: 'pointer' }}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '12px', gap: '12px' }}>
+              <span style={{ fontSize: '13px', color: '#526278' }}>Tổng cộng ước tính:</span>
+              <strong style={{ fontSize: '16px', color: '#245bdb' }}>
+                {totalCalculated.toLocaleString('vi-VN')} đ
+              </strong>
+            </div>
+          </div>
+
+          <div className="modal-form-actions">
+            <Button variant="secondary" onClick={() => setCreating(false)} disabled={createMutation.isPending}>
               Hủy
             </Button>
             <Button variant="primary" type="submit" pending={createMutation.isPending}>
-              Tạo chứng từ
+              Lưu bản nháp (DRAFT)
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* Modal Xem Chi Tiết Chứng Từ */}
+      {/* Modal Xem chi tiết chứng từ kho */}
       <Modal
         open={!!viewingDoc}
-        onOpenChange={(open: boolean) => !open && setViewingDoc(null)}
-        title={`Chi tiết chứng từ: ${viewingDoc?.documentCode}`}
+        onOpenChange={(open) => !open && setViewingDoc(null)}
+        title={`Chi tiết chứng từ #${viewingDoc?.documentCode}`}
+        description="Xem thông tin chi tiết chứng từ và danh sách phụ tùng đi kèm."
       >
         {viewingDoc && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-3 rounded-lg border">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '8px' }}>
               <div>
-                <span className="text-gray-500">Loại phiếu: </span>
-                <span className="font-semibold">{viewingDoc.documentType}</span>
+                <span className="muted" style={{ fontSize: '12px' }}>Loại chứng từ:</span>
+                <div style={{ marginTop: '2px' }}>{renderTypeBadge(viewingDoc.documentType)}</div>
               </div>
               <div>
-                <span className="text-gray-500">Trạng thái: </span>
-                <span className="font-semibold">{viewingDoc.status}</span>
+                <span className="muted" style={{ fontSize: '12px' }}>Trạng thái:</span>
+                <div style={{ marginTop: '2px' }}>{renderStatusBadge(viewingDoc.status)}</div>
               </div>
-              <div>
-                <span className="text-gray-500">Nhà cung cấp: </span>
-                <span className="font-semibold">{viewingDoc.supplierName || '—'}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Lệnh sửa chữa: </span>
-                <span className="font-semibold">#{viewingDoc.repairOrderId || '—'}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Tham chiếu: </span>
-                <span className="font-semibold">{viewingDoc.supplierInvoiceNumber || '—'}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Tổng giá trị: </span>
-                <span className="font-semibold text-blue-600">
-                  {Number(viewingDoc.totalAmount).toLocaleString('vi-VN')} VNĐ
-                </span>
-              </div>
+              {viewingDoc.supplierName && (
+                <div>
+                  <span className="muted" style={{ fontSize: '12px' }}>Nhà cung cấp:</span>
+                  <div style={{ fontWeight: 600 }}>{viewingDoc.supplierName}</div>
+                </div>
+              )}
+              {viewingDoc.repairOrderId && (
+                <div>
+                  <span className="muted" style={{ fontSize: '12px' }}>Mã phiếu sửa chữa:</span>
+                  <div style={{ fontWeight: 600 }}>#{viewingDoc.repairOrderId}</div>
+                </div>
+              )}
+              {viewingDoc.supplierInvoiceNumber && (
+                <div>
+                  <span className="muted" style={{ fontSize: '12px' }}>Hóa đơn chứng từ gốc:</span>
+                  <div>{viewingDoc.supplierInvoiceNumber}</div>
+                </div>
+              )}
+              {viewingDoc.reason && (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <span className="muted" style={{ fontSize: '12px' }}>Lý do / Diễn giải:</span>
+                  <div>{viewingDoc.reason}</div>
+                </div>
+              )}
             </div>
 
-            <h4 className="font-semibold text-gray-800 text-sm">Danh sách dòng chi tiết</h4>
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-100 border-b">
+            {/* Bảng danh sách dòng chứng từ */}
+            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600 }}>
                   <tr>
-                    <th className="p-2">Mã SKU</th>
-                    <th className="p-2">Tên phụ tùng</th>
-                    <th className="p-2 text-right">Số lượng</th>
-                    <th className="p-2 text-right">Đơn giá</th>
-                    <th className="p-2 text-right">Thành tiền</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>STT</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Mã SKU</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Tên phụ tùng</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Số lượng</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Đơn giá (đ)</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>Thành tiền</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {viewingDoc.items.map((line) => (
-                    <tr key={line.id}>
-                      <td className="p-2 font-mono">{line.partSku}</td>
-                      <td className="p-2">{line.partName}</td>
-                      <td className="p-2 text-right font-medium">{line.quantity}</td>
-                      <td className="p-2 text-right">
-                        {Number(line.unitCost).toLocaleString('vi-VN')}
+                <tbody>
+                  {viewingDoc.items?.map((item, idx) => (
+                    <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '8px 12px', color: '#64748b' }}>{idx + 1}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{item.partSku}</td>
+                      <td style={{ padding: '8px 12px' }}>{item.partName}</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
+                        {item.quantity} {item.unit}
                       </td>
-                      <td className="p-2 text-right font-semibold text-gray-900">
-                        {Number(line.lineTotal).toLocaleString('vi-VN')}
+                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        {Number(item.unitCost).toLocaleString('vi-VN')} đ
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
+                        {Number(item.lineTotal).toLocaleString('vi-VN')} đ
                       </td>
                     </tr>
                   ))}
@@ -539,7 +877,14 @@ export function InventoryDocumentsPage() {
               </table>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', paddingRight: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#526278' }}>Tổng giá trị chứng từ:</span>
+              <strong style={{ fontSize: '18px', color: '#245bdb' }}>
+                {Number(viewingDoc.totalAmount).toLocaleString('vi-VN')} đ
+              </strong>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
               <Button variant="secondary" onClick={() => setViewingDoc(null)}>
                 Đóng
               </Button>
@@ -548,29 +893,28 @@ export function InventoryDocumentsPage() {
         )}
       </Modal>
 
-      {/* Confirm Ghi sổ kho */}
-      <ConfirmModal
-        open={!!postingId}
-        onOpenChange={(open: boolean) => !open && setPostingId(null)}
-        title="Ghi sổ kho chứng từ"
-        description="Khi ghi sổ, hệ thống sẽ thực hiện cập nhật tức thời số lượng tồn kho và ghi nhận lịch sử vào sổ kho. Thao tác này không thể hoàn tác!"
-        confirmLabel="Ghi sổ ngay"
-        variant="primary"
+      {/* ConfirmDialog Ghi sổ */}
+      <ConfirmDialog
+        open={!!postingDoc}
+        title="Ghi sổ chứng từ kho?"
+        description={`Xác nhận ghi sổ cho chứng từ "${postingDoc?.documentCode}". Thao tác này sẽ ghi nhận bất biến vào sổ kho, cập nhật số lượng tồn thực tế và giá vốn bình quân (MAC). Sau khi ghi sổ không thể sửa đổi.`}
+        confirmLabel="Ghi sổ (POST)"
         pending={postMutation.isPending}
+        onCancel={() => setPostingDoc(null)}
         onConfirm={handlePost}
       />
 
-      {/* Confirm Hủy phiếu */}
-      <ConfirmModal
-        open={!!cancellingId}
-        onOpenChange={(open: boolean) => !open && setCancellingId(null)}
-        title="Hủy chứng từ kho"
-        description="Bạn có chắc muốn hủy chứng từ bản nháp này?"
+      {/* ConfirmDialog Hủy */}
+      <ConfirmDialog
+        open={!!cancellingDoc}
+        title="Hủy chứng từ kho?"
+        description={`Hủy bỏ bản nháp chứng từ "${cancellingDoc?.documentCode}". Chứng từ sẽ chuyển sang trạng thái CANCELLED.`}
         confirmLabel="Hủy chứng từ"
-        variant="danger"
+        danger
         pending={cancelMutation.isPending}
+        onCancel={() => setCancellingDoc(null)}
         onConfirm={handleCancel}
       />
-    </div>
+    </>
   );
 }

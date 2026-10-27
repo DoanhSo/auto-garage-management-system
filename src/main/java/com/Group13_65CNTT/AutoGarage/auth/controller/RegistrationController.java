@@ -29,7 +29,7 @@ public class RegistrationController {
     @PostMapping(ApiPaths.REGISTER)
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize(SecurityConstants.PERMIT_ALL)
-    @Operation(summary = "Register a customer account with email and password")
+    @Operation(summary = "Register a customer account with username, email and password")
     public ApiResponse<Void> register(
             @Valid @RequestBody RegistrationRequest request, HttpServletRequest httpRequest) {
         registrationService.register(request);

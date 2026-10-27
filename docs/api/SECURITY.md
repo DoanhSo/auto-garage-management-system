@@ -11,7 +11,8 @@ Backend theo 7 tầng: `AuthController`/`AuthServiceImpl` và `UserController`/`
 ## Kiến trúc Keycloak OIDC & OAuth2 Resource Server
 
 - **Identity Provider (IdP):** Keycloak 26 (Quarkus) kết nối container PostgreSQL 16 độc lập (`keycloak-postgres` trong `compose.yaml`), cấu hình sẵn tại [`docker/keycloak/realm-export.json`](../../docker/keycloak/realm-export.json).
-- **Cấp phát & Làm mới Token (Access + Refresh Token):** Thực hiện trực tiếp tại Keycloak (`autogarage-realm`) theo chuẩn OAuth 2.0 Authorization Code Flow + PKCE (`S256`) với Refresh Token Rotation (`revokeRefreshToken: true`, `refreshTokenMaxReuse: 0`).
+- **Cấp phát & làm mới token:** Form hiện tại dùng password grant tới Keycloak; helper Authorization Code + PKCE vẫn được giữ. Sau đăng nhập, `POST /api/v1/auth/session` nhận Bearer và refresh token, đổi token và kiểm tra cùng subject trước khi đặt cookie HttpOnly. `POST /api/v1/auth/session/refresh` xoay cookie và trả access token trong ApiResponse; `DELETE /api/v1/auth/session` xóa cookie/thu hồi phiên. Refresh token không được trả trong body của session bridge hoặc lưu trong browser storage. Chi tiết tại [KEYCLOAK_SETUP.md](../KEYCLOAK_SETUP.md).
+- **Cookie & CSRF:** Cookie phiên `AG_REFRESH` có HttpOnly, SameSite=Strict, Path=/api/v1/auth/session, Secure theo cấu hình (mặc định true; compose HTTP local false). Session bridge yêu cầu Origin khớp allowlist cho cả request cùng origin. Chỉ session bridge bật CORS credentials; API nghiệp vụ vẫn yêu cầu Bearer. Client chờ khôi phục token và xác thực `/auth/me` trước khi mở router, không chuyển về login khi provider chỉ tạm thời 503.
 - **Xác thực Token tại Backend (RS256 & JWKS):**
   - `IdentityConfiguration` cấu hình `NimbusJwtDecoder.withJwkSetUri(properties.jwkSetUri()).jwsAlgorithm(SignatureAlgorithm.RS256).build()`.
   - `KeycloakJwtAuthenticationConverter` trích xuất vai trò từ `realm_access.roles` (hoặc claim `role`) và ánh xạ sang `ROLE_<ROLE>` trong `SecurityContextHolder`.

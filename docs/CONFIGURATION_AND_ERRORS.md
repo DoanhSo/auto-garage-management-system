@@ -7,6 +7,7 @@
 Secret, URL, issuer, audience, thời hạn token, chi phí BCrypt và origin CORS lấy từ môi trường. Secret không có giá trị dự phòng. Giá trị policy được bind vào `@ConfigurationProperties`, đăng ký tại configuration và kiểm tra khi khởi động.
 
 - `AuthProperties`, `BootstrapProperties`: JWT, CORS (AUTH_CORS_MAX_AGE mặc định 1h, không âm) và khởi tạo admin chủ động.
+- `BrowserSessionProperties`: `KEYCLOAK_TOKEN_URI` (mặc định endpoint token của issuer), `KEYCLOAK_BROWSER_CLIENT_ID=autogarage-frontend`, `AUTH_SESSION_REQUEST_TIMEOUT=10s` dương, `AUTH_SESSION_COOKIE_SECURE=true`. Compose local đặt endpoint nội bộ và Secure=false cho HTTP. Cookie refresh chỉ tại `/api/v1/auth/session`; kiểm tra Origin allowlist, không thay cơ chế Bearer của API nghiệp vụ. Xem `KEYCLOAK_SETUP.md`.
 - `PasswordProperties`: `AUTH_PASSWORD_MIN_LENGTH`, mặc định 12, cho phép 12–72. Service dùng cùng `PasswordPolicy` cho create user, đổi mật khẩu và bootstrap. Giới hạn 72 byte UTF-8 là ràng buộc của BCrypt; không cho tăng bằng env. Độ dài tối thiểu đếm Unicode code point.
 - `PaginationProperties`: `PAGINATION_DEFAULT_SIZE=20`, `PAGINATION_MAX_SIZE=100`, `PAGINATION_MAX_PAGE=100000`. Default size không được vượt max size; hard ceiling cấu hình max size là 1000. Controller và service dùng chung `PaginationPolicy`; từ chối unpaged để tránh truy vấn không giới hạn. Allowlist trường sort vẫn thuộc contract API.
 - `ReportProperties`: `REPORT_MAX_PERIOD=366d`; giới hạn phải dương. So sánh toàn bộ Duration, không cắt phần lẻ ngày.

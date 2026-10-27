@@ -61,6 +61,11 @@ security:
     clock-skew: ${AUTH_JWT_CLOCK_SKEW:0s}
     allowed-origins: ${AUTH_CORS_ORIGINS:}
     cors-max-age: ${AUTH_CORS_MAX_AGE:1h}
+  browser-session:
+    token-uri: ${KEYCLOAK_TOKEN_URI:${security.auth.issuer}/protocol/openid-connect/token}
+    client-id: ${KEYCLOAK_BROWSER_CLIENT_ID:autogarage-frontend}
+    request-timeout: ${AUTH_SESSION_REQUEST_TIMEOUT:10s}
+    secure-cookie: ${AUTH_SESSION_COOKIE_SECURE:true}
   password:
     min-length: ${AUTH_PASSWORD_MIN_LENGTH:12}
   bootstrap:

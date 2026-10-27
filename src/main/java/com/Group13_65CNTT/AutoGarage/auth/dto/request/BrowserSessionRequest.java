@@ -1,0 +1,12 @@
+package com.Group13_65CNTT.AutoGarage.auth.dto.request;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class BrowserSessionRequest {
+    @NotBlank(message = "Refresh token is required")
+    private String refreshToken;
+}

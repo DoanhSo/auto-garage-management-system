@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { UiPolicy } from '../../../shared/types/contracts';
+import { usernameSchema } from '../../../shared/validation/username';
 export const loginSchema = z.object({
   identifier: z
     .string()
@@ -21,6 +22,11 @@ export function passwordRequirement(policy: UiPolicy) {
 export function registrationSchema(policy: UiPolicy) {
   return z
     .object({
+      username: z
+        .string()
+        .trim()
+        .pipe(usernameSchema)
+        .transform((value) => value.toLowerCase()),
       fullName: z.string().trim().min(1, 'Nhập họ và tên.').max(150, 'Tối đa 150 ký tự.'),
       email: z
         .string()

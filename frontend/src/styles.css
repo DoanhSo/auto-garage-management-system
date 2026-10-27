@@ -1095,7 +1095,9 @@ select.input {
   position: static;
   padding: 20px 24px 16px;
 }
-.centered-dialog .account-editor-form {
+.centered-dialog .account-editor-form,
+.centered-dialog .modal-form,
+.centered-dialog .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px 22px;
@@ -1120,18 +1122,35 @@ select.input {
   }
 }
 .account-editor-form > .form-section-label,
+.modal-form > .form-section-label,
+.form-grid > .form-section-label,
 .account-editor-form > .checkbox-field,
+.modal-form > .checkbox-field,
+.form-grid > .checkbox-field,
 .account-editor-form > .alert,
+.modal-form > .alert,
+.form-grid > .alert,
 .account-editor-form > .conflict-panel,
+.modal-form > .conflict-panel,
+.form-grid > .conflict-panel,
 .account-editor-form > .info-strip,
 .account-editor-form > .full-width-field,
-.account-editor-actions {
+.account-editor-actions,
+.modal-form-actions,
+.modal-form > .full-width,
+.form-grid > .full-width {
   grid-column: 1 / -1;
 }
-.account-editor-form .form-section-label {
+.account-editor-form .form-section-label,
+.modal-form .form-section-label,
+.form-grid .form-section-label {
   padding-bottom: 7px;
 }
-.account-editor-actions {
+.account-editor-actions,
+.modal-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
   margin-top: 4px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
@@ -1203,7 +1222,10 @@ select.input {
     font-size: 11px;
     margin-top: 3px;
   }
-  .centered-dialog .account-editor-form {
+  .centered-dialog .account-editor-form,
+  .centered-dialog .modal-form,
+  .centered-dialog .form-grid {
+    grid-template-columns: 1fr;
     padding: 14px;
     gap: 10px 12px;
   }
@@ -1787,127 +1809,6 @@ select.input {
 .notice-back {
   display: none;
 }
-.login-layout {
-  display: grid;
-  place-items: center;
-  min-height: 100dvh;
-  padding: 40px 20px;
-  background: #fafafa;
-}
-
-.login-main {
-  width: 100%;
-  max-width: 420px;
-}
-.login-card {
-  width: 100%;
-  padding: 32px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-}
-.login-card-header .eyebrow {
-  color: var(--primary);
-  font-weight: 700;
-}
-.login-card h1 {
-  font-size: 28px;
-  letter-spacing: -0.7px;
-  margin-top: 4px;
-}
-.login-card-header > .description {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #526278;
-  margin-bottom: 24px;
-}
-.login-card .alert {
-  margin-bottom: 18px;
-}
-.login-card .form-stack {
-  gap: 16px;
-}
-.login-card .button-primary {
-  min-height: 44px;
-  margin-top: 4px;
-}
-.login-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 22px 0 18px;
-  color: #64748b;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1px;
-}
-.login-divider::before,
-.login-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: #e2e8f0;
-}
-.login-sso-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.button-google {
-  min-height: 44px;
-  background: #ffffff;
-  border-color: #cbd5e1;
-  color: #1e293b;
-  font-weight: 600;
-}
-.button-google:hover:not(:disabled) {
-  background: #f8fafc;
-  border-color: #94a3b8;
-}
-.button-sso {
-  min-height: 42px;
-  background: #f1f5f9;
-  border-color: #dce5f2;
-  color: #243b5a;
-}
-.login-customer-box {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.login-customer-text {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.login-customer-text strong {
-  font-size: 13px;
-  color: #1e3a8a;
-}
-.login-customer-text span {
-  font-size: 12px;
-  color: #475569;
-  line-height: 1.5;
-}
-.login-note {
-  font-size: 11px;
-  color: #64748b;
-  text-align: center;
-  margin-top: 20px;
-  line-height: 1.65;
-}
-.login-security {
-  font-size: 11px;
-  color: #64748b;
-  margin-top: 24px;
-  text-align: center;
-}
-.login-card .input {
-  min-height: 44px;
-}
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -1996,10 +1897,6 @@ select.input {
   }
   .inbox-grid {
     grid-template-columns: minmax(270px, 0.9fr) minmax(300px, 1.1fr);
-  }
-
-  .login-main {
-    padding: 40px 30px;
   }
 }
 @media (max-width: 640px) {
@@ -2236,28 +2133,6 @@ select.input {
   }
   .notice-item {
     padding: 20px 16px;
-  }
-  .login-layout {
-    display: flex;
-    flex-direction: column;
-    background: white;
-  }
-
-  .login-main {
-    padding: 55px 24px 28px;
-    flex: 1;
-    justify-content: flex-start;
-  }
-  .login-card {
-    max-width: 400px;
-  }
-  .login-security {
-    margin-top: auto;
-    padding-top: 55px;
-    max-width: 280px;
-  }
-  .login-card h2 {
-    font-size: 28px;
   }
   .toast-region {
     bottom: 16px;
@@ -2816,23 +2691,6 @@ select.input {
   --muted: #526278;
   background: #fafafa;
 }
-.login-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 32px;
-  font-size: 18px;
-  font-weight: 650;
-  color: #172338;
-}
-.login-brand svg {
-  color: var(--primary);
-}
-.login-divider {
-  letter-spacing: 0;
-  font-weight: 400;
-  font-size: 12px;
-}
 .panel,
 .metric-card {
   box-shadow: none;
@@ -2884,15 +2742,6 @@ select.input {
   border-radius: 6px;
 }
 @media (max-width: 640px) {
-  .login-layout {
-    padding: 24px 16px;
-  }
-  .login-card {
-    padding: 24px 20px;
-  }
-  .login-card h1 {
-    font-size: 24px;
-  }
   .header-user-pill {
     display: none;
   }

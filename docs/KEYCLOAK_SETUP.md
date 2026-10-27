@@ -10,8 +10,10 @@ Luồng này được chọn theo trải nghiệm yêu cầu; không hỗ trợ 
 challenge của luồng browser. Nếu sau này cần MFA, chuyển sang Authorization Code
 + PKCE thay vì tự bỏ qua bước xác thực.
 
-`POST /api/v1/auth/register` là endpoint công khai với DTO chỉ gồm fullName, email,
-password. Backend kiểm tra PasswordPolicy rồi gọi Keycloak Admin API để tạo danh
+`POST /api/v1/auth/register` là endpoint công khai với DTO chỉ gồm username,
+fullName, email, password. Username bắt buộc, dùng 3–100 chữ/số ASCII và dấu chấm,
+gạch dưới/gạch ngang theo cùng hợp đồng tài khoản nhân viên; backend chuẩn hóa
+username và email về chữ thường. Backend kiểm tra PasswordPolicy rồi gọi Keycloak Admin API để tạo danh
 tính **CUSTOMER**, emailVerified=false. Không liên kết/nâng quyền tài khoản trùng.
 Không lưu mật khẩu vào database gara; sau khi đăng ký, frontend tự đăng nhập,
 và `/auth/me` dùng cơ chế JIT sẵn có để tạo User/Customer trong gara. Nếu tạo vai
@@ -20,11 +22,49 @@ trò Keycloak thất bại, adapter cố xóa danh tính vừa tạo; lỗi hạ
 vẫn tạo tài khoản qua backend, nên không thể bỏ qua PasswordPolicy bằng form cũ.
 
 Giữ `registrationEmailAsUsername=false` và `loginWithEmailAllowed=true`. Username
-của khách hàng đăng ký qua app được backend lấy từ email; tài khoản nhân viên vẫn
-giữ username riêng. Bật Email as username cho cả realm sẽ khiến Keycloak đổi tên
+của khách hàng đăng ký mới do khách hàng tự chọn, độc lập với email. Tài khoản
+cũ đã dùng email làm username vẫn giữ nguyên, không đổi tên hoặc reset mật khẩu.
+Đăng nhập chấp nhận username hoặc email. Thiếu/sai username trả 400/code 2001;
+trùng username hoặc email trả 409/code 2003, không liên kết/nâng quyền danh tính
+cũ. Bật Email as username cho cả realm sẽ khiến Keycloak đổi tên
 tài khoản khi Admin API tạo/sửa profile, làm sai luồng quản trị nhân viên.
 `keycloak-setup` đồng bộ các thiết lập này cho realm đã tồn tại, không reset
 password/volume. Không đưa credential quản trị Keycloak vào frontend.
+
+## Khôi phục phiên sau refresh
+
+Sau password grant hoặc PKCE, frontend gửi refresh token một lần đến
+`POST /api/v1/auth/session`, kèm Bearer của cùng người dùng. Backend đổi token
+với Keycloak, kiểm tra JWT và subject khớp rồi đặt cookie phiên `AG_REFRESH`:
+HttpOnly, SameSite=Strict, Path=/api/v1/auth/session, không có Domain/Max-Age.
+Response chỉ có accessToken, expiresIn, tokenType trong ApiResponse; refresh
+token không xuất hiện trong body. Các API nghiệp vụ vẫn dùng Bearer.
+
+`POST /api/v1/auth/session/refresh` nhận cookie, đổi token và xoay cookie mới.
+Ứng dụng chờ bước này và `/auth/me` trước khi render router, giữ nguyên đường dẫn
+đang xem. StrictMode dùng chung request khởi tạo; Web Locks tuần tự hóa xoay
+cookie giữa các tab trên trình duyệt hỗ trợ. Môi trường không có Web Locks chỉ
+tuần tự trong cùng trang; dùng một tab khi provider bật refresh-token rotation
+không cho reuse để tránh các tab cũ tranh nhau làm mới.
+
+`DELETE /api/v1/auth/session` xóa cookie và kết thúc phiên Keycloak, kể cả khi
+không còn access token. Logout ứng dụng vẫn dùng `/auth/logout` để thu hồi
+auth_version. Cookie lỗi/hết hạn trả 401 và được xóa; lỗi provider/DB trả 503 và
+giữ phiên để thử lại. Frontend lưu marker ý định logout không chứa token để
+không khôi phục nhầm cookie khi người dùng đã logout trong lúc mất mạng.
+
+Mọi POST/DELETE của session bridge yêu cầu Origin khớp allowlist
+`AUTH_CORS_ORIGINS` (bao gồm request cùng origin); thiếu Origin cũng bị từ chối.
+Chỉ các endpoint session cho CORS credentials, các API Bearer khác giữ cấu hình
+không credentials. Không đưa token vào localStorage/sessionStorage.
+
+- `KEYCLOAK_TOKEN_URI`: endpoint token backend truy cập được; mặc định từ issuer.
+  Docker dùng hostname nội bộ `keycloak`, không dùng localhost trong container.
+- `KEYCLOAK_BROWSER_CLIENT_ID`: mặc định autogarage-frontend.
+- `AUTH_SESSION_REQUEST_TIMEOUT`: mặc định 10s, phải dương.
+- `AUTH_SESSION_COOKIE_SECURE`: mặc định true khi triển khai HTTPS. Chỉ đặt false
+  cho HTTP local; compose local đã đặt rõ false. Không thay đổi timeout/lifetime
+  phiên của Keycloak; cookie phiên không tự tạo cơ chế "nhớ đăng nhập vĩnh viễn".
 
 Google OAuth để sau; nhập địa chỉ Gmail vào form hiện tại không đăng nhập Google
 và không sử dụng mật khẩu Google. OTP/link/xác minh email cần SMTP của Keycloak,
@@ -85,9 +125,10 @@ Console hoặc Admin REST API trước khi sử dụng bản code này:
 
 Với Keycloak chạy riêng, frontend cần đặt `VITE_KEYCLOAK_PUBLIC_ORIGIN` thành URL
 realm đầy đủ mà trình duyệt truy cập được, ví dụ local
-`http://localhost:8081/realms/autogarage-realm`. Đăng nhập và đăng ký sẽ điều hướng
-trực tiếp tới URL này. `VITE_KEYCLOAK_ISSUER=/realms/autogarage-realm` vẫn có thể dùng
-proxy `/realms` của Vite để gửi yêu cầu token/refresh/logout từ frontend.
+`http://localhost:8081/realms/autogarage-realm` cho các helper PKCE nếu dùng.
+Form hiện tại dùng password grant qua `VITE_KEYCLOAK_ISSUER=/realms/autogarage-realm`
+và proxy `/realms`, không mở giao diện Keycloak. Khôi phục phiên/làm mới token
+đi qua session bridge của backend được mô tả ở trên.
 
 Chỉ dùng đường dẫn tương đối cho `VITE_KEYCLOAK_PUBLIC_ORIGIN` khi đã có reverse
 proxy cùng origin hoàn chỉnh, chuyển tiếp cả `/realms` và tài nguyên `/resources`,
