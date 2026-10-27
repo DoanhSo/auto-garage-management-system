@@ -44,12 +44,14 @@ export function Field({
   hint,
   children,
   required = false,
+  className = '',
 }: {
   label: string;
   error?: string;
   hint?: ReactNode;
   children: ReactNode;
   required?: boolean;
+  className?: string;
 }) {
   const generated = useId();
   const element = isValidElement<InputHTMLAttributes<HTMLInputElement>>(children) ? children : null;
@@ -66,7 +68,7 @@ export function Field({
       })
     : children;
   return (
-    <div className="field">
+    <div className={`field ${className}`.trim()}>
       <label className="field-label" htmlFor={id}>
         {label}
         {required && <span className="required"> *</span>}
@@ -320,14 +322,15 @@ export function Badge({
   variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'outline';
   className?: string;
 }) {
-  const variantClass = {
-    primary: 'badge-primary',
-    secondary: 'badge-neutral',
-    success: 'badge-success',
-    warning: 'badge-warning',
-    danger: 'badge-danger',
-    outline: 'badge-outline',
-  }[variant] || 'badge-neutral';
+  const variantClass =
+    {
+      primary: 'badge-primary',
+      secondary: 'badge-neutral',
+      success: 'badge-success',
+      warning: 'badge-warning',
+      danger: 'badge-danger',
+      outline: 'badge-outline',
+    }[variant] || 'badge-neutral';
 
   return <span className={`badge ${variantClass} ${className}`}>{children}</span>;
 }
@@ -390,4 +393,3 @@ export function ConfirmModal({
     />
   );
 }
-

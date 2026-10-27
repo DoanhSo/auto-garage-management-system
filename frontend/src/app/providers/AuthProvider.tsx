@@ -12,6 +12,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { configureSession } from '../../shared/api/client';
 import { authApi } from '../../features/auth/api/authApi';
 import type { OidcTokenBundle, User } from '../../shared/types/contracts';
+import { Loading, QueryError } from '../../shared/components/ui';
+import { ApiError } from '../../shared/api/errors';
+import { logoutPending, markLogoutPending } from '../../features/auth/api/sessionIntent';
 
 interface AuthContextValue {
   user: User | null;
@@ -33,8 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
   const [notice, setNotice] = useState('');
+  const [restoring, setRestoring] = useState(true);
+  const [restoreFailure, setRestoreFailure] = useState<unknown>(null);
+  const bootstrapRequest = useRef<Promise<OidcTokenBundle | null> | null>(null);
   const attempt = useRef(0);
-  const refreshTokenRef = useRef<string | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const channel = useRef<BroadcastChannel | null>(null);
 
@@ -49,10 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (message = 'Phiên đăng nhập đã kết thúc.') => {
       attempt.current++;
       stopRefreshTimer();
-      refreshTokenRef.current = null;
+      markLogoutPending(true);
       configureSession(null, () => {});
       queryClient.clear();
       setUser(null);
+      setRestoring(false);
+      setRestoreFailure(null);
       setSessionKey((value) => value + 1);
       setNotice(message);
     },
@@ -66,20 +73,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const scheduleRefresh = useCallback(
     (bundle: OidcTokenBundle, sessionAttempt: number) => {
       stopRefreshTimer();
-      refreshTokenRef.current = bundle.refreshToken;
-      if (!bundle.refreshToken) return;
       const refreshLeadSeconds = Math.min(30, bundle.expiresIn / 5);
       const delayMs = Math.max(1, (bundle.expiresIn - refreshLeadSeconds) * 1000);
       refreshTimerRef.current = setTimeout(async () => {
-        const currentRefreshToken = refreshTokenRef.current;
-        if (!currentRefreshToken || sessionAttempt !== attempt.current) return;
+        if (sessionAttempt !== attempt.current) return;
         try {
-          const nextBundle = await authApi.refreshToken(currentRefreshToken);
+          const nextBundle = await authApi.refreshBrowserSession();
           if (sessionAttempt !== attempt.current) return;
+          if (!nextBundle) {
+            expire();
+            return;
+          }
           configureSession(nextBundle.accessToken, expire);
           scheduleRefresh(nextBundle, sessionAttempt);
-        } catch {
-          if (sessionAttempt === attempt.current) expire();
+        } catch (error) {
+          if (sessionAttempt === attempt.current) setRestoreFailure(error);
         }
       }, delayMs);
     },
@@ -91,10 +99,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (id !== attempt.current) throw new DOMException('Login cancelled', 'AbortError');
       configureSession(bundle.accessToken, expire);
       try {
+        if (bundle.refreshToken) {
+          bundle = await authApi.openBrowserSession(bundle.refreshToken);
+          if (id !== attempt.current) throw new DOMException('Login cancelled', 'AbortError');
+          configureSession(bundle.accessToken, expire);
+        }
         const currentUser = await authApi.me();
         if (id !== attempt.current) throw new DOMException('Login cancelled', 'AbortError');
         queryClient.clear();
         scheduleRefresh(bundle, id);
+        markLogoutPending(false);
         setUser(currentUser);
         setSessionKey((value) => value + 1);
         setNotice('');
@@ -102,7 +116,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         if (id === attempt.current) {
           stopRefreshTimer();
-          refreshTokenRef.current = null;
           configureSession(null, expire);
         }
         throw error;
@@ -110,6 +123,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [expire, queryClient, scheduleRefresh, stopRefreshTimer],
   );
+
+  const restoreSession = useCallback(async () => {
+    const id = ++attempt.current;
+    setRestoring(true);
+    setRestoreFailure(null);
+    const pending = (bootstrapRequest.current ??= (async () => {
+      if (logoutPending()) {
+        await authApi.closeBrowserSession();
+        markLogoutPending(false);
+        return null;
+      }
+      return authApi.refreshBrowserSession();
+    })());
+    try {
+      const bundle = await pending;
+      if (id !== attempt.current) return;
+      if (bundle) await establishSession(bundle, id);
+      else configureSession(null, expire);
+    } catch (error) {
+      if (id !== attempt.current) return;
+      if (error instanceof ApiError && error.status === 401) clearSession();
+      else setRestoreFailure(error);
+    } finally {
+      if (id === attempt.current) setRestoring(false);
+      if (bootstrapRequest.current === pending) bootstrapRequest.current = null;
+    }
+  }, [clearSession, establishSession, expire]);
+
+  useEffect(() => {
+    void restoreSession();
+  }, [restoreSession]);
 
   useEffect(() => {
     const current =
@@ -129,7 +173,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => () => {
       attempt.current++;
       stopRefreshTimer();
-      refreshTokenRef.current = null;
     },
     [stopRefreshTimer],
   );
@@ -154,14 +197,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     let confirmed = true;
-    const activeRefreshToken = refreshTokenRef.current;
+    markLogoutPending(true);
     attempt.current++;
     stopRefreshTimer();
     try {
-      await authApi.logout(activeRefreshToken);
+      await authApi.logout();
     } catch {
       confirmed = false;
     } finally {
+      try {
+        await authApi.closeBrowserSession();
+      } catch {
+        confirmed = false;
+      }
       clearSession(
         confirmed
           ? 'Đã đăng xuất khỏi hệ thống.'
@@ -189,7 +237,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }),
     [user, sessionKey, notice, login, completePkceLogin, logout, clearSession, setCurrentUser],
   );
-  return <Context value={value}>{children}</Context>;
+  return (
+    <Context value={value}>
+      {restoring ? (
+        <Loading label="Đang khôi phục phiên đăng nhập…" />
+      ) : restoreFailure ? (
+        <QueryError
+          error={restoreFailure}
+          retry={() => {
+            void restoreSession();
+          }}
+        />
+      ) : (
+        children
+      )}
+    </Context>
+  );
 }
 export function useAuth() {
   const value = useContext(Context);

@@ -30,8 +30,9 @@ function app() {
 }
 async function fill() {
   const user = userEvent.setup();
-  await screen.findByRole('heading', { name: 'Đăng ký tài khoản' });
+  await screen.findByRole('heading', { name: 'Đăng ký tài khoản' }, { timeout: 3000 });
   await user.type(screen.getByLabelText('Họ và tên', { exact: false }), 'Customer Name');
+  await user.type(screen.getByLabelText('Tên đăng nhập', { exact: false }), 'Customer.One');
   await user.type(screen.getByLabelText('Email', { exact: false }), 'customer@gmail.com');
   await user.type(
     screen.getByLabelText(/^Mật khẩu\s*\*/, { selector: 'input' }),
@@ -46,6 +47,7 @@ async function fill() {
 describe('Registration inside AutoGarage', () => {
   it('sends only registration fields and logs into the customer workspace without redirecting to Keycloak', async () => {
     const create = vi.fn();
+    const login = vi.spyOn(authApi, 'loginWithPassword');
     const redirect = vi.spyOn(authApi, 'startRegistrationRedirect');
     server.use(
       http.post('/api/v1/auth/register', async ({ request }) => {
@@ -61,8 +63,13 @@ describe('Registration inside AutoGarage', () => {
     await user.click(screen.getByRole('button', { name: 'Đăng ký' }));
     expect(await screen.findByText('Customer workspace')).toBeVisible();
     expect(create).toHaveBeenCalledExactlyOnceWith({
+      username: 'customer.one',
       fullName: 'Customer Name',
       email: 'customer@gmail.com',
+      password: 'test-password-123',
+    });
+    expect(login).toHaveBeenCalledWith({
+      identifier: 'customer.one',
       password: 'test-password-123',
     });
     expect(redirect).not.toHaveBeenCalled();
@@ -79,8 +86,40 @@ describe('Registration inside AutoGarage', () => {
     await user.click(screen.getByRole('button', { name: 'Đăng ký' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Dữ liệu trùng');
     expect(screen.getByLabelText('Email', { exact: false })).toHaveValue('customer@gmail.com');
+    expect(screen.getByLabelText('Tên đăng nhập', { exact: false })).toHaveValue('Customer.One');
     expect(screen.getByLabelText(/^Mật khẩu\s*\*/, { selector: 'input' })).toHaveValue('');
     expect(login).not.toHaveBeenCalled();
+  });
+  it('requires a valid username and does not submit malformed values', async () => {
+    const create = vi.spyOn(authApi, 'register');
+    app();
+    const user = await fill();
+    const username = screen.getByLabelText('Tên đăng nhập', { exact: false });
+    for (const value of ['', 'ab', 'customer name', 'customer@gmail.com', 'nguyễn']) {
+      await user.clear(username);
+      if (value) await user.type(username, value);
+      await user.click(screen.getByRole('button', { name: 'Đăng ký' }));
+      expect(username).toHaveAttribute('aria-invalid', 'true');
+    }
+    expect(create).not.toHaveBeenCalled();
+  });
+  it('shows server username validation next to the field and keeps identity input', async () => {
+    server.use(
+      http.post('/api/v1/auth/register', () =>
+        HttpResponse.json(
+          { ...envelope(null, 2001), data: { username: 'Invalid username' } },
+          { status: 400 },
+        ),
+      ),
+    );
+    app();
+    const user = await fill();
+    await user.click(screen.getByRole('button', { name: 'Đăng ký' }));
+    expect(
+      await screen.findByText('Giá trị không hợp lệ. Kiểm tra nội dung và độ dài.'),
+    ).toBeVisible();
+    expect(screen.getByLabelText('Tên đăng nhập', { exact: false })).toHaveValue('Customer.One');
+    expect(screen.getByLabelText(/^Mật khẩu\s*\*/, { selector: 'input' })).toHaveValue('');
   });
   it('rejects a mismatched password confirmation before sending a registration request', async () => {
     const create = vi.spyOn(authApi, 'register');

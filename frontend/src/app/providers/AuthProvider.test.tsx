@@ -1,10 +1,14 @@
 import { act, render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from './AuthProvider';
 import { authApi } from '../../features/auth/api/authApi';
 import type { User } from '../../shared/types/contracts';
 import * as transport from '../../shared/api/client';
+
+beforeEach(() => {
+  vi.spyOn(authApi, 'refreshBrowserSession').mockResolvedValue(null);
+});
 
 describe('Authentication refresh lifecycle', () => {
   it('ignores an in-flight refresh while backend logout is pending', async () => {
@@ -16,15 +20,18 @@ describe('Authentication refresh lifecycle', () => {
       tokenType: 'Bearer',
     };
     vi.spyOn(authApi, 'loginWithPassword').mockResolvedValue(bundle);
+    vi.spyOn(authApi, 'openBrowserSession').mockResolvedValue({ ...bundle, refreshToken: null });
+    vi.spyOn(authApi, 'closeBrowserSession').mockResolvedValue(null);
     vi.spyOn(authApi, 'me').mockResolvedValue({ id: '7', role: 'CUSTOMER' } as User);
     let finishRefresh!: (value: typeof bundle) => void;
     let finishLogout!: () => void;
-    vi.spyOn(authApi, 'refreshToken').mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          finishRefresh = resolve;
-        }),
-    );
+    let refreshCalls = 0;
+    vi.mocked(authApi.refreshBrowserSession).mockImplementation(() => {
+      if (++refreshCalls === 1) return Promise.resolve(null);
+      return new Promise((resolve) => {
+        finishRefresh = resolve;
+      });
+    });
     vi.spyOn(authApi, 'logout').mockImplementation(
       () =>
         new Promise<void>((resolve) => {
@@ -45,6 +52,9 @@ describe('Authentication refresh lifecycle', () => {
       </QueryClientProvider>,
     );
     await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
       await auth.login({ identifier: 'fixture', password: 'test-only' });
     });
     await act(async () => {
@@ -57,7 +67,7 @@ describe('Authentication refresh lifecycle', () => {
     await act(async () => {
       finishRefresh({ ...bundle, accessToken: 'late-token' });
     });
-    expect(configure).toHaveBeenCalledTimes(1);
+    expect(configure.mock.calls.some(([token]) => token === 'late-token')).toBe(false);
     await act(async () => {
       finishLogout();
       await logout;
@@ -74,8 +84,12 @@ describe('Authentication refresh lifecycle', () => {
       tokenType: 'Bearer',
     };
     vi.spyOn(authApi, 'loginWithPassword').mockResolvedValue(bundle);
+    vi.spyOn(authApi, 'openBrowserSession').mockResolvedValue({ ...bundle, refreshToken: null });
     vi.spyOn(authApi, 'me').mockResolvedValue({ id: '7', role: 'CUSTOMER' } as User);
-    const refresh = vi.spyOn(authApi, 'refreshToken').mockResolvedValue(bundle);
+    const refresh = vi
+      .mocked(authApi.refreshBrowserSession)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ ...bundle, refreshToken: null });
     let auth!: ReturnType<typeof useAuth>;
     function Probe() {
       auth = useAuth();
@@ -89,14 +103,17 @@ describe('Authentication refresh lifecycle', () => {
       </QueryClientProvider>,
     );
     await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
       await auth.login({ identifier: 'fixture', password: 'test-only' });
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(8000);
     });
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(2);
     mounted.unmount();
     await vi.advanceTimersByTimeAsync(20000);
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(2);
   });
 });

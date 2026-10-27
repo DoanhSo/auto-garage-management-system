@@ -1,17 +1,13 @@
 import { z } from 'zod';
 import { roles, type User } from '../../../shared/types/contracts';
+import { usernameSchema } from '../../../shared/validation/username';
 export const userFormSchema = () =>
   z.object({
     fullName: z
       .string()
       .max(150, 'Họ tên tối đa 150 ký tự.')
       .refine((value) => !!value.trim(), 'Nhập họ và tên.'),
-    username: z
-      .string()
-      .regex(
-        /^[A-Za-z0-9._-]{3,100}$/,
-        'Dùng 3–100 chữ/số ASCII, dấu chấm, gạch dưới hoặc gạch ngang.',
-      ),
+    username: usernameSchema,
     email: z
       .string()
       .max(254, 'Email tối đa 254 ký tự.')

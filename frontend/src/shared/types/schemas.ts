@@ -12,6 +12,11 @@ export const userSchema = z.object({
   version: z.string().regex(/^\d+$/),
   createdAt: z.string(),
 });
+export const browserSessionSchema = z.object({
+  accessToken: z.string().min(1),
+  expiresIn: z.number().int().positive(),
+  tokenType: z.literal('Bearer'),
+});
 export const oidcTokenSchema = z.object({
   access_token: z.string().min(1),
   refresh_token: z.string().min(1).optional(),

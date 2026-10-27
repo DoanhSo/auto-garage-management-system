@@ -8,6 +8,11 @@ public final class ApiPaths {
     public static final String LOGOUT = "/logout";
     public static final String REGISTER = "/register";
     public static final String REGISTRATION = AUTH_BASE + REGISTER;
+    public static final String SESSION = "/session";
+    public static final String SESSION_REFRESH = SESSION + "/refresh";
+    public static final String BROWSER_SESSION = AUTH_BASE + SESSION;
+    public static final String BROWSER_SESSION_REFRESH = AUTH_BASE + SESSION_REFRESH;
+    public static final String BROWSER_SESSION_WILDCARD = BROWSER_SESSION + "/**";
 
     public static final String USERS_BASE = "/api/v1/admin/users";
     public static final String USERS_WILDCARD = USERS_BASE + "/**";

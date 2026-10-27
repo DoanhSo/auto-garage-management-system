@@ -3,11 +3,13 @@ import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll, vi } from 'vitest';
 import { configureSession } from '../shared/api/client';
 import { server } from './server';
+import { markLogoutPending } from '../features/auth/api/sessionIntent';
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => {
   cleanup();
   server.resetHandlers();
   configureSession(null, () => {});
+  markLogoutPending(false);
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });

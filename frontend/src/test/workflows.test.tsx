@@ -41,7 +41,10 @@ function app(destination: React.ReactNode = <UsersPage />) {
 }
 async function login() {
   const user = userEvent.setup();
-  await user.type(screen.getByLabelText('Tên đăng nhập hoặc email', { exact: false }), 'admin');
+  await user.type(
+    await screen.findByLabelText('Tên đăng nhập hoặc email', { exact: false }),
+    'admin',
+  );
   await user.type(screen.getByLabelText(/^Mật khẩu\s*\*/, { selector: 'input' }), 'valid-password');
   await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
   return user;
@@ -154,7 +157,7 @@ describe('Forms against HTTP contracts', () => {
     );
     app();
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Đăng nhập' }));
+    await user.click(await screen.findByRole('button', { name: 'Đăng nhập' }));
     expect(await screen.findByText('Nhập tên đăng nhập hoặc email.')).toBeVisible();
     expect(calls).toBe(0);
     await user.type(screen.getByLabelText('Tên đăng nhập hoặc email', { exact: false }), 'admin');

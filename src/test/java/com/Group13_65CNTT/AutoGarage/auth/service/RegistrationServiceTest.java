@@ -25,12 +25,13 @@ class RegistrationServiceTest {
     @Test
     void normalizesEmailAndCreatesOnlyCustomerWithoutTransformingPassword() {
         RegistrationRequest request = request();
+        request.setUsername(" Customer.One ");
         request.setEmail(" Customer@Gmail.com "); request.setFullName(" Customer Name "); request.setPassword("  test-password-123  ");
         when(identities.createOrLinkUser(anyString(), anyString(), anyString(), any(), anyString())).thenReturn(Optional.of("new-identity"));
         service.register(request);
         var order = inOrder(passwordPolicy, identities);
         order.verify(passwordPolicy).validateNewPassword("  test-password-123  ");
-        order.verify(identities).createOrLinkUser("customer@gmail.com", "customer@gmail.com", "Customer Name", Role.CUSTOMER, "  test-password-123  ");
+        order.verify(identities).createOrLinkUser("customer.one", "customer@gmail.com", "Customer Name", Role.CUSTOMER, "  test-password-123  ");
     }
 
     @Test
@@ -58,7 +59,7 @@ class RegistrationServiceTest {
 
     private RegistrationRequest request() {
         RegistrationRequest request = new RegistrationRequest();
-        request.setFullName("Customer Name"); request.setEmail("customer@gmail.com"); request.setPassword("test-password-123");
+        request.setUsername("customer.one"); request.setFullName("Customer Name"); request.setEmail("customer@gmail.com"); request.setPassword("test-password-123");
         return request;
     }
 }
