@@ -11,7 +11,7 @@ export function ServiceCards({
 }: {
   canManage?: boolean;
   services: Service[];
-  onEdit: (id: string) => void;
+  onEdit: (id: string, trigger: HTMLElement) => void;
   onDeactivate: (service: Service) => void;
 }) {
   if (!services.length) {
@@ -30,101 +30,87 @@ export function ServiceCards({
         const hours = (s.standardMinutes / 60).toFixed(1);
 
         return (
-          <li
-            key={s.id}
-            className="vehicle-card border border-border rounded-lg p-4 bg-card shadow-sm space-y-3"
-          >
-            <div className="flex items-start justify-between gap-2">
+          <li key={s.id}>
+            <div className="user-card-top">
+              <span className="code-tag">{s.serviceCode}</span>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs font-semibold bg-muted text-muted-foreground px-2 py-0.5 rounded">
-                    {s.serviceCode}
-                  </span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded font-medium ${
-                      isPackage
-                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
-                        : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-                    }`}
-                  >
-                    {isPackage ? 'Gói bảo dưỡng' : 'Dịch vụ lẻ'}
-                  </span>
-                </div>
-                <h3 className="text-sm font-semibold text-foreground mt-1.5">{s.serviceName}</h3>
+                <strong>{s.serviceName}</strong>
+                <span className={`badge ${isPackage ? 'badge-primary' : 'badge-neutral'}`}>
+                  {isPackage ? 'Gói bảo dưỡng' : 'Dịch vụ lẻ'}
+                </span>
               </div>
               <StatusBadge active={s.isActive} />
             </div>
 
-            <div className="flex items-baseline justify-between pt-1 border-t border-border/60">
-              <span className="text-xs text-muted-foreground">Tiền công định mức:</span>
-              <span className="text-base font-bold text-primary">{money(s.unitPrice)}</span>
-            </div>
+            <div className="customer-card-details">
+              <div className="info-row credit-row">
+                <span className="muted">Tiền công định mức:</span>
+                <strong className="credit-amount">{money(s.unitPrice)}</strong>
+              </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <Clock size={13} className="shrink-0" />
+              <div className="info-row">
+                <Clock size={14} aria-hidden />
                 <span>
-                  {s.standardMinutes} phút (~{hours}h)
+                  Thời gian chuẩn: {s.standardMinutes} phút (~{hours} giờ)
                 </span>
               </div>
 
               {s.requiredBayType ? (
-                <div className="flex items-center gap-1.5 truncate">
-                  <Box size={13} className="shrink-0" />
-                  <span className="truncate">{s.requiredBayType}</span>
+                <div className="info-row">
+                  <Box size={14} aria-hidden />
+                  <span>Yêu cầu khoang: {s.requiredBayType}</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5">
-                  <Wrench size={13} className="shrink-0" />
-                  <span>Khoang tự do</span>
+                <div className="info-row">
+                  <Wrench size={14} aria-hidden />
+                  <span className="muted">Khoang tự do</span>
                 </div>
               )}
 
-              {(s.warrantyDays > 0 || s.warrantyKm > 0) && (
-                <div className="flex items-center gap-1.5 col-span-2 text-emerald-600 dark:text-emerald-400">
-                  <ShieldCheck size={13} className="shrink-0" />
+              {isPackage && (
+                <div className="info-row">
+                  <RotateCw size={14} aria-hidden />
                   <span>
-                    Bảo hành: {s.warrantyDays > 0 ? `${s.warrantyDays} ngày` : ''}
-                    {s.warrantyDays > 0 && s.warrantyKm > 0 ? ' / ' : ''}
-                    {s.warrantyKm > 0 ? `${s.warrantyKm.toLocaleString('vi-VN')} km` : ''}
+                    Chu kỳ: {s.periodKm?.toLocaleString('vi-VN')} km hoặc {s.periodMonths} tháng
                   </span>
                 </div>
               )}
 
-              {isPackage && (s.intervalKm || s.intervalMonths) && (
-                <div className="flex items-center gap-1.5 col-span-2 text-indigo-600 dark:text-indigo-400">
-                  <RotateCw size={13} className="shrink-0" />
-                  <span>
-                    Chu kỳ: {s.intervalKm ? `${s.intervalKm.toLocaleString('vi-VN')} km` : ''}
-                    {s.intervalKm && s.intervalMonths ? ' hoặc ' : ''}
-                    {s.intervalMonths ? `${s.intervalMonths} tháng` : ''}
-                  </span>
+              {s.warrantyMonths ? (
+                <div className="info-row">
+                  <ShieldCheck size={14} aria-hidden />
+                  <span>Bảo hành: {s.warrantyMonths} tháng</span>
                 </div>
-              )}
+              ) : null}
+
+              {s.description && <p className="muted" style={{ marginTop: 4 }}>{s.description}</p>}
             </div>
 
-            <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-border">
-              {canManage && (
-                <Button
-                  variant="ghost"
-                  className="button-small h-8 px-2.5 text-xs"
-                  onClick={() => onEdit(s.id)}
-                >
-                  <SquarePen size={14} className="mr-1" />
-                  Sửa
-                </Button>
-              )}
+            <div className="user-card-bottom">
+              <div className="row-actions">
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    aria-label={`Sửa dịch vụ ${s.serviceName}`}
+                    onClick={(e) => onEdit(s.id, e.currentTarget)}
+                  >
+                    <SquarePen size={16} />
+                    Sửa
+                  </Button>
+                )}
 
-              {canManage && (
-                <Button
-                  variant="ghost"
-                  className="button-small h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  onClick={() => onDeactivate(s)}
-                  title="Ngừng áp dụng"
-                >
-                  <Trash2 size={14} />
-                </Button>
-              )}
+                {canManage && s.isActive && (
+                  <Button
+                    variant="ghost"
+                    className="delete-action"
+                    aria-label={`Ngừng áp dụng dịch vụ ${s.serviceName}`}
+                    onClick={() => onDeactivate(s)}
+                  >
+                    <Trash2 size={16} />
+                    Ngừng áp dụng
+                  </Button>
+                )}
+              </div>
             </div>
           </li>
         );

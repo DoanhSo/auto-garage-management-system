@@ -8,9 +8,24 @@ import {
   CalendarX,
   UserX,
 } from 'lucide-react';
-import type { Booking } from '../../../shared/types/contracts';
+import type { Booking, BookingStatus } from '../../../shared/types/contracts';
 import { Button, Empty } from '../../../shared/components/ui';
 import { formatDateTime } from '../../../shared/utils/format';
+
+export function BookingStatusBadge({ status }: { status: BookingStatus }) {
+  switch (status) {
+    case 'PENDING':
+      return <span className="badge badge-warning">Chờ xác nhận</span>;
+    case 'CONFIRMED':
+      return <span className="badge badge-primary">Đã xác nhận</span>;
+    case 'RECEIVED':
+      return <span className="badge badge-success">Đã vào xưởng</span>;
+    case 'CANCELLED':
+      return <span className="badge badge-danger">Đã hủy</span>;
+    case 'NO_SHOW':
+      return <span className="badge badge-neutral">Vắng mặt</span>;
+  }
+}
 
 export function BookingCards({
   canManage = false,
@@ -28,7 +43,7 @@ export function BookingCards({
   onReschedule: (booking: Booking) => void;
   onCancel: (booking: Booking) => void;
   onNoShow: (booking: Booking) => void;
-  onVehicleCheck: (booking: Booking) => void;
+  onVehicleCheck?: (booking: Booking) => void;
 }) {
   if (!bookings.length) {
     return (
@@ -39,147 +54,107 @@ export function BookingCards({
     );
   }
 
-  const getStatusBadge = (status: Booking['status']) => {
-    switch (status) {
-      case 'PENDING':
-        return (
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-            Chờ xác nhận
-          </span>
-        );
-      case 'CONFIRMED':
-        return (
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-            Đã xác nhận
-          </span>
-        );
-      case 'RECEIVED':
-        return (
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-            Đã vào xưởng
-          </span>
-        );
-      case 'CANCELLED':
-        return (
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
-            Đã hủy
-          </span>
-        );
-      case 'NO_SHOW':
-        return (
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300">
-            Vắng mặt
-          </span>
-        );
-    }
-  };
-
   return (
     <ul className="user-cards" aria-label="Danh sách lịch hẹn dạng thẻ">
       {bookings.map((b) => (
-        <li
-          key={b.id}
-          className="vehicle-card border border-border rounded-lg p-4 bg-card shadow-sm space-y-3"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-semibold bg-muted text-muted-foreground px-2 py-0.5 rounded">
-                #{b.bookingCode}
-              </span>
-              <span className="font-mono font-bold text-xs bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20">
-                {b.licensePlate}
-              </span>
+        <li key={b.id}>
+          <div className="user-card-top">
+            <span className="code-tag">#{b.bookingCode}</span>
+            <span className="plate-badge">{b.licensePlate}</span>
+            <div style={{ marginLeft: 'auto' }}>
+              <BookingStatusBadge status={b.status} />
             </div>
-            {getStatusBadge(b.status)}
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-            <Calendar size={13} className="text-primary" />
-            <span>Hẹn lúc: {formatDateTime(b.appointmentAt)}</span>
-          </div>
+          <div className="customer-card-details">
+            <div className="info-row">
+              <Calendar size={14} aria-hidden />
+              <strong>Hẹn lúc: {formatDateTime(b.appointmentAt)}</strong>
+            </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5 truncate">
-              <User size={13} className="shrink-0" />
-              <span className="truncate">
+            <div className="info-row">
+              <User size={14} aria-hidden />
+              <span>
                 {b.customerName} ({b.customerPhone})
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 truncate">
-              <Car size={13} className="shrink-0" />
-              <span className="truncate">{b.serviceName || 'Khám tổng quát'}</span>
+            <div className="info-row">
+              <Car size={14} aria-hidden />
+              <span>{b.serviceName || 'Kiểm tra & bảo dưỡng tổng quát'}</span>
             </div>
+
+            {b.requestDescription && (
+              <p className="muted" style={{ marginTop: 4 }}>
+                {b.requestDescription}
+              </p>
+            )}
+
+            {b.cancellationReason && (
+              <div className="info-row">
+                <span className="badge badge-danger">Lý do hủy: {b.cancellationReason}</span>
+              </div>
+            )}
           </div>
 
-          {b.requestDescription && (
-            <div className="text-xs text-muted-foreground bg-muted/40 p-2 rounded line-clamp-2">
-              {b.requestDescription}
-            </div>
-          )}
-
-          {b.cancellationReason && (
-            <div className="text-xs text-red-600 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200">
-              Lý do hủy: {b.cancellationReason}
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-border">
-            {canManage && b.status === 'PENDING' && (
-              <Button
-                variant="primary"
-                className="button-small h-8 px-2.5 text-xs"
-                onClick={() => onConfirm(b)}
-              >
-                <CheckCircle size={13} className="mr-1" />
-                Xác nhận
-              </Button>
-            )}
-
-            {canManage && b.status === 'CONFIRMED' && (
-              <Button
-                variant="primary"
-                className="button-small h-8 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700"
-                onClick={() => onCheckIn(b)}
-              >
-                <LogIn size={13} className="mr-1" />
-                Tiếp nhận vào xưởng
-              </Button>
-            )}
-
-            {(b.status === 'PENDING' || b.status === 'CONFIRMED') && (
-              <>
+          <div className="user-card-bottom">
+            <div className="row-actions">
+              {canManage && b.status === 'PENDING' && (
                 <Button
-                  variant="ghost"
-                  className="button-small h-8 px-2 text-xs"
-                  onClick={() => onReschedule(b)}
+                  variant="primary"
+                  aria-label={`Xác nhận lịch hẹn ${b.bookingCode}`}
+                  onClick={() => onConfirm(b)}
                 >
-                  <CalendarClock size={13} className="mr-1 text-amber-500" />
-                  Dời lịch
+                  <CheckCircle size={16} />
+                  Xác nhận
                 </Button>
+              )}
 
-                {canManage && b.status === 'CONFIRMED' && (
+              {canManage && b.status === 'CONFIRMED' && (
+                <Button
+                  variant="primary"
+                  aria-label={`Tiếp nhận xe ${b.licensePlate} vào xưởng`}
+                  onClick={() => onCheckIn(b)}
+                >
+                  <LogIn size={16} />
+                  Tiếp nhận vào xưởng
+                </Button>
+              )}
+
+              {(b.status === 'PENDING' || b.status === 'CONFIRMED') && (
+                <>
                   <Button
                     variant="ghost"
-                    className="button-small h-8 px-2 text-xs text-slate-600"
-                    onClick={() => onNoShow(b)}
-                    title="Đánh dấu khách không đến"
+                    aria-label={`Dời lịch hẹn ${b.bookingCode}`}
+                    onClick={() => onReschedule(b)}
                   >
-                    <UserX size={13} className="mr-1" />
-                    Vắng mặt
+                    <CalendarClock size={16} />
+                    Dời lịch
                   </Button>
-                )}
 
-                <Button
-                  variant="ghost"
-                  className="button-small h-8 px-2 text-xs text-red-600 hover:text-red-700"
-                  onClick={() => onCancel(b)}
-                >
-                  <CalendarX size={13} className="mr-1" />
-                  Hủy
-                </Button>
-              </>
-            )}
+                  {canManage && b.status === 'CONFIRMED' && (
+                    <Button
+                      variant="ghost"
+                      aria-label={`Đánh dấu vắng mặt lịch hẹn ${b.bookingCode}`}
+                      onClick={() => onNoShow(b)}
+                    >
+                      <UserX size={16} />
+                      Vắng mặt
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="ghost"
+                    className="delete-action"
+                    aria-label={`Hủy lịch hẹn ${b.bookingCode}`}
+                    onClick={() => onCancel(b)}
+                  >
+                    <CalendarX size={16} />
+                    Hủy
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         </li>
       ))}

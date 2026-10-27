@@ -336,6 +336,21 @@ select.input {
   background: #edf8f1;
   border: 1px solid #d8eee1;
 }
+.badge-warning {
+  color: #9a6700;
+  background: #fff8e6;
+  border: 1px solid #ffeaad;
+}
+.badge-danger {
+  color: #b42335;
+  background: #fdf2f2;
+  border: 1px solid #f8d7da;
+}
+.badge-outline {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+}
 .status-dot {
   width: 5px;
   height: 5px;
