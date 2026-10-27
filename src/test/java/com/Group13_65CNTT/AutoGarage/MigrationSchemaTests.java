@@ -103,7 +103,7 @@ class MigrationSchemaTests extends IntegrationTestSupport {
                         "SELECT COUNT(*) FROM information_schema.views WHERE"
                                 + " table_schema=DATABASE()",
                         Integer.class));
-        assertEquals(9, flyway.info().applied().length);
+        assertEquals(10, flyway.info().applied().length);
         assertEquals(0, flyway.info().pending().length);
         flyway.validate();
     }

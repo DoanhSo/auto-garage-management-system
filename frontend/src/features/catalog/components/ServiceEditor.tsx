@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError, errorMessage } from '../../../shared/api/errors';
+import { applyFormError } from '../../../shared/api/errors';
 import {
   Button,
   ConfirmDialog,
@@ -88,7 +88,7 @@ function ServiceForm({
             warrantyTerms: values.warrantyTerms?.trim() || null,
           },
         });
-        notify.success('Cập nhật dịch vụ thành công');
+        notify('Cập nhật dịch vụ thành công');
       } else {
         await create.mutateAsync({
           serviceCode: values.serviceCode?.trim() || null,
@@ -105,14 +105,11 @@ function ServiceForm({
           warrantyKm: Number(values.warrantyKm ?? 0),
           warrantyTerms: values.warrantyTerms?.trim() || null,
         });
-        notify.success('Thêm dịch vụ mới thành công');
+        notify('Thêm dịch vụ mới thành công');
       }
       onSaved();
     } catch (err: unknown) {
-      const field = applyFormError(err, setError);
-      if (!field) {
-        notify.error(errorMessage(err) ?? 'Lưu dịch vụ thất bại');
-      }
+      applyFormError(err, setError, Object.keys(values));
     }
   }
 
@@ -120,8 +117,12 @@ function ServiceForm({
 
   return (
     <>
-      <form className="editor-form account-editor-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <FormError message={errors.root?.message} />
+      <form
+        className="editor-form account-editor-form"
+        onSubmit={handleSubmit(onSubmit)}
+        noValidate
+      >
+        <FormError message={errors.root?.server?.message} />
 
         <div className="form-section-label">Thông tin dịch vụ & Phân loại</div>
 
@@ -237,7 +238,7 @@ function ServiceForm({
                   className="input"
                   min={1}
                   placeholder="5000"
-                  {...register('intervalKm')}
+                  {...register('intervalKm', { valueAsNumber: true })}
                 />
               </Field>
 
@@ -251,7 +252,7 @@ function ServiceForm({
                   className="input"
                   min={1}
                   placeholder="6"
-                  {...register('intervalMonths')}
+                  {...register('intervalMonths', { valueAsNumber: true })}
                 />
               </Field>
             </div>
@@ -330,8 +331,7 @@ function ServiceForm({
         title="Hủy các thay đổi?"
         description="Dữ liệu dịch vụ chưa lưu sẽ bị mất nếu bạn đóng biểu mẫu này."
         confirmLabel="Bỏ thay đổi"
-        cancelLabel="Tiếp tục chỉnh sửa"
-        destructive
+        danger
         onConfirm={() => {
           setDiscard(false);
           onSaved();
@@ -344,8 +344,7 @@ function ServiceForm({
         title="Rời khỏi trang?"
         description="Bạn có thay đổi chưa lưu trên thông tin dịch vụ. Bạn có chắc muốn rời đi?"
         confirmLabel="Rời đi"
-        cancelLabel="Ở lại"
-        destructive
+        danger
         onConfirm={() => blocker.proceed?.()}
         onCancel={() => blocker.reset?.()}
       />
@@ -365,6 +364,10 @@ export function ServiceEditor({
   const isEditing = Boolean(serviceId);
   const detail = useServiceQuery(serviceId);
   const [closeHandler, setCloseHandler] = useState<(() => void) | null>(null);
+  const registerCloseHandler = useCallback(
+    (handler: () => void) => setCloseHandler(() => handler),
+    [],
+  );
 
   const title = isEditing ? 'Chỉnh sửa dịch vụ & đơn giá' : 'Thêm dịch vụ kỹ thuật mới';
   const description = isEditing
@@ -385,16 +388,13 @@ export function ServiceEditor({
       {isEditing && detail.isLoading ? (
         <Loading label="Đang tải dữ liệu dịch vụ…" />
       ) : isEditing && detail.isError ? (
-        <QueryError
-          error={detail.error}
-          retry={() => detail.refetch()}
-        />
+        <QueryError error={detail.error} retry={() => detail.refetch()} />
       ) : (
         <ServiceForm
           key={serviceId ?? 'new'}
           existing={detail.data}
           onSaved={onClose}
-          onRequestClose={setCloseHandler}
+          onRequestClose={registerCloseHandler}
         />
       )}
     </Sheet>

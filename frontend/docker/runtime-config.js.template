@@ -1,0 +1,1 @@
+window.__AUTOGARAGE_CONFIG__ = { keycloakPublicOrigin: "${KEYCLOAK_PUBLIC_URL}" };

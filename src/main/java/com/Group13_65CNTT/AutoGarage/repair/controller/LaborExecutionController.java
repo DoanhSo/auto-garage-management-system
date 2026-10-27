@@ -13,6 +13,7 @@ import com.Group13_65CNTT.AutoGarage.repair.dto.response.TaskAssignmentResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.TaskWorkSummaryResponse;
 import com.Group13_65CNTT.AutoGarage.repair.service.LaborExecutionService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -28,31 +29,32 @@ import java.util.List;
 @RequestMapping(ApiPaths.REPAIR_TASKS_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Labor Execution", description = "Phân công kỹ thuật viên, bấm giờ timer và hoàn thành công việc (TV3)")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class LaborExecutionController {
 
     private final LaborExecutionService laborExecutionService;
     private final CurrentUserProvider currentUserProvider;
 
     @PostMapping("/{taskId}/assignments")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Phân công kỹ thuật viên cho công việc (MAIN, ASSISTANT, QC)")
     public ResponseEntity<ApiResponse<TaskAssignmentResponse>> assignTask(
             @PathVariable Long taskId,
             @Valid @RequestBody TaskAssignmentRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         TaskAssignmentResponse response = laborExecutionService.assignTask(actorId, taskId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
     }
 
     @DeleteMapping("/assignments/{assignmentId}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Giải phóng phân công kỹ thuật viên")
     public ResponseEntity<ApiResponse<Void>> releaseAssignment(
             @PathVariable Long assignmentId,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         laborExecutionService.releaseAssignment(actorId, assignmentId);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, null, httpRequest.getRequestURI()));
     }
@@ -68,25 +70,25 @@ public class LaborExecutionController {
     }
 
     @PostMapping("/assignments/{assignmentId}/timer/start")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
     @Operation(summary = "Bắt đầu bấm giờ làm việc (Timer) cho kỹ thuật viên")
     public ResponseEntity<ApiResponse<LaborSessionResponse>> startTimer(
             @PathVariable Long assignmentId,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         LaborSessionResponse response = laborExecutionService.startTimer(actorId, assignmentId);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
     }
 
     @PostMapping("/assignments/{assignmentId}/timer/stop")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
     @Operation(summary = "Tạm dừng hoặc dừng bấm giờ làm việc (PAUSE, COMPLETE, CANCEL)")
     public ResponseEntity<ApiResponse<LaborSessionResponse>> stopTimer(
             @PathVariable Long assignmentId,
             @Valid @RequestBody LaborSessionStopRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         LaborSessionResponse response = laborExecutionService.stopTimer(actorId, assignmentId, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
@@ -102,13 +104,13 @@ public class LaborExecutionController {
     }
 
     @PostMapping("/{taskId}/complete")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
     @Operation(summary = "Xác nhận hoàn thành công việc, đóng timer và tính tổng giờ công thực")
     public ResponseEntity<ApiResponse<TaskWorkSummaryResponse>> completeTask(
             @PathVariable Long taskId,
             @RequestBody(required = false) TaskCompletionRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         TaskWorkSummaryResponse response = laborExecutionService.completeTask(actorId, taskId, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }

@@ -6,11 +6,14 @@ public final class AuditConstants {
 
     public static final String ACTION_ADMIN_BOOTSTRAPPED = "ADMIN_BOOTSTRAPPED";
     public static final String ACTION_AUTH_LOGOUT_ALL = "AUTH_LOGOUT_ALL";
+    public static final String ACTION_CUSTOMER_JIT_PROVISIONED = "CUSTOMER_JIT_PROVISIONED";
     public static final String ACTION_USER_CREATED = "USER_CREATED";
     public static final String ACTION_USER_UPDATED = "USER_UPDATED";
     public static final String ACTION_USER_DELETED = "USER_DELETED";
     public static final String ACTION_NOTIFICATION_ENQUEUED = "NOTIFICATION_ENQUEUED";
+    public static final String ACTION_NOTIFICATION_BROADCAST = "NOTIFICATION_BROADCAST";
     public static final String ACTION_NOTIFICATION_READ = "NOTIFICATION_READ";
+    public static final String ACTION_NOTIFICATION_DELETED = "NOTIFICATION_DELETED";
 
     public static final String DETAIL_ROLE = "role";
     public static final String DETAIL_ACTIVE = "active";

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { customerTypes, type Customer, type CustomerType } from '../../../shared/types/contracts';
+import { customerTypes, type Customer } from '../../../shared/types/contracts';
 
 export const customerFormSchema = z
   .object({
@@ -27,15 +27,18 @@ export const customerFormSchema = z
     companyName: z.string().trim().max(255, 'Tên công ty tối đa 255 ký tự').optional(),
     taxCode: z.string().trim().max(30, 'Mã số thuế tối đa 30 ký tự').optional(),
     creditLimit: z.coerce
-      .number({ invalid_type_error: 'Hạn mức công nợ phải là số' })
+      .number<number>({ error: 'Hạn mức công nợ phải là số' })
       .min(0, 'Hạn mức công nợ không được âm'),
     paymentTermDays: z.coerce
-      .number({ invalid_type_error: 'Hạn nợ (ngày) phải là số' })
+      .number<number>({ error: 'Hạn nợ (ngày) phải là số' })
       .int('Hạn nợ phải là số nguyên ngày')
       .min(0, 'Hạn nợ không được âm'),
   })
   .superRefine((data, ctx) => {
-    if (data.customerType === 'BUSINESS' && (!data.companyName || data.companyName.trim().length === 0)) {
+    if (
+      data.customerType === 'BUSINESS' &&
+      (!data.companyName || data.companyName.trim().length === 0)
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['companyName'],

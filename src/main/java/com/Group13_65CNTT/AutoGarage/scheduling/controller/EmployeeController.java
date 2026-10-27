@@ -36,7 +36,7 @@ import java.util.Set;
 @RequestMapping(ApiPaths.EMPLOYEES_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Employee Management", description = "Technician and garage staff management")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class EmployeeController {
 
     private static final Set<String> SORT_FIELDS =
@@ -79,12 +79,12 @@ public class EmployeeController {
     public ResponseEntity<ApiResponse<Page<EmployeeResponse>>> getEmployees(
             @RequestParam(required = false) Boolean isActive,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Integer size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
             HttpServletRequest httpRequest) {
         Page<EmployeeResponse> responses = schedulingService.getEmployees(
-                isActive, pagination.page(page, size, sortBy, sortDir, SORT_FIELDS));
+                isActive, pagination.page(page, size != null ? size : pagination.defaultSize(), sortBy, sortDir, SORT_FIELDS));
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, responses, httpRequest.getRequestURI()));
     }
 

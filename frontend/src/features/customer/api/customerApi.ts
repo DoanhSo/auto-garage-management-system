@@ -9,6 +9,8 @@ export interface CustomerQueryParams {
 }
 
 export const customerApi = {
+  me: async (signal?: AbortSignal): Promise<Customer> =>
+    customerSchema.parse(await request<unknown>('/customers/me', { signal })),
   list: async (params?: CustomerQueryParams, signal?: AbortSignal): Promise<Customer[]> => {
     const raw = await request<unknown>(
       '/customers' +

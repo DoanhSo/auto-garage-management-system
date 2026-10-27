@@ -1,19 +1,11 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError, errorMessage } from '../../../shared/api/errors';
-import {
-  Button,
-  Field,
-  FormError,
-  Sheet,
-} from '../../../shared/components/ui';
+import { applyFormError } from '../../../shared/api/errors';
+import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
 import type { Booking } from '../../../shared/types/contracts';
 import { useCancelBookingMutation } from '../hooks/useReception';
-import {
-  cancelFormSchema,
-  type CancelFormValues,
-} from '../schemas/receptionSchema';
+import { cancelFormSchema, type CancelFormValues } from '../schemas/receptionSchema';
 import { CalendarX } from 'lucide-react';
 
 export function CancelBookingDialog({
@@ -53,14 +45,11 @@ export function CancelBookingDialog({
         },
       });
 
-      notify.success(`Đã hủy lịch hẹn #${booking.bookingCode}`);
+      notify(`Đã hủy lịch hẹn #${booking.bookingCode}`);
       reset();
       onClose();
     } catch (err: unknown) {
-      const field = applyFormError(err, setError);
-      if (!field) {
-        notify.error(errorMessage(err) ?? 'Hủy lịch hẹn thất bại');
-      }
+      applyFormError(err, setError, Object.keys(values));
     }
   }
 
@@ -72,8 +61,12 @@ export function CancelBookingDialog({
       title={`Hủy lịch hẹn #${booking.bookingCode}`}
       description={`Khách hàng: ${booking.customerName} • Xe: ${booking.licensePlate}`}
     >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="editor-form account-editor-form">
-        <FormError message={errors.root?.message} />
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        noValidate
+        className="editor-form account-editor-form"
+      >
+        <FormError message={errors.root?.server?.message} />
 
         <Field
           label="Lý do hủy lịch hẹn *"
@@ -89,12 +82,7 @@ export function CancelBookingDialog({
         </Field>
 
         <div className="form-actions account-editor-actions">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={cancel.isPending}
-            onClick={onClose}
-          >
+          <Button type="button" variant="ghost" disabled={cancel.isPending} onClick={onClose}>
             Đóng
           </Button>
           <Button

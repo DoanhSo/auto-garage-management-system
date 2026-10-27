@@ -7,6 +7,10 @@ import com.Group13_65CNTT.AutoGarage.reception.mapper.VehicleCheckMapper;
 import com.Group13_65CNTT.AutoGarage.reception.repository.AttachmentRepository;
 import com.Group13_65CNTT.AutoGarage.reception.service.AttachmentServiceImpl;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +27,9 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AttachmentServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.reception.repository.VehicleCheckRepository vehicleCheckRepository;
+    @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    @org.mockito.Spy private com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties workshop = new com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties();
 
     @Mock
     private AttachmentRepository attachmentRepository;
@@ -43,6 +50,48 @@ class AttachmentServiceTest {
                 "image/jpeg",
                 "dummy image content bytes".getBytes()
         );
+    }
+
+    @Test
+    void forbiddenAttachmentReadDoesNotLoadMetadata() {
+        doThrow(new BusinessException(ResponseCode.FORBIDDEN)).when(customerScope)
+                .requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.ATTACHMENT, 10L);
+
+        assertThrows(BusinessException.class, () -> attachmentService.getAttachmentById(10L));
+        verifyNoInteractions(attachmentRepository);
+    }
+
+    @Test
+    void uploadRespectsConfiguredLimit() {
+        workshop.setMaxAttachmentBytes(1);
+        assertThrows(BusinessRuleException.class, () -> attachmentService.uploadAttachment(
+                100L, 1L, null, AttachmentCategory.CHECK_IN, 2L, validImageFile));
+        verifyNoInteractions(attachmentRepository);
+    }
+
+    @Test
+    void uploadRejectsMissingActorWithoutSaving() {
+        BusinessException failure = assertThrows(BusinessException.class, () ->
+                attachmentService.uploadAttachment(100L, 1L, null, AttachmentCategory.CHECK_IN, null, validImageFile));
+        assertEquals(ResponseCode.UNAUTHORIZED, failure.getResponseCode());
+        verifyNoInteractions(attachmentRepository);
+    }
+
+    @Test
+    void uploadReadFailurePreservesCauseAndServerError() throws IOException {
+        MultipartFile unreadable = mock(MultipartFile.class);
+        when(unreadable.isEmpty()).thenReturn(false);
+        when(unreadable.getSize()).thenReturn(20L);
+        when(unreadable.getContentType()).thenReturn("image/jpeg");
+        IOException unavailable = new IOException("private storage details");
+        when(unreadable.getInputStream()).thenThrow(unavailable);
+
+        BusinessException failure = assertThrows(BusinessException.class, () ->
+                attachmentService.uploadAttachment(100L, 1L, null, AttachmentCategory.CHECK_IN, 2L, unreadable));
+        assertEquals(ResponseCode.INTERNAL_SERVER_ERROR, failure.getResponseCode());
+        assertSame(unavailable, failure.getCause());
+        assertFalse(failure.getMessage().contains("private storage details"));
+        verifyNoInteractions(attachmentRepository);
     }
 
     @Test

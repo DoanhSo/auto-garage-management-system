@@ -1,5 +1,6 @@
 package com.Group13_65CNTT.AutoGarage.reception.service;
 
+import com.Group13_65CNTT.AutoGarage.common.security.ActorIds;
 import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
 import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
 import com.Group13_65CNTT.AutoGarage.reception.dto.CheckInVehicleRequest;
@@ -123,7 +124,7 @@ public class ReceptionServiceImpl implements ReceptionService {
         vehicle.setOdometer(request.getOdometerIn());
         vehicleRepository.save(vehicle);
 
-        long actor = request.getActorUserId() != null ? request.getActorUserId() : 1L;
+        long actor = ActorIds.require(request.getActorUserId());
         long repairOrderId;
         if (repairWorkflow != null) {
             repairOrderId =
@@ -134,7 +135,8 @@ public class ReceptionServiceImpl implements ReceptionService {
                             vehicle.getId(),
                             request.getOdometerIn());
         } else {
-            repairOrderId = System.currentTimeMillis();
+            throw new com.Group13_65CNTT.AutoGarage.common.exception.BusinessException(
+                    com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.SERVICE_UNAVAILABLE);
         }
 
         CheckInVehicleResponse response = new CheckInVehicleResponse();

@@ -27,7 +27,7 @@ import java.util.List;
 @RequestMapping(ApiPaths.SERVICES_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Service Catalog", description = "Service packages, pricing, repair standard minutes and warranties")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class CatalogController {
 
     private final CatalogService catalogService;

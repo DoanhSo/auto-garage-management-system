@@ -9,6 +9,7 @@ import org.mapstruct.*;
 public interface NotificationMapper {
     @BeanMapping(ignoreByDefault = true)
     @Mapping(target = "id", source = "id")
+    @Mapping(target = "userId", source = "userId")
     @Mapping(target = "channel", source = "channel")
     @Mapping(target = "subject", source = "subject")
     @Mapping(target = "payloadJson", source = "payloadJson")

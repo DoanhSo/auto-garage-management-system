@@ -1,6 +1,10 @@
 spring:
   application:
     name: AutoGarage
+  servlet:
+    multipart:
+      max-file-size: ${garage.workshop.max-attachment-bytes}B
+      max-request-size: ${garage.workshop.max-upload-request-bytes}B
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -42,6 +46,14 @@ springdoc:
     enabled: ${OPENAPI_ENABLED:false}
 
 security:
+  keycloak-admin:
+    enabled: ${KEYCLOAK_ADMIN_ENABLED:true}
+    server-url: ${KEYCLOAK_ADMIN_SERVER_URL:}
+    realm: ${KEYCLOAK_ADMIN_REALM:}
+    username: ${KEYCLOAK_ADMIN_USERNAME:}
+    password: ${KEYCLOAK_ADMIN_PASSWORD:}
+    connect-timeout: ${KEYCLOAK_ADMIN_CONNECT_TIMEOUT:5s}
+    request-timeout: ${KEYCLOAK_ADMIN_REQUEST_TIMEOUT:10s}
   auth:
     issuer: ${KEYCLOAK_ISSUER_URI}
     audience: ${AUTH_JWT_AUDIENCE}
@@ -58,6 +70,11 @@ security:
     identity-id: ${AUTH_BOOTSTRAP_IDENTITY_ID:}
 
 garage:
+  workshop:
+    default-service-minutes: ${WORKSHOP_DEFAULT_SERVICE_MINUTES:60}
+    max-attachment-bytes: ${WORKSHOP_MAX_ATTACHMENT_BYTES:15728640}
+    max-upload-request-bytes: ${WORKSHOP_MAX_UPLOAD_REQUEST_BYTES:16777216}
+    reservation-hold: ${WORKSHOP_RESERVATION_HOLD:30m}
   pagination:
     default-size: ${PAGINATION_DEFAULT_SIZE:20}
     max-size: ${PAGINATION_MAX_SIZE:100}

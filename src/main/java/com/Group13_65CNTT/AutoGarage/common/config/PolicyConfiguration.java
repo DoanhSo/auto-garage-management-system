@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties({
     PasswordProperties.class,
     PaginationProperties.class,
-    ReportProperties.class
+    ReportProperties.class,
+    WorkshopProperties.class
 })
 public class PolicyConfiguration {}

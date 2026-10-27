@@ -26,7 +26,6 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,6 +34,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Set;
 
 @RestController
 @RequiredArgsConstructor
@@ -75,7 +76,7 @@ public class InventoryDocumentController {
             HttpServletRequest http) {
         Pageable pageable = pagination.page(
                 page, size, sortBy, sortDir,
-                java.util.Set.of("createdAt", "documentCode", "totalAmount"));
+                Set.of("id", "createdAt", "documentCode", "totalAmount"));
         return ApiResponse.success(
                 ResponseCode.SUCCESS,
                 inventoryService.searchDocuments(type, status, supplierId, orderId, query, pageable),

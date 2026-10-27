@@ -14,6 +14,14 @@ import { ToastProvider } from './providers/ToastProvider';
 import { AppShell } from './layouts/AppShell';
 import { Button, Loading } from '../shared/components/ui';
 import { retryQuery } from '../shared/api/errors';
+import type { Role } from '../shared/types/contracts';
+import {
+  STAFF_ROLES,
+  WAREHOUSE_ROLES,
+  FINANCE_ROLES,
+  FRONT_DESK_ROLES,
+  BOOKING_ROLES,
+} from './access';
 
 const LoginPage = lazy(() =>
   import('../features/auth/pages/LoginPage').then((module) => ({
@@ -23,6 +31,11 @@ const LoginPage = lazy(() =>
 const AccountPage = lazy(() =>
   import('../features/auth/pages/AccountPage').then((module) => ({
     default: module.AccountPage,
+  })),
+);
+const RegistrationPage = lazy(() =>
+  import('../features/auth/pages/RegistrationPage').then((module) => ({
+    default: module.RegistrationPage,
   })),
 );
 const UsersPage = lazy(() =>
@@ -111,14 +124,21 @@ export function RequireAuth() {
   );
 }
 
-export function RequireAdmin() {
+export function RequireRoles({ allowedRoles }: { allowedRoles: readonly Role[] }) {
   const { user } = useAuth();
-  return user?.role === 'ADMIN' ? <Outlet /> : <Navigate to="/403" replace />;
+  return user && allowedRoles.includes(user.role) ? <Outlet /> : <Navigate to="/403" replace />;
+}
+
+export function RequireAdmin() {
+  return <RequireRoles allowedRoles={['ADMIN']} />;
 }
 
 function Home() {
   const { user } = useAuth();
-  return <Navigate to={user?.role === 'ADMIN' ? '/admin/reports' : '/reception'} replace />;
+  if (user?.role === 'ADMIN') return <Navigate to="/admin/reports" replace />;
+  if (user?.role === 'WAREHOUSE_STAFF') return <Navigate to="/inventory/parts" replace />;
+  if (user?.role === 'RECEPTIONIST') return <Navigate to="/billing/invoices" replace />;
+  return <Navigate to="/notifications" replace />;
 }
 
 function StatusPage({ forbidden = false }: { forbidden?: boolean }) {
@@ -172,6 +192,7 @@ const router = createBrowserRouter([
     errorElement: <RouteError />,
     children: [
       { path: '/login', element: <LoginPage /> },
+      { path: '/register', element: <RegistrationPage /> },
       {
         element: <RequireAuth />,
         children: [
@@ -179,19 +200,40 @@ const router = createBrowserRouter([
             element: <AppShell />,
             children: [
               { index: true, element: <Home /> },
-              { path: 'reception', element: <BookingsPage /> },
-              { path: 'customers', element: <CustomersPage /> },
-              { path: 'vehicles', element: <VehiclesPage /> },
+              {
+                element: <RequireRoles allowedRoles={BOOKING_ROLES} />,
+                children: [
+                  { path: 'reception', element: <BookingsPage /> },
+                  { path: 'vehicles', element: <VehiclesPage /> },
+                ],
+              },
+              {
+                element: <RequireRoles allowedRoles={FRONT_DESK_ROLES} />,
+                children: [{ path: 'customers', element: <CustomersPage /> }],
+              },
               { path: 'services', element: <ServicesPage /> },
-              { path: 'inventory/parts', element: <PartsPage /> },
-              { path: 'inventory/suppliers', element: <SuppliersPage /> },
-              { path: 'inventory/documents', element: <InventoryDocumentsPage /> },
-              { path: 'inventory/reconciliation', element: <StockReconciliationPage /> },
-              { path: 'billing/invoices', element: <InvoicesPage /> },
-              { path: 'billing/payments', element: <PaymentsPage /> },
-              { path: 'billing/debt-ledger', element: <DebtLedgerPage /> },
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'account/security', element: <AccountPage /> },
+              {
+                element: <RequireRoles allowedRoles={STAFF_ROLES} />,
+                children: [
+                  { path: 'inventory/parts', element: <PartsPage /> },
+                  { path: 'inventory/documents', element: <InventoryDocumentsPage /> },
+                  { path: 'billing/invoices', element: <InvoicesPage /> },
+                  { path: 'billing/payments', element: <PaymentsPage /> },
+                ],
+              },
+              {
+                element: <RequireRoles allowedRoles={WAREHOUSE_ROLES} />,
+                children: [
+                  { path: 'inventory/suppliers', element: <SuppliersPage /> },
+                  { path: 'inventory/reconciliation', element: <StockReconciliationPage /> },
+                ],
+              },
+              {
+                element: <RequireRoles allowedRoles={FINANCE_ROLES} />,
+                children: [{ path: 'billing/debt-ledger', element: <DebtLedgerPage /> }],
+              },
               {
                 element: <RequireAdmin />,
                 children: [

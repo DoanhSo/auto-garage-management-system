@@ -26,13 +26,13 @@ import java.util.List;
 @RequestMapping(ApiPaths.CUSTOMERS_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Customer Management", description = "Customer profiles, contact details and credit limits")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class CustomerController {
 
     private final CustomerService customerService;
 
     @PostMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTIONIST_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Create customer profile")
     public ResponseEntity<ApiResponse<CustomerResponse>> createCustomer(
             @Valid @RequestBody CreateCustomerRequest request,
@@ -43,7 +43,7 @@ public class CustomerController {
     }
 
     @GetMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Search customers with optional filters")
     public ResponseEntity<ApiResponse<List<CustomerResponse>>> getCustomers(
             @RequestParam(required = false) String search,
@@ -54,7 +54,7 @@ public class CustomerController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_BOOKING_ACCESS)
     @Operation(summary = "Fetch customer by ID")
     public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerById(
             @PathVariable Long id,
@@ -63,8 +63,16 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
 
+    @GetMapping(ApiPaths.ME)
+    @PreAuthorize(SecurityConstants.HAS_BOOKING_ACCESS)
+    @Operation(summary = "Fetch the customer profile linked to the authenticated account")
+    public ResponseEntity<ApiResponse<CustomerResponse>> getCurrentCustomer(HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS,
+                customerService.getCurrentCustomer(), httpRequest.getRequestURI()));
+    }
+
     @GetMapping("/code/{code}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Fetch customer by customer code")
     public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerByCode(
             @PathVariable String code,
@@ -74,7 +82,7 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTIONIST_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Update customer profile")
     public ResponseEntity<ApiResponse<CustomerResponse>> updateCustomer(
             @PathVariable Long id,
@@ -85,7 +93,7 @@ public class CustomerController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTIONIST_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Deactivate customer")
     public ResponseEntity<ApiResponse<Void>> deactivateCustomer(
             @PathVariable Long id,

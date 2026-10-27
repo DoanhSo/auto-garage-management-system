@@ -39,7 +39,7 @@ public class DebtController {
     private final PaginationPolicy pagination;
 
     @GetMapping(ApiPaths.DEBTS_INVOICE_BALANCES)
-    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTION_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_FINANCE_STAFF)
     @Operation(summary = "Sổ theo dõi công nợ khách hàng theo hóa đơn (v_invoice_balances)")
     public ApiResponse<Page<InvoiceBalanceResponse>> getCustomerDebts(
             @RequestParam(required = false) Long customerId,
@@ -60,7 +60,7 @@ public class DebtController {
     }
 
     @GetMapping(ApiPaths.DEBTS_SUPPLIER_BALANCES)
-    @PreAuthorize(SecurityConstants.HAS_ROLE_WAREHOUSE_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_FINANCE_STAFF)
     @Operation(summary = "Sổ theo dõi công nợ nhà cung cấp (v_supplier_balances)")
     public ApiResponse<Page<SupplierBalanceResponse>> getSupplierDebts(
             @RequestParam(required = false) Boolean hasBalance,

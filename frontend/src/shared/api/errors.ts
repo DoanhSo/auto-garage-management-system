@@ -8,6 +8,7 @@ const messages: Record<number, string> = {
   2006: 'Không thể khóa hoặc hạ quyền quản trị viên hoạt động cuối cùng.',
   2007: 'Mật khẩu chưa đáp ứng chính sách hiện tại.',
   2010: 'Dữ liệu đang được xử lý. Vui lòng tải lại trước khi thao tác.',
+  2013: 'Tệp hoặc yêu cầu vượt quá dung lượng cho phép. Hãy chọn tệp nhỏ hơn.',
   3001: 'Phiên đăng nhập không còn hợp lệ.',
   3002: 'Bạn không có quyền thực hiện thao tác này.',
   3003: 'Phiên đăng nhập đã hết hạn hoặc bị thu hồi.',

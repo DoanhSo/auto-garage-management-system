@@ -5,12 +5,13 @@ import {
   CalendarCheck,
   Car,
   ChartNoAxesCombined,
-  ChevronRight,
   Contact,
   History,
   Layers,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   ShieldCheck,
   Users,
   Wrench,
@@ -27,35 +28,82 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from '../providers/AuthProvider';
 import { useMeQuery, useLogoutMutation } from '../../features/auth/hooks/useAuthQueries';
 import { useUnreadCountQuery } from '../../features/notification/hooks/useNotifications';
-import { Button } from '../../shared/components/ui';
+import { Button, RoleBadge } from '../../shared/components/ui';
+import { roles, type Role } from '../../shared/types/contracts';
+import { FRONT_DESK_ROLES, BOOKING_ROLES } from '../access';
 import { initials } from '../../shared/utils/format';
 
-const links = [
-  // TV2: Tiếp nhận xe, Khách hàng, Phương tiện, Dịch vụ & Tiền công
-  { to: '/reception', label: 'Tiếp nhận xe', icon: CalendarCheck, admin: false },
-  { to: '/customers', label: 'Khách hàng', icon: Contact, admin: false },
-  { to: '/vehicles', label: 'Phương tiện', icon: Car, admin: false },
-  { to: '/services', label: 'Dịch vụ & Tiền công', icon: Layers, admin: false },
-
-  // TV4: Kho phụ tùng & Tài chính hóa đơn
-  { to: '/inventory/parts', label: 'Kho & Phụ tùng', icon: Package, admin: false },
-  { to: '/inventory/suppliers', label: 'Nhà cung cấp', icon: Building2, admin: false },
-  { to: '/inventory/documents', label: 'Chứng từ kho', icon: FileText, admin: false },
-  { to: '/inventory/reconciliation', label: 'Đối soát kho', icon: Scale, admin: false },
-  { to: '/billing/invoices', label: 'Hóa đơn dịch vụ', icon: Receipt, admin: false },
-  { to: '/billing/payments', label: 'Sổ quỹ Thu / Chi', icon: DollarSign, admin: false },
-  { to: '/billing/debt-ledger', label: 'Sổ nợ & Tín dụng', icon: CreditCard, admin: false },
-
-  // TV1: Báo cáo, Quản trị người dùng & Nhật ký
+const links: ReadonlyArray<{
+  to: string;
+  label: string;
+  icon: typeof Bell;
+  allowedRoles: readonly Role[];
+}> = [
+  {
+    to: '/reception',
+    label: 'Tiếp nhận xe',
+    icon: CalendarCheck,
+    allowedRoles: BOOKING_ROLES,
+  },
+  {
+    to: '/customers',
+    label: 'Khách hàng',
+    icon: Contact,
+    allowedRoles: FRONT_DESK_ROLES,
+  },
+  { to: '/vehicles', label: 'Phương tiện', icon: Car, allowedRoles: BOOKING_ROLES },
+  { to: '/services', label: 'Dịch vụ', icon: Layers, allowedRoles: roles },
+  {
+    to: '/inventory/parts',
+    label: 'Kho & Phụ tùng',
+    icon: Package,
+    allowedRoles: ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN'],
+  },
+  {
+    to: '/inventory/suppliers',
+    label: 'Nhà cung cấp',
+    icon: Building2,
+    allowedRoles: ['ADMIN', 'WAREHOUSE_STAFF'],
+  },
+  {
+    to: '/inventory/documents',
+    label: 'Chứng từ kho',
+    icon: FileText,
+    allowedRoles: ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN'],
+  },
+  {
+    to: '/inventory/reconciliation',
+    label: 'Đối soát kho',
+    icon: Scale,
+    allowedRoles: ['ADMIN', 'WAREHOUSE_STAFF'],
+  },
+  {
+    to: '/billing/invoices',
+    label: 'Hóa đơn dịch vụ',
+    icon: Receipt,
+    allowedRoles: ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN'],
+  },
+  {
+    to: '/billing/payments',
+    label: 'Sổ quỹ Thu / Chi',
+    icon: DollarSign,
+    allowedRoles: ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF', 'TECHNICIAN'],
+  },
+  {
+    to: '/billing/debt-ledger',
+    label: 'Sổ nợ & Tín dụng',
+    icon: CreditCard,
+    allowedRoles: ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF'],
+  },
   {
     to: '/admin/reports',
     label: 'Báo cáo',
     icon: ChartNoAxesCombined,
-    admin: true,
+    allowedRoles: ['ADMIN'],
   },
-  { to: '/admin/users', label: 'Tài khoản', icon: Users, admin: true },
-  { to: '/admin/audit', label: 'Nhật ký', icon: History, admin: true },
-  { to: '/notifications', label: 'Thông báo', icon: Bell, admin: false },
+  { to: '/admin/users', label: 'Tài khoản', icon: Users, allowedRoles: ['ADMIN'] },
+  { to: '/admin/audit', label: 'Nhật ký', icon: History, allowedRoles: ['ADMIN'] },
+  { to: '/notifications', label: 'Thông báo', icon: Bell, allowedRoles: roles },
 ];
 
 export function AppShell() {
@@ -65,13 +113,14 @@ export function AppShell() {
   const unread = useUnreadCountQuery();
   const location = useLocation();
   const [mobile, setMobile] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (me.data) setCurrentUser(me.data);
   }, [me.data, setCurrentUser]);
 
-  const allowed = links.filter((link) => !link.admin || user?.role === 'ADMIN');
+  const allowed = links.filter((link) => !!user && link.allowedRoles.includes(user.role));
   const title =
     links.find((link) => location.pathname.startsWith(link.to))?.label ?? 'Tài khoản cá nhân';
 
@@ -83,10 +132,11 @@ export function AppShell() {
           key={to}
           to={to}
           onClick={close}
+          title={collapsed ? label : undefined}
           className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
         >
           <Icon size={19} aria-hidden />
-          <span>{label}</span>
+          <span className="nav-item-label">{label}</span>
           {to === '/notifications' && unread.data !== undefined && BigInt(unread.data) > 0n && (
             <span className="nav-count">{BigInt(unread.data) > 99n ? '99+' : unread.data}</span>
           )}
@@ -96,34 +146,46 @@ export function AppShell() {
       <NavLink
         to="/account/security"
         onClick={close}
+        title={collapsed ? 'Tài khoản của tôi' : undefined}
         className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
       >
         <ShieldCheck size={19} />
-        <span>Tài khoản của tôi</span>
+        <span className="nav-item-label">Tài khoản của tôi</span>
       </NavLink>
     </nav>
   );
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="sidebar">
-        <NavLink
-          to={user?.role === 'ADMIN' ? '/admin/reports' : '/notifications'}
-          className="brand"
-        >
-          <span className="brand-mark">
-            <Wrench size={22} />
-          </span>
-          <span>
-            AutoGarage<small>GARAGE WORKSPACE</small>
-          </span>
-        </NavLink>
+        <div className="sidebar-brand-row">
+          <NavLink
+            to={user?.role === 'ADMIN' ? '/admin/reports' : '/notifications'}
+            className="brand"
+          >
+            <span className="brand-mark">
+              <Wrench size={20} />
+            </span>
+            <span className="brand-text">
+              AutoGarage<small>Quản lý gara</small>
+            </span>
+          </NavLink>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={() => setCollapsed((prev) => !prev)}
+            aria-label={collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'}
+            title={collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'}
+          >
+            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
+        </div>
         {nav()}
         <div className="sidebar-footer">
           <span className="avatar">{initials(user?.fullName ?? '')}</span>
-          <div>
+          <div className="sidebar-user-meta">
             <strong>{user?.fullName}</strong>
-            <span>{user?.username}</span>
+            <span>@{user?.username}</span>
           </div>
         </div>
       </aside>
@@ -133,46 +195,58 @@ export function AppShell() {
             <Button
               ref={trigger}
               variant="ghost"
-              className="menu-button"
+              className="mobile-menu"
               aria-label="Mở menu điều hướng"
               aria-expanded={mobile}
               onClick={() => setMobile(true)}
             >
               <Menu size={20} />
             </Button>
-            <span>{title}</span>
+            <strong>{title}</strong>
           </div>
           <div className="header-actions">
-            <span className="avatar-chip">
-              <span className="avatar">{initials(user?.fullName ?? '')}</span>
-              <span>{user?.fullName}</span>
-            </span>
+            <NavLink
+              className="bell-button"
+              to="/notifications"
+              aria-label={`Thông báo${unread.data ? ' — ' + unread.data + ' chưa đọc' : ''}`}
+            >
+              <Bell size={19} />
+              {unread.data !== undefined && BigInt(unread.data) > 0n && (
+                <span className="bell-dot" />
+              )}
+            </NavLink>
+            <div className="header-user-pill">
+              <span className="header-name">{user?.fullName}</span>
+              {user && <RoleBadge role={user.role} />}
+            </div>
             <Button
               variant="ghost"
               onClick={() => logout.mutate()}
               aria-label="Đăng xuất khỏi hệ thống"
               pending={logout.isPending}
             >
-              <LogOut size={16} />
-              <span>Đăng xuất</span>
+              <LogOut size={17} />
+              <span className="logout-label">Đăng xuất</span>
             </Button>
           </div>
         </header>
-        <main className="main-viewport" id="main-content" tabIndex={-1}>
+        <main className="workspace" id="main-content" tabIndex={-1}>
           <Outlet />
         </main>
       </div>
       <Dialog.Root open={mobile} onOpenChange={setMobile}>
         <Dialog.Portal>
-          <Dialog.Overlay className="dialog-backdrop" />
+          <Dialog.Overlay className="overlay" />
           <Dialog.Content
-            className="mobile-drawer"
+            className="mobile-nav"
             aria-label="Thanh điều hướng di động"
             onCloseAutoFocus={(e) => {
               e.preventDefault();
               trigger.current?.focus();
             }}
           >
+            <Dialog.Title className="sr-only">Điều hướng</Dialog.Title>
+            <Dialog.Description className="sr-only">Chọn chức năng của gara.</Dialog.Description>
             <div className="drawer-header">
               <span className="brand-mark">
                 <Wrench size={20} />

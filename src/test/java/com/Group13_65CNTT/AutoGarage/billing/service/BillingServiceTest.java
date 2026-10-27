@@ -61,6 +61,20 @@ class BillingServiceTest {
     @InjectMocks BillingServiceImpl service;
 
     @Test
+    void invoiceReadinessPreservesInfrastructureFailure() {
+        RepairWorkflow workflow = mock(RepairWorkflow.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "repairWorkflow", Optional.of(workflow));
+        var failure = new org.springframework.dao.DataAccessResourceFailureException("private database details");
+        doThrow(failure).when(workflow).requireInvoiceReady(1L, 200L);
+        InvoiceIssueRequest request = InvoiceIssueRequest.builder().repairOrderId(200L).build();
+
+        assertThatThrownBy(() -> service.issueInvoice(1L, request)).isSameAs(failure);
+
+        verifyNoInteractions(jdbcTemplate);
+        verify(invoiceRepository, never()).save(any());
+    }
+
+    @Test
     void issueInvoice_Success() {
         InvoiceIssueRequest req = InvoiceIssueRequest.builder()
                 .repairOrderId(200L)

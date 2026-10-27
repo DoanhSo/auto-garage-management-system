@@ -12,7 +12,6 @@ import {
   Field,
   FormError,
   Loading,
-  PasswordInput,
   QueryError,
   ReadOnlyField,
   RoleBadge,
@@ -21,19 +20,16 @@ import {
 } from '../../../shared/components/ui';
 import { roles, roleLabels, type UiPolicy, type User } from '../../../shared/types/contracts';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
-import { passwordRequirement } from '../../auth/schemas/authSchemas';
 import { usersApi } from '../api/usersApi';
 import { useCreateUserMutation, useUpdateUserMutation, useUserQuery } from '../hooks/useUsers';
 import { userDefaults, userFormSchema, type UserFormValues } from '../schemas/userSchema';
 
 function UserForm({
   existing,
-  policy,
   onSaved,
   onRequestClose,
 }: {
   existing?: User;
-  policy: UiPolicy;
   onSaved: () => void;
   onRequestClose: (handler: () => void) => void;
 }) {
@@ -53,7 +49,7 @@ function UserForm({
     getValues,
     formState: { errors, isDirty },
   } = useForm<UserFormValues>({
-    resolver: zodResolver(userFormSchema(policy, !existing)),
+    resolver: zodResolver(userFormSchema()),
     mode: 'onBlur',
     defaultValues: userDefaults(existing),
   });
@@ -88,7 +84,7 @@ function UserForm({
         : await create.mutateAsync({
             ...body,
             username: values.username.toLowerCase(),
-            password: values.password,
+            ...(values.password.trim() ? { password: values.password.trim() } : {}),
           });
       reset(userDefaults(result));
       setConfirmSelf(null);
@@ -105,7 +101,7 @@ function UserForm({
       onSaved();
     } catch (error) {
       setConfirmSelf(null);
-      applyFormError(error, setError, ['fullName', 'username', 'email', 'role', 'password']);
+      applyFormError(error, setError, ['fullName', 'username', 'email', 'role']);
       if (error instanceof ApiError && error.code === 2005) setConflict(true);
     } finally {
       create.reset();
@@ -176,35 +172,32 @@ function UserForm({
             ))}
           </select>
         </Field>
-        {existing && (
+        {existing ? (
           <label className="checkbox-field">
             <input type="checkbox" {...register('active')} disabled={busy} />
             <span>Cho phép tài khoản hoạt động</span>
           </label>
-        )}
-        {!existing && (
+        ) : (
           <>
-            <div className="form-section-label">BẢO MẬT</div>
             <Field
-              label="Mật khẩu"
-              required
-              hint={passwordRequirement(policy)}
+              label="Mật khẩu khởi tạo Keycloak"
               error={errors.password?.message}
+              hint="Tùy chọn (tối thiểu 8 ký tự). Hệ thống đồng bộ trực tiếp tài khoản & vai trò sang Keycloak OIDC."
             >
-              <PasswordInput
+              <input
+                className="input"
+                type="password"
                 {...register('password')}
-                title={passwordRequirement(policy)}
-                autoComplete="new-password"
+                maxLength={72}
                 disabled={busy}
+                autoComplete="new-password"
+                placeholder="Để trống để dùng mật khẩu khởi tạo mặc định"
               />
             </Field>
-            <Field label="Xác nhận mật khẩu" required error={errors.confirmPassword?.message}>
-              <PasswordInput
-                {...register('confirmPassword')}
-                autoComplete="new-password"
-                disabled={busy}
-              />
-            </Field>
+            <p className="field-hint">
+              Tài khoản nhân sự (`ADMIN`, `RECEPTIONIST`, `WAREHOUSE_STAFF`, `TECHNICIAN`) chỉ được
+              cấp phát bởi Quản trị viên và đồng bộ tự động sang Keycloak.
+            </p>
           </>
         )}
         <FormError message={errors.root?.server?.message} />
@@ -291,12 +284,11 @@ function UserForm({
 }
 export function UserEditor({
   id,
-  policy,
   onClose,
   onRestoreFocus,
 }: {
   id: 'new' | string;
-  policy: UiPolicy;
+  policy?: UiPolicy;
   onClose: () => void;
   onRestoreFocus: () => void;
 }) {
@@ -329,7 +321,6 @@ export function UserEditor({
       ) : (
         <UserForm
           existing={id === 'new' ? undefined : user.data}
-          policy={policy}
           onSaved={onClose}
           onRequestClose={registerClose}
         />

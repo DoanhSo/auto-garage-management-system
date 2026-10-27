@@ -39,7 +39,7 @@ import java.util.Set;
 @RequestMapping(ApiPaths.SERVICE_BAYS_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Service Bay Management", description = "Bay configuration, maintenance, and reservations")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class ServiceBayController {
 
     private static final Set<String> SORT_FIELDS =
@@ -74,12 +74,12 @@ public class ServiceBayController {
     public ResponseEntity<ApiResponse<Page<ServiceBayResponse>>> getServiceBays(
             @RequestParam(required = false) Boolean isActive,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Integer size,
             @RequestParam(defaultValue = "bayCode") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir,
             HttpServletRequest httpRequest) {
         Page<ServiceBayResponse> responses = schedulingService.getServiceBays(
-                isActive, pagination.page(page, size, sortBy, sortDir, SORT_FIELDS));
+                isActive, pagination.page(page, size != null ? size : pagination.defaultSize(), sortBy, sortDir, SORT_FIELDS));
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, responses, httpRequest.getRequestURI()));
     }
 
@@ -111,7 +111,7 @@ public class ServiceBayController {
             @Valid @RequestBody MaintenanceReservationRequest request,
             HttpServletRequest httpRequest) {
         request.setBayId(id);
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         BayReservationResponse response = schedulingService.scheduleMaintenance(actorId, request);
         return ResponseEntity.created(URI.create(ApiPaths.SERVICE_BAYS_BASE + "/" + id + "/maintenance/" + response.getId()))
                 .body(ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
@@ -123,10 +123,10 @@ public class ServiceBayController {
     public ResponseEntity<ApiResponse<Page<BayReservationResponse>>> getBayReservations(
             @PathVariable Long id,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Integer size,
             HttpServletRequest httpRequest) {
         Page<BayReservationResponse> responses = schedulingService.getBayReservations(
-                id, pagination.page(page, size, "startsAt", "asc", Set.of("startsAt", "endsAt", "status")));
+                id, pagination.page(page, size != null ? size : pagination.defaultSize(), "startsAt", "asc", Set.of("startsAt", "endsAt", "status")));
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, responses, httpRequest.getRequestURI()));
     }
 }

@@ -22,6 +22,21 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     Page<Notification> searchInbox(
             @Param("userId") long userId, @Param("unread") boolean unread, Pageable pageable);
 
+    @Query(
+            """
+            SELECT n FROM Notification n
+            WHERE (:channel IS NULL OR n.channel = :channel)
+              AND (:status IS NULL OR n.status = :status)
+              AND (:keyword IS NULL OR LOWER(n.subject) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR LOWER(n.eventKey) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                   OR LOWER(n.destination) LIKE LOWER(CONCAT('%', :keyword, '%')))
+            """)
+    Page<Notification> searchAdminNotifications(
+            @Param("channel") String channel,
+            @Param("status") String status,
+            @Param("keyword") String keyword,
+            Pageable pageable);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT n FROM Notification n WHERE n.id = :id")
     Optional<Notification> findLockedById(@Param("id") Long id);

@@ -23,7 +23,6 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,6 +33,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Set;
 
 @RestController
 @RequiredArgsConstructor
@@ -57,7 +58,7 @@ public class SupplierController {
     }
 
     @GetMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_WAREHOUSE_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
     @Operation(summary = "Tìm kiếm và phân trang danh sách nhà cung cấp")
     public ApiResponse<Page<SupplierResponse>> search(
             @RequestParam(required = false) String query,
@@ -69,7 +70,7 @@ public class SupplierController {
             HttpServletRequest http) {
         Pageable pageable = pagination.page(
                 page, size, sortBy, sortDir,
-                java.util.Set.of("supplierName", "supplierCode", "createdAt"));
+                Set.of("id", "supplierName", "supplierCode", "createdAt"));
         return ApiResponse.success(
                 ResponseCode.SUCCESS,
                 supplierService.searchSuppliers(query, active, pageable),
@@ -77,7 +78,7 @@ public class SupplierController {
     }
 
     @GetMapping(ApiPaths.BY_ID)
-    @PreAuthorize(SecurityConstants.HAS_ROLE_WAREHOUSE_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
     @Operation(summary = "Xem chi tiết nhà cung cấp theo ID")
     public ApiResponse<SupplierResponse> getById(
             @PathVariable Long id,

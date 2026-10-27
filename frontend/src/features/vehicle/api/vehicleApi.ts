@@ -74,7 +74,11 @@ export const vehicleApi = {
     });
   },
 
-  timeline: async (id: string, params?: VehicleTimelineParams, signal?: AbortSignal): Promise<VehicleTimeline> => {
+  timeline: async (
+    id: string,
+    params?: VehicleTimelineParams,
+    signal?: AbortSignal,
+  ): Promise<VehicleTimeline> => {
     const raw = await request<unknown>(
       `/vehicles/${id}/timeline` +
         queryString({

@@ -10,12 +10,14 @@ import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.util.DatabaseFailures;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
+import com.Group13_65CNTT.AutoGarage.common.util.PasswordPolicy;
 import com.Group13_65CNTT.AutoGarage.identity.dto.request.UserCreateRequest;
 import com.Group13_65CNTT.AutoGarage.identity.dto.request.UserUpdateRequest;
 import com.Group13_65CNTT.AutoGarage.identity.dto.response.UserResponse;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.identity.mapper.UserMapper;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
+import com.Group13_65CNTT.AutoGarage.identity.service.KeycloakIdentityService;
 import com.Group13_65CNTT.AutoGarage.identity.service.UserService;
 
 import jakarta.persistence.EntityManager;
@@ -45,6 +47,8 @@ public class UserServiceImpl implements UserService {
     private final CurrentUserProvider currentUser;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final KeycloakIdentityService keycloakIdentityService;
+    private final PasswordPolicy passwordPolicy;
 
     @Override
     @Transactional
@@ -64,6 +68,18 @@ public class UserServiceImpl implements UserService {
                 || (email != null && userRepository.existsByEmail(email))
                 || (identityId != null && userRepository.existsByIdentityId(identityId))) {
             throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
+        }
+        if (identityId == null && keycloakIdentityService != null) {
+            passwordPolicy.validateNewPassword(request.getPassword());
+            identityId =
+                    keycloakIdentityService
+                            .createOrLinkUser(
+                                    username,
+                                    email,
+                                    request.getFullName().strip(),
+                                    request.getRole(),
+                                    request.getPassword())
+                            .orElseThrow(() -> new BusinessException(ResponseCode.AUTHENTICATION_UNAVAILABLE));
         }
         User user = userMapper.toEntity(request);
         user.setIdentityId(identityId);
@@ -132,7 +148,10 @@ public class UserServiceImpl implements UserService {
         user.setActive(false);
         user.setDeletedAt(clock.instant());
         user.setUpdatedBy(actorId);
-        save(user);
+        User saved = save(user);
+        if (keycloakIdentityService != null) {
+            keycloakIdentityService.disableUser(saved.getIdentityId(), saved.getUsername());
+        }
     }
 
     private UserResponse applyUpdate(Long id, UserUpdateRequest request) {
@@ -146,7 +165,8 @@ public class UserServiceImpl implements UserService {
                 request.getActive(),
                 request.getVersion(),
                 administrators.size());
-        if (user.getRole() != request.getRole() || user.isActive() != request.getActive()) {
+        boolean revokeTokens = user.getRole() != request.getRole() || user.isActive() != request.getActive();
+        if (revokeTokens) {
             user.setAuthVersion(user.getAuthVersion() + 1);
         }
         userMapper.updateEntityFromRequest(request, user);
@@ -154,7 +174,20 @@ public class UserServiceImpl implements UserService {
         user.setRole(request.getRole());
         user.setActive(request.getActive());
         user.setUpdatedBy(actorId);
-        return userMapper.toResponse(save(user));
+        User saved = save(user);
+        if (keycloakIdentityService != null) {
+            keycloakIdentityService.syncUserUpdate(
+                    saved.getIdentityId(),
+                    saved.getUsername(),
+                    saved.getEmail(),
+                    saved.getFullName(),
+                    saved.getRole(),
+                    saved.isActive());
+            if (revokeTokens) {
+                keycloakIdentityService.syncAuthVersion(saved.getIdentityId(), saved.getUsername(), saved.getAuthVersion());
+            }
+        }
+        return userMapper.toResponse(saved);
     }
 
     private void verifyMutation(

@@ -5,6 +5,8 @@ spring:
     password: ${TEST_DB_PASSWORD:autogarage_test}
 
 security:
+  keycloak-admin:
+    enabled: false
   auth:
     issuer: http://localhost:8081/realms/autogarage-test
     audience: autogarage-test-api

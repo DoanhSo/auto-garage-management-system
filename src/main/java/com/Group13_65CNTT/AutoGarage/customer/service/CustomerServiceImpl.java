@@ -1,5 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.customer.service;
 
+import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
+import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
 import com.Group13_65CNTT.AutoGarage.customer.dto.CreateCustomerRequest;
 import com.Group13_65CNTT.AutoGarage.customer.dto.CustomerResponse;
 import com.Group13_65CNTT.AutoGarage.customer.dto.UpdateCustomerRequest;
@@ -21,18 +23,21 @@ import java.util.Random;
 @Service
 @Transactional
 public class CustomerServiceImpl implements CustomerService {
+    private final CustomerScope customerScope;
 
     private final CustomerRepository customerRepository;
     private final CustomerMapper customerMapper;
     private final Random random = new Random();
 
-    public CustomerServiceImpl(CustomerRepository customerRepository, CustomerMapper customerMapper) {
+    public CustomerServiceImpl(CustomerRepository customerRepository, CustomerMapper customerMapper, CustomerScope customerScope) {
+        this.customerScope = customerScope;
         this.customerRepository = customerRepository;
         this.customerMapper = customerMapper;
     }
 
     @Override
     public CustomerResponse createCustomer(CreateCustomerRequest request) {
+        customerScope.requireFrontDesk();
         validateCreditAndTerm(request.getCreditLimit(), request.getPaymentTermDays());
 
         String normalizedPhone = normalizePhone(request.getPhone());
@@ -58,7 +63,14 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     @Transactional(readOnly = true)
+    public CustomerResponse getCurrentCustomer() {
+        return getCustomerById(customerScope.currentCustomerId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public CustomerResponse getCustomerById(Long id) {
+        customerScope.requireResource(AccessResource.CUSTOMER, id);
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + id));
         return customerMapper.toResponse(customer);
@@ -69,12 +81,14 @@ public class CustomerServiceImpl implements CustomerService {
     public CustomerResponse getCustomerByCode(String code) {
         Customer customer = customerRepository.findByCustomerCode(code.trim().toUpperCase())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với mã: " + code));
+        customerScope.requireResource(AccessResource.CUSTOMER, customer.getId());
         return customerMapper.toResponse(customer);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<CustomerResponse> searchCustomers(String search, Boolean isActive) {
+        customerScope.requireFrontDesk();
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
         return customerRepository.searchCustomers(cleanSearch, isActive)
                 .stream()
@@ -84,6 +98,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public CustomerResponse updateCustomer(Long id, UpdateCustomerRequest request) {
+        customerScope.requireFrontDesk();
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + id));
 
@@ -108,6 +123,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public void deactivateCustomer(Long id) {
+        customerScope.requireFrontDesk();
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + id));
         customer.setIsActive(false);

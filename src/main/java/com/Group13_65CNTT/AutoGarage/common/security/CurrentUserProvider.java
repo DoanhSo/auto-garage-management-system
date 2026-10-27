@@ -2,6 +2,7 @@ package com.Group13_65CNTT.AutoGarage.common.security;
 
 import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
@@ -43,13 +44,21 @@ public class CurrentUserProvider {
         throw new BusinessException(ResponseCode.UNAUTHORIZED);
     }
 
-    public String subjectOrNull() {
+    public Role role() {
+        return KeycloakJwtAuthenticationConverter.extractSingleRole(currentJwt())
+                .orElseThrow(() -> new BusinessException(ResponseCode.UNAUTHORIZED));
+    }
+
+    public Optional<Jwt> jwt() {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (!(authentication instanceof JwtAuthenticationToken jwt) || !jwt.isAuthenticated()) {
-            return null;
+            return Optional.empty();
         }
-        String subject = jwt.getToken().getSubject();
-        return subject == null || subject.isBlank() ? null : subject;
+        return Optional.of(jwt.getToken());
+    }
+
+    public String subjectOrNull() {
+        return jwt().map(Jwt::getSubject).filter(s -> !s.isBlank()).orElse(null);
     }
 
     public Long userIdOrNull() {
@@ -63,10 +72,6 @@ public class CurrentUserProvider {
     }
 
     private Jwt currentJwt() {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (!(authentication instanceof JwtAuthenticationToken jwt) || !jwt.isAuthenticated()) {
-            throw new BusinessException(ResponseCode.UNAUTHORIZED);
-        }
-        return jwt.getToken();
+        return jwt().orElseThrow(() -> new BusinessException(ResponseCode.UNAUTHORIZED));
     }
 }

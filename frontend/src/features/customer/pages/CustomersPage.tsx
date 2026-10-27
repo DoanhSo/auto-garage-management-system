@@ -76,10 +76,10 @@ export function CustomersPage() {
     if (!deactivatingCustomer) return;
     try {
       await deleteMutation.mutateAsync(deactivatingCustomer.id);
-      notify.success(`Đã ngừng hoạt động khách hàng "${deactivatingCustomer.fullName}"`);
+      notify(`Đã ngừng hoạt động khách hàng "${deactivatingCustomer.fullName}"`);
       setDeactivatingCustomer(null);
     } catch (err: unknown) {
-      notify.error(errorMessage(err));
+      notify(errorMessage(err));
     }
   };
 
@@ -220,22 +220,21 @@ export function CustomersPage() {
 
       {isError && <QueryError error={error} retry={() => refetch()} />}
 
-      {!isLoading && !isError && (
-        compact ? (
+      {!isLoading &&
+        !isError &&
+        (compact ? (
           <CustomerCards
             customers={filteredCustomers}
             onEdit={handleOpenEdit}
             onDeactivate={setDeactivatingCustomer}
           />
         ) : (
-          <DataTable
+          <DataTable<Customer>
             data={filteredCustomers}
             columns={columns}
-            emptyTitle="Chưa có khách hàng nào"
-            emptyDescription="Nhấn 'Thêm khách hàng' hoặc thay đổi bộ lọc để xem kết quả."
+            caption="Danh sách khách hàng"
           />
-        )
-      )}
+        ))}
 
       <CustomerEditor
         customerId={editingId}
@@ -249,8 +248,7 @@ export function CustomersPage() {
         title="Ngừng hoạt động khách hàng?"
         description={`Bạn có chắc chắn muốn chuyển trạng thái khách hàng "${deactivatingCustomer?.fullName}" sang ngừng hoạt động? Khách hàng sẽ không thể tạo lịch hẹn hay tiếp nhận mới.`}
         confirmLabel="Ngừng hoạt động"
-        cancelLabel="Giữ lại"
-        variant="danger"
+        danger
         pending={deleteMutation.isPending}
         onConfirm={handleConfirmDeactivate}
         onCancel={() => setDeactivatingCustomer(null)}

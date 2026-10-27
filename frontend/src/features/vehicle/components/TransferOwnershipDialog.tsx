@@ -1,13 +1,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError, errorMessage } from '../../../shared/api/errors';
-import {
-  Button,
-  Field,
-  FormError,
-  Sheet,
-} from '../../../shared/components/ui';
+import { applyFormError } from '../../../shared/api/errors';
+import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
 import type { Vehicle } from '../../../shared/types/contracts';
 import { useCustomersQuery } from '../../customer/hooks/useCustomers';
 import { useTransferOwnershipMutation } from '../hooks/useVehicles';
@@ -29,7 +24,9 @@ export function TransferOwnershipDialog({
 }) {
   const notify = useToast();
   const transfer = useTransferOwnershipMutation();
-  const { data: customers = [], isLoading: isLoadingCustomers } = useCustomersQuery({ isActive: true });
+  const { data: customers = [], isLoading: isLoadingCustomers } = useCustomersQuery({
+    isActive: true,
+  });
 
   const {
     register,
@@ -62,18 +59,17 @@ export function TransferOwnershipDialog({
         id: vehicle.id,
         values: {
           newCustomerId: values.newCustomerId,
-          transferOdometer: values.transferOdometer ? Number(values.transferOdometer) : vehicle.odometer,
+          transferOdometer: values.transferOdometer
+            ? Number(values.transferOdometer)
+            : vehicle.odometer,
           transferNote: values.transferNote?.trim() || null,
         },
       });
-      notify.success(`Đã chuyển nhượng quyền sở hữu xe ${vehicle.licensePlate} thành công`);
+      notify(`Đã chuyển nhượng quyền sở hữu xe ${vehicle.licensePlate} thành công`);
       reset();
       onClose();
     } catch (err: unknown) {
-      const field = applyFormError(err, setError);
-      if (!field) {
-        notify.error(errorMessage(err) ?? 'Chuyển nhượng phương tiện thất bại');
-      }
+      applyFormError(err, setError, Object.keys(values));
     }
   }
 
@@ -85,13 +81,19 @@ export function TransferOwnershipDialog({
       title={`Chuyển nhượng xe ${vehicle.licensePlate}`}
       description={`Chuyển giao quyền sở hữu xe ${vehicle.brand} ${vehicle.model} cho khách hàng mới.`}
     >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="editor-form account-editor-form">
-        <FormError message={errors.root?.message} />
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        noValidate
+        className="editor-form account-editor-form"
+      >
+        <FormError message={errors.root?.server?.message} />
 
         <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
           <AlertTriangle size={16} className="shrink-0 mt-0.5" />
           <div>
-            <strong>Quy tắc bảo mật lịch sử (UC05/BR04):</strong> Lịch sử sửa chữa kỹ thuật trước đây vẫn được lưu trữ trên phương tiện, nhưng toàn bộ dữ liệu tài chính (chi phí dịch vụ) của chủ cũ sẽ tự động ẩn đối với chủ xe mới.
+            <strong>Quy tắc bảo mật lịch sử (UC05/BR04):</strong> Lịch sử sửa chữa kỹ thuật trước
+            đây vẫn được lưu trữ trên phương tiện, nhưng toàn bộ dữ liệu tài chính (chi phí dịch vụ)
+            của chủ cũ sẽ tự động ẩn đối với chủ xe mới.
           </div>
         </div>
 
@@ -118,7 +120,8 @@ export function TransferOwnershipDialog({
             <option value="">-- Chọn khách hàng chủ mới --</option>
             {eligibleCustomers.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.customerCode ? `[${c.customerCode}] ` : ''}{c.fullName} - {c.phone}
+                {c.customerCode ? `[${c.customerCode}] ` : ''}
+                {c.fullName} - {c.phone}
               </option>
             ))}
           </select>
@@ -149,19 +152,10 @@ export function TransferOwnershipDialog({
         </Field>
 
         <div className="form-actions account-editor-actions">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={transfer.isPending}
-            onClick={onClose}
-          >
+          <Button type="button" variant="ghost" disabled={transfer.isPending} onClick={onClose}>
             Hủy
           </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={transfer.isPending}
-          >
+          <Button type="submit" variant="primary" disabled={transfer.isPending}>
             {transfer.isPending ? 'Đang chuyển giao...' : 'Xác nhận chuyển nhượng'}
           </Button>
         </div>

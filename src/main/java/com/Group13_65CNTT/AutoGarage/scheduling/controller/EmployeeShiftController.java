@@ -35,7 +35,7 @@ import java.util.Set;
 @RequestMapping(ApiPaths.SHIFTS_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Shift Management", description = "Employee shift scheduling and dispatching")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class EmployeeShiftController {
 
     private static final Set<String> SORT_FIELDS =
@@ -51,7 +51,7 @@ public class EmployeeShiftController {
     public ResponseEntity<ApiResponse<ShiftResponse>> createShift(
             @Valid @RequestBody ShiftCreateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         ShiftResponse response = schedulingService.createShift(actorId, request);
         return ResponseEntity.created(URI.create(ApiPaths.SHIFTS_BASE + "/" + response.getId()))
                 .body(ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
@@ -63,7 +63,7 @@ public class EmployeeShiftController {
     public ResponseEntity<ApiResponse<Void>> cancelShift(
             @PathVariable Long id,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         schedulingService.cancelShift(actorId, id);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, null, httpRequest.getRequestURI()));
     }
@@ -74,12 +74,12 @@ public class EmployeeShiftController {
     public ResponseEntity<ApiResponse<Page<ShiftResponse>>> getEmployeeShifts(
             @PathVariable Long employeeId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Integer size,
             @RequestParam(defaultValue = "startsAt") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir,
             HttpServletRequest httpRequest) {
         Page<ShiftResponse> responses = schedulingService.getEmployeeShifts(
-                employeeId, pagination.page(page, size, sortBy, sortDir, SORT_FIELDS));
+                employeeId, pagination.page(page, size != null ? size : pagination.defaultSize(), sortBy, sortDir, SORT_FIELDS));
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, responses, httpRequest.getRequestURI()));
     }
 }

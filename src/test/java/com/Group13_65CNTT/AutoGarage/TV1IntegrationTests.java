@@ -130,6 +130,56 @@ class TV1IntegrationTests extends IntegrationTestSupport {
     }
 
     @Test
+    void browserOriginCanBroadcastReadAndRecallWithoutBypassingRecipientPermissions()
+            throws Exception {
+        String admin = token("tv1.admin"), customer = token("tv1.customer");
+        org.springframework.test.web.servlet.request.RequestPostProcessor browser =
+                request -> {
+                    request.setServerName("127.0.0.1");
+                    request.setServerPort(5173);
+                    request.addHeader("Origin", "http://127.0.0.1:5173");
+                    return request;
+                };
+        String broadcast = json.writeValueAsString(Map.of(
+                "subject", "Garage notice",
+                "targetRoles", java.util.List.of(),
+                "payloadJson", "{\"message\":\"Opening hours updated\"}"));
+        perform(post("/api/v1/notifications/broadcast").with(browser)
+                        .header("Authorization", "Bearer " + admin)
+                        .contentType(MediaType.APPLICATION_JSON).content(broadcast))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.recipientCount").value(2));
+        var inbox = perform(get("/api/v1/notifications").with(browser)
+                        .header("Authorization", "Bearer " + customer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1)).andReturn();
+        long id = json.readTree(inbox.getResponse().getContentAsString())
+                .path("data").path("content").get(0).path("id").asLong();
+        perform(post("/api/v1/notifications/" + id + "/read").with(browser)
+                        .header("Authorization", "Bearer " + customer))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.readAt").isNotEmpty());
+        perform(post("/api/v1/notifications/" + id + "/read").with(browser)
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isForbidden());
+        perform(post("/api/v1/notifications/broadcast").with(browser)
+                        .header("Authorization", "Bearer " + customer)
+                        .contentType(MediaType.APPLICATION_JSON).content(broadcast))
+                .andExpect(status().isForbidden());
+        perform(delete("/api/v1/notifications/" + id).with(browser)
+                        .header("Authorization", "Bearer " + customer))
+                .andExpect(status().isForbidden());
+        perform(get("/api/v1/notifications/admin").with(browser)
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(2));
+        perform(delete("/api/v1/notifications/" + id).with(browser)
+                        .header("Authorization", "Bearer " + admin))
+                .andExpect(status().isOk());
+        perform(get("/api/v1/notifications/" + id).with(browser)
+                        .header("Authorization", "Bearer " + customer))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void changedPayloadWithSameEventCannotOverwriteOriginal() {
         var request =
                 NotificationCreateRequest.builder()
@@ -291,7 +341,7 @@ class TV1IntegrationTests extends IntegrationTestSupport {
                                 .content(
                                         json.writeValueAsString(
                                                 Map.of(
-                                                        "username", "tv1.quoted",
+                                                        "identityId", "tv1-quoted", "username", "tv1.quoted",
                                                         "fullName", fullName,
                                                         "role", "CUSTOMER"))))
                 .andExpect(status().isCreated())

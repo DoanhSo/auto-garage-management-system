@@ -63,10 +63,9 @@ export const receptionApi = {
   },
 
   confirmBooking: async (id: string, actorUserId?: string): Promise<Booking> => {
-    const raw = await request<unknown>(
-      `/bookings/${id}/confirm` + queryString({ actorUserId }),
-      { method: 'POST' },
-    );
+    const raw = await request<unknown>(`/bookings/${id}/confirm` + queryString({ actorUserId }), {
+      method: 'POST',
+    });
     return bookingSchema.parse(raw);
   },
 
@@ -87,10 +86,9 @@ export const receptionApi = {
   },
 
   markNoShow: async (id: string, actorUserId?: string): Promise<Booking> => {
-    const raw = await request<unknown>(
-      `/bookings/${id}/no-show` + queryString({ actorUserId }),
-      { method: 'POST' },
-    );
+    const raw = await request<unknown>(`/bookings/${id}/no-show` + queryString({ actorUserId }), {
+      method: 'POST',
+    });
     return bookingSchema.parse(raw);
   },
 

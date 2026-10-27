@@ -1,9 +1,10 @@
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { FRONT_DESK_ROLES } from '../../../app/access';
 import { useMemo, useRef, useState } from 'react';
 import {
   Plus,
   SquarePen,
   Trash2,
-  Car,
   History,
   ArrowRightLeft,
   Calendar,
@@ -36,6 +37,8 @@ import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 export function VehiclesPage() {
   const compact = useMediaQuery('(max-width: 640px)');
   const notify = useToast();
+  const { user } = useAuth();
+  const canManage = !!user && FRONT_DESK_ROLES.includes(user.role);
 
   const [search, setSearch] = useState('');
   const [isActive, setIsActive] = useState('ALL');
@@ -88,10 +91,10 @@ export function VehiclesPage() {
     if (!deactivatingVehicle) return;
     try {
       await deleteMutation.mutateAsync(deactivatingVehicle.id);
-      notify.success(`Đã ngừng hoạt động phương tiện "${deactivatingVehicle.licensePlate}"`);
+      notify(`Đã ngừng hoạt động phương tiện "${deactivatingVehicle.licensePlate}"`);
       setDeactivatingVehicle(null);
     } catch (err: unknown) {
-      notify.error(errorMessage(err));
+      notify(errorMessage(err));
     }
   };
 
@@ -170,11 +173,7 @@ export function VehiclesPage() {
           return (
             <div
               className={`flex items-center gap-1 text-xs font-medium ${
-                isExpired
-                  ? 'text-red-500'
-                  : isExpiringSoon
-                    ? 'text-amber-500'
-                    : 'text-foreground'
+                isExpired ? 'text-red-500' : isExpiringSoon ? 'text-amber-500' : 'text-foreground'
               }`}
             >
               <Calendar size={13} />
@@ -197,8 +196,7 @@ export function VehiclesPage() {
             <div className="row-actions flex items-center justify-end gap-1">
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-xs"
+                className="button-small h-8 px-2 text-xs"
                 title="Lịch sử bảo dưỡng sửa chữa"
                 onClick={() => handleOpenTimeline(vehicle.id)}
               >
@@ -206,55 +204,59 @@ export function VehiclesPage() {
                 Lịch sử
               </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-xs"
-                title="Chuyển nhượng quyền sở hữu"
-                onClick={() => handleOpenTransfer(vehicle)}
-              >
-                <ArrowRightLeft size={14} className="mr-1 text-amber-500" />
-                Đổi chủ
-              </Button>
+              {canManage && (
+                <Button
+                  variant="ghost"
+                  className="button-small h-8 px-2 text-xs"
+                  title="Chuyển nhượng quyền sở hữu"
+                  onClick={() => handleOpenTransfer(vehicle)}
+                >
+                  <ArrowRightLeft size={14} className="mr-1 text-amber-500" />
+                  Đổi chủ
+                </Button>
+              )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
-                title="Chỉnh sửa thông tin"
-                onClick={() => handleOpenEdit(vehicle.id)}
-              >
-                <SquarePen size={14} />
-              </Button>
+              {canManage && (
+                <Button
+                  variant="ghost"
+                  className="button-small h-8 w-8 p-0"
+                  title="Chỉnh sửa thông tin"
+                  onClick={() => handleOpenEdit(vehicle.id)}
+                >
+                  <SquarePen size={14} />
+                </Button>
+              )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                title="Ngừng hoạt động"
-                onClick={() => setDeactivatingVehicle(vehicle)}
-              >
-                <Trash2 size={14} />
-              </Button>
+              {canManage && (
+                <Button
+                  variant="ghost"
+                  className="button-small h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  title="Ngừng hoạt động"
+                  onClick={() => setDeactivatingVehicle(vehicle)}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              )}
             </div>
           );
         },
       },
     ],
-    [],
+    [canManage],
   );
 
   return (
     <div className="page-shell">
       <PageHeader
-        eyebrow="MODULE M03"
         title="Quản lý Phương tiện"
         description="Quản lý danh sách phương tiện, theo dõi số ODO, chuyển nhượng quyền sở hữu và tra cứu lịch sử sửa chữa."
         actions={
-          <Button ref={createTrigger} variant="primary" onClick={handleOpenCreate}>
-            <Plus size={16} />
-            Đăng ký xe mới
-          </Button>
+          canManage && (
+            <Button ref={createTrigger} variant="primary" onClick={handleOpenCreate}>
+              <Plus size={16} />
+              Đăng ký xe mới
+            </Button>
+          )
         }
       />
 
@@ -272,12 +274,10 @@ export function VehiclesPage() {
       {isLoading ? (
         <Loading label="Đang tải danh sách phương tiện…" />
       ) : isError ? (
-        <QueryError
-          error={error}
-          retry={() => refetch()}
-        />
+        <QueryError error={error} retry={() => refetch()} />
       ) : compact ? (
         <VehicleCards
+          canManage={canManage}
           vehicles={vehicles}
           onEdit={handleOpenEdit}
           onTransfer={handleOpenTransfer}
@@ -285,7 +285,11 @@ export function VehiclesPage() {
           onDeactivate={setDeactivatingVehicle}
         />
       ) : (
-        <DataTable columns={columns} data={vehicles} emptyMessage="Không tìm thấy phương tiện nào." />
+        <DataTable<Vehicle>
+          columns={columns}
+          data={vehicles}
+          caption="Không tìm thấy phương tiện nào."
+        />
       )}
 
       {editorOpen && (
@@ -326,8 +330,7 @@ export function VehiclesPage() {
         title="Xác nhận ngừng hoạt động phương tiện"
         description={`Bạn có chắc muốn chuyển phương tiện biển số "${deactivatingVehicle?.licensePlate}" sang trạng thái ngừng hoạt động? Xe này sẽ không thể tạo lệnh sửa chữa mới.`}
         confirmLabel="Ngừng hoạt động"
-        cancelLabel="Hủy"
-        destructive
+        danger
         onConfirm={handleConfirmDeactivate}
         onCancel={() => setDeactivatingVehicle(null)}
       />

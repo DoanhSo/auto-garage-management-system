@@ -1,5 +1,11 @@
 package com.Group13_65CNTT.AutoGarage.quality.service.impl;
 
+import com.Group13_65CNTT.AutoGarage.common.security.ActorIds;
+import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
+import com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService;
 import com.Group13_65CNTT.AutoGarage.quality.dto.request.QualityCheckCreateRequest;
 import com.Group13_65CNTT.AutoGarage.quality.dto.response.QualityCheckResponse;
 import com.Group13_65CNTT.AutoGarage.quality.mapper.QualityCheckMapper;
@@ -38,6 +44,8 @@ public class QualityServiceImpl implements QualityService {
     private final LaborSessionRepository laborSessionRepository;
     private final EmployeeRepository employeeRepository;
     private final QualityCheckMapper qualityCheckMapper;
+    private final ObjectAccessService objectAccess;
+    private final CustomerScope customerScope;
 
     @Override
     @Transactional
@@ -47,6 +55,8 @@ public class QualityServiceImpl implements QualityService {
         if (request.getResult() != CheckResult.PASSED && request.getResult() != CheckResult.FAILED) {
             throw new BusinessRuleException("Kết quả kiểm tra chất lượng (QC) chỉ có thể là PASSED hoặc FAILED");
         }
+        long actorId = ActorIds.require(actorUserId);
+        objectAccess.requireQualityCheckAccess(actorId, request.getRepairOrderId());
 
         RepairOrder order = repairOrderRepository.findByIdForUpdate(request.getRepairOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + request.getRepairOrderId()));
@@ -65,14 +75,11 @@ public class QualityServiceImpl implements QualityService {
             throw new BusinessRuleException("Vẫn còn phiên làm việc (timer) của kỹ thuật viên chưa kết thúc");
         }
 
-        // 3. Kiểm tra thẩm quyền can_qc nếu actor là nhân viên
-        if (actorUserId != null) {
-            employeeRepository.findByUserId(actorUserId).ifPresent(employee -> {
-                if (Boolean.FALSE.equals(employee.getCanQc())) {
-                    throw new BusinessRuleException("Kỹ thuật viên không có thẩm quyền kiểm tra chất lượng (can_qc = false)");
-                }
-            });
-        }
+        // Only an active, QC-capable employee assigned to inspect this order may record QC.
+        employeeRepository.findByUserId(actorId)
+                .filter(employee -> Boolean.TRUE.equals(employee.getIsActive())
+                        && Boolean.TRUE.equals(employee.getCanQc()))
+                .orElseThrow(() -> new BusinessException(ResponseCode.FORBIDDEN));
 
         int nextAttemptNo = vehicleCheckRepository.findMaxAttemptNo(order.getId(), CheckType.QC) + 1;
 
@@ -86,7 +93,7 @@ public class QualityServiceImpl implements QualityService {
         check.setSchemaVersion(1);
         check.setOdometer(request.getOdometer());
         check.setNotes(request.getNotes());
-        check.setCheckedBy(actorUserId != null ? actorUserId : 1L);
+        check.setCheckedBy(ActorIds.require(actorUserId));
         check.setCheckedAt(Instant.now());
 
         VehicleCheck savedCheck = vehicleCheckRepository.save(check);
@@ -125,12 +132,14 @@ public class QualityServiceImpl implements QualityService {
     public QualityCheckResponse getQualityCheckById(Long id) {
         VehicleCheck check = vehicleCheckRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy biên bản kiểm tra với ID: " + id));
+        customerScope.requireResource(AccessResource.REPAIR_ORDER, check.getRepairOrderId());
         return qualityCheckMapper.toResponse(check);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<QualityCheckResponse> getQualityChecksByRepairOrderId(Long repairOrderId) {
+        customerScope.requireResource(AccessResource.REPAIR_ORDER, repairOrderId);
         return vehicleCheckRepository.findAllByRepairOrderIdAndCheckTypeOrderByAttemptNoAsc(
                 repairOrderId, CheckType.QC).stream()
                 .map(qualityCheckMapper::toResponse)
@@ -140,6 +149,7 @@ public class QualityServiceImpl implements QualityService {
     @Override
     @Transactional(readOnly = true)
     public QualityCheckResponse getLatestQualityCheck(Long repairOrderId) {
+        customerScope.requireResource(AccessResource.REPAIR_ORDER, repairOrderId);
         RepairOrder order = repairOrderRepository.findById(repairOrderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + repairOrderId));
 

@@ -1,17 +1,5 @@
-import {
-  Calendar,
-  CheckCircle2,
-  Clock,
-  Gauge,
-  Lock,
-  Paperclip,
-} from 'lucide-react';
-import {
-  Button,
-  Loading,
-  QueryError,
-  Sheet,
-} from '../../../shared/components/ui';
+import { Calendar, CheckCircle2, Clock, Gauge, Lock, Paperclip } from 'lucide-react';
+import { Button, Loading, QueryError, Sheet } from '../../../shared/components/ui';
 import { useVehicleTimelineQuery } from '../hooks/useVehicles';
 import { money, formatDateTime } from '../../../shared/utils/format';
 
@@ -24,9 +12,13 @@ export function VehicleTimelineModal({
   open: boolean;
   onClose: () => void;
 }) {
-  const { data: timeline, isLoading, isError, error, refetch } = useVehicleTimelineQuery(
-    open ? vehicleId : null,
-  );
+  const {
+    data: timeline,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useVehicleTimelineQuery(open ? vehicleId : null);
 
   return (
     <Sheet
@@ -49,7 +41,9 @@ export function VehicleTimelineModal({
           <div className="text-center py-12 text-muted-foreground">
             <Clock className="mx-auto mb-3 opacity-40" size={36} />
             <p className="text-base font-medium">Chưa có lịch sử dịch vụ sửa chữa</p>
-            <p className="text-xs mt-1">Phương tiện này chưa phát sinh lệnh sửa chữa (Repair Order) nào trong hệ thống.</p>
+            <p className="text-xs mt-1">
+              Phương tiện này chưa phát sinh lệnh sửa chữa (Repair Order) nào trong hệ thống.
+            </p>
           </div>
         ) : (
           <div className="relative border-l-2 border-primary/20 ml-4 pl-6 space-y-6">
@@ -93,13 +87,17 @@ export function VehicleTimelineModal({
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                     {entry.customerComplaint && (
                       <div>
-                        <span className="text-xs text-muted-foreground block font-medium">Hiện tượng / Yêu cầu:</span>
+                        <span className="text-xs text-muted-foreground block font-medium">
+                          Hiện tượng / Yêu cầu:
+                        </span>
                         <p className="text-foreground mt-0.5">{entry.customerComplaint}</p>
                       </div>
                     )}
                     {entry.diagnosis && (
                       <div>
-                        <span className="text-xs text-muted-foreground block font-medium">Chẩn đoán kỹ thuật:</span>
+                        <span className="text-xs text-muted-foreground block font-medium">
+                          Chẩn đoán kỹ thuật:
+                        </span>
                         <p className="text-foreground mt-0.5">{entry.diagnosis}</p>
                       </div>
                     )}

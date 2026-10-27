@@ -16,7 +16,7 @@ export const vehicleFormSchema = z.object({
   brand: z.string().trim().min(1, 'Hãng xe là bắt buộc').max(50, 'Hãng xe tối đa 50 ký tự'),
   model: z.string().trim().min(1, 'Dòng xe (Model) là bắt buộc').max(50, 'Dòng xe tối đa 50 ký tự'),
   manufactureYear: z.coerce
-    .number({ invalid_type_error: 'Năm sản xuất phải là số' })
+    .number<number>({ error: 'Năm sản xuất phải là số' })
     .int('Năm sản xuất phải là số nguyên')
     .min(1900, 'Năm sản xuất không hợp lệ')
     .max(new Date().getFullYear() + 1, 'Năm sản xuất không vượt quá năm tiếp theo')
@@ -25,7 +25,7 @@ export const vehicleFormSchema = z.object({
   color: z.string().trim().max(30, 'Màu sơn tối đa 30 ký tự').optional(),
   fuelType: z.string().trim().max(20, 'Loại nhiên liệu tối đa 20 ký tự').optional(),
   odometer: z.coerce
-    .number({ invalid_type_error: 'Số ODO phải là số' })
+    .number<number>({ error: 'Số ODO phải là số' })
     .int('Số ODO phải là số nguyên')
     .min(0, 'Số ODO không được âm'),
   inspectionDueDate: z.string().trim().optional(),
@@ -36,7 +36,7 @@ export type VehicleFormValues = z.infer<typeof vehicleFormSchema>;
 export const transferOwnershipSchema = z.object({
   newCustomerId: z.string().min(1, 'Vui lòng chọn chủ xe mới'),
   transferOdometer: z.coerce
-    .number({ invalid_type_error: 'Số ODO phải là số' })
+    .number<number>({ error: 'Số ODO phải là số' })
     .int('Số ODO phải là số nguyên')
     .min(0, 'Số ODO không được âm')
     .optional(),
@@ -53,7 +53,7 @@ export function vehicleDefaults(existing?: Vehicle): VehicleFormValues {
     engineNumber: existing?.engineNumber ?? '',
     brand: existing?.brand ?? '',
     model: existing?.model ?? '',
-    manufactureYear: existing?.manufactureYear ?? ('' as unknown as number),
+    manufactureYear: existing?.manufactureYear ?? Number.NaN,
     color: existing?.color ?? '',
     fuelType: existing?.fuelType ?? 'Xăng',
     odometer: existing?.odometer ?? 0,

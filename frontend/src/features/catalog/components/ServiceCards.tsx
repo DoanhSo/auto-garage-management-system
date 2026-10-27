@@ -1,21 +1,15 @@
-import {
-  Wrench,
-  Clock,
-  ShieldCheck,
-  RotateCw,
-  SquarePen,
-  Trash2,
-  Box,
-} from 'lucide-react';
+import { Wrench, Clock, ShieldCheck, RotateCw, SquarePen, Trash2, Box } from 'lucide-react';
 import type { Service } from '../../../shared/types/contracts';
 import { Button, Empty, StatusBadge } from '../../../shared/components/ui';
 import { money } from '../../../shared/utils/format';
 
 export function ServiceCards({
+  canManage = false,
   services,
   onEdit,
   onDeactivate,
 }: {
+  canManage?: boolean;
   services: Service[];
   onEdit: (id: string) => void;
   onDeactivate: (service: Service) => void;
@@ -36,7 +30,10 @@ export function ServiceCards({
         const hours = (s.standardMinutes / 60).toFixed(1);
 
         return (
-          <li key={s.id} className="vehicle-card border border-border rounded-lg p-4 bg-card shadow-sm space-y-3">
+          <li
+            key={s.id}
+            className="vehicle-card border border-border rounded-lg p-4 bg-card shadow-sm space-y-3"
+          >
             <div className="flex items-start justify-between gap-2">
               <div>
                 <div className="flex items-center gap-2">
@@ -66,7 +63,9 @@ export function ServiceCards({
             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Clock size={13} className="shrink-0" />
-                <span>{s.standardMinutes} phút (~{hours}h)</span>
+                <span>
+                  {s.standardMinutes} phút (~{hours}h)
+                </span>
               </div>
 
               {s.requiredBayType ? (
@@ -105,25 +104,27 @@ export function ServiceCards({
             </div>
 
             <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-border">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2.5 text-xs"
-                onClick={() => onEdit(s.id)}
-              >
-                <SquarePen size={14} className="mr-1" />
-                Sửa
-              </Button>
+              {canManage && (
+                <Button
+                  variant="ghost"
+                  className="button-small h-8 px-2.5 text-xs"
+                  onClick={() => onEdit(s.id)}
+                >
+                  <SquarePen size={14} className="mr-1" />
+                  Sửa
+                </Button>
+              )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                onClick={() => onDeactivate(s)}
-                title="Ngừng áp dụng"
-              >
-                <Trash2 size={14} />
-              </Button>
+              {canManage && (
+                <Button
+                  variant="ghost"
+                  className="button-small h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => onDeactivate(s)}
+                  title="Ngừng áp dụng"
+                >
+                  <Trash2 size={14} />
+                </Button>
+              )}
             </div>
           </li>
         );

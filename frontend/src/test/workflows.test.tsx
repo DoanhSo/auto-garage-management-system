@@ -10,6 +10,9 @@ import { LoginPage } from '../features/auth/pages/LoginPage';
 import { UsersPage } from '../features/identity/pages/UsersPage';
 import { AccountPage } from '../features/auth/pages/AccountPage';
 import { NotificationsPage } from '../features/notification/pages/NotificationsPage';
+import { ServicesPage } from '../features/catalog/pages/ServicesPage';
+import { BookingsPage } from '../features/reception/pages/BookingsPage';
+import { authApi } from '../features/auth/api/authApi';
 import { admin, baseHandlers, envelope, member, page } from './fixtures';
 import { server } from './server';
 
@@ -21,6 +24,7 @@ function app(destination: React.ReactNode = <UsersPage />) {
     [
       { path: '/login', element: <LoginPage /> },
       { path: '/admin/reports', element: destination },
+      { path: '/notifications', element: destination },
     ],
     { initialEntries: ['/login'] },
   );
@@ -44,13 +48,108 @@ async function login() {
 }
 beforeEach(() => server.use(...baseHandlers()));
 describe('Forms against HTTP contracts', () => {
+  it('logs in from the local credentials form without opening the Keycloak portal', async () => {
+    const redirect = vi.spyOn(authApi, 'startPkceRedirect');
+    app();
+    expect(screen.queryByRole('button', { name: /Keycloak/ })).not.toBeInTheDocument();
+    await login();
+    expect(await screen.findByRole('button', { name: 'Thêm tài khoản' })).toBeVisible();
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it('keeps a new service editor open and submits with optional maintenance fields empty', async () => {
+    const create = vi.fn();
+    server.use(
+      http.get('/api/v1/services', () => HttpResponse.json(envelope([]))),
+      http.post('/api/v1/services', async ({ request }) => {
+        const values = await request.json();
+        create(values);
+        return HttpResponse.json(
+          envelope(
+            {
+              ...(values as object),
+              id: 4,
+              serviceCode: 'SVC-4',
+              requiredSkillsJson: null,
+              isActive: true,
+              createdAt: admin.createdAt,
+              updatedAt: admin.createdAt,
+              version: 0,
+            },
+            1001,
+          ),
+          { status: 201 },
+        );
+      }),
+    );
+    app(<ServicesPage />);
+    const user = await login();
+    await user.click(await screen.findByRole('button', { name: 'Thêm dịch vụ mới' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(
+      within(dialog).getByLabelText('Tên dịch vụ / Gói bảo dưỡng', { exact: false }),
+      'Kiểm tra định kỳ',
+    );
+    await user.click(within(dialog).getByRole('button', { name: /Thêm dịch vụ/ }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    expect(create.mock.calls[0][0]).toMatchObject({
+      intervalKm: null,
+      intervalMonths: null,
+      warrantyDays: 0,
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('loads a customer booking form from their own profile without exposing the customer directory', async () => {
+    const ownCustomer = {
+      id: 9,
+      userId: 2,
+      customerCode: 'CUS-9',
+      fullName: 'Khách hàng',
+      customerType: 'INDIVIDUAL',
+      phone: null,
+      email: null,
+      address: null,
+      companyName: null,
+      taxCode: null,
+      creditLimit: 0,
+      paymentTermDays: 0,
+      isActive: true,
+      createdAt: admin.createdAt,
+      updatedAt: admin.createdAt,
+      version: 0,
+    };
+    const directory = vi.fn();
+    server.use(
+      http.get('/api/v1/auth/me', () =>
+        HttpResponse.json(envelope({ ...member, role: 'CUSTOMER' })),
+      ),
+      http.get('/api/v1/bookings', () => HttpResponse.json(envelope([]))),
+      http.get('/api/v1/services', () => HttpResponse.json(envelope([]))),
+      http.get('/api/v1/vehicles', () => HttpResponse.json(envelope([]))),
+      http.get('/api/v1/customers/me', () => HttpResponse.json(envelope(ownCustomer))),
+      http.get('/api/v1/customers', () => {
+        directory();
+        return HttpResponse.json(envelope(null, 3002), { status: 403 });
+      }),
+    );
+    app(<BookingsPage />);
+    const user = await login();
+    await user.click(await screen.findByRole('button', { name: 'Đặt lịch hẹn mới' }));
+    const dialog = await screen.findByRole('dialog');
+    const customer = within(dialog).getByLabelText('Khách hàng đặt hẹn', { exact: false });
+    await waitFor(() => expect(customer).toHaveValue('9'));
+    expect(customer).toBeDisabled();
+    expect(directory).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Tiếp nhận vãng lai' })).not.toBeInTheDocument();
+  });
   it('validates login and prevents duplicate requests while pending', async () => {
     let calls = 0;
     server.use(
-      http.post('/api/v1/auth/login', async () => {
+      http.post('/realms/autogarage-realm/protocol/openid-connect/token', async () => {
         calls++;
         await delay(100);
-        return HttpResponse.json(envelope(null, 3005), { status: 401 });
+        return HttpResponse.json({ error: 'invalid_grant' }, { status: 401 });
       }),
     );
     app();
@@ -84,7 +183,6 @@ describe('Forms against HTTP contracts', () => {
       }),
     );
     expect(await within(dialog).findByText('Nhập họ và tên.')).toBeVisible();
-    expect(within(dialog).getAllByText('Ít nhất 12 ký tự, tối đa 72 byte UTF-8.')).toHaveLength(1);
     expect(within(dialog).queryByText('3–100 ký tự: chữ/số, dấu . _ -')).not.toBeInTheDocument();
     expect(create).not.toHaveBeenCalled();
     await user.type(within(dialog).getByLabelText('Họ và tên', { exact: false }), 'New Member');
@@ -92,14 +190,6 @@ describe('Forms against HTTP contracts', () => {
     await user.selectOptions(
       within(dialog).getByLabelText('Vai trò', { exact: false }),
       'RECEPTIONIST',
-    );
-    await user.type(
-      within(dialog).getByLabelText(/^Mật khẩu\s*\*/, { selector: 'input' }),
-      'temporary-password',
-    );
-    await user.type(
-      within(dialog).getByLabelText('Xác nhận mật khẩu', { exact: false }),
-      'temporary-password',
     );
     await user.click(
       within(dialog).getByRole('button', {
@@ -112,7 +202,6 @@ describe('Forms against HTTP contracts', () => {
       email: null,
       fullName: 'New Member',
       role: 'RECEPTIONIST',
-      password: 'temporary-password',
     });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
@@ -233,26 +322,23 @@ describe('Forms against HTTP contracts', () => {
     );
     expect(deletes).toBe(1);
   });
-  it('does not log out for a wrong current password', async () => {
+  it('renders Keycloak security panel and revokes all active sessions', async () => {
+    let logoutCalls = 0;
     server.use(
-      http.post('/api/v1/auth/password', () =>
-        HttpResponse.json(envelope(null, 3005), { status: 401 }),
-      ),
+      http.post('/api/v1/auth/logout', () => {
+        logoutCalls++;
+        return HttpResponse.json(envelope(null));
+      }),
     );
     app(<AccountPage />);
     const user = await login();
-    await user.type(await screen.findByLabelText('Mật khẩu hiện tại', { exact: false }), 'wrong');
-    await user.type(
-      screen.getByLabelText(/^Mật khẩu mới/, { selector: 'input' }),
-      'new-password-long',
+    expect(await screen.findByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+    expect(screen.getByRole('link', { name: /Mở cổng tài khoản Keycloak/i })).toHaveAttribute(
+      'href',
+      '/realms/autogarage-realm/account',
     );
-    await user.type(
-      screen.getByLabelText('Xác nhận mật khẩu mới', { exact: false }),
-      'new-password-long',
-    );
-    await user.click(screen.getByRole('button', { name: 'Đổi mật khẩu' }));
-    expect(await screen.findByText('Mật khẩu hiện tại chưa đúng.')).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Thu hồi mọi phiên đăng nhập/i }));
+    await waitFor(() => expect(logoutCalls).toBe(1));
   });
   it('renders notification payload as text and saves read state once', async () => {
     const notice = {

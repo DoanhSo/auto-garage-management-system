@@ -4,6 +4,11 @@ import com.Group13_65CNTT.AutoGarage.common.constant.ApiPaths;
 import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.dto.ApiResponse;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.enums.Role;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
+import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
+import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
 import com.Group13_65CNTT.AutoGarage.vehicle.dto.CreateVehicleRequest;
 import com.Group13_65CNTT.AutoGarage.vehicle.dto.TransferOwnershipRequest;
 import com.Group13_65CNTT.AutoGarage.vehicle.dto.UpdateVehicleRequest;
@@ -28,13 +33,15 @@ import java.util.List;
 @RequestMapping(ApiPaths.VEHICLES_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Vehicle Management", description = "Vehicle profiles, odometer history and ownership transfers")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class VehicleController {
 
     private final VehicleService vehicleService;
+    private final CurrentUserProvider currentUserProvider;
+    private final CustomerRepository customerRepository;
 
     @PostMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTIONIST_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Register vehicle")
     public ResponseEntity<ApiResponse<VehicleResponse>> createVehicle(
             @Valid @RequestBody CreateVehicleRequest request,
@@ -45,7 +52,7 @@ public class VehicleController {
     }
 
     @GetMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_BOOKING_ACCESS)
     @Operation(summary = "Search vehicles")
     public ResponseEntity<ApiResponse<List<VehicleResponse>>> getVehicles(
             @RequestParam(required = false) Long customerId,
@@ -57,7 +64,7 @@ public class VehicleController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Fetch vehicle by ID")
     public ResponseEntity<ApiResponse<VehicleResponse>> getVehicleById(
             @PathVariable Long id,
@@ -67,7 +74,7 @@ public class VehicleController {
     }
 
     @GetMapping("/plate/{plate}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Fetch vehicle by license plate")
     public ResponseEntity<ApiResponse<VehicleResponse>> getVehicleByPlate(
             @PathVariable String plate,
@@ -77,7 +84,7 @@ public class VehicleController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTIONIST_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Update vehicle information")
     public ResponseEntity<ApiResponse<VehicleResponse>> updateVehicle(
             @PathVariable Long id,
@@ -88,7 +95,7 @@ public class VehicleController {
     }
 
     @PostMapping("/{id}/transfer")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTIONIST_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Transfer vehicle ownership")
     public ResponseEntity<ApiResponse<VehicleResponse>> transferOwnership(
             @PathVariable Long id,
@@ -99,7 +106,7 @@ public class VehicleController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTIONIST_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Deactivate vehicle")
     public ResponseEntity<ApiResponse<Void>> deactivateVehicle(
             @PathVariable Long id,
@@ -114,9 +121,11 @@ public class VehicleController {
     public ResponseEntity<ApiResponse<VehicleTimelineResponse>> getVehicleTimeline(
             @PathVariable Long id,
             @RequestParam(required = false) Long requestingCustomerId,
-            @RequestParam(required = false, defaultValue = "STAFF") String role,
+            @RequestParam(required = false) String role,
             HttpServletRequest httpRequest) {
-        VehicleTimelineResponse response = vehicleService.getVehicleTimeline(id, requestingCustomerId, role);
+        Role actorRole = currentUserProvider.role();
+        VehicleTimelineResponse response = vehicleService.getVehicleTimeline(
+                id, customerIdFor(actorRole), actorRole.name());
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
 
@@ -126,9 +135,17 @@ public class VehicleController {
     public ResponseEntity<ApiResponse<VehicleTimelineResponse>> getVehicleTimelineByPlate(
             @PathVariable String plate,
             @RequestParam(required = false) Long requestingCustomerId,
-            @RequestParam(required = false, defaultValue = "STAFF") String role,
+            @RequestParam(required = false) String role,
             HttpServletRequest httpRequest) {
-        VehicleTimelineResponse response = vehicleService.getVehicleTimelineByPlate(plate, requestingCustomerId, role);
+        Role actorRole = currentUserProvider.role();
+        VehicleTimelineResponse response = vehicleService.getVehicleTimelineByPlate(
+                plate, customerIdFor(actorRole), actorRole.name());
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
+    }
+    private Long customerIdFor(Role role) {
+        if (role != Role.CUSTOMER) return null;
+        return customerRepository.findByUserId(currentUserProvider.userId())
+                .map(Customer::getId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.FORBIDDEN));
     }
 }

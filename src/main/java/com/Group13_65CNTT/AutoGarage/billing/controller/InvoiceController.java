@@ -74,7 +74,7 @@ public class InvoiceController {
             HttpServletRequest http) {
         Pageable pageable = pagination.page(
                 page, size, sortBy, sortDir,
-                Set.of("issuedAt", "invoiceCode", "totalAmount"));
+                Set.of("id", "issuedAt", "invoiceCode", "totalAmount"));
         return ApiResponse.success(
                 ResponseCode.SUCCESS,
                 billingService.searchInvoices(status, customerId, orderId, query, pageable),

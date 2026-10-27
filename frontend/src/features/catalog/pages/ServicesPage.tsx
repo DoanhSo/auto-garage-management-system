@@ -1,13 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import {
-  Plus,
-  SquarePen,
-  Trash2,
-  Clock,
-  ShieldCheck,
-  RotateCw,
-  Box,
-} from 'lucide-react';
+import { Plus, SquarePen, Trash2, Clock, ShieldCheck, RotateCw, Box } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -72,10 +64,10 @@ export function ServicesPage() {
     if (!deactivatingService) return;
     try {
       await deleteMutation.mutateAsync(deactivatingService.id);
-      notify.success(`Đã ngừng áp dụng dịch vụ "${deactivatingService.serviceName}"`);
+      notify(`Đã ngừng áp dụng dịch vụ "${deactivatingService.serviceName}"`);
       setDeactivatingService(null);
     } catch (err: unknown) {
-      notify.error(errorMessage(err));
+      notify(errorMessage(err));
     }
   };
 
@@ -127,9 +119,7 @@ export function ServicesPage() {
         header: 'Đơn giá tiền công',
         cell: ({ row }) => (
           <div>
-            <span className="font-bold text-sm text-primary">
-              {money(row.original.unitPrice)}
-            </span>
+            <span className="font-bold text-sm text-primary">{money(row.original.unitPrice)}</span>
             <span className="text-xs text-muted-foreground ml-1">/ {row.original.unit}</span>
           </div>
         ),
@@ -143,7 +133,9 @@ export function ServicesPage() {
           return (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Clock size={13} />
-              <span>{mins} phút (~{hrs}h)</span>
+              <span>
+                {mins} phút (~{hrs}h)
+              </span>
             </div>
           );
         },
@@ -205,8 +197,7 @@ export function ServicesPage() {
             <div className="row-actions flex items-center justify-end gap-1">
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
+                className="button-small h-8 w-8 p-0"
                 title="Chỉnh sửa dịch vụ"
                 onClick={() => handleOpenEdit(service.id)}
               >
@@ -215,8 +206,7 @@ export function ServicesPage() {
 
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="button-small h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                 title="Ngừng áp dụng"
                 onClick={() => setDeactivatingService(service)}
               >
@@ -233,7 +223,6 @@ export function ServicesPage() {
   return (
     <div className="page-shell">
       <PageHeader
-        eyebrow="MODULE M04"
         title="Danh mục Dịch vụ & Tiền công"
         description="Quản lý bảng giá tiền công kỹ thuật, định mức thời gian tiêu chuẩn và cấu hình các gói bảo dưỡng định kỳ."
         actions={
@@ -263,18 +252,20 @@ export function ServicesPage() {
       {isLoading ? (
         <Loading label="Đang tải danh mục dịch vụ…" />
       ) : isError ? (
-        <QueryError
-          error={error}
-          retry={() => refetch()}
-        />
+        <QueryError error={error} retry={() => refetch()} />
       ) : compact ? (
         <ServiceCards
+          canManage={isAdmin}
           services={services}
           onEdit={handleOpenEdit}
           onDeactivate={setDeactivatingService}
         />
       ) : (
-        <DataTable columns={columns} data={services} emptyMessage="Không tìm thấy dịch vụ nào." />
+        <DataTable<Service>
+          columns={columns}
+          data={services}
+          caption="Không tìm thấy dịch vụ nào."
+        />
       )}
 
       {editorOpen && (
@@ -293,8 +284,7 @@ export function ServicesPage() {
         title="Ngừng áp dụng dịch vụ"
         description={`Bạn có chắc muốn chuyển dịch vụ "${deactivatingService?.serviceName}" sang trạng thái ngừng áp dụng? Dịch vụ này sẽ không xuất hiện khi báo giá mới.`}
         confirmLabel="Ngừng áp dụng"
-        cancelLabel="Hủy"
-        destructive
+        danger
         onConfirm={handleConfirmDeactivate}
         onCancel={() => setDeactivatingService(null)}
       />

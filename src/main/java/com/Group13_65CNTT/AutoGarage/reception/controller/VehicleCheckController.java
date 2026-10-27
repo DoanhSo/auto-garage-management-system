@@ -4,9 +4,12 @@ import com.Group13_65CNTT.AutoGarage.common.constant.ApiPaths;
 import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.dto.ApiResponse;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.reception.dto.CreateVehicleCheckRequest;
 import com.Group13_65CNTT.AutoGarage.reception.dto.VehicleCheckResponse;
 import com.Group13_65CNTT.AutoGarage.reception.service.VehicleCheckService;
+import com.Group13_65CNTT.AutoGarage.reception.entity.CheckType;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -25,24 +28,30 @@ import java.util.List;
 @RequestMapping(ApiPaths.VEHICLE_CHECKS_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Vehicle Inspection", description = "Vehicle check sheets, reception inspection and technical evaluations")
-@SecurityRequirement(name = "bearerAuth")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class VehicleCheckController {
 
     private final VehicleCheckService vehicleCheckService;
+    private final CurrentUserProvider currentUserProvider;
 
     @PostMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTIONIST_OR_TECHNICIAN_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
     @Operation(summary = "Record vehicle check result")
     public ResponseEntity<ApiResponse<VehicleCheckResponse>> recordVehicleCheck(
             @Valid @RequestBody CreateVehicleCheckRequest request,
             HttpServletRequest httpRequest) {
+        // QC must use the quality workflow, which checks tasks, timers and QC assignment.
+        if (request.getCheckType() == CheckType.QC) {
+            throw new BusinessException(ResponseCode.BAD_REQUEST);
+        }
+        request.setCheckedBy(currentUserProvider.userId());
         VehicleCheckResponse response = vehicleCheckService.recordVehicleCheck(request);
         return ResponseEntity.created(URI.create(ApiPaths.VEHICLE_CHECKS_BASE + "/" + response.getId()))
                 .body(ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Fetch vehicle check by ID")
     public ResponseEntity<ApiResponse<VehicleCheckResponse>> getVehicleCheckById(
             @PathVariable Long id,
@@ -52,7 +61,7 @@ public class VehicleCheckController {
     }
 
     @GetMapping("/order/{repairOrderId}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Fetch checks by repair order ID")
     public ResponseEntity<ApiResponse<List<VehicleCheckResponse>>> getChecksByRepairOrder(
             @PathVariable Long repairOrderId,

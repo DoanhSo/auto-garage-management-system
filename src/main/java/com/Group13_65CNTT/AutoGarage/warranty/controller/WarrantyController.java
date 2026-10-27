@@ -11,6 +11,7 @@ import com.Group13_65CNTT.AutoGarage.warranty.dto.response.WarrantyClaimResponse
 import com.Group13_65CNTT.AutoGarage.warranty.dto.response.WarrantyResponse;
 import com.Group13_65CNTT.AutoGarage.warranty.service.WarrantyService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping(ApiPaths.WARRANTIES_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Warranties", description = "Quản lý chính sách bảo hành và yêu cầu bảo hành (TV3)")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class WarrantyController {
 
     private final WarrantyService warrantyService;
@@ -75,12 +77,12 @@ public class WarrantyController {
     }
 
     @PostMapping("/claims")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Tiếp nhận và mở yêu cầu bảo hành")
     public ResponseEntity<ApiResponse<WarrantyClaimResponse>> openClaim(
             @Valid @RequestBody WarrantyClaimOpenRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         WarrantyClaimResponse response = warrantyService.openClaim(actorId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
@@ -93,7 +95,7 @@ public class WarrantyController {
             @PathVariable Long claimId,
             @Valid @RequestBody WarrantyClaimDecideRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         WarrantyClaimResponse response = warrantyService.decideClaim(actorId, claimId, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
     }

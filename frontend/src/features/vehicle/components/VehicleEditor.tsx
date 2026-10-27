@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError, errorMessage } from '../../../shared/api/errors';
+import { applyFormError } from '../../../shared/api/errors';
 import {
   Button,
   ConfirmDialog,
@@ -43,7 +43,9 @@ function VehicleForm({
   const update = useUpdateVehicleMutation();
   const [discard, setDiscard] = useState(false);
 
-  const { data: customers = [], isLoading: isLoadingCustomers } = useCustomersQuery({ isActive: true });
+  const { data: customers = [], isLoading: isLoadingCustomers } = useCustomersQuery({
+    isActive: true,
+  });
 
   const {
     register,
@@ -93,7 +95,7 @@ function VehicleForm({
             inspectionDueDate: values.inspectionDueDate || null,
           },
         });
-        notify.success('Cập nhật thông tin phương tiện thành công');
+        notify('Cập nhật thông tin phương tiện thành công');
       } else {
         await create.mutateAsync({
           customerId: values.customerId,
@@ -108,21 +110,22 @@ function VehicleForm({
           odometer: Number(values.odometer),
           inspectionDueDate: values.inspectionDueDate || null,
         });
-        notify.success('Đăng ký phương tiện mới thành công');
+        notify('Đăng ký phương tiện mới thành công');
       }
       onSaved();
     } catch (err: unknown) {
-      const field = applyFormError(err, setError);
-      if (!field) {
-        notify.error(errorMessage(err) ?? 'Lưu thông tin phương tiện thất bại');
-      }
+      applyFormError(err, setError, Object.keys(values));
     }
   }
 
   return (
     <>
-      <form className="editor-form account-editor-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <FormError message={errors.root?.message} />
+      <form
+        className="editor-form account-editor-form"
+        onSubmit={handleSubmit(onSubmit)}
+        noValidate
+      >
+        <FormError message={errors.root?.server?.message} />
 
         <div className="form-section-label">Thông tin sở hữu & Định danh</div>
 
@@ -130,7 +133,11 @@ function VehicleForm({
           label="Chủ sở hữu xe"
           required={!existing}
           error={errors.customerId?.message}
-          hint={existing ? 'Chủ xe được cố định. Để đổi chủ sở hữu, hãy dùng chức năng Chuyển nhượng.' : undefined}
+          hint={
+            existing
+              ? 'Chủ xe được cố định. Để đổi chủ sở hữu, hãy dùng chức năng Chuyển nhượng.'
+              : undefined
+          }
         >
           {existing ? (
             <input
@@ -140,15 +147,12 @@ function VehicleForm({
               disabled
             />
           ) : (
-            <select
-              className="select"
-              disabled={isLoadingCustomers}
-              {...register('customerId')}
-            >
+            <select className="select" disabled={isLoadingCustomers} {...register('customerId')}>
               <option value="">-- Chọn khách hàng chủ xe --</option>
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.customerCode ? `[${c.customerCode}] ` : ''}{c.fullName} - {c.phone}
+                  {c.customerCode ? `[${c.customerCode}] ` : ''}
+                  {c.fullName} - {c.phone}
                 </option>
               ))}
             </select>
@@ -160,7 +164,11 @@ function VehicleForm({
             label="Biển số xe"
             required={!existing}
             error={errors.licensePlate?.message}
-            hint={existing ? 'Biển số xe không thể thay đổi sau khi đăng ký' : 'Ví dụ: 30F-12345, 51K-99999'}
+            hint={
+              existing
+                ? 'Biển số xe không thể thay đổi sau khi đăng ký'
+                : 'Ví dụ: 30F-12345, 51K-99999'
+            }
           >
             <input
               type="text"
@@ -232,7 +240,7 @@ function VehicleForm({
               type="number"
               className="input"
               placeholder="2022"
-              {...register('manufactureYear')}
+              {...register('manufactureYear', { valueAsNumber: true })}
             />
           </Field>
 
@@ -262,11 +270,7 @@ function VehicleForm({
           error={errors.inspectionDueDate?.message}
           hint="Hệ thống sẽ nhắc hạn trước 15 ngày"
         >
-          <input
-            type="date"
-            className="input"
-            {...register('inspectionDueDate')}
-          />
+          <input type="date" className="input" {...register('inspectionDueDate')} />
         </Field>
 
         <div className="form-actions account-editor-actions">
@@ -292,8 +296,7 @@ function VehicleForm({
         title="Hủy các thay đổi?"
         description="Dữ liệu thông tin xe chưa lưu sẽ bị mất nếu bạn đóng biểu mẫu này."
         confirmLabel="Bỏ thay đổi"
-        cancelLabel="Tiếp tục chỉnh sửa"
-        destructive
+        danger
         onConfirm={() => {
           setDiscard(false);
           onSaved();
@@ -306,8 +309,7 @@ function VehicleForm({
         title="Rời khỏi trang?"
         description="Bạn có thay đổi chưa lưu trên thông tin phương tiện. Bạn có chắc muốn rời đi?"
         confirmLabel="Rời đi"
-        cancelLabel="Ở lại"
-        destructive
+        danger
         onConfirm={() => blocker.proceed?.()}
         onCancel={() => blocker.reset?.()}
       />
@@ -329,6 +331,10 @@ export function VehicleEditor({
   const isEditing = Boolean(vehicleId);
   const detail = useVehicleQuery(vehicleId);
   const [closeHandler, setCloseHandler] = useState<(() => void) | null>(null);
+  const registerCloseHandler = useCallback(
+    (handler: () => void) => setCloseHandler(() => handler),
+    [],
+  );
 
   const title = isEditing ? 'Chỉnh sửa thông tin phương tiện' : 'Đăng ký phương tiện mới';
   const description = isEditing
@@ -349,17 +355,14 @@ export function VehicleEditor({
       {isEditing && detail.isLoading ? (
         <Loading label="Đang tải thông tin phương tiện…" />
       ) : isEditing && detail.isError ? (
-        <QueryError
-          error={detail.error}
-          retry={() => detail.refetch()}
-        />
+        <QueryError error={detail.error} retry={() => detail.refetch()} />
       ) : (
         <VehicleForm
           key={vehicleId ?? 'new'}
           existing={detail.data}
           preselectedCustomerId={preselectedCustomerId}
           onSaved={onClose}
-          onRequestClose={setCloseHandler}
+          onRequestClose={registerCloseHandler}
         />
       )}
     </Sheet>

@@ -1,18 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError, errorMessage } from '../../../shared/api/errors';
-import {
-  Button,
-  ConfirmDialog,
-  Field,
-  FormError,
-  Loading,
-  Sheet,
-} from '../../../shared/components/ui';
+import { applyFormError } from '../../../shared/api/errors';
+import { Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/components/ui';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
-import { useCustomersQuery } from '../../customer/hooks/useCustomers';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { useCustomersQuery, useMyCustomerQuery } from '../../customer/hooks/useCustomers';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
 import { useServicesQuery } from '../../catalog/hooks/useCatalog';
 import { useCreateBookingMutation } from '../hooks/useReception';
@@ -30,12 +24,25 @@ function BookingForm({
   onRequestClose: (handler: () => void) => void;
 }) {
   const notify = useToast();
+  const { user } = useAuth();
+  const isCustomer = user?.role === 'CUSTOMER';
   const create = useCreateBookingMutation();
   const [discard, setDiscard] = useState(false);
 
-  const { data: customers = [], isLoading: isLoadingCustomers } = useCustomersQuery({ isActive: true });
-  const { data: allVehicles = [], isLoading: isLoadingVehicles } = useVehiclesQuery({ isActive: true });
-  const { data: services = [], isLoading: isLoadingServices } = useServicesQuery({ isActive: true });
+  const directory = useCustomersQuery({ isActive: true }, !isCustomer);
+  const ownProfile = useMyCustomerQuery(isCustomer);
+  const customers = isCustomer
+    ? ownProfile.data
+      ? [ownProfile.data]
+      : []
+    : (directory.data ?? []);
+  const isLoadingCustomers = isCustomer ? ownProfile.isLoading : directory.isLoading;
+  const { data: allVehicles = [], isLoading: isLoadingVehicles } = useVehiclesQuery({
+    isActive: true,
+  });
+  const { data: services = [], isLoading: isLoadingServices } = useServicesQuery({
+    isActive: true,
+  });
 
   const {
     register,
@@ -50,6 +57,9 @@ function BookingForm({
     defaultValues: bookingDefaults(),
   });
 
+  useEffect(() => {
+    if (isCustomer && ownProfile.data) setValue('customerId', ownProfile.data.id);
+  }, [isCustomer, ownProfile.data, setValue]);
   const selectedCustomerId = watch('customerId');
 
   // Lọc xe theo khách hàng đã chọn
@@ -88,20 +98,21 @@ function BookingForm({
         requestDescription: values.requestDescription?.trim() || null,
       });
 
-      notify.success('Đặt lịch hẹn thành công');
+      notify('Đặt lịch hẹn thành công');
       onSaved();
     } catch (err: unknown) {
-      const field = applyFormError(err, setError);
-      if (!field) {
-        notify.error(errorMessage(err) ?? 'Đặt lịch hẹn thất bại');
-      }
+      applyFormError(err, setError, Object.keys(values));
     }
   }
 
   return (
     <>
-      <form className="editor-form account-editor-form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <FormError message={errors.root?.message} />
+      <form
+        className="editor-form account-editor-form"
+        onSubmit={handleSubmit(onSubmit)}
+        noValidate
+      >
+        <FormError message={errors.root?.server?.message} />
 
         <div className="form-section-label">Thông tin khách hàng & Phương tiện</div>
 
@@ -113,7 +124,7 @@ function BookingForm({
         >
           <select
             className="select"
-            disabled={isLoadingCustomers}
+            disabled={isLoadingCustomers || isCustomer}
             {...register('customerId', {
               onChange: () => setValue('vehicleId', ''),
             })}
@@ -121,7 +132,8 @@ function BookingForm({
             <option value="">-- Chọn khách hàng --</option>
             {customers.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.customerCode ? `[${c.customerCode}] ` : ''}{c.fullName} - {c.phone}
+                {c.customerCode ? `[${c.customerCode}] ` : ''}
+                {c.fullName} - {c.phone}
               </option>
             ))}
           </select>
@@ -159,19 +171,11 @@ function BookingForm({
           error={errors.appointmentAt?.message}
           hint="Thời gian khách hàng dự kiến đưa xe vào xưởng"
         >
-          <input
-            type="datetime-local"
-            className="input"
-            {...register('appointmentAt')}
-          />
+          <input type="datetime-local" className="input" {...register('appointmentAt')} />
         </Field>
 
         <Field label="Hạng mục / Gói dịch vụ đăng ký" error={errors.serviceId?.message}>
-          <select
-            className="select"
-            disabled={isLoadingServices}
-            {...register('serviceId')}
-          >
+          <select className="select" disabled={isLoadingServices} {...register('serviceId')}>
             <option value="">-- Khám tổng quát / Chưa xác định dịch vụ cụ thể --</option>
             {services.map((s) => (
               <option key={s.id} value={s.id}>
@@ -181,7 +185,10 @@ function BookingForm({
           </select>
         </Field>
 
-        <Field label="Mô tả hiện tượng / Yêu cầu của khách hàng" error={errors.requestDescription?.message}>
+        <Field
+          label="Mô tả hiện tượng / Yêu cầu của khách hàng"
+          error={errors.requestDescription?.message}
+        >
           <textarea
             className="input min-h-[80px] resize-none"
             placeholder="Khách báo xe phát ra tiếng ồn khi tăng tốc, có mùi khét, cần thay nhớt..."
@@ -212,8 +219,7 @@ function BookingForm({
         title="Hủy đặt lịch hẹn?"
         description="Dữ liệu lịch hẹn chưa lưu sẽ bị mất nếu bạn đóng biểu mẫu này."
         confirmLabel="Bỏ thay đổi"
-        cancelLabel="Tiếp tục"
-        destructive
+        danger
         onConfirm={() => {
           setDiscard(false);
           onSaved();
@@ -226,8 +232,7 @@ function BookingForm({
         title="Rời khỏi trang?"
         description="Bạn có thay đổi chưa lưu trên biểu mẫu đặt lịch hẹn."
         confirmLabel="Rời đi"
-        cancelLabel="Ở lại"
-        destructive
+        danger
         onConfirm={() => blocker.proceed?.()}
         onCancel={() => blocker.reset?.()}
       />
@@ -235,14 +240,12 @@ function BookingForm({
   );
 }
 
-export function BookingEditor({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function BookingEditor({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [closeHandler, setCloseHandler] = useState<(() => void) | null>(null);
+  const registerCloseHandler = useCallback(
+    (handler: () => void) => setCloseHandler(() => handler),
+    [],
+  );
 
   return (
     <Sheet
@@ -255,10 +258,7 @@ export function BookingEditor({
       description="Ghi nhận lịch hẹn bảo dưỡng, sửa chữa cho khách hàng và phân bổ khoang dự kiến."
       placement="side"
     >
-      <BookingForm
-        onSaved={onClose}
-        onRequestClose={setCloseHandler}
-      />
+      <BookingForm onSaved={onClose} onRequestClose={registerCloseHandler} />
     </Sheet>
   );
 }

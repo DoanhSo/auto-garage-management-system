@@ -6,6 +6,9 @@ param(
     [string]$BootstrapIdentityId = ''
 )
 $ErrorActionPreference = 'Stop'
+if ($WithBootstrapAdministrator -and $BootstrapIdentityId -notmatch '^[A-Za-z0-9-]{1,36}$') {
+    throw 'Bootstrap requires the real Keycloak user ID; create the garage administrator in Keycloak first (docs/KEYCLOAK_SETUP.md).'
+}
 $taskOutputPath = [System.IO.Path]::GetFullPath($OutputPath)
 if (Test-Path -LiteralPath $taskOutputPath) {
     Write-Output "Environment file already exists; preserved: $taskOutputPath"
@@ -31,6 +34,11 @@ $taskSettings = @(
     "KEYCLOAK_DB_PASSWORD=$taskKeycloakDbPassword",
     'KEYCLOAK_ADMIN_USERNAME=admin',
     "KEYCLOAK_ADMIN_PASSWORD=$taskKeycloakAdminPassword",
+    'KEYCLOAK_ADMIN_ENABLED=true',
+    'KEYCLOAK_ADMIN_SERVER_URL=http://localhost:8081',
+    'KEYCLOAK_ADMIN_REALM=autogarage-realm',
+    'KEYCLOAK_ADMIN_CONNECT_TIMEOUT=5s',
+    'KEYCLOAK_ADMIN_REQUEST_TIMEOUT=10s',
     'DB_URL=jdbc:mysql://localhost:3307/autogarage?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true',
     'DB_USERNAME=autogarage',
     'SERVER_PORT=8080',
@@ -51,4 +59,4 @@ $taskSettings = @(
 )
 [System.IO.File]::WriteAllText($taskOutputPath, ($taskSettings -join [Environment]::NewLine) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
 Write-Output "Created local environment: $taskOutputPath"
-Write-Output 'Secrets were generated locally and were not printed. Read the private file for bootstrap credentials if enabled.'
+Write-Output 'Secrets were generated locally and were not printed. Set up the garage administrator using docs/KEYCLOAK_SETUP.md.'

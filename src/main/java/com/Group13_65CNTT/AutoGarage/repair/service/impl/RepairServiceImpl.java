@@ -312,19 +312,11 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         });
 
         // Giải phóng khoang sửa chữa
-        try {
-            bayScheduling.releaseForRepair(actorUserId, repairOrderId);
-        } catch (Exception ex) {
-            log.warn("Lỗi khi giải phóng khoang cho phiếu #{}: {}", repairOrderId, ex.getMessage());
-        }
+        bayScheduling.releaseForRepair(actorUserId, repairOrderId);
 
         // Giải phóng lượng giữ phụ tùng trong kho
         if (inventoryOperations != null) {
-            try {
-                inventoryOperations.releaseForOrder(actorUserId, repairOrderId);
-            } catch (Exception ex) {
-                log.warn("Lỗi khi giải phóng vật tư kho cho phiếu #{}: {}", repairOrderId, ex.getMessage());
-            }
+            inventoryOperations.releaseForOrder(actorUserId, repairOrderId);
         }
 
         // Ghi biên bản bàn giao xe
@@ -342,11 +334,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         // Tạo chính sách bảo hành I07 nếu đã có hóa đơn phát hành cho phiếu
         if (warrantyOperations != null && invoiceRepository != null) {
             invoiceRepository.findByRepairOrderId(repairOrderId).ifPresent(inv -> {
-                try {
-                    warrantyOperations.createFromInvoice(actorUserId, inv.getId(), odometerOut);
-                } catch (Exception ex) {
-                    log.warn("Lỗi khi tạo chính sách bảo hành từ hóa đơn #{}: {}", inv.getId(), ex.getMessage());
-                }
+                warrantyOperations.createFromInvoice(actorUserId, inv.getId(), odometerOut);
             });
         }
 

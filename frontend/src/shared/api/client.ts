@@ -34,7 +34,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     Accept: options.binary ? 'text/csv, application/json' : 'application/json',
   };
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  const multipart = options.body instanceof FormData;
+  if (options.body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), env.requestTimeoutMs);
   const signal = options.signal
@@ -51,7 +52,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       signal,
       credentials: 'omit',
       cache: 'no-store',
-      body: options.body === undefined ? undefined : encodeJson(options.body),
+      body: multipart
+        ? (options.body as FormData)
+        : options.body === undefined
+          ? undefined
+          : encodeJson(options.body),
     });
     assertSession();
     if (

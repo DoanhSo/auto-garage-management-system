@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { vehicleApi, type VehicleQueryParams, type VehicleTimelineParams } from '../api/vehicleApi';
-import type { VehicleCreate, VehicleUpdate, TransferOwnership } from '../../../shared/types/contracts';
+import type {
+  VehicleCreate,
+  VehicleUpdate,
+  TransferOwnership,
+} from '../../../shared/types/contracts';
 
 export const vehicleKeys = {
   all: ['vehicles'] as const,
@@ -9,7 +13,8 @@ export const vehicleKeys = {
   details: () => [...vehicleKeys.all, 'detail'] as const,
   detail: (id: string) => [...vehicleKeys.details(), id] as const,
   timelines: () => [...vehicleKeys.all, 'timeline'] as const,
-  timeline: (id: string, params?: VehicleTimelineParams) => [...vehicleKeys.timelines(), id, params] as const,
+  timeline: (id: string, params?: VehicleTimelineParams) =>
+    [...vehicleKeys.timelines(), id, params] as const,
 };
 
 export function useVehiclesQuery(params?: VehicleQueryParams) {
@@ -30,7 +35,8 @@ export function useVehicleQuery(id: string | null) {
 export function useVehicleTimelineQuery(id: string | null, params?: VehicleTimelineParams) {
   return useQuery({
     queryKey: id ? vehicleKeys.timeline(id, params) : ['vehicles', 'timeline', 'empty'],
-    queryFn: ({ signal }) => (id ? vehicleApi.timeline(id, params, signal) : Promise.reject('No ID')),
+    queryFn: ({ signal }) =>
+      id ? vehicleApi.timeline(id, params, signal) : Promise.reject('No ID'),
     enabled: Boolean(id),
   });
 }

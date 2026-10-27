@@ -109,12 +109,7 @@ public class BillingServiceImpl implements BillingService {
 
         // Check readiness via I03 contract if available, and also verify DB state directly
         if (repairWorkflow.isPresent()) {
-            try {
-                repairWorkflow.get().requireInvoiceReady(actorUserId, request.getRepairOrderId());
-            } catch (Exception ex) {
-                log.warn("RepairWorkflow.requireInvoiceReady rejected order {}: {}", request.getRepairOrderId(), ex.getMessage());
-                throw new BusinessException(ResponseCode.BAD_REQUEST, ex);
-            }
+            repairWorkflow.get().requireInvoiceReady(actorUserId, request.getRepairOrderId());
         }
 
         // Direct DB verification of order readiness

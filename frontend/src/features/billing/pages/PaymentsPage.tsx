@@ -1,18 +1,9 @@
 import { useState } from 'react';
-import {
-  usePaymentsQuery,
-  usePaySupplierMutation,
-} from '../hooks/useBilling';
+import { usePaymentsQuery, usePaySupplierMutation } from '../hooks/useBilling';
 import { useSuppliersQuery, useDocumentsQuery } from '../../inventory/hooks/useInventory';
 import type { PaymentDirection, PaymentMethod, SupplierPaymentInput } from '../types/billing';
 import { Button, Field, Modal, Badge, Loading } from '../../../shared/components/ui';
-import {
-  DollarSign,
-  Plus,
-  Search,
-  ArrowDownLeft,
-  ArrowUpRight,
-} from 'lucide-react';
+import { DollarSign, Plus, Search, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 
 export function PaymentsPage() {
   const [direction, setDirection] = useState<PaymentDirection | ''>('');
@@ -94,7 +85,8 @@ export function PaymentsPage() {
             Sổ Quỹ & Giao dịch Thu / Chi (UC24)
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Quản lý dòng tiền vào (thu tiền hóa đơn khách) và dòng tiền ra (chi trả tiền nhập hàng NCC)
+            Quản lý dòng tiền vào (thu tiền hóa đơn khách) và dòng tiền ra (chi trả tiền nhập hàng
+            NCC)
           </p>
         </div>
         <Button
@@ -126,7 +118,7 @@ export function PaymentsPage() {
         <select
           value={direction}
           onChange={(e) => {
-            setDirection(e.target.value as any);
+            setDirection(e.target.value as typeof direction);
             setPage(0);
           }}
           className="border rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -165,7 +157,9 @@ export function PaymentsPage() {
               <tbody className="divide-y divide-gray-100 text-sm">
                 {data.content.map((pay) => (
                   <tr key={pay.id} className="hover:bg-gray-50/80 transition-colors">
-                    <td className="py-3 px-4 font-mono font-medium text-gray-900">{pay.transactionCode}</td>
+                    <td className="py-3 px-4 font-mono font-medium text-gray-900">
+                      {pay.transactionCode}
+                    </td>
                     <td className="py-3 px-4">
                       {pay.direction === 'IN' ? (
                         <Badge variant="success" className="inline-flex items-center gap-1">
@@ -185,7 +179,8 @@ export function PaymentsPage() {
                       )}
                       {pay.documentCode && (
                         <div>
-                          Phiếu kho: <span className="font-mono font-medium">{pay.documentCode}</span>
+                          Phiếu kho:{' '}
+                          <span className="font-mono font-medium">{pay.documentCode}</span>
                         </div>
                       )}
                       {pay.notes && <div className="text-xs text-gray-400">{pay.notes}</div>}

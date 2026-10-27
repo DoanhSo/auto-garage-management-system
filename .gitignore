@@ -40,5 +40,9 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/.cache/
 frontend/output/playwright/
+frontend/.playwright-cli/
+.playwright-cli/
 .DS_Store
 *.DS_Store
+.docker-local/
+release/

@@ -61,15 +61,30 @@ public final class AccountTokenValidator implements OAuth2TokenValidator<Jwt> {
             return INVALID;
         }
         // Do not disguise a database outage as invalid credentials.
-        return resolveUser(users, token)
-                .filter(
-                        u ->
-                                u.isActive()
-                                        && u.getDeletedAt() == null
-                                        && u.getAuthVersion() == version
-                                        && u.getRole() == role)
-                .map(u -> OAuth2TokenValidatorResult.success())
-                .orElse(INVALID);
+        Optional<User> resolved = resolveUser(users, token);
+        if (resolved.isPresent()) {
+            return resolved.filter(
+                            u ->
+                                    u.isActive()
+                                            && u.getDeletedAt() == null
+                                            && u.getAuthVersion() == version
+                                            && u.getRole() == role)
+                    .map(u -> OAuth2TokenValidatorResult.success())
+                    .orElse(INVALID);
+        }
+        // Allow JIT provisioning exclusively for self-registered or Google-authenticated CUSTOMER
+        // tokens issued by Keycloak (never for staff or administrator roles).
+        if (role == Role.CUSTOMER
+                && version == SecurityConstants.DEFAULT_AUTH_VERSION
+                && token.getSubject().matches(SecurityConstants.IDENTITY_ID_PATTERN)
+                && !token.getSubject().matches(SecurityConstants.POSITIVE_LONG_ID_PATTERN)) {
+            String preferredUsername =
+                    token.getClaimAsString(SecurityConstants.PREFERRED_USERNAME_CLAIM);
+            if (preferredUsername != null && !preferredUsername.isBlank()) {
+                return OAuth2TokenValidatorResult.success();
+            }
+        }
+        return INVALID;
     }
 
     public static Optional<User> resolveUser(UserRepository users, Jwt token) {
@@ -78,8 +93,14 @@ public final class AccountTokenValidator implements OAuth2TokenValidator<Jwt> {
         Optional<User> byIdentity = users.findByIdentityId(subject);
         if (byIdentity.isPresent()) return byIdentity;
         if (subject.matches(SecurityConstants.POSITIVE_LONG_ID_PATTERN)) {
+            final long id;
+            try {
+                id = Long.parseLong(subject);
+            } catch (NumberFormatException invalidIdentifier) {
+                return Optional.empty();
+            }
             Optional<User> byId =
-                    users.findById(Long.parseLong(subject))
+                    users.findById(id)
                             .filter(
                                     u ->
                                             u.getIdentityId() == null
@@ -89,6 +110,11 @@ public final class AccountTokenValidator implements OAuth2TokenValidator<Jwt> {
         String preferredUsername =
                 token.getClaimAsString(SecurityConstants.PREFERRED_USERNAME_CLAIM);
         if (preferredUsername != null && !preferredUsername.isBlank()) {
+            // Customer usernames are self-service input in Keycloak. Matching an unbound local
+            // customer by name would let a new registration take over that customer's records.
+            if (KeycloakJwtAuthenticationConverter.extractSingleRole(token).orElse(null) == Role.CUSTOMER) {
+                return Optional.empty();
+            }
             return users.findByUsername(preferredUsername.strip().toLowerCase(Locale.ROOT))
                     .filter(u -> u.getIdentityId() == null || u.getIdentityId().equals(subject));
         }

@@ -1,21 +1,13 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError, errorMessage } from '../../../shared/api/errors';
-import {
-  Button,
-  Field,
-  FormError,
-  Sheet,
-} from '../../../shared/components/ui';
+import { applyFormError } from '../../../shared/api/errors';
+import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
 import type { Booking, Vehicle } from '../../../shared/types/contracts';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
 import { useCheckInVehicleMutation } from '../hooks/useReception';
-import {
-  checkInFormSchema,
-  type CheckInFormValues,
-} from '../schemas/receptionSchema';
-import { LogIn, Gauge, Fuel } from 'lucide-react';
+import { checkInFormSchema, type CheckInFormValues } from '../schemas/receptionSchema';
+import { LogIn } from 'lucide-react';
 
 export function CheckInModal({
   booking,
@@ -32,9 +24,12 @@ export function CheckInModal({
 }) {
   const notify = useToast();
   const checkIn = useCheckInVehicleMutation();
-  const { data: vehicles = [], isLoading: isLoadingVehicles } = useVehiclesQuery({ isActive: true });
+  const { data: vehicles = [], isLoading: isLoadingVehicles } = useVehiclesQuery({
+    isActive: true,
+  });
 
-  const activeVehicle = vehicle || (booking ? vehicles.find((v) => v.id === booking.vehicleId) : null);
+  const activeVehicle =
+    vehicle || (booking ? vehicles.find((v) => v.id === booking.vehicleId) : null);
 
   const {
     register,
@@ -66,19 +61,18 @@ export function CheckInModal({
         bookingId: values.bookingId || null,
         vehicleId: values.vehicleId,
         odometerIn: Number(values.odometerIn),
-        fuelLevelPercent: values.fuelLevelPercent ? Number(values.fuelLevelPercent) : null,
+        fuelLevelPercent: Number.isFinite(values.fuelLevelPercent)
+          ? Number(values.fuelLevelPercent)
+          : null,
         customerComplaint: values.customerComplaint?.trim() || null,
       });
 
-      notify.success(`Tiếp nhận xe thành công! Mã lệnh sửa chữa: #${result.orderCode}`);
+      notify(`Tiếp nhận xe thành công! Mã lệnh sửa chữa: #${result.orderCode}`);
       reset();
       onClose();
       onCheckInSuccess?.(result.orderCode, result.repairOrderId);
     } catch (err: unknown) {
-      const field = applyFormError(err, setError);
-      if (!field) {
-        notify.error(errorMessage(err) ?? 'Tiếp nhận xe vào xưởng thất bại');
-      }
+      applyFormError(err, setError, Object.keys(values));
     }
   }
 
@@ -90,15 +84,13 @@ export function CheckInModal({
     : 'Ghi nhận hiện trạng xe, số ODO và khởi tạo lệnh sửa chữa mới.';
 
   return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      placement="center"
-      title={title}
-      description={description}
-    >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="editor-form account-editor-form">
-        <FormError message={errors.root?.message} />
+    <Sheet open={open} onClose={onClose} placement="center" title={title} description={description}>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        noValidate
+        className="editor-form account-editor-form"
+      >
+        <FormError message={errors.root?.server?.message} />
 
         {!booking && !vehicle && (
           <Field
@@ -124,7 +116,10 @@ export function CheckInModal({
         {activeVehicle && (
           <div className="p-3 bg-muted/60 border border-border rounded-md text-xs space-y-1">
             <div className="flex justify-between font-medium">
-              <span>Phương tiện: {activeVehicle.licensePlate} ({activeVehicle.brand} {activeVehicle.model})</span>
+              <span>
+                Phương tiện: {activeVehicle.licensePlate} ({activeVehicle.brand}{' '}
+                {activeVehicle.model})
+              </span>
               <span>ODO gần nhất: {activeVehicle.odometer.toLocaleString('vi-VN')} km</span>
             </div>
             <div className="text-muted-foreground">
@@ -137,7 +132,11 @@ export function CheckInModal({
           <Field
             label="Số ODO vào xưởng (km) *"
             error={errors.odometerIn?.message}
-            hint={activeVehicle ? `Tối thiểu ${activeVehicle.odometer.toLocaleString('vi-VN')} km` : undefined}
+            hint={
+              activeVehicle
+                ? `Tối thiểu ${activeVehicle.odometer.toLocaleString('vi-VN')} km`
+                : undefined
+            }
           >
             <div className="relative">
               <input
@@ -162,7 +161,7 @@ export function CheckInModal({
               max={100}
               placeholder="50"
               disabled={checkIn.isPending}
-              {...register('fuelLevelPercent')}
+              {...register('fuelLevelPercent', { valueAsNumber: true })}
             />
           </Field>
         </div>
@@ -181,19 +180,10 @@ export function CheckInModal({
         </Field>
 
         <div className="form-actions account-editor-actions">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={checkIn.isPending}
-            onClick={onClose}
-          >
+          <Button type="button" variant="ghost" disabled={checkIn.isPending} onClick={onClose}>
             Hủy
           </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={checkIn.isPending}
-          >
+          <Button type="submit" variant="primary" disabled={checkIn.isPending}>
             <LogIn size={16} className="mr-1" />
             {checkIn.isPending ? 'Đang tiếp nhận...' : 'Xác nhận vào xưởng & Mở lệnh'}
           </Button>

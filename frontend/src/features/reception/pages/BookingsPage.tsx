@@ -1,17 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
-import {
-  Plus,
-  LogIn,
-  CheckCircle,
-  CalendarClock,
-  CalendarX,
-  UserX,
-  Calendar,
-  Car,
-  User,
-  Clock,
-  ClipboardCheck,
-} from 'lucide-react';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { FRONT_DESK_ROLES } from '../../../app/access';
+import { useMemo, useRef, useState, useCallback } from 'react';
+import { Plus, LogIn, CheckCircle, CalendarClock, CalendarX, UserX, Calendar } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
 import {
@@ -43,6 +33,8 @@ import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 export function BookingsPage() {
   const compact = useMediaQuery('(max-width: 640px)');
   const notify = useToast();
+  const { user } = useAuth();
+  const canManage = !!user && FRONT_DESK_ROLES.includes(user.role);
 
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('ALL');
@@ -61,7 +53,9 @@ export function BookingsPage() {
   const [noShowBooking, setNoShowBooking] = useState<Booking | null>(null);
 
   // Sau khi check-in thành công có thể mở ngay biên bản kiểm tra xe
-  const [createdRepairOrder, setCreatedRepairOrder] = useState<{ id: string; code: string } | null>(null);
+  const [createdRepairOrder, setCreatedRepairOrder] = useState<{ id: string; code: string } | null>(
+    null,
+  );
   const [vehicleCheckOpen, setVehicleCheckOpen] = useState(false);
 
   const createTrigger = useRef<HTMLButtonElement>(null);
@@ -73,7 +67,13 @@ export function BookingsPage() {
     };
   }, [status]);
 
-  const { data: allBookings = [], isLoading, isError, error, refetch } = useBookingsQuery(queryParams);
+  const {
+    data: allBookings = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useBookingsQuery(queryParams);
   const confirmMutation = useConfirmBookingMutation();
   const noShowMutation = useMarkNoShowMutation();
 
@@ -90,38 +90,61 @@ export function BookingsPage() {
     );
   }, [allBookings, debouncedSearch]);
 
-  const handleConfirm = async (booking: Booking) => {
-    try {
-      await confirmMutation.mutateAsync({ id: booking.id });
-      notify.success(`Đã xác nhận lịch hẹn #${booking.bookingCode}`);
-    } catch (err: unknown) {
-      notify.error(errorMessage(err) ?? 'Xác nhận lịch hẹn thất bại');
-    }
-  };
+  const handleConfirm = useCallback(
+    async (booking: Booking) => {
+      try {
+        await confirmMutation.mutateAsync({ id: booking.id });
+        notify(`Đã xác nhận lịch hẹn #${booking.bookingCode}`);
+      } catch (err: unknown) {
+        notify(errorMessage(err) ?? 'Xác nhận lịch hẹn thất bại');
+      }
+    },
+    [confirmMutation, notify],
+  );
 
   const handleMarkNoShow = async () => {
     if (!noShowBooking) return;
     try {
       await noShowMutation.mutateAsync({ id: noShowBooking.id });
-      notify.success(`Đã đánh dấu vắng mặt cho lịch hẹn #${noShowBooking.bookingCode}`);
+      notify(`Đã đánh dấu vắng mặt cho lịch hẹn #${noShowBooking.bookingCode}`);
       setNoShowBooking(null);
     } catch (err: unknown) {
-      notify.error(errorMessage(err) ?? 'Cập nhật thất bại');
+      notify(errorMessage(err) ?? 'Cập nhật thất bại');
     }
   };
 
   const getStatusBadge = (bStatus: BookingStatus) => {
     switch (bStatus) {
       case 'PENDING':
-        return <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Chờ xác nhận</span>;
+        return (
+          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+            Chờ xác nhận
+          </span>
+        );
       case 'CONFIRMED':
-        return <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">Đã xác nhận</span>;
+        return (
+          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+            Đã xác nhận
+          </span>
+        );
       case 'RECEIVED':
-        return <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">Đã vào xưởng</span>;
+        return (
+          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+            Đã vào xưởng
+          </span>
+        );
       case 'CANCELLED':
-        return <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">Đã hủy</span>;
+        return (
+          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
+            Đã hủy
+          </span>
+        );
       case 'NO_SHOW':
-        return <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300">Vắng mặt</span>;
+        return (
+          <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300">
+            Vắng mặt
+          </span>
+        );
     }
   };
 
@@ -165,7 +188,9 @@ export function BookingsPage() {
               {row.original.licensePlate}
             </span>
             {row.original.vehicleModel && (
-              <div className="text-xs text-muted-foreground mt-0.5">{row.original.vehicleModel}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {row.original.vehicleModel}
+              </div>
             )}
           </div>
         ),
@@ -198,11 +223,10 @@ export function BookingsPage() {
           const b = row.original;
           return (
             <div className="row-actions flex items-center justify-end gap-1">
-              {b.status === 'PENDING' && (
+              {canManage && b.status === 'PENDING' && (
                 <Button
                   variant="primary"
-                  size="sm"
-                  className="h-8 px-2 text-xs"
+                  className="button-small h-8 px-2 text-xs"
                   onClick={() => handleConfirm(b)}
                   title="Xác nhận lịch hẹn"
                 >
@@ -211,11 +235,10 @@ export function BookingsPage() {
                 </Button>
               )}
 
-              {b.status === 'CONFIRMED' && (
+              {canManage && b.status === 'CONFIRMED' && (
                 <Button
                   variant="primary"
-                  size="sm"
-                  className="h-8 px-2 text-xs bg-emerald-600 hover:bg-emerald-700"
+                  className="button-small h-8 px-2 text-xs bg-emerald-600 hover:bg-emerald-700"
                   onClick={() => {
                     setCheckInBooking(b);
                     setCheckInOpen(true);
@@ -231,8 +254,7 @@ export function BookingsPage() {
                 <>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
+                    className="button-small h-8 w-8 p-0"
                     title="Dời lịch hẹn"
                     onClick={() => {
                       setRescheduleBooking(b);
@@ -242,11 +264,10 @@ export function BookingsPage() {
                     <CalendarClock size={14} className="text-amber-500" />
                   </Button>
 
-                  {b.status === 'CONFIRMED' && (
+                  {canManage && b.status === 'CONFIRMED' && (
                     <Button
                       variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-slate-600"
+                      className="button-small h-8 w-8 p-0 text-slate-600"
                       title="Khách không đến (No-show)"
                       onClick={() => setNoShowBooking(b)}
                     >
@@ -256,8 +277,7 @@ export function BookingsPage() {
 
                   <Button
                     variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="button-small h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                     title="Hủy lịch hẹn"
                     onClick={() => {
                       setCancelBooking(b);
@@ -273,27 +293,28 @@ export function BookingsPage() {
         },
       },
     ],
-    [],
+    [handleConfirm, canManage],
   );
 
   return (
     <div className="page-shell">
       <PageHeader
-        eyebrow="MODULE M05"
         title="Lịch hẹn & Tiếp nhận xe"
         description="Quản lý lịch hẹn dịch vụ, tiếp nhận xe vào gara, ghi nhận hiện trạng và khởi tạo lệnh sửa chữa."
         actions={
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setCheckInBooking(null);
-                setCheckInOpen(true);
-              }}
-            >
-              <LogIn size={16} />
-              Tiếp nhận vãng lai
-            </Button>
+            {canManage && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setCheckInBooking(null);
+                  setCheckInOpen(true);
+                }}
+              >
+                <LogIn size={16} />
+                Tiếp nhận vãng lai
+              </Button>
+            )}
             <Button ref={createTrigger} variant="primary" onClick={() => setEditorOpen(true)}>
               <Plus size={16} />
               Đặt lịch hẹn mới
@@ -316,12 +337,10 @@ export function BookingsPage() {
       {isLoading ? (
         <Loading label="Đang tải danh sách lịch hẹn…" />
       ) : isError ? (
-        <QueryError
-          error={error}
-          retry={() => refetch()}
-        />
+        <QueryError error={error} retry={() => refetch()} />
       ) : compact ? (
         <BookingCards
+          canManage={canManage}
           bookings={bookings}
           onConfirm={handleConfirm}
           onCheckIn={(b) => {
@@ -340,15 +359,14 @@ export function BookingsPage() {
           onVehicleCheck={() => {}}
         />
       ) : (
-        <DataTable columns={columns} data={bookings} emptyMessage="Không tìm thấy lịch hẹn nào." />
-      )}
-
-      {editorOpen && (
-        <BookingEditor
-          open={editorOpen}
-          onClose={() => setEditorOpen(false)}
+        <DataTable<Booking>
+          columns={columns}
+          data={bookings}
+          caption="Không tìm thấy lịch hẹn nào."
         />
       )}
+
+      {editorOpen && <BookingEditor open={editorOpen} onClose={() => setEditorOpen(false)} />}
 
       {checkInOpen && (
         <CheckInModal
@@ -404,8 +422,7 @@ export function BookingsPage() {
         title="Xác nhận khách vắng mặt (No-show)"
         description={`Đánh dấu khách hàng lịch hẹn #${noShowBooking?.bookingCode} không đến gara? Khoang kỹ thuật đã đặt giữ sẽ tự động được giải phóng.`}
         confirmLabel="Xác nhận vắng mặt"
-        cancelLabel="Đóng"
-        destructive
+        danger
         onConfirm={handleMarkNoShow}
         onCancel={() => setNoShowBooking(null)}
       />

@@ -1,0 +1,16 @@
+.git
+.idea
+.vscode
+frontend
+docker/*
+!docker/backend-entrypoint.sh
+docs
+scripts
+target/*
+!target/AutoGarage-0.0.1-SNAPSHOT.jar
+.env
+.env.*
+.docker-local
+release
+output
+*.log

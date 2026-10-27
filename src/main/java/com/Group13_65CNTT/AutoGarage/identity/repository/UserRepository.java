@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,8 +40,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findLockedById(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT u FROM User u WHERE u.role = :role AND u.active = true AND u.deletedAt IS NULL ORDER BY u.id")
+    @Query(
+            "SELECT u FROM User u WHERE u.role = :role AND u.active = true AND u.deletedAt IS NULL"
+                    + " ORDER BY u.id")
     List<User> lockActiveAdministrators(@Param("role") Role role);
+
+    @Query(
+            "SELECT u FROM User u WHERE u.active = true AND u.deletedAt IS NULL AND (:role IS NULL"
+                    + " OR u.role = :role) ORDER BY u.id")
+    List<User> findActiveUsersForBroadcast(@Param("role") Role role);
+
+    @Query(
+            "SELECT u FROM User u WHERE u.active = true AND u.deletedAt IS NULL AND u.role IN"
+                    + " :roles ORDER BY u.id")
+    List<User> findActiveUsersByRoles(@Param("roles") Collection<Role> roles);
 
     @Query(
             """

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { serviceTypes, type Service, type ServiceType } from '../../../shared/types/contracts';
+import { serviceTypes, type Service } from '../../../shared/types/contracts';
 
 export const bayTypes = [
   'Khoang tiêu chuẩn',
@@ -22,33 +22,33 @@ export const serviceFormSchema = z.object({
     .max(150, 'Tên dịch vụ tối đa 150 ký tự'),
   serviceType: z.enum(serviceTypes),
   description: z.string().trim().max(1000, 'Mô tả tối đa 1000 ký tự').optional(),
-  unit: z.string().trim().max(30, 'Đơn vị tính tối đa 30 ký tự').default('lượt'),
+  unit: z.string().trim().max(30, 'Đơn vị tính tối đa 30 ký tự'),
   unitPrice: z.coerce
-    .number({ invalid_type_error: 'Đơn giá phải là số' })
+    .number<number>({ error: 'Đơn giá phải là số' })
     .min(0, 'Đơn giá không được âm'),
   standardMinutes: z.coerce
-    .number({ invalid_type_error: 'Thời gian định mức phải là số' })
+    .number<number>({ error: 'Thời gian định mức phải là số' })
     .int('Thời gian phải là số nguyên phút')
     .min(1, 'Thời gian định mức phải từ 1 phút trở lên'),
   requiredBayType: z.string().trim().max(30, 'Loại khoang tối đa 30 ký tự').optional(),
   intervalKm: z.coerce
-    .number({ invalid_type_error: 'Chu kỳ km phải là số' })
+    .number<number>({ error: 'Chu kỳ km phải là số' })
     .int('Chu kỳ km phải là số nguyên')
     .min(1, 'Chu kỳ km phải lớn hơn 0')
     .optional()
     .or(z.nan()),
   intervalMonths: z.coerce
-    .number({ invalid_type_error: 'Chu kỳ tháng phải là số' })
+    .number<number>({ error: 'Chu kỳ tháng phải là số' })
     .int('Chu kỳ tháng phải là số nguyên')
     .min(1, 'Chu kỳ tháng phải lớn hơn 0')
     .optional()
     .or(z.nan()),
   warrantyDays: z.coerce
-    .number({ invalid_type_error: 'Số ngày bảo hành phải là số' })
+    .number<number>({ error: 'Số ngày bảo hành phải là số' })
     .int('Số ngày bảo hành phải là số nguyên')
     .min(0, 'Số ngày bảo hành không được âm'),
   warrantyKm: z.coerce
-    .number({ invalid_type_error: 'Số km bảo hành phải là số' })
+    .number<number>({ error: 'Số km bảo hành phải là số' })
     .int('Số km bảo hành phải là số nguyên')
     .min(0, 'Số km bảo hành không được âm'),
   warrantyTerms: z.string().trim().max(1000, 'Điều khoản bảo hành tối đa 1000 ký tự').optional(),
@@ -66,8 +66,8 @@ export function serviceDefaults(existing?: Service): ServiceFormValues {
     unitPrice: existing ? Number(existing.unitPrice) : 0,
     standardMinutes: existing?.standardMinutes ?? 30,
     requiredBayType: existing?.requiredBayType ?? '',
-    intervalKm: existing?.intervalKm ?? ('' as unknown as number),
-    intervalMonths: existing?.intervalMonths ?? ('' as unknown as number),
+    intervalKm: existing?.intervalKm ?? Number.NaN,
+    intervalMonths: existing?.intervalMonths ?? Number.NaN,
     warrantyDays: existing?.warrantyDays ?? 0,
     warrantyKm: existing?.warrantyKm ?? 0,
     warrantyTerms: existing?.warrantyTerms ?? '',

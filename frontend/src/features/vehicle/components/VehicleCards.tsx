@@ -1,5 +1,4 @@
 import {
-  Car,
   Calendar,
   Gauge,
   History,
@@ -14,12 +13,14 @@ import { Button, Empty, StatusBadge } from '../../../shared/components/ui';
 import { formatDate } from '../../../shared/utils/format';
 
 export function VehicleCards({
+  canManage = false,
   vehicles,
   onEdit,
   onTransfer,
   onTimeline,
   onDeactivate,
 }: {
+  canManage?: boolean;
   vehicles: Vehicle[];
   onEdit: (id: string) => void;
   onTransfer: (vehicle: Vehicle) => void;
@@ -46,7 +47,10 @@ export function VehicleCards({
           v.inspectionDueDate && new Date(v.inspectionDueDate).getTime() < Date.now();
 
         return (
-          <li key={v.id} className="vehicle-card border border-border rounded-lg p-4 bg-card shadow-sm space-y-3">
+          <li
+            key={v.id}
+            className="vehicle-card border border-border rounded-lg p-4 bg-card shadow-sm space-y-3"
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-base font-bold bg-primary/10 text-primary px-2.5 py-1 rounded border border-primary/20">
@@ -104,8 +108,7 @@ export function VehicleCards({
             <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-border">
               <Button
                 variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-xs"
+                className="button-small h-8 px-2 text-xs"
                 onClick={() => onTimeline(v.id)}
                 title="Lịch sử sửa chữa"
               >
@@ -113,37 +116,40 @@ export function VehicleCards({
                 Lịch sử
               </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-xs"
-                onClick={() => onTransfer(v)}
-                title="Chuyển nhượng chủ xe"
-              >
-                <ArrowRightLeft size={14} className="mr-1 text-amber-500" />
-                Đổi chủ
-              </Button>
+              {canManage && (
+                <Button
+                  variant="ghost"
+                  className="button-small h-8 px-2 text-xs"
+                  onClick={() => onTransfer(v)}
+                  title="Chuyển nhượng chủ xe"
+                >
+                  <ArrowRightLeft size={14} className="mr-1 text-amber-500" />
+                  Đổi chủ
+                </Button>
+              )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-xs"
-                onClick={() => onEdit(v.id)}
-                title="Sửa xe"
-              >
-                <SquarePen size={14} className="mr-1" />
-                Sửa
-              </Button>
+              {canManage && (
+                <Button
+                  variant="ghost"
+                  className="button-small h-8 px-2 text-xs"
+                  onClick={() => onEdit(v.id)}
+                  title="Sửa xe"
+                >
+                  <SquarePen size={14} className="mr-1" />
+                  Sửa
+                </Button>
+              )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                onClick={() => onDeactivate(v)}
-                title="Ngừng hoạt động"
-              >
-                <Trash2 size={14} />
-              </Button>
+              {canManage && (
+                <Button
+                  variant="ghost"
+                  className="button-small h-8 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => onDeactivate(v)}
+                  title="Ngừng hoạt động"
+                >
+                  <Trash2 size={14} />
+                </Button>
+              )}
             </div>
           </li>
         );

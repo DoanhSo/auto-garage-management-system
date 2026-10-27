@@ -42,7 +42,9 @@ export function CustomerCards({
 
           <div className="customer-card-details">
             <div className="info-row">
-              <span className={`badge ${cust.customerType === 'BUSINESS' ? 'badge-primary' : 'badge-neutral'}`}>
+              <span
+                className={`badge ${cust.customerType === 'BUSINESS' ? 'badge-primary' : 'badge-neutral'}`}
+              >
                 {cust.customerType === 'BUSINESS' ? 'Doanh nghiệp' : 'Cá nhân'}
               </span>
               {cust.companyName && (
@@ -74,7 +76,8 @@ export function CustomerCards({
             <div className="info-row credit-row">
               <CreditCard size={14} aria-hidden />
               <span>
-                Hạn mức: <strong>{formatVnd(cust.creditLimit)}</strong> ({cust.paymentTermDays} ngày)
+                Hạn mức: <strong>{formatVnd(cust.creditLimit)}</strong> ({cust.paymentTermDays}{' '}
+                ngày)
               </span>
             </div>
           </div>

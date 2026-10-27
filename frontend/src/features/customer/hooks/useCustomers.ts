@@ -10,10 +10,19 @@ export const customerKeys = {
   detail: (id: string) => [...customerKeys.details(), id] as const,
 };
 
-export function useCustomersQuery(params?: CustomerQueryParams) {
+export function useCustomersQuery(params?: CustomerQueryParams, enabled = true) {
   return useQuery({
     queryKey: customerKeys.list(params),
     queryFn: ({ signal }) => customerApi.list(params, signal),
+    enabled,
+  });
+}
+
+export function useMyCustomerQuery(enabled = true) {
+  return useQuery({
+    queryKey: [...customerKeys.all, 'me'],
+    queryFn: ({ signal }) => customerApi.me(signal),
+    enabled,
   });
 }
 

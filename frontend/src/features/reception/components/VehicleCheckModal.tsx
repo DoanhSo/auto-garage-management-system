@@ -2,22 +2,11 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { applyFormError, errorMessage } from '../../../shared/api/errors';
-import {
-  Button,
-  Field,
-  FormError,
-  Sheet,
-} from '../../../shared/components/ui';
-import {
-  useRecordVehicleCheckMutation,
-  useUploadAttachmentMutation,
-} from '../hooks/useReception';
-import {
-  vehicleCheckFormSchema,
-  type VehicleCheckFormValues,
-} from '../schemas/receptionSchema';
-import { ClipboardCheck, Upload, Image, CheckCircle, AlertTriangle } from 'lucide-react';
+import { applyFormError } from '../../../shared/api/errors';
+import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
+import { useRecordVehicleCheckMutation, useUploadAttachmentMutation } from '../hooks/useReception';
+import { vehicleCheckFormSchema, type VehicleCheckFormValues } from '../schemas/receptionSchema';
+import { ClipboardCheck, Upload, Image } from 'lucide-react';
 
 export function VehicleCheckModal({
   repairOrderId,
@@ -76,7 +65,7 @@ export function VehicleCheckModal({
         repairOrderId: values.repairOrderId,
         checkType: values.checkType,
         checklistJson: JSON.stringify(checklistObj),
-        odometer: values.odometer ? Number(values.odometer) : null,
+        odometer: Number.isFinite(values.odometer) ? Number(values.odometer) : null,
         notes: values.notes?.trim() || null,
       });
 
@@ -92,15 +81,12 @@ export function VehicleCheckModal({
         }
       }
 
-      notify.success('Ghi nhận biên bản kiểm tra xe thành công');
+      notify('Ghi nhận biên bản kiểm tra xe thành công');
       reset();
       setSelectedFiles([]);
       onClose();
     } catch (err: unknown) {
-      const field = applyFormError(err, setError);
-      if (!field) {
-        notify.error(errorMessage(err) ?? 'Lưu biên bản kiểm tra thất bại');
-      }
+      applyFormError(err, setError, Object.keys(values));
     } finally {
       setIsUploading(false);
     }
@@ -116,14 +102,17 @@ export function VehicleCheckModal({
       title={`Biên bản kiểm tra xe ${orderCode ? '#' + orderCode : ''}`}
       description="Kiểm tra hiện trạng ngoại thất, nội thất, đèn báo và chụp ảnh bằng chứng ban đầu."
     >
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="editor-form account-editor-form">
-        <FormError message={errors.root?.message} />
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        noValidate
+        className="editor-form account-editor-form"
+      >
+        <FormError message={errors.root?.server?.message} />
 
         <div className="form-row-2">
           <Field label="Loại biên bản kiểm tra" required error={errors.checkType?.message}>
             <select className="select" disabled={busy} {...register('checkType')}>
               <option value="CHECK_IN">Kiểm tra tiếp nhận ban đầu (Check-in)</option>
-              <option value="QC">Kiểm định chất lượng kỹ thuật (QC)</option>
               <option value="HANDOVER">Kiểm tra bàn giao xe khách (Handover)</option>
             </select>
           </Field>
@@ -202,7 +191,8 @@ export function VehicleCheckModal({
             />
           </label>
           <p className="text-[11px] text-muted-foreground">
-            Chấp nhận định dạng: JPG, PNG, WEBP, PDF. Ảnh chụp hiện trạng sẽ tự động lưu trữ bảo mật và gắn với lệnh sửa chữa.
+            Chấp nhận định dạng: JPG, PNG, WEBP, PDF. Ảnh chụp hiện trạng sẽ tự động lưu trữ bảo mật
+            và gắn với lệnh sửa chữa.
           </p>
           {selectedFiles.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-1">
@@ -220,19 +210,10 @@ export function VehicleCheckModal({
         </div>
 
         <div className="form-actions account-editor-actions">
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={busy}
-            onClick={onClose}
-          >
+          <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>
             Hủy
           </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={busy}
-          >
+          <Button type="submit" variant="primary" disabled={busy}>
             <ClipboardCheck size={16} className="mr-1" />
             {busy ? 'Đang lưu biên bản...' : 'Lưu biên bản kiểm tra'}
           </Button>

@@ -1,3 +1,4 @@
+import { dateTimeInput } from '../../../shared/utils/dates';
 import { z } from 'zod';
 import type { Booking } from '../../../shared/types/contracts';
 
@@ -33,20 +34,16 @@ export const checkInFormSchema = z.object({
   bookingId: z.string().optional(),
   vehicleId: z.string().min(1, 'Phương tiện tiếp nhận là bắt buộc'),
   odometerIn: z.coerce
-    .number({ invalid_type_error: 'Số ODO phải là số' })
+    .number<number>({ error: 'Số ODO phải là số' })
     .int('Số ODO phải là số nguyên')
     .min(0, 'Số ODO không được âm'),
   fuelLevelPercent: z.coerce
-    .number({ invalid_type_error: 'Mức nhiên liệu phải là số' })
+    .number<number>({ error: 'Mức nhiên liệu phải là số' })
     .min(0, 'Mức nhiên liệu tối thiểu 0%')
     .max(100, 'Mức nhiên liệu tối đa 100%')
     .optional()
     .or(z.nan()),
-  customerComplaint: z
-    .string()
-    .trim()
-    .max(500, 'Yêu cầu kiểm tra tối đa 500 ký tự')
-    .optional(),
+  customerComplaint: z.string().trim().max(500, 'Yêu cầu kiểm tra tối đa 500 ký tự').optional(),
 });
 
 export type CheckInFormValues = z.infer<typeof checkInFormSchema>;
@@ -54,7 +51,7 @@ export type CheckInFormValues = z.infer<typeof checkInFormSchema>;
 export const vehicleCheckFormSchema = z.object({
   repairOrderId: z.string().min(1, 'Mã lệnh sửa chữa là bắt buộc'),
   checkType: z.enum(['CHECK_IN', 'QC', 'HANDOVER']),
-  odometer: z.coerce.number().int().min(0).optional(),
+  odometer: z.coerce.number<number>().int().min(0).optional(),
   notes: z.string().trim().max(1000).optional(),
   exteriorCondition: z.string().trim().optional(),
   interiorCondition: z.string().trim().optional(),
@@ -69,7 +66,7 @@ export function bookingDefaults(existing?: Booking): BookingFormValues {
     vehicleId: existing?.vehicleId ?? '',
     serviceId: existing?.serviceId ?? '',
     bayId: existing?.bayId ?? '',
-    appointmentAt: existing?.appointmentAt ? existing.appointmentAt.slice(0, 16) : '',
+    appointmentAt: existing?.appointmentAt ? dateTimeInput(existing.appointmentAt) : '',
     requestDescription: existing?.requestDescription ?? '',
   };
 }

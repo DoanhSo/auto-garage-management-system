@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
@@ -75,13 +75,14 @@ function CustomerForm({
             phone: values.phone.trim(),
             email: values.email?.trim() || null,
             address: values.address?.trim() || null,
-            companyName: values.customerType === 'BUSINESS' ? values.companyName?.trim() || null : null,
+            companyName:
+              values.customerType === 'BUSINESS' ? values.companyName?.trim() || null : null,
             taxCode: values.customerType === 'BUSINESS' ? values.taxCode?.trim() || null : null,
             creditLimit: values.creditLimit,
             paymentTermDays: values.paymentTermDays,
           },
         });
-        notify.success('Cập nhật hồ sơ khách hàng thành công');
+        notify('Cập nhật hồ sơ khách hàng thành công');
       } else {
         await create.mutateAsync({
           fullName: values.fullName.trim(),
@@ -89,19 +90,17 @@ function CustomerForm({
           phone: values.phone.trim(),
           email: values.email?.trim() || null,
           address: values.address?.trim() || null,
-          companyName: values.customerType === 'BUSINESS' ? values.companyName?.trim() || null : null,
+          companyName:
+            values.customerType === 'BUSINESS' ? values.companyName?.trim() || null : null,
           taxCode: values.customerType === 'BUSINESS' ? values.taxCode?.trim() || null : null,
           creditLimit: values.creditLimit,
           paymentTermDays: values.paymentTermDays,
         });
-        notify.success('Tạo mới hồ sơ khách hàng thành công');
+        notify('Tạo mới hồ sơ khách hàng thành công');
       }
       onSaved();
     } catch (err: unknown) {
-      const handled = applyFormError(err, setError);
-      if (!handled) {
-        notify.error(errorMessage(err));
-      }
+      applyFormError(err, setError, Object.keys(values));
     }
   }
 
@@ -109,7 +108,11 @@ function CustomerForm({
 
   return (
     <>
-      <form onSubmit={handleSubmit(onSubmit)} className="editor-form account-editor-form" noValidate>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="editor-form account-editor-form"
+        noValidate
+      >
         <FormError message={generalError ? errorMessage(generalError) : undefined} />
 
         <div className="form-section-label">THÔNG TIN CƠ BẢN</div>
@@ -231,7 +234,12 @@ function CustomerForm({
           >
             Hủy
           </Button>
-          <Button variant="primary" type="submit" pending={busy} disabled={Boolean(existing && !isDirty)}>
+          <Button
+            variant="primary"
+            type="submit"
+            pending={busy}
+            disabled={Boolean(existing && !isDirty)}
+          >
             {busy ? 'Đang lưu…' : existing ? 'Lưu thay đổi' : 'Thêm khách hàng'}
           </Button>
         </div>
@@ -242,7 +250,6 @@ function CustomerForm({
         title="Bỏ thay đổi chưa lưu?"
         description="Nội dung đang nhập sẽ được xóa. Dữ liệu đã lưu trên máy chủ không thay đổi."
         confirmLabel="Bỏ thay đổi"
-        cancelLabel="Tiếp tục sửa"
         onConfirm={() => {
           setDiscard(false);
           if (blocker.state === 'blocked') blocker.proceed?.();
@@ -271,6 +278,10 @@ export function CustomerEditor({
   const isEditing = Boolean(customerId);
   const detailQuery = useCustomerQuery(customerId);
   const [closeHandler, setCloseHandler] = useState<(() => void) | null>(null);
+  const registerCloseHandler = useCallback(
+    (handler: () => void) => setCloseHandler(() => handler),
+    [],
+  );
 
   const title = isEditing ? 'Chỉnh sửa hồ sơ khách hàng' : 'Thêm mới khách hàng';
   const description = isEditing
@@ -297,7 +308,7 @@ export function CustomerEditor({
         <CustomerForm
           existing={detailQuery.data}
           onSaved={onClose}
-          onRequestClose={(handler) => setCloseHandler(() => handler)}
+          onRequestClose={registerCloseHandler}
         />
       )}
     </Sheet>

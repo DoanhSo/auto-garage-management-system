@@ -23,7 +23,6 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequiredArgsConstructor
@@ -72,7 +72,7 @@ public class PartController {
             HttpServletRequest http) {
         Pageable pageable = pagination.page(
                 page, size, sortBy, sortDir,
-                java.util.Set.of("partName", "sku", "purchasePrice", "sellingPrice", "stockQuantity", "createdAt"));
+                Set.of("id", "partName", "sku", "purchasePrice", "sellingPrice", "stockQuantity", "createdAt"));
         return ApiResponse.success(
                 ResponseCode.SUCCESS,
                 partService.searchParts(query, supplierId, active, pageable),
@@ -80,7 +80,7 @@ public class PartController {
     }
 
     @GetMapping(ApiPaths.PARTS_LOW_STOCK)
-    @PreAuthorize(SecurityConstants.HAS_ROLE_WAREHOUSE_OR_ADMIN)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
     @Operation(summary = "Cảnh báo phụ tùng dưới ngưỡng tồn kho an toàn")
     public ApiResponse<List<PartResponse>> getLowStock(HttpServletRequest http) {
         return ApiResponse.success(

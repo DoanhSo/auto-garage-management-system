@@ -88,7 +88,7 @@ public class PaymentController {
             HttpServletRequest http) {
         Pageable pageable = pagination.page(
                 page, size, sortBy, sortDir,
-                Set.of("paidAt", "amount", "transactionCode"));
+                Set.of("id", "paidAt", "amount", "transactionCode"));
         return ApiResponse.success(
                 ResponseCode.SUCCESS,
                 billingService.searchPayments(direction, invoiceId, documentId, query, pageable),

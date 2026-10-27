@@ -9,6 +9,7 @@ import com.Group13_65CNTT.AutoGarage.quality.dto.request.QualityCheckCreateReque
 import com.Group13_65CNTT.AutoGarage.quality.dto.response.QualityCheckResponse;
 import com.Group13_65CNTT.AutoGarage.quality.service.QualityService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -24,18 +25,19 @@ import java.util.List;
 @RequestMapping(ApiPaths.QUALITY_CHECKS_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Quality Checks", description = "Kiểm tra chất lượng (QC) và yêu cầu làm lại (TV3)")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class QualityCheckController {
 
     private final QualityService qualityService;
     private final CurrentUserProvider currentUserProvider;
 
     @PostMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_TECHNICIAN)
     @Operation(summary = "Thực hiện kiểm tra chất lượng (QC) cho phiếu sửa chữa")
     public ResponseEntity<ApiResponse<QualityCheckResponse>> performQualityCheck(
             @Valid @RequestBody QualityCheckCreateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         QualityCheckResponse response = qualityService.performQualityCheck(actorId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));

@@ -70,6 +70,8 @@ public class SecurityConfiguration {
                                         .permitAll();
                             a.requestMatchers(HttpMethod.GET, ApiPaths.UI_POLICY)
                                     .permitAll()
+                                    .requestMatchers(HttpMethod.POST, ApiPaths.REGISTRATION)
+                                    .permitAll()
                                     .requestMatchers(ApiPaths.AUTH_WILDCARD)
                                     .authenticated()
                                     .requestMatchers(ApiPaths.USERS_BASE, ApiPaths.USERS_WILDCARD)
@@ -79,15 +81,91 @@ public class SecurityConfiguration {
                                             ApiPaths.AUDIT_BASE,
                                             ApiPaths.REPORTS_WILDCARD)
                                     .hasRole(Role.ADMIN.name())
-                                    .requestMatchers(HttpMethod.POST, ApiPaths.NOTIFICATIONS_BASE)
+                                    .requestMatchers(
+                                            HttpMethod.POST,
+                                            ApiPaths.NOTIFICATIONS_BASE,
+                                            ApiPaths.NOTIFICATIONS_BASE
+                                                    + ApiPaths.NOTIFICATIONS_BROADCAST)
+                                    .hasRole(Role.ADMIN.name())
+                                    .requestMatchers(
+                                            HttpMethod.GET,
+                                            ApiPaths.NOTIFICATIONS_BASE
+                                                    + ApiPaths.NOTIFICATIONS_ADMIN)
+                                    .hasRole(Role.ADMIN.name())
+                                    .requestMatchers(
+                                            HttpMethod.DELETE, ApiPaths.NOTIFICATIONS_WILDCARD)
                                     .hasRole(Role.ADMIN.name())
                                     .requestMatchers(
                                             ApiPaths.NOTIFICATIONS_BASE,
                                             ApiPaths.NOTIFICATIONS_WILDCARD)
                                     .authenticated()
                                     .requestMatchers(
-                                            "/api/v1/inventory/**",
-                                            "/api/v1/billing/**")
+                                            HttpMethod.GET,
+                                            ApiPaths.SERVICES_BASE,
+                                            ApiPaths.SERVICES_WILDCARD)
+                                    .authenticated()
+                                    .requestMatchers(
+                                            ApiPaths.SERVICES_BASE, ApiPaths.SERVICES_WILDCARD)
+                                    .hasRole(Role.ADMIN.name())
+                                    .requestMatchers(
+                                            ApiPaths.CUSTOMERS_BASE, ApiPaths.CUSTOMERS_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.CUSTOMER.name())
+                                    .requestMatchers(
+                                            ApiPaths.VEHICLES_BASE, ApiPaths.VEHICLES_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.TECHNICIAN.name(),
+                                            Role.CUSTOMER.name())
+                                    .requestMatchers(
+                                            ApiPaths.BOOKINGS_BASE, ApiPaths.BOOKINGS_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.CUSTOMER.name())
+                                    .requestMatchers(
+                                            ApiPaths.RECEPTION_BASE, ApiPaths.RECEPTION_WILDCARD)
+                                    .hasAnyRole(Role.ADMIN.name(), Role.RECEPTIONIST.name())
+                                    .requestMatchers(
+                                            ApiPaths.VEHICLE_CHECKS_BASE,
+                                            ApiPaths.VEHICLE_CHECKS_WILDCARD,
+                                            ApiPaths.ATTACHMENTS_BASE,
+                                            ApiPaths.ATTACHMENTS_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.TECHNICIAN.name(),
+                                            Role.CUSTOMER.name())
+                                    .requestMatchers(
+                                            ApiPaths.EMPLOYEES_BASE,
+                                            ApiPaths.EMPLOYEES_WILDCARD,
+                                            ApiPaths.SHIFTS_BASE,
+                                            ApiPaths.SHIFTS_WILDCARD,
+                                            ApiPaths.SERVICE_BAYS_BASE,
+                                            ApiPaths.SERVICE_BAYS_WILDCARD,
+                                            ApiPaths.BAY_RESERVATIONS_BASE,
+                                            ApiPaths.BAY_RESERVATIONS_WILDCARD,
+                                            ApiPaths.REPAIR_ORDERS_BASE,
+                                            ApiPaths.REPAIR_ORDERS_WILDCARD,
+                                            ApiPaths.REPAIR_TASKS_BASE,
+                                            ApiPaths.REPAIR_TASKS_WILDCARD,
+                                            ApiPaths.QUALITY_CHECKS_BASE,
+                                            ApiPaths.QUALITY_CHECKS_WILDCARD,
+                                            ApiPaths.WARRANTIES_BASE,
+                                            ApiPaths.WARRANTIES_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.TECHNICIAN.name(),
+                                            Role.WAREHOUSE_STAFF.name())
+                                    .requestMatchers(
+                                            ApiPaths.ESTIMATES_BASE,
+                                            ApiPaths.ESTIMATES_WILDCARD,
+                                            ApiPaths.INVENTORY_WILDCARD,
+                                            ApiPaths.BILLING_WILDCARD)
                                     .authenticated()
                                     .requestMatchers(
                                             ApiPaths.CUSTOMERS_BASE, ApiPaths.CUSTOMERS_BASE + "/**",

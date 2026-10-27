@@ -1,17 +1,17 @@
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, Bell, ChartNoAxesCombined, ShieldCheck, Wrench } from 'lucide-react';
+import { Link, Navigate, useLocation } from 'react-router-dom';
+import { ArrowRight, UserPlus, Wrench } from 'lucide-react';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { useLoginMutation } from '../hooks/useAuthQueries';
 import { loginSchema } from '../schemas/authSchemas';
 import { Button, Field, FormError, PasswordInput } from '../../../shared/components/ui';
 import { errorMessage } from '../../../shared/api/errors';
 import { safeReturnTo } from '../../../shared/utils/format';
+
 export function LoginPage() {
   const auth = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const mutation = useLoginMutation();
   const {
@@ -25,8 +25,8 @@ export function LoginPage() {
     mode: 'onBlur',
     defaultValues: { identifier: '', password: '' },
   });
-  const { reset: resetMutation } = mutation;
-  useEffect(() => () => resetMutation(), [resetMutation]);
+  const { reset } = mutation;
+  useEffect(() => () => reset(), [reset]);
   if (auth.user)
     return (
       <Navigate
@@ -40,15 +40,8 @@ export function LoginPage() {
   const submit = handleSubmit(async (values) => {
     if (mutation.isPending) return;
     try {
-      const user = await mutation.mutateAsync(values);
+      await mutation.mutateAsync(values);
       resetField('password');
-      navigate(
-        safeReturnTo(
-          (location.state as { returnTo?: unknown } | null)?.returnTo,
-          user.role === 'ADMIN' ? '/admin/reports' : '/notifications',
-        ),
-        { replace: true },
-      );
     } catch (error) {
       setError('root.server', { message: errorMessage(error) });
     } finally {
@@ -57,45 +50,16 @@ export function LoginPage() {
   });
   return (
     <div className="login-layout">
-      <aside className="login-story">
-        <div className="brand">
-          <span className="brand-mark">
-            <Wrench size={23} />
-          </span>
-          <span>
-            AutoGarage<small>GARAGE WORKSPACE</small>
-          </span>
-        </div>
-        <div className="login-story-body">
-          <p className="eyebrow">DÀNH CHO ĐỘI NGŨ CỦA BẠN</p>
-          <h1>
-            Mọi thông tin.
-            <br />
-            Một không gian làm việc.
-          </h1>
-          <p>Quản lý truy cập, theo dõi thông báo và nắm bắt số liệu vận hành gara.</p>
-          <div className="story-features">
-            <span>
-              <ShieldCheck size={19} />
-              Quyền truy cập theo vai trò
-            </span>
-            <span>
-              <Bell size={19} />
-              Thông báo dành riêng cho bạn
-            </span>
-            <span>
-              <ChartNoAxesCombined size={19} />
-              Báo cáo tập trung, rõ ràng
-            </span>
-          </div>
-        </div>
-        <p className="login-story-footer">AutoGarage · Hệ thống quản lý gara ô tô</p>
-      </aside>
-      <main className="login-main">
+      <main className="login-main" id="main-content" tabIndex={-1}>
         <div className="login-card">
-          <p className="eyebrow">CHÀO MỪNG TRỞ LẠI</p>
-          <h2>Đăng nhập</h2>
-          <p className="description">Sử dụng tài khoản được quản trị viên cấp để tiếp tục.</p>
+          <div className="login-brand">
+            <Wrench size={22} aria-hidden />
+            <span>AutoGarage</span>
+          </div>
+          <div className="login-card-header">
+            <h1>Đăng nhập</h1>
+            <p className="description">Sử dụng tên đăng nhập hoặc email và mật khẩu của bạn.</p>
+          </div>
           {auth.notice && (
             <div className="alert" role="status">
               {auth.notice}
@@ -109,7 +73,7 @@ export function LoginPage() {
                 autoComplete="username"
                 autoFocus
                 maxLength={254}
-                placeholder="Nhập tài khoản của bạn"
+                placeholder="Tên đăng nhập hoặc email"
                 disabled={mutation.isPending}
               />
             </Field>
@@ -117,8 +81,8 @@ export function LoginPage() {
               <PasswordInput
                 {...register('password')}
                 autoComplete="current-password"
+                placeholder="Nhập mật khẩu của bạn"
                 disabled={mutation.isPending}
-                placeholder="Nhập mật khẩu"
               />
             </Field>
             <FormError message={errors.root?.server?.message} />
@@ -132,7 +96,17 @@ export function LoginPage() {
               <ArrowRight size={17} aria-hidden />
             </Button>
           </form>
-          <p className="login-note">Cần hỗ trợ truy cập? Liên hệ quản trị viên gara.</p>
+          <div className="login-customer-box">
+            <div className="login-customer-text">
+              <strong>Khách hàng mới?</strong>
+              <span>Tạo tài khoản bằng email để đặt lịch và theo dõi dịch vụ.</span>
+            </div>
+            <Link className="button button-secondary full-width" to="/register">
+              <UserPlus size={16} aria-hidden />
+              Đăng ký tài khoản
+            </Link>
+          </div>
+          <p className="login-note">Tài khoản nhân viên do quản trị viên gara cấp.</p>
         </div>
         <p className="login-security">Thông tin hiển thị theo quyền truy cập của bạn.</p>
       </main>

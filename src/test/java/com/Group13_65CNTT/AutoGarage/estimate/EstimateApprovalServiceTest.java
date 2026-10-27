@@ -118,6 +118,23 @@ class EstimateApprovalServiceTest {
     }
 
     @Test
+    void decide_ReservationFailureAbortsApproval() {
+        when(estimateRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mockEstimate));
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        when(estimateItemRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(itemPart));
+        var unavailable = new org.springframework.dao.DataAccessResourceFailureException("private database details");
+        doThrow(unavailable).when(inventoryOperations).reserve(1L, 20L, itemPart.getQuantity());
+
+        assertThatThrownBy(() -> estimateService.decide(1L, 1L,
+                List.of(new EstimateApproval.LineDecision(20L, EstimateApproval.Decision.APPROVED, null)), "KEY"))
+                .isSameAs(unavailable);
+
+        verify(estimateRepository, never()).save(any());
+        verify(estimateItemRepository, never()).save(any());
+        verify(notificationAudit, never()).recordCompletedRequest(anyLong(), any(), any(), anyLong(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("I04.decide: Phê duyệt cả SERVICE và PART sinh task và giữ kho thành công")
     void decide_ApproveAll_Success() {
         when(estimateRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mockEstimate));

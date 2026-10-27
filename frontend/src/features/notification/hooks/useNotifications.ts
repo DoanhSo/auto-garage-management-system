@@ -20,12 +20,15 @@ export function useUnreadCountQuery() {
     ...polling,
   });
 }
-export function useInboxQuery(params: { unread: boolean; page: number; size: number }) {
+export function useInboxQuery(
+  params: { unread: boolean; page: number; size: number },
+  enabled = true,
+) {
   const { user, sessionKey } = useAuth();
   return useQuery({
     queryKey: ['private', sessionKey, 'notifications', 'inbox', user?.id, params],
     queryFn: ({ signal }) => notificationsApi.inbox(params, signal),
-    enabled: !!user,
+    enabled: !!user && enabled,
     ...polling,
   });
 }
@@ -54,6 +57,58 @@ export function useMarkReadMutation() {
           query.queryKey[1] === sessionKey &&
           query.queryKey[2] === 'notifications' &&
           query.queryKey[3] !== 'detail',
+      });
+    },
+  });
+}
+export function useAdminNotificationsQuery(params: {
+  status?: string;
+  channel?: string;
+  page: number;
+  size: number;
+  enabled?: boolean;
+}) {
+  const { user, sessionKey } = useAuth();
+  return useQuery({
+    queryKey: ['private', sessionKey, 'notifications', 'admin-list', user?.id, params],
+    queryFn: ({ signal }) =>
+      notificationsApi.adminList(
+        {
+          status: params.status,
+          channel: params.channel,
+          page: params.page,
+          size: params.size,
+        },
+        signal,
+      ),
+    enabled: !!user && user.role === 'ADMIN' && (params.enabled ?? true),
+    ...polling,
+  });
+}
+export function useBroadcastNotificationMutation() {
+  const { sessionKey } = useAuth();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: notificationsApi.broadcast,
+    retry: 0,
+    onSuccess: async () => {
+      await client.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[1] === sessionKey && query.queryKey[2] === 'notifications',
+      });
+    },
+  });
+}
+export function useDeleteNotificationMutation() {
+  const { sessionKey } = useAuth();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: notificationsApi.remove,
+    retry: 0,
+    onSuccess: async () => {
+      await client.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[1] === sessionKey && query.queryKey[2] === 'notifications',
       });
     },
   });

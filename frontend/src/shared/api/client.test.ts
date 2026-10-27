@@ -5,6 +5,40 @@ import { envelope } from '../../test/fixtures';
 import { configureSession, request } from './client';
 import { ApiError } from './errors';
 describe('HTTP/session boundary', () => {
+  it('passes multipart bytes unchanged and lets the browser set its boundary', async () => {
+    const body = new FormData();
+    body.append('repairOrderId', '9223372036854775807');
+    body.append(
+      'file',
+      new File(['inspection evidence'], 'inspection.txt', { type: 'text/plain' }),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url, options: RequestInit) => {
+        expect(options.body).toBe(body);
+        const headers = new Headers(options.headers);
+        expect(headers.has('content-type')).toBe(false);
+        expect(headers.get('authorization')).toBe('Bearer upload-session');
+        expect(body.get('repairOrderId')).toBe('9223372036854775807');
+        const file = body.get('file') as File;
+        expect(file.name).toBe('inspection.txt');
+        const text = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsText(file);
+        });
+        expect(text).toBe('inspection evidence');
+        return new Response(JSON.stringify(envelope({ id: 9 })), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }),
+    );
+    configureSession('upload-session', () => {});
+    await expect(request('/attachments/upload', { method: 'POST', body })).resolves.toEqual({
+      id: '9',
+    });
+  });
   it('uses bearer for private calls and omits it for public calls', async () => {
     const headers: (string | null)[] = [];
     server.use(

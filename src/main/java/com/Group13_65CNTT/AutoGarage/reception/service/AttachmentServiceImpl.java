@@ -1,5 +1,9 @@
 package com.Group13_65CNTT.AutoGarage.reception.service;
 
+import com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties;
+import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
+import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
+import com.Group13_65CNTT.AutoGarage.reception.repository.VehicleCheckRepository;
 import com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentResponse;
 import com.Group13_65CNTT.AutoGarage.reception.entity.Attachment;
 import com.Group13_65CNTT.AutoGarage.reception.entity.AttachmentCategory;
@@ -7,6 +11,8 @@ import com.Group13_65CNTT.AutoGarage.reception.mapper.VehicleCheckMapper;
 import com.Group13_65CNTT.AutoGarage.reception.repository.AttachmentRepository;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,8 +31,8 @@ import java.util.UUID;
 @Service
 @Transactional
 public class AttachmentServiceImpl implements AttachmentService {
+    private final WorkshopProperties workshop;
 
-    private static final long MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "image/jpeg",
             "image/png",
@@ -37,22 +43,31 @@ public class AttachmentServiceImpl implements AttachmentService {
 
     private final AttachmentRepository attachmentRepository;
     private final VehicleCheckMapper vehicleCheckMapper;
+    private final VehicleCheckRepository vehicleCheckRepository;
+    private final CustomerScope customerScope;
 
     public AttachmentServiceImpl(AttachmentRepository attachmentRepository,
-                                 VehicleCheckMapper vehicleCheckMapper) {
+                                 VehicleCheckMapper vehicleCheckMapper, WorkshopProperties workshop,
+                                 VehicleCheckRepository vehicleCheckRepository, CustomerScope customerScope) {
+        this.workshop = workshop;
         this.attachmentRepository = attachmentRepository;
         this.vehicleCheckMapper = vehicleCheckMapper;
+        this.vehicleCheckRepository = vehicleCheckRepository;
+        this.customerScope = customerScope;
     }
 
     @Override
     public AttachmentResponse uploadAttachment(Long repairOrderId, Long vehicleCheckId, Long warrantyClaimId,
                                                AttachmentCategory category, Long uploadedBy, MultipartFile file) {
+        if (uploadedBy == null || uploadedBy <= 0) {
+            throw new BusinessException(ResponseCode.UNAUTHORIZED);
+        }
         if (file == null || file.isEmpty()) {
             throw new BusinessRuleException("Tệp tải lên không được để trống");
         }
 
-        if (file.getSize() > MAX_FILE_SIZE) {
-            throw new BusinessRuleException("Kích thước tệp vượt quá giới hạn cho phép (tối đa 15MB)");
+        if (file.getSize() > workshop.getMaxAttachmentBytes()) {
+            throw new BusinessRuleException("Kích thước tệp vượt quá giới hạn cho phép");
         }
 
         String contentType = file.getContentType();
@@ -93,7 +108,7 @@ public class AttachmentServiceImpl implements AttachmentService {
         attachment.setSizeBytes(file.getSize());
         attachment.setSha256(sha256);
         attachment.setCategory(category);
-        attachment.setUploadedBy(uploadedBy != null ? uploadedBy : 1L);
+        attachment.setUploadedBy(uploadedBy);
 
         Attachment saved = attachmentRepository.save(attachment);
         return vehicleCheckMapper.toAttachmentResponse(saved);
@@ -102,6 +117,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     @Override
     @Transactional(readOnly = true)
     public AttachmentResponse getAttachmentById(Long id) {
+        customerScope.requireResource(AccessResource.ATTACHMENT, id);
         Attachment attachment = attachmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tệp đính kèm với ID: " + id));
         return vehicleCheckMapper.toAttachmentResponse(attachment);
@@ -110,6 +126,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     @Override
     @Transactional(readOnly = true)
     public List<AttachmentResponse> getAttachmentsByRepairOrder(Long repairOrderId) {
+        customerScope.requireResource(AccessResource.REPAIR_ORDER, repairOrderId);
         return attachmentRepository.findAllByRepairOrderId(repairOrderId)
                 .stream()
                 .map(vehicleCheckMapper::toAttachmentResponse)
@@ -119,6 +136,9 @@ public class AttachmentServiceImpl implements AttachmentService {
     @Override
     @Transactional(readOnly = true)
     public List<AttachmentResponse> getAttachmentsByVehicleCheck(Long vehicleCheckId) {
+        var check = vehicleCheckRepository.findById(vehicleCheckId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        customerScope.requireResource(AccessResource.REPAIR_ORDER, check.getRepairOrderId());
         return attachmentRepository.findAllByVehicleCheckId(vehicleCheckId)
                 .stream()
                 .map(vehicleCheckMapper::toAttachmentResponse)
@@ -135,7 +155,7 @@ public class AttachmentServiceImpl implements AttachmentService {
             }
             return HexFormat.of().formatHex(digest.digest());
         } catch (IOException | NoSuchAlgorithmException e) {
-            throw new BusinessRuleException("Không thể tính mã băm SHA-256 của tệp đính kèm: " + e.getMessage());
+            throw new BusinessException(ResponseCode.INTERNAL_SERVER_ERROR, e);
         }
     }
 

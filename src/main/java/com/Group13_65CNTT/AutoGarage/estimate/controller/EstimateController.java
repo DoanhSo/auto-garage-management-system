@@ -11,6 +11,7 @@ import com.Group13_65CNTT.AutoGarage.estimate.dto.response.EstimateResponse;
 import com.Group13_65CNTT.AutoGarage.estimate.entity.EstimateStatus;
 import com.Group13_65CNTT.AutoGarage.estimate.service.EstimateService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -27,18 +28,19 @@ import java.util.List;
 @RequestMapping(ApiPaths.ESTIMATES_BASE)
 @RequiredArgsConstructor
 @Tag(name = "Estimates", description = "Quản lý lập báo giá và phê duyệt từng dòng (TV3)")
+@SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class EstimateController {
 
     private final EstimateService estimateService;
     private final CurrentUserProvider currentUserProvider;
 
     @PostMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
     @Operation(summary = "Lập báo giá mới (INITIAL hoặc SUPPLEMENTAL)")
     public ResponseEntity<ApiResponse<EstimateResponse>> createEstimate(
             @Valid @RequestBody EstimateCreateRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         EstimateResponse response = estimateService.createEstimate(actorId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(
                 ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
@@ -91,12 +93,12 @@ public class EstimateController {
     }
 
     @PostMapping("/{id}/send")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
     @Operation(summary = "Gửi báo giá cho khách hàng phê duyệt")
     public ResponseEntity<ApiResponse<EstimateResponse>> sendEstimate(
             @PathVariable Long id,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         EstimateResponse response = estimateService.sendEstimate(actorId, id);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
@@ -108,7 +110,7 @@ public class EstimateController {
             @PathVariable Long id,
             @Valid @RequestBody EstimateDecisionRequest request,
             HttpServletRequest httpRequest) {
-        Long actorId = currentUserProvider.userIdOrNull();
+        Long actorId = currentUserProvider.userId();
         EstimateResponse response = estimateService.decideEstimate(actorId, id, request);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
