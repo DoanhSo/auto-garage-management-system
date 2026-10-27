@@ -561,27 +561,30 @@ export function PartsPage() {
         </div>
       </section>
 
-      {/* Modal Thêm phụ tùng 2 cột */}
+      {/* Modal Thêm phụ tùng 3 cột */}
       <Modal
         open={creating}
         onOpenChange={setCreating}
         title="Thêm phụ tùng mới"
         description="Khai báo mã phụ tùng, đơn giá, định mức dự trữ và điều kiện bảo hành."
+        size="lg"
       >
-        <form onSubmit={handleCreate} className="modal-form">
-          <div className="form-section-label">THÔNG TIN PHỤ TÙNG</div>
+        <form onSubmit={handleCreate} className="modal-form grid-3col">
+          <div className="form-section-label">THÔNG TIN ĐỊNH DANH & QUẢN LÝ KHO</div>
 
-          <Field label="Tên phụ tùng" required>
-            <input
-              name="partName"
-              className="input"
-              placeholder="VD: Nhớt tổng hợp Castrol 5W-30 (Can 4L)"
-              required
-              autoFocus
-            />
-          </Field>
+          <div className="col-span-2">
+            <Field label="Tên phụ tùng" required>
+              <input
+                name="partName"
+                className="input"
+                placeholder="VD: Nhớt tổng hợp Castrol 5W-30 (Can 4L)"
+                required
+                autoFocus
+              />
+            </Field>
+          </div>
 
-          <Field label="Mã SKU" required hint="Mã quản lý kho duy nhất (VD: PRT-OIL-5W30)">
+          <Field label="Mã SKU" required>
             <input
               name="sku"
               className="input font-mono"
@@ -590,8 +593,8 @@ export function PartsPage() {
             />
           </Field>
 
-          <Field label="Đơn vị tính" required hint="VD: Can, Cái, Bộ, Lít, Bình">
-            <input name="unit" className="input" placeholder="Cái" required />
+          <Field label="Đơn vị tính" required>
+            <input name="unit" className="input" placeholder="Ví dụ: Can, Cái, Bộ..." required />
           </Field>
 
           <Field label="Nhà cung cấp ưu tiên">
@@ -605,16 +608,18 @@ export function PartsPage() {
             </select>
           </Field>
 
-          <Field label="Giá nhập dự kiến (VNĐ)" hint="Dùng để tham chiếu khi lập đơn mua">
+          <Field label="Mức tồn tối thiểu">
+            <input name="reorderLevel" type="number" min="0" defaultValue="5" className="input" />
+          </Field>
+
+          <div className="form-section-label">GIÁ BÁN & CHÍNH SÁCH BẢO HÀNH</div>
+
+          <Field label="Giá nhập dự kiến (VNĐ)">
             <input name="purchasePrice" type="number" min="0" step="1000" defaultValue="0" className="input" />
           </Field>
 
-          <Field label="Giá bán niêm yết (VNĐ)" required hint="Giá xuất hóa đơn cho khách">
+          <Field label="Giá bán niêm yết (VNĐ)" required>
             <input name="sellingPrice" type="number" min="0" step="1000" defaultValue="0" required className="input" />
-          </Field>
-
-          <Field label="Mức tồn tối thiểu" hint="Hệ thống sẽ bật cảnh báo khi tồn kho chạm mức này">
-            <input name="reorderLevel" type="number" min="0" defaultValue="5" className="input" />
           </Field>
 
           <Field label="Thời hạn bảo hành (ngày)">
@@ -625,20 +630,23 @@ export function PartsPage() {
             <input name="warrantyKm" type="number" min="0" defaultValue="5000" className="input" />
           </Field>
 
-          <Field label="Điều khoản bảo hành" className="full-width">
-            <input name="warrantyTerms" className="input" placeholder="VD: Bảo hành 1 đổi 1 nếu lỗi từ nhà sản xuất" />
-          </Field>
+          <div className="col-span-2">
+            <Field label="Điều khoản bảo hành">
+              <input name="warrantyTerms" className="input" placeholder="VD: Bảo hành 1 đổi 1 nếu lỗi từ nhà sản xuất" />
+            </Field>
+          </div>
 
-          <Field label="Mô tả kỹ thuật / ứng dụng xe" className="full-width">
-            <textarea
-              name="description"
-              className="input"
-              rows={2}
-              placeholder="Ghi chú tương thích các dòng xe, lưu ý khi lắp ráp..."
-            />
-          </Field>
+          <div className="col-span-3">
+            <Field label="Mô tả kỹ thuật / ứng dụng xe">
+              <input
+                name="description"
+                className="input"
+                placeholder="Ghi chú tương thích các dòng xe, lưu ý khi lắp ráp..."
+              />
+            </Field>
+          </div>
 
-          <div className="modal-form-actions">
+          <div className="modal-form-actions col-span-3">
             <Button variant="secondary" onClick={() => setCreating(false)} disabled={createMutation.isPending}>
               Hủy
             </Button>
@@ -649,28 +657,31 @@ export function PartsPage() {
         </form>
       </Modal>
 
-      {/* Modal Sửa phụ tùng 2 cột */}
+      {/* Modal Sửa phụ tùng 3 cột */}
       <Modal
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
         title="Cập nhật phụ tùng"
         description={`Chỉnh sửa thông tin phụ tùng ${editing?.sku}`}
+        size="lg"
       >
         {editing && (
-          <form onSubmit={handleUpdate} className="modal-form">
-            <div className="form-section-label">THÔNG TIN PHỤ TÙNG</div>
+          <form onSubmit={handleUpdate} className="modal-form grid-3col">
+            <div className="form-section-label">THÔNG TIN ĐỊNH DANH & QUẢN LÝ KHO</div>
 
-            <Field label="Tên phụ tùng" required>
-              <input
-                name="partName"
-                className="input"
-                defaultValue={editing.partName}
-                required
-                autoFocus
-              />
-            </Field>
+            <div className="col-span-2">
+              <Field label="Tên phụ tùng" required>
+                <input
+                  name="partName"
+                  className="input"
+                  defaultValue={editing.partName}
+                  required
+                  autoFocus
+                />
+              </Field>
+            </div>
 
-            <Field label="Mã SKU" hint="Mã SKU cố định">
+            <Field label="Mã SKU">
               <input
                 name="sku"
                 className="input font-mono"
@@ -699,6 +710,18 @@ export function PartsPage() {
               </select>
             </Field>
 
+            <Field label="Mức tồn tối thiểu">
+              <input
+                name="reorderLevel"
+                type="number"
+                min="0"
+                defaultValue={editing.reorderLevel}
+                className="input"
+              />
+            </Field>
+
+            <div className="form-section-label">GIÁ BÁN & CHÍNH SÁCH BẢO HÀNH</div>
+
             <Field label="Giá nhập tham chiếu (VNĐ)">
               <input
                 name="purchasePrice"
@@ -718,16 +741,6 @@ export function PartsPage() {
                 step="1000"
                 defaultValue={editing.sellingPrice}
                 required
-                className="input"
-              />
-            </Field>
-
-            <Field label="Mức tồn tối thiểu">
-              <input
-                name="reorderLevel"
-                type="number"
-                min="0"
-                defaultValue={editing.reorderLevel}
                 className="input"
               />
             </Field>
@@ -752,6 +765,17 @@ export function PartsPage() {
               />
             </Field>
 
+            <div className="col-span-2">
+              <Field label="Điều khoản bảo hành">
+                <input
+                  name="warrantyTerms"
+                  className="input"
+                  defaultValue={editing.warrantyTerms || ''}
+                  placeholder="VD: Bảo hành 1 đổi 1..."
+                />
+              </Field>
+            </div>
+
             <Field label="Trạng thái kinh doanh">
               <select name="isActive" className="input" defaultValue={String(editing.isActive)}>
                 <option value="true">Đang kinh doanh (Hoạt động)</option>
@@ -759,24 +783,18 @@ export function PartsPage() {
               </select>
             </Field>
 
-            <Field label="Điều khoản bảo hành" className="full-width">
-              <input
-                name="warrantyTerms"
-                className="input"
-                defaultValue={editing.warrantyTerms || ''}
-              />
-            </Field>
+            <div className="col-span-2">
+              <Field label="Mô tả kỹ thuật">
+                <input
+                  name="description"
+                  className="input"
+                  defaultValue={editing.description || ''}
+                  placeholder="Ghi chú tương thích các dòng xe..."
+                />
+              </Field>
+            </div>
 
-            <Field label="Mô tả kỹ thuật" className="full-width">
-              <textarea
-                name="description"
-                className="input"
-                rows={2}
-                defaultValue={editing.description || ''}
-              />
-            </Field>
-
-            <div className="modal-form-actions">
+            <div className="modal-form-actions col-span-3">
               <Button variant="secondary" onClick={() => setEditing(null)} disabled={updateMutation.isPending}>
                 Hủy
               </Button>
