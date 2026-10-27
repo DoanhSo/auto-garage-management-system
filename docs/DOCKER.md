@@ -54,18 +54,24 @@ Stack source dung `.env` o thu muc goc; launcher bundle dung `.docker-local/.env
 Day la hai project Docker rieng. Khong dung credential cua stack demo de dang nhap
 vao stack source da co tai khoan.
 
-Compose mac dinh chon image da kiem thu `2026.10.26.1`, khong dung tag `latest` cu.
-Neu `.env` da dat `AUTOGARAGE_IMAGE_TAG`, doi thanh `2026.10.26.1` va chay:
+Compose mac dinh chon image da kiem thu `2026.10.27.4`, khong dung tag `latest` cu.
+Neu `.env` da dat `AUTOGARAGE_IMAGE_TAG`, doi thanh `2026.10.27.4` va chay:
 
 ```powershell
 docker compose --env-file .env up -d --no-build --pull never --wait
 docker compose --env-file .env images
 ```
 
-Kiem tra frontend/backend deu dung tag `2026.10.26.1`. Thao tac cap nhat giu volume,
+Kiem tra frontend/backend deu dung tag `2026.10.27.4`. Thao tac cap nhat giu volume,
 tai khoan va mat khau cu. Voi realm da co, `keycloak-setup` van cap nhat redirect
 URI, web origin, user profile va token mapper khi khong tao admin tu dong.
 Sau cap nhat, mo `http://localhost:3000/login` va Ctrl+F5 de nap giao dien moi.
+
+Ban `2026.10.27.4` ho tro khoi phuc phien qua cookie HttpOnly. Dang nhap lai mot
+lan sau khi nang cap tu ban chi giu token trong memory; nhung lan refresh sau
+giu nguyen trang khi phien Keycloak con hop le. Compose HTTP local dat
+`AUTH_SESSION_COOKIE_SECURE=false`; trien khai HTTPS phai bat true. Khong xoa
+volume hoac reset mat khau de cap nhat phien.
 
 Khong chay `down -v` neu muon giu du lieu. Khong gui `.docker-local` cho nguoi
 khac: thu muc nay chua credential va cau hinh rieng cua may. Khong doi secret

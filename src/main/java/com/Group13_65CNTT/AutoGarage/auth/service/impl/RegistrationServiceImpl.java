@@ -25,11 +25,12 @@ public class RegistrationServiceImpl implements RegistrationService {
     @PreAuthorize(SecurityConstants.PERMIT_ALL)
     public void register(RegistrationRequest request) {
         passwordPolicy.validateNewPassword(request.getPassword());
+        String username = request.getUsername().strip().toLowerCase(Locale.ROOT);
         String email = request.getEmail().strip().toLowerCase(Locale.ROOT);
         // Keycloak owns credentials; the existing authenticated /me flow provisions
         // the garage CUSTOMER and customer profile after the first successful login.
         keycloakIdentityService.createOrLinkUser(
-                email, email, request.getFullName().strip(), Role.CUSTOMER, request.getPassword())
+                username, email, request.getFullName().strip(), Role.CUSTOMER, request.getPassword())
                 .orElseThrow(() -> new BusinessException(ResponseCode.AUTHENTICATION_UNAVAILABLE));
     }
 }

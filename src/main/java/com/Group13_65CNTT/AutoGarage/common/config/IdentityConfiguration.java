@@ -20,7 +20,7 @@ import java.time.Clock;
 
 @Configuration
 @EnableTransactionManagement(order = 0)
-@EnableConfigurationProperties({AuthProperties.class, BootstrapProperties.class, KeycloakAdminProperties.class})
+@EnableConfigurationProperties({AuthProperties.class, BootstrapProperties.class, KeycloakAdminProperties.class, BrowserSessionProperties.class})
 public class IdentityConfiguration {
     @Bean
     Clock identityClock() {

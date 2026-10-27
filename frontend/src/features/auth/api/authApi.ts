@@ -3,9 +3,33 @@ import { ApiError } from '../../../shared/api/errors';
 import { env } from '../../../shared/config/env';
 import { safeReturnTo } from '../../../shared/utils/format';
 import type { OidcTokenBundle } from '../../../shared/types/contracts';
-import { oidcTokenSchema, userSchema } from '../../../shared/types/schemas';
+import { browserSessionSchema, oidcTokenSchema, userSchema } from '../../../shared/types/schemas';
 
 const PKCE_STORAGE_KEY = 'autogarage-oidc-pkce';
+let browserSessionQueue: Promise<unknown> = Promise.resolve();
+async function browserSessionLock<T>(operation: () => Promise<T>): Promise<T> {
+  // Serialize cookie rotation across tabs where Web Locks is available.
+  if (navigator.locks)
+    return await navigator.locks.request('autogarage-browser-session', operation);
+  const next = browserSessionQueue.then(operation, operation);
+  browserSessionQueue = next.then(
+    () => undefined,
+    () => undefined,
+  );
+  return next;
+}
+
+async function browserSession(path: string, refreshToken?: string): Promise<OidcTokenBundle> {
+  const result = browserSessionSchema.parse(
+    await request<unknown>(path, {
+      method: 'POST',
+      credentials: 'include',
+      authenticated: refreshToken !== undefined,
+      body: refreshToken === undefined ? undefined : { refreshToken },
+    }),
+  );
+  return { ...result, refreshToken: null };
+}
 
 export interface PkceSessionState {
   verifier: string;
@@ -109,7 +133,26 @@ async function exchangeOidcToken(params: Record<string, string>): Promise<OidcTo
 }
 
 export const authApi = {
-  register: (values: { fullName: string; email: string; password: string }) =>
+  openBrowserSession: (refreshToken: string) =>
+    browserSessionLock(() => browserSession('/auth/session', refreshToken)),
+  refreshBrowserSession: () =>
+    browserSessionLock(async () => {
+      try {
+        return await browserSession('/auth/session/refresh');
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) return null;
+        throw error;
+      }
+    }),
+  closeBrowserSession: () =>
+    browserSessionLock(() =>
+      request<null>('/auth/session', {
+        method: 'DELETE',
+        authenticated: false,
+        credentials: 'include',
+      }),
+    ),
+  register: (values: { username: string; fullName: string; email: string; password: string }) =>
     request<null>('/auth/register', { method: 'POST', body: values, authenticated: false }),
   loginWithPassword: (values: { identifier: string; password: string }) =>
     exchangeOidcToken({

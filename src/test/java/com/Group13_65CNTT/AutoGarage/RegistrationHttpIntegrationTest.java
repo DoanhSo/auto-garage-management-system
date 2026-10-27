@@ -35,12 +35,12 @@ class RegistrationHttpIntegrationTest extends IntegrationTestSupport {
         mvc.perform(post(ApiPaths.REGISTRATION).contentType(MediaType.APPLICATION_JSON).content(body("customer@gmail.com", "test-password-123")))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.code").value(1001)).andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.path").value(ApiPaths.REGISTRATION)).andExpect(jsonPath("$.data").isEmpty());
-        verify(identities).createOrLinkUser("customer@gmail.com", "customer@gmail.com", "Customer Name", Role.CUSTOMER, "test-password-123");
+        verify(identities).createOrLinkUser("customer.one", "customer@gmail.com", "Customer Name", Role.CUSTOMER, "test-password-123");
     }
 
     @Test
     void cannotMassAssignAdministratorRoleOrIdentity() throws Exception {
-        mvc.perform(post(ApiPaths.REGISTRATION).contentType(MediaType.APPLICATION_JSON).content("{\"fullName\":\"Customer\",\"email\":\"customer@gmail.com\",\"password\":\"test-password-123\",\"role\":\"ADMIN\",\"identityId\":\"existing-admin\"}"))
+        mvc.perform(post(ApiPaths.REGISTRATION).contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"customer.one\",\"fullName\":\"Customer\",\"email\":\"customer@gmail.com\",\"password\":\"test-password-123\",\"role\":\"ADMIN\",\"identityId\":\"existing-admin\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.success").value(false));
         verifyNoInteractions(identities);
     }
@@ -80,6 +80,29 @@ class RegistrationHttpIntegrationTest extends IntegrationTestSupport {
     }
 
     private String body(String email, String password) {
-        return json.writeValueAsString(Map.of("fullName", "Customer Name", "email", email, "password", password));
+        return json.writeValueAsString(Map.of("username", "customer.one", "fullName", "Customer Name", "email", email, "password", password));
+    }
+
+    @Test
+    void requiresValidUsernameBeforeCallingIdentityProvider() throws Exception {
+        for (String username : new String[]{"", "ab", "a".repeat(101), "customer name", "customer@example.test", "nguyễn"}) {
+            var payload = Map.of("username", username, "fullName", "Customer Name", "email", "customer@gmail.com", "password", "test-password-123");
+            mvc.perform(post(ApiPaths.REGISTRATION).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(payload)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(2001))
+                .andExpect(jsonPath("$.data.username").isString());
+        }
+        mvc.perform(post(ApiPaths.REGISTRATION).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"fullName\":\"Customer\",\"email\":\"customer@gmail.com\",\"password\":\"test-password-123\"}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.data.username").isString());
+        verifyNoInteractions(identities);
+    }
+
+    @Test
+    void normalizesMixedCaseUsernameWithoutReplacingItWithEmail() throws Exception {
+        when(identities.createOrLinkUser(anyString(), anyString(), anyString(), any(), anyString())).thenReturn(Optional.of("new-identity"));
+        mvc.perform(post(ApiPaths.REGISTRATION).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("username", "Customer.One", "fullName", "Customer Name", "email", "customer@gmail.com", "password", "test-password-123"))))
+            .andExpect(status().isCreated());
+        verify(identities).createOrLinkUser("customer.one", "customer@gmail.com", "Customer Name", Role.CUSTOMER, "test-password-123");
     }
 }

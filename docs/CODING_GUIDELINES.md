@@ -58,6 +58,15 @@ Giữ package gara, Java 21/Spring Boot 4.1.1 và năm role gara. Auth dùng Ent
 - Last-admin, historical ownership khi xe đổi chủ, technician/QC assignment và private notification recipient đều là invariant bắt buộc.
 - Phân trang có page/size/sortBy/sortDir và allowlist sort; không bind tên cột SQL tùy ý. Export file là response binary riêng có Content-Type/filename và quyền như báo cáo.
 
+## Thiết kế giao diện
+
+Tuân thủ [UI_DESIGN_GUIDELINES.md](UI_DESIGN_GUIDELINES.md) cho toàn bộ frontend.
+Dùng chung design token và component, phong cách minimalism thống nhất giữa các
+màn hình. Form thêm/sửa là dialog ở giữa, desktop chia hai cột bằng nhau; xác nhận
+xóa dùng dialog cùng hệ thống. Không tạo drawer CRUD cố định hai bên hoặc form
+dài có thanh cuộn nội bộ mặc định. Khi thay đổi component chung, kiểm tra các màn
+đang sử dụng và khả năng thao tác trên mobile, khi zoom và bằng bàn phím.
+
 ## Kiểm thử và checklist bàn giao
 
 1. Migration mới nếu schema đổi; không sửa checksum cũ.

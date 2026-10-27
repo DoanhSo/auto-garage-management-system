@@ -23,6 +23,7 @@ interface RequestOptions {
   signal?: AbortSignal;
   authenticated?: boolean;
   binary?: boolean;
+  credentials?: 'include' | 'omit';
 }
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -50,7 +51,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       method: options.method ?? 'GET',
       headers,
       signal,
-      credentials: 'omit',
+      credentials: options.credentials ?? 'omit',
       cache: 'no-store',
       body: multipart
         ? (options.body as FormData)

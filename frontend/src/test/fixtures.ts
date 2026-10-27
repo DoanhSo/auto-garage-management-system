@@ -42,6 +42,15 @@ export const page = (content: unknown[]) => ({
 });
 export function baseHandlers() {
   return [
+    http.post('/api/v1/auth/session', () =>
+      HttpResponse.json(
+        envelope({ accessToken: 'test-only-token', expiresIn: 1800, tokenType: 'Bearer' }),
+      ),
+    ),
+    http.post('/api/v1/auth/session/refresh', () =>
+      HttpResponse.json(envelope(null, 3003), { status: 401 }),
+    ),
+    http.delete('/api/v1/auth/session', () => HttpResponse.json(envelope(null))),
     http.get('/api/v1/public/ui-policy', () => HttpResponse.json(envelope(policy))),
     http.post('/realms/autogarage-realm/protocol/openid-connect/token', () =>
       HttpResponse.json({

@@ -2,6 +2,10 @@
 
 Ứng dụng React/TypeScript tích hợp API TV1. UI tiếng Việt, light mode; desktop dùng bảng, mobile dùng thẻ tài khoản; form thêm/sửa là dialog ở giữa, hai cột, vừa khung nhìn.
 
+Khi thêm hoặc sửa UI, tuân thủ [quy chuẩn thiết kế giao diện](../docs/UI_DESIGN_GUIDELINES.md): dùng chung design token/component, không thiết kế riêng một bộ form cho từng màn. Form CRUD nằm giữa, desktop hai cột bằng nhau, mobile một cột; form dài chia bước hợp lý, không dùng drawer hai bên hoặc cuộn nội bộ làm bố cục mặc định.
+
+Đăng nhập và đăng ký dùng chung `AuthLayout` và `src/features/auth/auth.css`: nền trắng/xanh nhạt, component form dùng chung, ảnh gara nằm trong panel phụ trên desktop. Form đăng ký chia hai cột, chuyển một cột trên mobile; trạng thái tải/lỗi chính sách cũng dùng cùng layout.
+
 ## Chạy local
 
 Cần **Node.js 24.15 trở lên thuộc nhánh 24** và npm. Node 16 không chạy Vite 8. Chạy backend theo README gốc trước, có MySQL/Flyway và tài khoản được cấp từ cấu hình riêng.
@@ -22,7 +26,7 @@ Policy mật khẩu, phân trang, kỳ báo cáo, múi giờ lấy từ **GET `/
 ## Chức năng
 
 - `/login`: username/email, validation, safe returnTo, lỗi credential an toàn.
-- `/register`: họ tên/email/mật khẩu/xác nhận trên AutoGarage; backend chỉ tạo CUSTOMER trong Keycloak, sau đó tự đăng nhập qua token endpoint. Không mở giao diện Keycloak; Google OAuth để sau.
+- `/register`: họ tên/username/email/mật khẩu/xác nhận trên AutoGarage; username theo schema chung với màn quản lý tài khoản, backend chỉ tạo CUSTOMER trong Keycloak. Tạo xong tự đăng nhập bằng username; các lần sau dùng được username hoặc email. Tài khoản cũ giữ nguyên. Không mở giao diện Keycloak; Google OAuth để sau.
 - `/account/security`: thông tin cá nhân, thu hồi phiên và mở cổng Keycloak để quản lý mật khẩu, mọi role đã đăng nhập.
 - `/admin/users`: ADMIN tìm/lọc/sort/phân trang, thêm/sửa, đổi role, khóa/mở khóa và xóa. Khóa/Mở khóa dùng cùng nút đổi theo trạng thái; xóa loại khỏi danh sách quản trị, giữ lịch sử và không thể khôi phục qua Sửa. PUT chỉ gửi field allowlist và version; email trống gửi null. 409 giữ draft, chỉ thay bằng bản server sau lựa chọn rõ ràng. Có lỗi last-admin và xác nhận đổi quyền chính mình.
 - `/notifications`: WEB inbox của principal, lọc chưa đọc, chi tiết text và lưu đã đọc. Badge dùng tổng unread từ server; polling dừng ở tab ẩn, chậm lại sau lỗi.
@@ -30,7 +34,9 @@ Policy mật khẩu, phân trang, kỳ báo cáo, múi giờ lấy từ **GET `/
 - `/admin/reports`: ADMIN chọn ngày theo garage timezone, KPI trong kỳ, số dư hiện tại, công nợ và CSV có bearer. End-date gồm cả ngày; API dùng UTC `[from,until)`.
 - Trang 403/404, loading/empty/error/retry. Backend quyết định quyền cuối cùng.
 
-Token chỉ nằm trong memory: **reload phải đăng nhập lại**. Access/refresh token Keycloak được giữ trong memory; ứng dụng tự refresh trước khi access token hết hạn. Không lưu token/password trong URL, localStorage, sessionStorage hoặc persisted cache. Logout xóa private cache; BroadcastChannel chỉ truyền sự kiện logout. 401/3001,3003 kết thúc phiên; 3005 khi sai mật khẩu hiện tại và 503 giữ phiên. Mutation retry=0; mất kết nối lúc ghi báo chưa xác nhận kết quả.
+Access token chỉ nằm trong memory. Sau đăng nhập, backend đổi refresh token thành cookie phiên **HttpOnly, SameSite=Strict** tại `/api/v1/auth/session`; reload tự khôi phục token rồi gọi `/auth/me` trước khi render router. Frontend không lưu token/password trong URL, localStorage, sessionStorage hoặc persisted cache. Cookie Secure mặc định bật, Docker HTTP local tắt bằng cấu hình. Các API nghiệp vụ vẫn chỉ nhận Bearer, không xác thực bằng cookie.
+
+Logout xóa cookie/private cache và thu hồi phiên; BroadcastChannel chỉ truyền sự kiện logout. Chỉ marker không nhạy cảm `autogarage-logout-pending` được lưu để không tự đăng nhập lại sau logout mất mạng; marker được xử lý trước khi khôi phục phiên. Lỗi restore 503/mất mạng hiển thị Thử lại và giữ cookie, không chuyển nhầm về login. Cookie hết hạn/thu hồi (401) yêu cầu đăng nhập lại. Mutation retry=0; mất kết nối lúc ghi báo chưa xác nhận kết quả. Chi tiết endpoint và cấu hình tại `../docs/KEYCLOAK_SETUP.md`.
 
 ## Cấu trúc và cách mở rộng
 
