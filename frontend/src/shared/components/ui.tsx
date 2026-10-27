@@ -345,12 +345,16 @@ export function Modal({
   children,
   onOpenChange,
   description = '',
+  size,
+  className,
 }: {
   open: boolean;
   title: string;
   description?: string;
   children: ReactNode;
   onOpenChange: (open: boolean) => void;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
 }) {
   return (
     <Sheet
@@ -358,6 +362,8 @@ export function Modal({
       title={title}
       description={description}
       placement="center"
+      size={size}
+      className={className}
       onClose={() => onOpenChange(false)}
     >
       {children}
