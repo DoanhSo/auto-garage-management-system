@@ -457,27 +457,30 @@ export function SuppliersPage() {
         </div>
       </section>
 
-      {/* Modal Thêm nhà cung cấp chuẩn 2 cột */}
+      {/* Modal Thêm nhà cung cấp chuẩn 3 cột */}
       <Modal
         open={creating}
         onOpenChange={setCreating}
         title="Thêm nhà cung cấp"
         description="Khai báo đối tác cung ứng phụ tùng mới và điều khoản công nợ."
+        size="lg"
       >
-        <form onSubmit={handleCreate} className="modal-form">
-          <div className="form-section-label">THÔNG TIN DOANH NGHIỆP</div>
+        <form onSubmit={handleCreate} className="modal-form grid-3col">
+          <div className="form-section-label">THÔNG TIN DOANH NGHIỆP & ĐỊNH DANH</div>
 
-          <Field label="Tên nhà cung cấp" required>
-            <input
-              name="supplierName"
-              className="input"
-              placeholder="VD: Bosch Vietnam Co."
-              required
-              autoFocus
-            />
-          </Field>
+          <div className="col-span-2">
+            <Field label="Tên nhà cung cấp" required>
+              <input
+                name="supplierName"
+                className="input"
+                placeholder="VD: Bosch Vietnam Co., Ltd"
+                required
+                autoFocus
+              />
+            </Field>
+          </div>
 
-          <Field label="Mã nhà cung cấp" required hint="3–30 ký tự, viết hoa (VD: SUP-BOSCH)">
+          <Field label="Mã nhà cung cấp" required>
             <input
               name="supplierCode"
               className="input font-mono"
@@ -486,19 +489,21 @@ export function SuppliersPage() {
             />
           </Field>
 
-          <Field label="Số điện thoại" hint="Số hotline hoặc bàn">
-            <input name="phone" className="input" placeholder="028 3838 3838" />
+          <Field label="Mã số thuế">
+            <input name="taxCode" className="input" placeholder="Ví dụ: 0300123456" />
+          </Field>
+
+          <Field label="Số điện thoại">
+            <input name="phone" className="input" placeholder="Ví dụ: 028 3838 3838" />
           </Field>
 
           <Field label="Email liên hệ">
             <input name="email" type="email" className="input" placeholder="sales@ncc.vn" />
           </Field>
 
-          <Field label="Mã số thuế" hint="Dùng khi xuất hóa đơn đầu vào">
-            <input name="taxCode" className="input" placeholder="0300123456" />
-          </Field>
+          <div className="form-section-label">ĐIỀU KHOẢN HỢP TÁC & ĐỊA ĐIỂM</div>
 
-          <Field label="Thời hạn công nợ (ngày)" hint="Số ngày được phép trả chậm sau khi nhận hàng">
+          <Field label="Thời hạn công nợ (ngày)">
             <input
               name="paymentTermDays"
               type="number"
@@ -509,11 +514,13 @@ export function SuppliersPage() {
             />
           </Field>
 
-          <Field label="Địa chỉ trụ sở / kho hàng" className="full-width">
-            <input name="address" className="input" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành phố" />
-          </Field>
+          <div className="col-span-2">
+            <Field label="Địa chỉ trụ sở / kho hàng">
+              <input name="address" className="input" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
+            </Field>
+          </div>
 
-          <div className="modal-form-actions">
+          <div className="modal-form-actions col-span-3">
             <Button variant="secondary" onClick={() => setCreating(false)} disabled={createMutation.isPending}>
               Hủy
             </Button>
@@ -524,28 +531,31 @@ export function SuppliersPage() {
         </form>
       </Modal>
 
-      {/* Modal Sửa nhà cung cấp chuẩn 2 cột */}
+      {/* Modal Sửa nhà cung cấp chuẩn 3 cột */}
       <Modal
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
         title="Cập nhật nhà cung cấp"
         description={`Chỉnh sửa thông tin đối tác ${editing?.supplierCode}`}
+        size="lg"
       >
         {editing && (
-          <form onSubmit={handleUpdate} className="modal-form">
-            <div className="form-section-label">THÔNG TIN DOANH NGHIỆP</div>
+          <form onSubmit={handleUpdate} className="modal-form grid-3col">
+            <div className="form-section-label">THÔNG TIN DOANH NGHIỆP & ĐỊNH DANH</div>
 
-            <Field label="Tên nhà cung cấp" required>
-              <input
-                name="supplierName"
-                className="input"
-                defaultValue={editing.supplierName}
-                required
-                autoFocus
-              />
-            </Field>
+            <div className="col-span-2">
+              <Field label="Tên nhà cung cấp" required>
+                <input
+                  name="supplierName"
+                  className="input"
+                  defaultValue={editing.supplierName}
+                  required
+                  autoFocus
+                />
+              </Field>
+            </div>
 
-            <Field label="Mã nhà cung cấp" hint="Mã định danh không thay đổi">
+            <Field label="Mã nhà cung cấp">
               <input
                 name="supplierCode"
                 className="input font-mono"
@@ -555,17 +565,19 @@ export function SuppliersPage() {
               />
             </Field>
 
+            <Field label="Mã số thuế">
+              <input name="taxCode" className="input" defaultValue={editing.taxCode || ''} placeholder="0300123456" />
+            </Field>
+
             <Field label="Số điện thoại">
-              <input name="phone" className="input" defaultValue={editing.phone || ''} />
+              <input name="phone" className="input" defaultValue={editing.phone || ''} placeholder="028 3838 3838" />
             </Field>
 
             <Field label="Email liên hệ">
-              <input name="email" type="email" className="input" defaultValue={editing.email || ''} />
+              <input name="email" type="email" className="input" defaultValue={editing.email || ''} placeholder="sales@ncc.vn" />
             </Field>
 
-            <Field label="Mã số thuế">
-              <input name="taxCode" className="input" defaultValue={editing.taxCode || ''} />
-            </Field>
+            <div className="form-section-label">ĐIỀU KHOẢN HỢP TÁC & ĐỊA ĐIỂM</div>
 
             <Field label="Thời hạn công nợ (ngày)">
               <input
@@ -578,18 +590,18 @@ export function SuppliersPage() {
               />
             </Field>
 
-            <Field label="Địa chỉ trụ sở / kho" className="full-width">
-              <input name="address" className="input" defaultValue={editing.address || ''} />
-            </Field>
-
-            <Field label="Trạng thái hợp tác" className="full-width">
+            <Field label="Trạng thái hợp tác">
               <select name="isActive" className="input" defaultValue={String(editing.isActive)}>
                 <option value="true">Đang hợp tác (Hoạt động)</option>
                 <option value="false">Ngừng hợp tác</option>
               </select>
             </Field>
 
-            <div className="modal-form-actions">
+            <Field label="Địa chỉ trụ sở / kho">
+              <input name="address" className="input" defaultValue={editing.address || ''} placeholder="Số nhà, đường, tỉnh/thành..." />
+            </Field>
+
+            <div className="modal-form-actions col-span-3">
               <Button variant="secondary" onClick={() => setEditing(null)} disabled={updateMutation.isPending}>
                 Hủy
               </Button>
