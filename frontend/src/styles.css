@@ -1104,20 +1104,44 @@ select.input {
   padding: 18px 24px 20px;
   flex: none;
 }
-.centered-dialog .account-editor-form.grid-3col {
+.centered-dialog .account-editor-form.grid-3col,
+.centered-dialog .modal-form.grid-3col,
+.centered-dialog .form-grid.grid-3col {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px 20px;
   padding: 16px 24px 20px;
 }
-.account-editor-form.grid-3col .col-span-2 {
+.account-editor-form.grid-3col .col-span-2,
+.modal-form.grid-3col .col-span-2,
+.form-grid.grid-3col .col-span-2,
+.grid-3col > .col-span-2,
+.grid-3col .field.col-span-2 {
   grid-column: span 2;
 }
+.account-editor-form.grid-3col .col-span-3,
+.modal-form.grid-3col .col-span-3,
+.form-grid.grid-3col .col-span-3,
+.grid-3col > .col-span-3,
+.grid-3col .field.col-span-3 {
+  grid-column: 1 / -1;
+}
 @media (max-width: 860px) {
-  .centered-dialog .account-editor-form.grid-3col {
+  .centered-dialog .account-editor-form.grid-3col,
+  .centered-dialog .modal-form.grid-3col,
+  .centered-dialog .form-grid.grid-3col {
     grid-template-columns: 1fr;
     gap: 10px 14px;
   }
-  .account-editor-form.grid-3col .col-span-2 {
+  .account-editor-form.grid-3col .col-span-2,
+  .modal-form.grid-3col .col-span-2,
+  .form-grid.grid-3col .col-span-2,
+  .grid-3col > .col-span-2,
+  .grid-3col .field.col-span-2,
+  .account-editor-form.grid-3col .col-span-3,
+  .modal-form.grid-3col .col-span-3,
+  .form-grid.grid-3col .col-span-3,
+  .grid-3col > .col-span-3,
+  .grid-3col .field.col-span-3 {
     grid-column: auto;
   }
 }
