@@ -383,7 +383,7 @@ export function ServiceEditor({
       }}
       title={title}
       description={description}
-      placement="side"
+      placement="center"
     >
       {isEditing && detail.isLoading ? (
         <Loading label="Đang tải dữ liệu dịch vụ…" />
