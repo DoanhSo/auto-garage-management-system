@@ -1089,7 +1089,9 @@ select.input {
   position: static;
   padding: 20px 24px 16px;
 }
-.centered-dialog .account-editor-form {
+.centered-dialog .account-editor-form,
+.centered-dialog .modal-form,
+.centered-dialog .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px 22px;
@@ -1097,16 +1099,33 @@ select.input {
   flex: none;
 }
 .account-editor-form > .form-section-label,
+.modal-form > .form-section-label,
+.form-grid > .form-section-label,
 .account-editor-form > .checkbox-field,
+.modal-form > .checkbox-field,
+.form-grid > .checkbox-field,
 .account-editor-form > .alert,
+.modal-form > .alert,
+.form-grid > .alert,
 .account-editor-form > .conflict-panel,
-.account-editor-actions {
+.modal-form > .conflict-panel,
+.form-grid > .conflict-panel,
+.account-editor-actions,
+.modal-form-actions,
+.modal-form > .full-width,
+.form-grid > .full-width {
   grid-column: 1 / -1;
 }
-.account-editor-form .form-section-label {
+.account-editor-form .form-section-label,
+.modal-form .form-section-label,
+.form-grid .form-section-label {
   padding-bottom: 7px;
 }
-.account-editor-actions {
+.account-editor-actions,
+.modal-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
   margin-top: 4px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
@@ -1178,7 +1197,10 @@ select.input {
     font-size: 11px;
     margin-top: 3px;
   }
-  .centered-dialog .account-editor-form {
+  .centered-dialog .account-editor-form,
+  .centered-dialog .modal-form,
+  .centered-dialog .form-grid {
+    grid-template-columns: 1fr;
     padding: 14px;
     gap: 10px 12px;
   }

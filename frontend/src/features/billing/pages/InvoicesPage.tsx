@@ -1,4 +1,32 @@
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import {
+  AlertCircle,
+  Ban,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  Eye,
+  Plus,
+  Receipt,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { useToast } from '../../../app/providers/ToastProvider';
+import {
+  Badge,
+  Button,
+  Field,
+  Loading,
+  Modal,
+  PageHeader,
+} from '../../../shared/components/ui';
+import { DataTable } from '../../../shared/components/DataTable';
+import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
+import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
+import { errorMessage } from '../../../shared/api/errors';
 import {
   useInvoicesQuery,
   useIssueInvoiceMutation,
@@ -12,22 +40,24 @@ import type {
   InvoiceStatus,
   PaymentMethod,
 } from '../types/billing';
-import { Button, Field, Modal, Badge, Loading } from '../../../shared/components/ui';
-import {
-  Receipt,
-  Plus,
-  Search,
-  Eye,
-  Ban,
-  CreditCard,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-} from 'lucide-react';
+
+const sortOptions = [
+  ['id:desc', 'Mã hóa đơn · Mới nhất'],
+  ['id:asc', 'Mã hóa đơn · Cũ nhất'],
+  ['totalAmount:desc', 'Tổng tiền · Cao nhất'],
+  ['totalAmount:asc', 'Tổng tiền · Thấp nhất'],
+  ['balanceAmount:desc', 'Còn nợ · Nhiều nhất'],
+];
 
 export function InvoicesPage() {
-  const [selectedStatus, setSelectedStatus] = useState<InvoiceStatus | ''>('');
+  const compact = useMediaQuery('(max-width: 640px)');
+  const notify = useToast();
+
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
+  const [selectedStatus, setSelectedStatus] = useState<InvoiceStatus | ''>('');
+  const [sortField, setSortField] = useState('id');
+  const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(0);
 
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
@@ -36,24 +66,37 @@ export function InvoicesPage() {
   const [voidReason, setVoidReason] = useState('');
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
 
-  // Payment form states
+  // Form states cho thu tiền
   const [payAmount, setPayAmount] = useState<number>(0);
-  const [payMethod, setPayMethod] = useState<PaymentMethod>('CASH');
+  const [payMethod, setPayMethod] = useState<PaymentMethod>('VIETQR');
   const [payReference, setPayReference] = useState('');
   const [payNotes, setPayNotes] = useState('');
 
-  const { data, isLoading } = useInvoicesQuery({
+  const createTrigger = useRef<HTMLButtonElement>(null);
+
+  const { data, isLoading, isFetching } = useInvoicesQuery({
     status: selectedStatus || undefined,
-    query: query || undefined,
+    query: debouncedQuery.trim() || undefined,
     page,
     size: 20,
-    sortBy: 'id',
-    sortDir: 'desc',
+    sortBy: sortField,
+    sortDir,
   });
 
   const issueMutation = useIssueInvoiceMutation();
   const voidMutation = useVoidInvoiceMutation();
   const receivePaymentMutation = useReceivePaymentMutation();
+
+  const filterCount = (query.trim() ? 1 : 0) + (selectedStatus !== '' ? 1 : 0);
+  const isFiltered = query.length > 0 || selectedStatus !== '' || sortField !== 'id' || sortDir !== 'desc';
+
+  const handleResetFilters = () => {
+    setQuery('');
+    setSelectedStatus('');
+    setSortField('id');
+    setSortDir('desc');
+    setPage(0);
+  };
 
   const handleIssue = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -64,23 +107,49 @@ export function InvoicesPage() {
       taxAmount: Number(formData.get('taxAmount') || 0),
       discountAmount: Number(formData.get('discountAmount') || 0),
     };
-    await issueMutation.mutateAsync(input);
-    setIssuing(false);
+
+    try {
+      await issueMutation.mutateAsync(input);
+      notify('Đã phát hành hóa đơn dịch vụ thành công.');
+      setIssuing(false);
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Lỗi khi phát hành hóa đơn.');
+    }
   };
 
   const handleVoid = async () => {
-    if (!voidingInvoice || !voidReason) return;
-    await voidMutation.mutateAsync({
-      id: voidingInvoice.id,
-      data: { voidReason },
-    });
-    setVoidingInvoice(null);
-    setVoidReason('');
+    if (!voidingInvoice || !voidReason.trim()) {
+      notify('Vui lòng nhập lý do hủy hóa đơn.');
+      return;
+    }
+    try {
+      await voidMutation.mutateAsync({
+        id: voidingInvoice.id,
+        data: { voidReason: voidReason.trim() },
+      });
+      notify(`Đã hủy hóa đơn ${voidingInvoice.invoiceCode}.`);
+      setVoidingInvoice(null);
+      setVoidReason('');
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Không thể hủy hóa đơn.');
+    }
+  };
+
+  const handleOpenPayment = (inv: Invoice) => {
+    setPayingInvoice(inv);
+    setPayAmount(Number(inv.balanceAmount || inv.totalAmount || 0));
+    setPayMethod('VIETQR');
+    setPayReference('');
+    setPayNotes('');
   };
 
   const handleReceivePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!payingInvoice) return;
+    if (!payingInvoice || payAmount <= 0) {
+      notify('Vui lòng nhập số tiền thanh toán hợp lệ lớn hơn 0.');
+      return;
+    }
+
     const input: PaymentReceiveInput = {
       invoiceId: payingInvoice.id,
       amount: payAmount,
@@ -88,8 +157,14 @@ export function InvoicesPage() {
       providerReference: payReference || undefined,
       notes: payNotes || undefined,
     };
-    await receivePaymentMutation.mutateAsync(input);
-    setPayingInvoice(null);
+
+    try {
+      await receivePaymentMutation.mutateAsync(input);
+      notify(`Đã ghi nhận thanh toán ${payAmount.toLocaleString('vi-VN')} đ cho hóa đơn ${payingInvoice.invoiceCode}.`);
+      setPayingInvoice(null);
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Ghi nhận thanh toán thất bại.');
+    }
   };
 
   const renderStatusBadge = (status: InvoiceStatus) => {
@@ -97,13 +172,13 @@ export function InvoicesPage() {
       case 'PAID':
         return (
           <Badge variant="success" className="inline-flex items-center gap-1">
-            <CheckCircle2 size={12} /> Đã thanh toán
+            <CheckCircle2 size={12} /> Đã thu đủ
           </Badge>
         );
       case 'PARTIALLY_PAID':
         return (
           <Badge variant="warning" className="inline-flex items-center gap-1">
-            <Clock size={12} /> Thanh toán 1 phần
+            <Clock size={12} /> Thu 1 phần
           </Badge>
         );
       case 'UNPAID':
@@ -117,411 +192,480 @@ export function InvoicesPage() {
     }
   };
 
-  return (
-    <div className="page-container p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Receipt className="text-blue-600" size={28} />
-            Quản lý Hóa đơn Sửa chữa (UC23)
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Xuất hóa đơn dịch vụ sửa chữa, theo dõi thanh toán và công nợ khách hàng
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          onClick={() => setIssuing(true)}
-          className="flex items-center gap-1.5"
-        >
-          <Plus size={16} />
-          Xuất hóa đơn mới
-        </Button>
-      </div>
-
-      {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center">
-        <div className="relative flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Tìm theo số hóa đơn, khách hàng..."
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(0);
-            }}
-            className="w-full pl-9 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <select
-          value={selectedStatus}
-          onChange={(e) => {
-            setSelectedStatus(e.target.value as typeof selectedStatus);
-            setPage(0);
-          }}
-          className="border rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">Tất cả trạng thái</option>
-          <option value="UNPAID">Chưa thanh toán (UNPAID)</option>
-          <option value="PARTIALLY_PAID">Thanh toán 1 phần (PARTIALLY_PAID)</option>
-          <option value="PAID">Đã thanh toán (PAID)</option>
-          <option value="VOID">Đã hủy (VOID)</option>
-        </select>
-      </div>
-
-      {/* Invoices Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {isLoading ? (
-          <div className="py-12 flex justify-center">
-            <Loading />
-          </div>
-        ) : !data?.content || data.content.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <Receipt size={48} className="mx-auto text-gray-300 mb-2" />
-            <p>Không có hóa đơn nào</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase">
-                  <th className="py-3 px-4">Số hóa đơn</th>
-                  <th className="py-3 px-4">Lệnh sửa chữa</th>
-                  <th className="py-3 px-4">Khách hàng</th>
-                  <th className="py-3 px-4 text-right">Tổng tiền (VNĐ)</th>
-                  <th className="py-3 px-4 text-right">Đã trả (VNĐ)</th>
-                  <th className="py-3 px-4 text-right">Còn nợ (VNĐ)</th>
-                  <th className="py-3 px-4 text-center">Trạng thái</th>
-                  <th className="py-3 px-4 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 text-sm">
-                {data.content.map((inv) => {
-                  const paid = Number(inv.paidAmount || 0);
-                  const bal = Number(inv.balanceAmount || 0);
-                  const custName = inv.customerSnapshot?.fullName || `KH #${inv.customerId}`;
-                  const custPhone = inv.customerSnapshot?.phone;
-
-                  return (
-                    <tr key={inv.id} className="hover:bg-gray-50/80 transition-colors">
-                      <td className="py-3 px-4 font-mono font-medium text-gray-900">
-                        {inv.invoiceCode}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-gray-700">#{inv.repairOrderId}</td>
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-gray-800">{custName}</div>
-                        {custPhone && <div className="text-xs text-gray-400">{custPhone}</div>}
-                      </td>
-                      <td className="py-3 px-4 text-right font-semibold text-gray-900">
-                        {Number(inv.totalAmount).toLocaleString('vi-VN')}
-                      </td>
-                      <td className="py-3 px-4 text-right text-green-600 font-medium">
-                        {paid.toLocaleString('vi-VN')}
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <span
-                          className={`font-semibold ${bal > 0 ? 'text-red-600' : 'text-gray-400'}`}
-                        >
-                          {bal.toLocaleString('vi-VN')}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">{renderStatusBadge(inv.status)}</td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex justify-end items-center gap-1.5">
-                          <button
-                            onClick={() => setViewingInvoice(inv)}
-                            className="p-1.5 text-gray-500 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
-                            title="Xem chi tiết"
-                          >
-                            <Eye size={16} />
-                          </button>
-                          {inv.status !== 'PAID' && inv.status !== 'VOID' && (
-                            <button
-                              onClick={() => {
-                                setPayingInvoice(inv);
-                                setPayAmount(bal);
-                              }}
-                              className="p-1.5 text-green-600 hover:text-green-700 rounded-lg hover:bg-green-50 transition-colors"
-                              title="Thu tiền hóa đơn"
-                            >
-                              <CreditCard size={16} />
-                            </button>
-                          )}
-                          {inv.status !== 'PAID' && inv.status !== 'VOID' && (
-                            <button
-                              onClick={() => setVoidingInvoice(inv)}
-                              className="p-1.5 text-red-500 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                              title="Hủy hóa đơn"
-                            >
-                              <Ban size={16} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Pagination */}
-        {data && data.totalPages > 1 && (
-          <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-t border-gray-100">
-            <span className="text-xs text-gray-500">
-              Trang {page + 1} / {data.totalPages} (Tổng {data.totalElements} hóa đơn)
+  const columns = useMemo<ColumnDef<Invoice>[]>(
+    () => [
+      {
+        id: 'invoice',
+        header: 'Hóa đơn',
+        cell: ({ row }) => (
+          <div className="account-cell">
+            <span
+              className="avatar"
+              style={{
+                background: '#edf3ff',
+                color: '#245bdb',
+                fontWeight: 700,
+              }}
+            >
+              <Receipt size={16} />
             </span>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                disabled={page === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                Trước
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={page >= data.totalPages - 1}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Sau
-              </Button>
+            <div>
+              <strong style={{ color: '#172338', fontFamily: 'monospace' }}>
+                {row.original.invoiceCode}
+              </strong>
+              <div className="muted" style={{ fontSize: '12px' }}>
+                Phiếu sửa chữa: #{row.original.repairOrderId}
+              </div>
             </div>
           </div>
-        )}
+        ),
+      },
+      {
+        id: 'customerAndVehicle',
+        header: 'Khách hàng & Xe',
+        cell: ({ row }) => {
+          const cust = row.original.customerSnapshot;
+          const veh = row.original.vehicleSnapshot;
+          return (
+            <div style={{ fontSize: '13px' }}>
+              <div style={{ fontWeight: 650, color: '#172338' }}>
+                {cust?.fullName || 'Khách vãng lai'}
+              </div>
+              <div className="muted" style={{ fontSize: '12px' }}>
+                {veh?.plateNumber ? (
+                  <span style={{ fontWeight: 600, color: '#245bdb' }}>{veh.plateNumber}</span>
+                ) : null}
+                {veh?.make || veh?.model ? ` (${veh.make || ''} ${veh.model || ''})` : ''}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'amounts',
+        header: 'Số tiền & Công nợ',
+        cell: ({ row }) => {
+          const inv = row.original;
+          const balance = Number(inv.balanceAmount ?? inv.totalAmount ?? 0);
+          return (
+            <div style={{ fontSize: '13px' }}>
+              <div style={{ fontWeight: 700, color: '#172338' }}>
+                {Number(inv.totalAmount).toLocaleString('vi-VN')} đ
+              </div>
+              <div style={{ fontSize: '11px', marginTop: '2px' }}>
+                {balance > 0 ? (
+                  <span style={{ color: '#b42335', fontWeight: 600 }}>
+                    Còn nợ: {balance.toLocaleString('vi-VN')} đ
+                  </span>
+                ) : (
+                  <span style={{ color: '#059669', fontWeight: 550 }}>Đã thu đủ 100%</span>
+                )}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: 'status',
+        header: 'Trạng thái',
+        cell: ({ row }) => renderStatusBadge(row.original.status),
+      },
+      {
+        accessorKey: 'issuedAt',
+        header: 'Ngày phát hành',
+        cell: ({ row }) => (
+          <span className="muted" style={{ fontSize: '12px' }}>
+            {new Date(row.original.issuedAt).toLocaleDateString('vi-VN', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: 'Thao tác',
+        cell: ({ row }) => {
+          const inv = row.original;
+          const canPay = inv.status === 'UNPAID' || inv.status === 'PARTIALLY_PAID';
+          const canVoid = inv.status === 'UNPAID';
+
+          return (
+            <div className="row-actions">
+              <Button
+                variant="ghost"
+                aria-label={`Xem chi tiết ${inv.invoiceCode}`}
+                onClick={() => setViewingInvoice(inv)}
+              >
+                <Eye size={16} />
+                <span>Xem</span>
+              </Button>
+              {canPay && (
+                <Button
+                  variant="ghost"
+                  aria-label={`Thu tiền hóa đơn ${inv.invoiceCode}`}
+                  onClick={() => handleOpenPayment(inv)}
+                  style={{ color: '#059669' }}
+                >
+                  <CreditCard size={16} />
+                  <span>Thu tiền</span>
+                </Button>
+              )}
+              {canVoid && (
+                <Button
+                  variant="ghost"
+                  className="delete-action"
+                  aria-label={`Hủy hóa đơn ${inv.invoiceCode}`}
+                  onClick={() => {
+                    setVoidingInvoice(inv);
+                    setVoidReason('');
+                  }}
+                >
+                  <Ban size={16} />
+                  <span>Hủy</span>
+                </Button>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    [],
+  );
+
+  const invoicesList = data?.content || [];
+  const totalElements = data?.totalElements || 0;
+  const totalPages = data?.totalPages || 1;
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="QUẢN LÝ TÀI CHÍNH & THANH TOÁN"
+        title="Hóa đơn dịch vụ"
+        description="Xuất hóa đơn dịch vụ sửa chữa, theo dõi thanh toán và quản lý công nợ khách hàng."
+        actions={
+          <Button
+            variant="primary"
+            ref={createTrigger}
+            onClick={() => setIssuing(true)}
+          >
+            <Plus size={18} />
+            <span>Phát hành hóa đơn</span>
+          </Button>
+        }
+      />
+
+      <div className="info-strip">
+        <Receipt size={18} />
+        <span>
+          Hóa đơn dịch vụ lưu snapshot bất biến thông tin khách hàng, thông số xe và đơn giá phụ tùng/tiền công tại thời điểm xuất hóa đơn. Mỗi phiếu sửa chữa chỉ phát hành tối đa 1 hóa đơn.
+        </span>
       </div>
 
-      {/* Modal Xuất Hóa Đơn Mới */}
+      <section className="panel table-panel">
+        {/* Bộ lọc hóa đơn */}
+        <div className="user-filters" role="search" aria-label="Bộ lọc hóa đơn">
+          <div className="user-filters-heading">
+            <div>
+              <SlidersHorizontal size={16} aria-hidden />
+              <h2>Bộ lọc hóa đơn dịch vụ</h2>
+              {filterCount > 0 && <span className="filter-count">{filterCount} đang áp dụng</span>}
+            </div>
+            <Button
+              variant="ghost"
+              className="filter-reset"
+              disabled={!isFiltered}
+              onClick={handleResetFilters}
+            >
+              <RotateCcw size={14} />
+              Đặt lại
+            </Button>
+          </div>
+
+          <div
+            className="user-filter-grid"
+            style={{
+              gridTemplateColumns: 'minmax(220px, 1.3fr) minmax(320px, 1.7fr) minmax(200px, 1fr)',
+            }}
+          >
+            {/* Ô tìm kiếm */}
+            <div className="user-filter-field">
+              <label htmlFor="inv-search-input">Tìm kiếm</label>
+              <div className="user-search">
+                <Search size={17} aria-hidden />
+                <input
+                  id="inv-search-input"
+                  className="input"
+                  placeholder="Nhập mã hóa đơn, tên khách, biển số xe..."
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setPage(0);
+                  }}
+                />
+                {query && (
+                  <button
+                    type="button"
+                    className="search-clear"
+                    aria-label="Xóa từ khóa tìm kiếm"
+                    onClick={() => {
+                      setQuery('');
+                      setPage(0);
+                    }}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Trạng thái Segmented */}
+            <fieldset className="user-filter-field status-filter">
+              <legend>Trạng thái thanh toán</legend>
+              <div className="status-segments">
+                {[
+                  { value: '', label: 'Tất cả' },
+                  { value: 'UNPAID', label: 'Chưa thu' },
+                  { value: 'PARTIALLY_PAID', label: '1 phần' },
+                  { value: 'PAID', label: 'Đã thu đủ' },
+                ].map((opt) => (
+                  <button
+                    key={opt.label}
+                    type="button"
+                    className={selectedStatus === opt.value ? 'selected' : ''}
+                    onClick={() => {
+                      setSelectedStatus(opt.value as InvoiceStatus | '');
+                      setPage(0);
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            {/* Sắp xếp */}
+            <div className="user-filter-field">
+              <label htmlFor="inv-sort-select">Sắp xếp theo</label>
+              <select
+                id="inv-sort-select"
+                className="input"
+                value={`${sortField}:${sortDir}`}
+                onChange={(e) => {
+                  const [f, d] = e.target.value.split(':');
+                  setSortField(f);
+                  setSortDir(d);
+                  setPage(0);
+                }}
+              >
+                {sortOptions.map(([val, label]) => (
+                  <option key={val} value={val}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Nội dung bảng */}
+        {isLoading ? (
+          <Loading label="Đang tải danh sách hóa đơn…" />
+        ) : compact ? (
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {invoicesList.map((inv) => (
+              <div
+                key={inv.id}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '10px',
+                  padding: '14px',
+                  background: 'white',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <strong style={{ fontSize: '15px', fontFamily: 'monospace' }}>{inv.invoiceCode}</strong>
+                    <div className="muted" style={{ fontSize: '12px' }}>{inv.customerSnapshot?.fullName}</div>
+                  </div>
+                  {renderStatusBadge(inv.status)}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span>Tổng tiền: <strong>{Number(inv.totalAmount).toLocaleString('vi-VN')} đ</strong></span>
+                  {Number(inv.balanceAmount) > 0 ? (
+                    <span style={{ color: '#b42335' }}>Nợ: <strong>{Number(inv.balanceAmount).toLocaleString('vi-VN')} đ</strong></span>
+                  ) : (
+                    <span style={{ color: '#059669' }}>Đã thu đủ</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #f0f2f5' }}>
+                  <span className="muted" style={{ fontSize: '11px' }}>Biển số: {inv.vehicleSnapshot?.plateNumber || '—'}</span>
+                  <div className="row-actions">
+                    <Button variant="ghost" onClick={() => setViewingInvoice(inv)}>
+                      <Eye size={15} /> Xem
+                    </Button>
+                    {(inv.status === 'UNPAID' || inv.status === 'PARTIALLY_PAID') && (
+                      <Button variant="ghost" onClick={() => handleOpenPayment(inv)} style={{ color: '#059669' }}>
+                        <CreditCard size={15} /> Thu
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <DataTable
+            caption="Danh sách hóa đơn dịch vụ"
+            columns={columns}
+            data={invoicesList}
+            busy={isFetching}
+          />
+        )}
+
+        {/* Phân trang */}
+        <div className="pagination" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="pagination-info">
+            Hiển thị <strong>{invoicesList.length > 0 ? 1 : 0}–{invoicesList.length}</strong> trong <strong>{totalElements}</strong> kết quả
+            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>Trang {page + 1} / {totalPages}</span>
+          </div>
+          <div className="pagination-controls">
+            <Button
+              variant="secondary"
+              disabled={page === 0 || isFetching}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+            >
+              Trang trước
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={page >= totalPages - 1 || isFetching}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Trang sau
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Modal Phát hành hóa đơn mới */}
       <Modal
         open={issuing}
-        onOpenChange={(open: boolean) => !open && setIssuing(false)}
-        title="Xuất Hóa Đơn Sửa Chữa Mới"
+        onOpenChange={setIssuing}
+        title="Phát hành hóa đơn dịch vụ mới"
+        description="Xuất hóa đơn từ phiếu sửa chữa đã nghiệm thu QC hoàn tất."
       >
-        <form onSubmit={handleIssue} className="space-y-4">
-          <Field label="Mã lệnh sửa chữa (Repair Order ID)" required>
+        <form onSubmit={handleIssue} className="modal-form">
+          <div className="form-section-label">THÔNG TIN PHÁT HÀNH</div>
+
+          <Field label="Mã phiếu sửa chữa (Repair Order ID)" required hint="Phiếu sửa chữa đã hoàn thành nghiệm thu">
             <input
-              type="number"
               name="repairOrderId"
-              required
-              className="w-full border rounded-lg px-3 py-2"
+              type="number"
+              className="input font-mono"
               placeholder="VD: 101"
+              required
+              autoFocus
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Tiền thuế GTGT / VAT (VNĐ)">
-              <input
-                type="number"
-                name="taxAmount"
-                defaultValue={0}
-                min="0"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </Field>
-            <Field label="Chiết khấu giảm giá (VNĐ)">
-              <input
-                type="number"
-                name="discountAmount"
-                defaultValue={0}
-                min="0"
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </Field>
-          </div>
+          <Field label="Thuế giá trị gia tăng (VAT đ)" hint="Số tiền thuế VAT tính trên doanh thu">
+            <input
+              name="taxAmount"
+              type="number"
+              min="0"
+              step="1000"
+              defaultValue="0"
+              className="input"
+            />
+          </Field>
 
-          <div className="flex justify-end gap-3 pt-3">
-            <Button variant="ghost" onClick={() => setIssuing(false)}>
+          <Field label="Chiết khấu / Giảm giá (đ)" hint="Số tiền giảm trừ trực tiếp cho khách hàng">
+            <input
+              name="discountAmount"
+              type="number"
+              min="0"
+              step="1000"
+              defaultValue="0"
+              className="input"
+            />
+          </Field>
+
+          <div className="modal-form-actions">
+            <Button variant="secondary" onClick={() => setIssuing(false)} disabled={issueMutation.isPending}>
               Hủy
             </Button>
             <Button variant="primary" type="submit" pending={issueMutation.isPending}>
-              Xuất hóa đơn
+              Phát hành hóa đơn
             </Button>
           </div>
         </form>
       </Modal>
 
-      {/* Modal Xem Chi Tiết Hóa Đơn */}
-      <Modal
-        open={!!viewingInvoice}
-        onOpenChange={(open: boolean) => !open && setViewingInvoice(null)}
-        title={`Chi tiết Hóa đơn: ${viewingInvoice?.invoiceCode}`}
-      >
-        {viewingInvoice && (
-          <div className="space-y-4 max-h-[80vh] overflow-y-auto pr-1">
-            <div className="grid grid-cols-2 gap-3 text-sm bg-gray-50 p-3 rounded-lg border">
-              <div>
-                <span className="text-gray-500">Mã lệnh SC: </span>
-                <span className="font-semibold">#{viewingInvoice.repairOrderId}</span>
-              </div>
-              <div>
-                <span className="text-gray-500">Trạng thái: </span>
-                {renderStatusBadge(viewingInvoice.status)}
-              </div>
-              <div>
-                <span className="text-gray-500">Khách hàng: </span>
-                <span className="font-semibold">
-                  {viewingInvoice.customerSnapshot?.fullName || `KH #${viewingInvoice.customerId}`}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500">Số điện thoại: </span>
-                <span className="font-semibold">
-                  {viewingInvoice.customerSnapshot?.phone || '—'}
-                </span>
-              </div>
-            </div>
-
-            {/* Bảng chi tiết dòng */}
-            <h4 className="font-semibold text-gray-800 text-sm">Các mục thanh toán</h4>
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-gray-100 border-b">
-                  <tr>
-                    <th className="p-2">Loại</th>
-                    <th className="p-2">Hạng mục</th>
-                    <th className="p-2 text-right">SL</th>
-                    <th className="p-2 text-right">Đơn giá</th>
-                    <th className="p-2 text-right">Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {viewingInvoice.items?.map((line) => (
-                    <tr key={line.id}>
-                      <td className="p-2">
-                        <Badge variant={line.itemType === 'PART' ? 'primary' : 'secondary'}>
-                          {line.itemType === 'PART' ? 'Phụ tùng' : 'Tiền công'}
-                        </Badge>
-                      </td>
-                      <td className="p-2 font-medium">{line.itemName}</td>
-                      <td className="p-2 text-right">{line.quantity}</td>
-                      <td className="p-2 text-right">
-                        {Number(line.unitPrice).toLocaleString('vi-VN')}
-                      </td>
-                      <td className="p-2 text-right font-semibold">
-                        {Number(line.lineTotal).toLocaleString('vi-VN')}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Bảng tổng tiền */}
-            <div className="space-y-1.5 text-sm bg-gray-50 p-3 rounded-lg border">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Tổng tiền trước thuế:</span>
-                <span className="font-medium">
-                  {Number(viewingInvoice.subtotal).toLocaleString('vi-VN')} VNĐ
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Giảm giá:</span>
-                <span className="font-medium text-amber-600">
-                  -{Number(viewingInvoice.discountAmount).toLocaleString('vi-VN')} VNĐ
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Tiền thuế:</span>
-                <span className="font-medium">
-                  {Number(viewingInvoice.taxAmount).toLocaleString('vi-VN')} VNĐ
-                </span>
-              </div>
-              <div className="flex justify-between border-t border-gray-200 pt-2 text-base font-bold text-gray-900">
-                <span>Tổng cộng:</span>
-                <span className="text-blue-600">
-                  {Number(viewingInvoice.totalAmount).toLocaleString('vi-VN')} VNĐ
-                </span>
-              </div>
-              <div className="flex justify-between text-xs pt-1">
-                <span className="text-green-600 font-medium">Đã thanh toán:</span>
-                <span className="text-green-600 font-medium">
-                  {Number(viewingInvoice.paidAmount || 0).toLocaleString('vi-VN')} VNĐ
-                </span>
-              </div>
-              <div className="flex justify-between text-xs font-bold text-red-600">
-                <span>Còn nợ:</span>
-                <span>{Number(viewingInvoice.balanceAmount || 0).toLocaleString('vi-VN')} VNĐ</span>
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <Button variant="secondary" onClick={() => setViewingInvoice(null)}>
-                Đóng
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Modal Thu Tiền Hóa Đơn */}
+      {/* Modal Thu tiền khách hàng */}
       <Modal
         open={!!payingInvoice}
-        onOpenChange={(open: boolean) => !open && setPayingInvoice(null)}
-        title={`Thu tiền Hóa đơn: ${payingInvoice?.invoiceCode}`}
+        onOpenChange={(open) => !open && setPayingInvoice(null)}
+        title={`Thu tiền hóa đơn #${payingInvoice?.invoiceCode}`}
+        description={`Khách hàng: ${payingInvoice?.customerSnapshot?.fullName || ''} · Biển số: ${payingInvoice?.vehicleSnapshot?.plateNumber || ''}`}
       >
         {payingInvoice && (
-          <form onSubmit={handleReceivePayment} className="space-y-4">
-            <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-900">
-              Khách hàng:{' '}
-              <span className="font-bold">
-                {payingInvoice.customerSnapshot?.fullName || `KH #${payingInvoice.customerId}`}
-              </span>
-              <br />
-              Số dư nợ còn lại:{' '}
-              <span className="font-bold text-red-600">
-                {Number(payingInvoice.balanceAmount || 0).toLocaleString('vi-VN')} VNĐ
-              </span>
-            </div>
+          <form onSubmit={handleReceivePayment} className="modal-form">
+            <div className="form-section-label">THÔNG TIN PHIẾU THU TIỀN</div>
 
-            <Field label="Số tiền thu (VNĐ)" required>
+            <Field label="Số tiền thu (VNĐ)" required hint={`Còn nợ: ${Number(payingInvoice.balanceAmount || payingInvoice.totalAmount).toLocaleString('vi-VN')} đ`}>
               <input
                 type="number"
-                min="1000"
-                max={Number(payingInvoice.balanceAmount || 0)}
+                min="1"
+                max={Number(payingInvoice.balanceAmount || payingInvoice.totalAmount)}
+                step="1000"
                 value={payAmount}
                 onChange={(e) => setPayAmount(Number(e.target.value))}
+                className="input font-bold"
                 required
-                className="w-full border rounded-lg px-3 py-2 font-bold text-lg text-blue-600"
+                autoFocus
               />
             </Field>
 
-            <Field label="Hình thức thanh toán" required>
+            <Field label="Phương thức thanh toán" required>
               <select
+                className="input"
                 value={payMethod}
                 onChange={(e) => setPayMethod(e.target.value as PaymentMethod)}
-                className="w-full border rounded-lg px-3 py-2 bg-white"
               >
-                <option value="CASH">Tiền mặt (CASH)</option>
-                <option value="BANK_TRANSFER">Chuyển khoản ngân hàng (BANK_TRANSFER)</option>
-                <option value="CARD">Quẹt thẻ POS (CARD)</option>
-                <option value="VIETQR">Mã VietQR</option>
+                <option value="VIETQR">Quét mã QR (VietQR)</option>
+                <option value="BANK_TRANSFER">Chuyển khoản ngân hàng</option>
+                <option value="CASH">Tiền mặt tại quầy</option>
+                <option value="CARD">Cà thẻ qua máy POS</option>
               </select>
             </Field>
 
-            <Field label="Mã chuẩn chi / Mã giao dịch ngân hàng">
+            <Field label="Mã giao dịch / Mã chuẩn chi ngân hàng" hint="Bắt buộc nếu chuyển khoản hoặc quét QR">
               <input
+                className="input font-mono"
+                placeholder="VD: QR-BIDV-102938"
                 value={payReference}
                 onChange={(e) => setPayReference(e.target.value)}
-                placeholder="VD: FT240981928"
-                className="w-full border rounded-lg px-3 py-2"
               />
             </Field>
 
-            <Field label="Ghi chú">
+            <Field label="Ghi chú phiếu thu">
               <input
+                className="input"
+                placeholder="Khách thanh toán qua VietQR..."
                 value={payNotes}
                 onChange={(e) => setPayNotes(e.target.value)}
-                placeholder="Ghi chú phiếu thu..."
-                className="w-full border rounded-lg px-3 py-2"
               />
             </Field>
 
-            <div className="flex justify-end gap-3 pt-3">
-              <Button variant="ghost" onClick={() => setPayingInvoice(null)}>
+            <div className="modal-form-actions">
+              <Button variant="secondary" onClick={() => setPayingInvoice(null)} disabled={receivePaymentMutation.isPending}>
                 Hủy
               </Button>
               <Button variant="primary" type="submit" pending={receivePaymentMutation.isPending}>
@@ -532,44 +676,146 @@ export function InvoicesPage() {
         )}
       </Modal>
 
-      {/* Modal Hủy Hóa Đơn */}
+      {/* Modal Chi tiết hóa đơn */}
+      <Modal
+        open={!!viewingInvoice}
+        onOpenChange={(open) => !open && setViewingInvoice(null)}
+        title={`Hóa đơn dịch vụ #${viewingInvoice?.invoiceCode}`}
+        description="Chi tiết snapshot khách hàng, xe và danh mục phụ tùng & tiền công."
+      >
+        {viewingInvoice && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '8px' }}>
+              <div>
+                <span className="muted" style={{ fontSize: '12px' }}>Khách hàng:</span>
+                <div style={{ fontWeight: 650, fontSize: '14px' }}>{viewingInvoice.customerSnapshot?.fullName}</div>
+                <div className="muted" style={{ fontSize: '12px' }}>SĐT: {viewingInvoice.customerSnapshot?.phone || '—'}</div>
+              </div>
+              <div>
+                <span className="muted" style={{ fontSize: '12px' }}>Xe sửa chữa:</span>
+                <div style={{ fontWeight: 650, fontSize: '14px', color: '#245bdb' }}>
+                  {viewingInvoice.vehicleSnapshot?.plateNumber}
+                </div>
+                <div className="muted" style={{ fontSize: '12px' }}>
+                  {viewingInvoice.vehicleSnapshot?.make} {viewingInvoice.vehicleSnapshot?.model}
+                </div>
+              </div>
+              <div>
+                <span className="muted" style={{ fontSize: '12px' }}>Trạng thái thanh toán:</span>
+                <div style={{ marginTop: '2px' }}>{renderStatusBadge(viewingInvoice.status)}</div>
+              </div>
+              <div>
+                <span className="muted" style={{ fontSize: '12px' }}>Ngày phát hành:</span>
+                <div style={{ fontWeight: 550, fontSize: '13px' }}>
+                  {new Date(viewingInvoice.issuedAt).toLocaleString('vi-VN')}
+                </div>
+              </div>
+            </div>
+
+            {/* Bảng chi tiết dòng hóa đơn */}
+            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600 }}>
+                  <tr>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Hạng mục</th>
+                    <th style={{ padding: '8px 12px', width: '80px', textAlign: 'center' }}>Loại</th>
+                    <th style={{ padding: '8px 12px', width: '70px', textAlign: 'right' }}>SL</th>
+                    <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>Đơn giá (đ)</th>
+                    <th style={{ padding: '8px 12px', width: '120px', textAlign: 'right' }}>Thành tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {viewingInvoice.items?.map((item) => (
+                    <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '8px 12px' }}>
+                        <div style={{ fontWeight: 550 }}>{item.itemName}</div>
+                        {item.warrantyDays > 0 && (
+                          <div className="muted" style={{ fontSize: '11px' }}>
+                            Bảo hành: {item.warrantyDays} ngày / {item.warrantyKm} km
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        <Badge variant={item.itemType === 'SERVICE' ? 'primary' : 'secondary'}>
+                          {item.itemType === 'SERVICE' ? 'Công' : 'Vật tư'}
+                        </Badge>
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
+                        {item.quantity} {item.unit || ''}
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                        {Number(item.unitPrice).toLocaleString('vi-VN')} đ
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
+                        {Number(item.lineTotal).toLocaleString('vi-VN')} đ
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Tổng hợp tài chính */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end', paddingRight: '8px', fontSize: '13px' }}>
+              <div>Tạm tính: <strong>{Number(viewingInvoice.subtotal).toLocaleString('vi-VN')} đ</strong></div>
+              {Number(viewingInvoice.taxAmount) > 0 && (
+                <div>Thuế VAT: <strong>+{Number(viewingInvoice.taxAmount).toLocaleString('vi-VN')} đ</strong></div>
+              )}
+              {Number(viewingInvoice.discountAmount) > 0 && (
+                <div style={{ color: '#059669' }}>
+                  Giảm giá: <strong>-{Number(viewingInvoice.discountAmount).toLocaleString('vi-VN')} đ</strong>
+                </div>
+              )}
+              <div style={{ fontSize: '16px', fontWeight: 700, color: '#245bdb', marginTop: '4px' }}>
+                Tổng cộng: {Number(viewingInvoice.totalAmount).toLocaleString('vi-VN')} đ
+              </div>
+              <div style={{ fontSize: '13px', marginTop: '2px' }}>
+                Đã thanh toán: <strong style={{ color: '#059669' }}>{Number(viewingInvoice.paidAmount || 0).toLocaleString('vi-VN')} đ</strong>
+              </div>
+              {Number(viewingInvoice.balanceAmount) > 0 && (
+                <div style={{ fontSize: '13px', color: '#b42335', fontWeight: 600 }}>
+                  Còn nợ: {Number(viewingInvoice.balanceAmount).toLocaleString('vi-VN')} đ
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+              <Button variant="secondary" onClick={() => setViewingInvoice(null)}>
+                Đóng
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Hủy hóa đơn */}
       <Modal
         open={!!voidingInvoice}
-        onOpenChange={(open: boolean) => !open && setVoidingInvoice(null)}
-        title={`Hủy bỏ Hóa đơn: ${voidingInvoice?.invoiceCode}`}
+        onOpenChange={(open) => !open && setVoidingInvoice(null)}
+        title={`Hủy hóa đơn #${voidingInvoice?.invoiceCode}`}
+        description="Nhập lý do hủy hóa đơn. Thao tác hủy là bất biến."
       >
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">
-            Hóa đơn sẽ bị chuyển sang trạng thái <strong>VOID (Hủy)</strong> và toàn bộ công nợ liên
-            quan sẽ được hoàn nguyên. Vui lòng nhập lý do hủy:
-          </p>
-
-          <Field label="Lý do hủy" required>
+        <div className="modal-form">
+          <Field label="Lý do hủy hóa đơn" required className="full-width">
             <textarea
+              className="input"
+              rows={3}
+              placeholder="VD: Nhập sai phiếu sửa chữa, khách hủy yêu cầu..."
               value={voidReason}
               onChange={(e) => setVoidReason(e.target.value)}
-              required
-              rows={3}
-              placeholder="Nhập lý do sai sót thông tin, khách đổi ý..."
-              className="w-full border rounded-lg px-3 py-2"
+              autoFocus
             />
           </Field>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setVoidingInvoice(null)}>
-              Quay lại
+          <div className="modal-form-actions">
+            <Button variant="secondary" onClick={() => setVoidingInvoice(null)} disabled={voidMutation.isPending}>
+              Bỏ qua
             </Button>
-            <Button
-              variant="danger"
-              disabled={!voidReason.trim()}
-              pending={voidMutation.isPending}
-              onClick={handleVoid}
-            >
+            <Button variant="danger" onClick={handleVoid} pending={voidMutation.isPending}>
               Xác nhận hủy hóa đơn
             </Button>
           </div>
         </div>
       </Modal>
-    </div>
+    </>
   );
 }
