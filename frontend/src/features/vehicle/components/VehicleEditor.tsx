@@ -350,7 +350,7 @@ export function VehicleEditor({
       }}
       title={title}
       description={description}
-      placement="side"
+      placement="center"
     >
       {isEditing && detail.isLoading ? (
         <Loading label="Đang tải thông tin phương tiện…" />
