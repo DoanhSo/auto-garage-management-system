@@ -628,9 +628,10 @@ export function InventoryDocumentsPage() {
         onOpenChange={setCreating}
         title="Lập chứng từ kho mới"
         description="Tạo phiếu nhập mua, xuất kho hoặc trả hàng (chứng từ tạo mới ở trạng thái DRAFT)."
+        size="xl"
       >
-        <form onSubmit={handleCreateDocument} className="modal-form">
-          <div className="form-section-label">THÔNG TIN CHỨNG TỪ</div>
+        <form onSubmit={handleCreateDocument} className="modal-form grid-3col">
+          <div className="form-section-label">THÔNG TIN CHỨNG TỪ KHO</div>
 
           <Field label="Loại chứng từ" required>
             <select
@@ -646,7 +647,7 @@ export function InventoryDocumentsPage() {
             </select>
           </Field>
 
-          {docType === 'IN' && (
+          {docType === 'IN' ? (
             <Field label="Nhà cung cấp" required>
               <select
                 className="input"
@@ -662,10 +663,8 @@ export function InventoryDocumentsPage() {
                 ))}
               </select>
             </Field>
-          )}
-
-          {(docType === 'OUT' || docType === 'RETURN') && (
-            <Field label="Mã phiếu sửa chữa (Repair Order ID)" required>
+          ) : (docType === 'OUT' || docType === 'RETURN') ? (
+            <Field label="Mã phiếu sửa chữa (RO ID)" required>
               <input
                 className="input font-mono"
                 placeholder="VD: 101"
@@ -673,6 +672,10 @@ export function InventoryDocumentsPage() {
                 onChange={(e) => setOrderId(e.target.value)}
                 required
               />
+            </Field>
+          ) : (
+            <Field label="Phân loại nghiệp vụ">
+              <input className="input" value="Nghiệp vụ nội bộ gara" disabled />
             </Field>
           )}
 
@@ -685,34 +688,36 @@ export function InventoryDocumentsPage() {
             />
           </Field>
 
-          <Field label="Lý do / Diễn giải chứng từ" className="full-width">
-            <input
-              className="input"
-              placeholder="Ghi chú nghiệp vụ..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </Field>
+          <div className="col-span-3">
+            <Field label="Lý do / Diễn giải chứng từ">
+              <input
+                className="input"
+                placeholder="Nhập ghi chú hoặc lý do phát sinh chứng từ kho..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </Field>
+          </div>
 
           {/* Danh sách mặt hàng chi tiết */}
-          <div style={{ gridColumn: '1 / -1', marginTop: '12px' }}>
+          <div className="col-span-3" style={{ marginTop: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#36485f', letterSpacing: '0.4px' }}>
+              <span className="form-section-label" style={{ margin: 0, padding: 0 }}>
                 CHI TIẾT DANH MỤC PHỤ TÙNG
               </span>
-              <Button variant="secondary" onClick={handleAddLine} style={{ minHeight: '30px', padding: '4px 10px', fontSize: '12px' }}>
+              <Button variant="secondary" onClick={handleAddLine} style={{ minHeight: '30px', padding: '3px 10px', fontSize: '12px' }}>
                 <Plus size={14} /> Thêm dòng
               </Button>
             </div>
 
-            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', maxHeight: '180px', overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600 }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600, position: 'sticky', top: 0, zIndex: 1 }}>
                   <tr>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>Phụ tùng</th>
-                    <th style={{ padding: '8px 12px', width: '100px', textAlign: 'right' }}>Số lượng</th>
-                    <th style={{ padding: '8px 12px', width: '140px', textAlign: 'right' }}>Đơn giá (đ)</th>
-                    <th style={{ padding: '8px 12px', width: '140px', textAlign: 'right' }}>Thành tiền</th>
+                    <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>Số lượng</th>
+                    <th style={{ padding: '8px 12px', width: '150px', textAlign: 'right' }}>Đơn giá (đ)</th>
+                    <th style={{ padding: '8px 12px', width: '150px', textAlign: 'right' }}>Thành tiền</th>
                     <th style={{ padding: '8px 12px', width: '50px', textAlign: 'center' }}></th>
                   </tr>
                 </thead>
@@ -721,7 +726,7 @@ export function InventoryDocumentsPage() {
                     const rowTotal = (Number(line.quantity) || 0) * (Number(line.unitCost) || 0);
                     return (
                       <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '8px 12px' }}>
+                        <td style={{ padding: '6px 12px' }}>
                           <select
                             className="input"
                             value={line.partId}
@@ -736,7 +741,7 @@ export function InventoryDocumentsPage() {
                             ))}
                           </select>
                         </td>
-                        <td style={{ padding: '8px 12px' }}>
+                        <td style={{ padding: '6px 12px' }}>
                           <input
                             type="number"
                             min="1"
@@ -747,7 +752,7 @@ export function InventoryDocumentsPage() {
                             required
                           />
                         </td>
-                        <td style={{ padding: '8px 12px' }}>
+                        <td style={{ padding: '6px 12px' }}>
                           <input
                             type="number"
                             min="0"
@@ -759,10 +764,10 @@ export function InventoryDocumentsPage() {
                             required
                           />
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
+                        <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600 }}>
                           {rowTotal.toLocaleString('vi-VN')} đ
                         </td>
-                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        <td style={{ padding: '6px 12px', textAlign: 'center' }}>
                           {lines.length > 1 && (
                             <button
                               type="button"
@@ -780,15 +785,15 @@ export function InventoryDocumentsPage() {
               </table>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '12px', gap: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '10px', gap: '12px' }}>
               <span style={{ fontSize: '13px', color: '#526278' }}>Tổng cộng ước tính:</span>
-              <strong style={{ fontSize: '16px', color: '#245bdb' }}>
+              <strong style={{ fontSize: '17px', color: '#245bdb' }}>
                 {totalCalculated.toLocaleString('vi-VN')} đ
               </strong>
             </div>
           </div>
 
-          <div className="modal-form-actions">
+          <div className="modal-form-actions col-span-3">
             <Button variant="secondary" onClick={() => setCreating(false)} disabled={createMutation.isPending}>
               Hủy
             </Button>
@@ -805,10 +810,11 @@ export function InventoryDocumentsPage() {
         onOpenChange={(open) => !open && setViewingDoc(null)}
         title={`Chi tiết chứng từ #${viewingDoc?.documentCode}`}
         description="Xem thông tin chi tiết chứng từ và danh sách phụ tùng đi kèm."
+        size="xl"
       >
         {viewingDoc && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 0' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '4px 0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px 16px', background: '#f8fafc', padding: '14px 18px', borderRadius: '8px' }}>
               <div>
                 <span className="muted" style={{ fontSize: '12px' }}>Loại chứng từ:</span>
                 <div style={{ marginTop: '2px' }}>{renderTypeBadge(viewingDoc.documentType)}</div>
@@ -817,36 +823,30 @@ export function InventoryDocumentsPage() {
                 <span className="muted" style={{ fontSize: '12px' }}>Trạng thái:</span>
                 <div style={{ marginTop: '2px' }}>{renderStatusBadge(viewingDoc.status)}</div>
               </div>
-              {viewingDoc.supplierName && (
-                <div>
-                  <span className="muted" style={{ fontSize: '12px' }}>Nhà cung cấp:</span>
-                  <div style={{ fontWeight: 600 }}>{viewingDoc.supplierName}</div>
+              <div>
+                <span className="muted" style={{ fontSize: '12px' }}>
+                  {viewingDoc.supplierName ? 'Nhà cung cấp:' : viewingDoc.repairOrderId ? 'Mã phiếu SC:' : 'Đối tác:'}
+                </span>
+                <div style={{ fontWeight: 600, marginTop: '2px' }}>
+                  {viewingDoc.supplierName || (viewingDoc.repairOrderId ? `#${viewingDoc.repairOrderId}` : '—')}
                 </div>
-              )}
-              {viewingDoc.repairOrderId && (
-                <div>
-                  <span className="muted" style={{ fontSize: '12px' }}>Mã phiếu sửa chữa:</span>
-                  <div style={{ fontWeight: 600 }}>#{viewingDoc.repairOrderId}</div>
-                </div>
-              )}
-              {viewingDoc.supplierInvoiceNumber && (
-                <div>
-                  <span className="muted" style={{ fontSize: '12px' }}>Hóa đơn chứng từ gốc:</span>
-                  <div>{viewingDoc.supplierInvoiceNumber}</div>
-                </div>
-              )}
+              </div>
+              <div>
+                <span className="muted" style={{ fontSize: '12px' }}>Hóa đơn gốc:</span>
+                <div style={{ marginTop: '2px' }}>{viewingDoc.supplierInvoiceNumber || '—'}</div>
+              </div>
               {viewingDoc.reason && (
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <span className="muted" style={{ fontSize: '12px' }}>Lý do / Diễn giải:</span>
-                  <div>{viewingDoc.reason}</div>
+                <div style={{ gridColumn: '1 / -1', paddingTop: '4px', borderTop: '1px solid #eef2f6' }}>
+                  <span className="muted" style={{ fontSize: '12px' }}>Lý do / Diễn giải: </span>
+                  <span style={{ fontSize: '13px' }}>{viewingDoc.reason}</span>
                 </div>
               )}
             </div>
 
             {/* Bảng danh sách dòng chứng từ */}
-            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', maxHeight: '220px', overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600 }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600, position: 'sticky', top: 0, zIndex: 1 }}>
                   <tr>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>STT</th>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>Mã SKU</th>
@@ -884,7 +884,7 @@ export function InventoryDocumentsPage() {
               </strong>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
               <Button variant="secondary" onClick={() => setViewingDoc(null)}>
                 Đóng
               </Button>
