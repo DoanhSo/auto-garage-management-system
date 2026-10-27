@@ -1,68 +1,344 @@
-import { useState } from 'react';
-import { useCustomerDebtsQuery, useSupplierDebtsQuery } from '../hooks/useBilling';
-import { Button, Badge, Loading } from '../../../shared/components/ui';
+import { useMemo, useState } from 'react';
 import {
-  CreditCard,
-  Users,
-  Building2,
   AlertTriangle,
+  Building2,
   CheckCircle2,
+  CreditCard,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
   TrendingDown,
   TrendingUp,
+  Users,
+  X,
 } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
+import {
+  Badge,
+  Button,
+  Loading,
+  PageHeader,
+} from '../../../shared/components/ui';
+import { DataTable } from '../../../shared/components/DataTable';
+import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
+import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
+import { useCustomerDebtsQuery, useSupplierDebtsQuery } from '../hooks/useBilling';
+import type { CustomerDebtBalance, SupplierDebtBalance } from '../types/billing';
+
+type CustomerDebtRow = CustomerDebtBalance & { id: string };
+type SupplierDebtRow = SupplierDebtBalance & { id: string };
 
 export function DebtLedgerPage() {
+  const compact = useMediaQuery('(max-width: 640px)');
   const [activeTab, setActiveTab] = useState<'customer' | 'supplier'>('customer');
   const [hasBalanceOnly, setHasBalanceOnly] = useState(false);
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
 
-  const { data: customerDebtsData, isLoading: isCustLoading } = useCustomerDebtsQuery({
-    hasBalance: hasBalanceOnly ? true : undefined,
-    size: 50,
-  });
+  const { data: customerDebtsData, isLoading: isCustLoading, isFetching: isCustFetching } =
+    useCustomerDebtsQuery({
+      hasBalance: hasBalanceOnly ? true : undefined,
+      size: 100,
+    });
 
-  const { data: supplierDebtsData, isLoading: isSuppLoading } = useSupplierDebtsQuery({
-    hasBalance: hasBalanceOnly ? true : undefined,
-    size: 50,
-  });
+  const { data: supplierDebtsData, isLoading: isSuppLoading, isFetching: isSuppFetching } =
+    useSupplierDebtsQuery({
+      hasBalance: hasBalanceOnly ? true : undefined,
+      size: 100,
+    });
 
   const customerDebts = customerDebtsData?.content || [];
   const supplierDebts = supplierDebtsData?.content || [];
 
-  const totalReceivables = customerDebts.reduce((sum, c) => sum + Number(c.balanceAmount || 0), 0);
-  const totalPayables = supplierDebts.reduce((sum, s) => sum + Number(s.balanceAmount || 0), 0);
+  const totalReceivables = customerDebts.reduce(
+    (sum, c) => sum + Number(c.balanceAmount || 0),
+    0,
+  );
+  const totalPayables = supplierDebts.reduce(
+    (sum, s) => sum + Number(s.balanceAmount || 0),
+    0,
+  );
+
+  const filterCount = (query.trim() ? 1 : 0) + (hasBalanceOnly ? 1 : 0);
+  const isFiltered = query.length > 0 || hasBalanceOnly;
+
+  const handleResetFilters = () => {
+    setQuery('');
+    setHasBalanceOnly(false);
+  };
+
+  const filteredCustomerDebts = useMemo(() => {
+    if (!debouncedQuery.trim()) return customerDebts;
+    const q = debouncedQuery.toLowerCase().trim();
+    return customerDebts.filter(
+      (c) =>
+        c.customerName?.toLowerCase().includes(q) ||
+        c.customerCode?.toLowerCase().includes(q) ||
+        c.phone?.includes(q),
+    );
+  }, [customerDebts, debouncedQuery]);
+
+  const filteredCustomerDebtsWithId: CustomerDebtRow[] = useMemo(() => {
+    return filteredCustomerDebts.map((c) => ({ ...c, id: c.customerId }));
+  }, [filteredCustomerDebts]);
+
+  const filteredSupplierDebts = useMemo(() => {
+    if (!debouncedQuery.trim()) return supplierDebts;
+    const q = debouncedQuery.toLowerCase().trim();
+    return supplierDebts.filter(
+      (s) =>
+        s.supplierName?.toLowerCase().includes(q) ||
+        s.supplierCode?.toLowerCase().includes(q) ||
+        s.phone?.includes(q),
+    );
+  }, [supplierDebts, debouncedQuery]);
+
+  const filteredSupplierDebtsWithId: SupplierDebtRow[] = useMemo(() => {
+    return filteredSupplierDebts.map((s) => ({ ...s, id: s.supplierId }));
+  }, [filteredSupplierDebts]);
+
+  const customerColumns = useMemo<ColumnDef<CustomerDebtRow>[]>(
+    () => [
+      {
+        id: 'customer',
+        header: 'Khách hàng',
+        cell: ({ row }) => (
+          <div className="account-cell">
+            <span
+              className="avatar"
+              style={{
+                background: '#edf3ff',
+                color: '#245bdb',
+                fontWeight: 700,
+              }}
+            >
+              <Users size={16} />
+            </span>
+            <div>
+              <strong style={{ color: '#172338' }}>{row.original.customerName}</strong>
+              <div className="muted font-mono" style={{ fontSize: '12px' }}>
+                {row.original.customerCode || `#${row.original.customerId}`}
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'phone',
+        header: 'Số điện thoại',
+        cell: ({ row }) => (
+          <span className="muted font-mono" style={{ fontSize: '13px' }}>
+            {row.original.phone || '—'}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'totalInvoiced',
+        header: 'Tổng phát sinh (đ)',
+        cell: ({ row }) => (
+          <span style={{ fontWeight: 600 }}>
+            {Number(row.original.totalInvoiced || 0).toLocaleString('vi-VN')} đ
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'totalPaid',
+        header: 'Đã thanh toán (đ)',
+        cell: ({ row }) => (
+          <span style={{ fontWeight: 600, color: '#059669' }}>
+            {Number(row.original.totalPaid || 0).toLocaleString('vi-VN')} đ
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'balanceAmount',
+        header: 'Dư nợ hiện tại',
+        cell: ({ row }) => {
+          const bal = Number(row.original.balanceAmount || 0);
+          return (
+            <span
+              style={{
+                fontSize: '14px',
+                fontWeight: 700,
+                color: bal > 0 ? '#b42335' : '#526278',
+              }}
+            >
+              {bal.toLocaleString('vi-VN')} đ
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'creditLimit',
+        header: 'Hạn mức nợ',
+        cell: ({ row }) => {
+          const limit = Number(row.original.creditLimit || 0);
+          return (
+            <span className="muted" style={{ fontSize: '13px' }}>
+              {limit > 0 ? `${limit.toLocaleString('vi-VN')} đ` : 'Không giới hạn'}
+            </span>
+          );
+        },
+      },
+      {
+        id: 'creditStatus',
+        header: 'Tình trạng tín dụng',
+        cell: ({ row }) => {
+          const bal = Number(row.original.balanceAmount || 0);
+          const limit = Number(row.original.creditLimit || 0);
+          const isOver = limit > 0 && bal > limit;
+
+          return isOver ? (
+            <Badge variant="danger" className="inline-flex items-center gap-1">
+              <AlertTriangle size={12} /> Vượt hạn mức
+            </Badge>
+          ) : (
+            <Badge variant="success" className="inline-flex items-center gap-1">
+              <CheckCircle2 size={12} /> Trong an toàn
+            </Badge>
+          );
+        },
+      },
+    ],
+    [],
+  );
+
+  const supplierColumns = useMemo<ColumnDef<SupplierDebtRow>[]>(
+    () => [
+      {
+        id: 'supplier',
+        header: 'Nhà cung cấp',
+        cell: ({ row }) => (
+          <div className="account-cell">
+            <span
+              className="avatar"
+              style={{
+                background: '#fff7ed',
+                color: '#c2410c',
+                fontWeight: 700,
+              }}
+            >
+              <Building2 size={16} />
+            </span>
+            <div>
+              <strong style={{ color: '#172338' }}>{row.original.supplierName}</strong>
+              <div className="muted font-mono" style={{ fontSize: '12px' }}>
+                {row.original.supplierCode}
+              </div>
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'phone',
+        header: 'Số điện thoại',
+        cell: ({ row }) => (
+          <span className="muted font-mono" style={{ fontSize: '13px' }}>
+            {row.original.phone || '—'}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'totalPurchased',
+        header: 'Tổng hàng nhập (đ)',
+        cell: ({ row }) => (
+          <span style={{ fontWeight: 600 }}>
+            {Number(row.original.totalPurchased || 0).toLocaleString('vi-VN')} đ
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'totalPaid',
+        header: 'Gara đã trả (đ)',
+        cell: ({ row }) => (
+          <span style={{ fontWeight: 600, color: '#059669' }}>
+            {Number(row.original.totalPaid || 0).toLocaleString('vi-VN')} đ
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'balanceAmount',
+        header: 'Gara còn nợ',
+        cell: ({ row }) => {
+          const bal = Number(row.original.balanceAmount || 0);
+          return (
+            <span
+              style={{
+                fontSize: '14px',
+                fontWeight: 700,
+                color: bal > 0 ? '#b42335' : '#526278',
+              }}
+            >
+              {bal.toLocaleString('vi-VN')} đ
+            </span>
+          );
+        },
+      },
+      {
+        accessorKey: 'paymentTermDays',
+        header: 'Thời hạn công nợ',
+        cell: ({ row }) => (
+          <Badge variant="outline">{row.original.paymentTermDays} ngày</Badge>
+        ),
+      },
+    ],
+    [],
+  );
+
+  const isLoading = activeTab === 'customer' ? isCustLoading : isSuppLoading;
+  const isFetching = activeTab === 'customer' ? isCustFetching : isSuppFetching;
 
   return (
-    <div className="page-container p-6 max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <CreditCard className="text-blue-600" size={28} />
-            Sổ Quản lý Công nợ Phải thu / Phải trả (TV4-06)
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Theo dõi công nợ khách hàng (hạn mức tín dụng) và công nợ nhà cung cấp phụ tùng
-          </p>
-        </div>
-        <Button
-          variant={hasBalanceOnly ? 'primary' : 'secondary'}
-          onClick={() => setHasBalanceOnly(!hasBalanceOnly)}
-        >
-          {hasBalanceOnly ? 'Hiển thị tất cả' : 'Chỉ xem đối tượng còn nợ'}
-        </Button>
+    <>
+      <PageHeader
+        eyebrow="QUẢN LÝ TÀI CHÍNH & THANH TOÁN"
+        title="Sổ nợ & Tín dụng"
+        description="Theo dõi hạn mức tín dụng khách hàng (phải thu) và công nợ nhà cung cấp phụ tùng (phải trả)."
+      />
+
+      <div className="info-strip">
+        <CreditCard size={18} />
+        <span>
+          Hạn mức tín dụng khách hàng được kiểm tra tự động khi bàn giao xe (canCloseOrder). Chỉ khi công nợ nằm trong hạn mức an toàn thì xe mới được phép bàn giao ra khỏi xưởng.
+        </span>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-red-50 text-red-600 rounded-lg">
-              <TrendingUp size={24} />
+      {/* KPI Cards Thống kê công nợ */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '16px',
+        }}
+      >
+        <div
+          style={{
+            background: 'white',
+            border: '1px solid var(--border)',
+            borderRadius: '12px',
+            padding: '18px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                padding: '10px',
+                borderRadius: '8px',
+                background: '#fff1f2',
+                color: '#b42335',
+              }}
+            >
+              <TrendingUp size={22} />
             </div>
             <div>
-              <div className="text-xs text-gray-500 font-medium">Tổng nợ phải thu (Khách hàng nợ gara)</div>
-              <div className="text-2xl font-bold text-red-600">
-                {totalReceivables.toLocaleString('vi-VN')} VNĐ
+              <div style={{ fontSize: '12px', color: '#526278', fontWeight: 550 }}>
+                Tổng nợ phải thu (Khách nợ gara)
+              </div>
+              <div style={{ fontSize: '22px', fontWeight: 700, color: '#b42335' }}>
+                {totalReceivables.toLocaleString('vi-VN')} đ
               </div>
             </div>
           </div>
@@ -71,15 +347,34 @@ export function DebtLedgerPage() {
           </Badge>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
-              <TrendingDown size={24} />
+        <div
+          style={{
+            background: 'white',
+            border: '1px solid var(--border)',
+            borderRadius: '12px',
+            padding: '18px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                padding: '10px',
+                borderRadius: '8px',
+                background: '#fff7ed',
+                color: '#c2410c',
+              }}
+            >
+              <TrendingDown size={22} />
             </div>
             <div>
-              <div className="text-xs text-gray-500 font-medium">Tổng nợ phải trả (Gara nợ nhà cung cấp)</div>
-              <div className="text-2xl font-bold text-amber-600">
-                {totalPayables.toLocaleString('vi-VN')} VNĐ
+              <div style={{ fontSize: '12px', color: '#526278', fontWeight: 550 }}>
+                Tổng nợ phải trả (Gara nợ NCC)
+              </div>
+              <div style={{ fontSize: '22px', fontWeight: 700, color: '#c2410c' }}>
+                {totalPayables.toLocaleString('vi-VN')} đ
               </div>
             </div>
           </div>
@@ -89,163 +384,193 @@ export function DebtLedgerPage() {
         </div>
       </div>
 
-      {/* Tabs navigation */}
-      <div className="flex border-b border-gray-200">
-        <button
-          onClick={() => setActiveTab('customer')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm border-b-2 transition-colors ${
-            activeTab === 'customer'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <Users size={18} />
-          Công nợ Khách hàng
-        </button>
-        <button
-          onClick={() => setActiveTab('supplier')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm border-b-2 transition-colors ${
-            activeTab === 'supplier'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <Building2 size={18} />
-          Công nợ Nhà cung cấp
-        </button>
-      </div>
-
-      {/* Tab 1: Công nợ khách hàng */}
-      {activeTab === 'customer' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {isCustLoading ? (
-            <div className="py-12 flex justify-center">
-              <Loading />
+      <section className="panel table-panel">
+        {/* Bộ lọc công nợ */}
+        <div className="user-filters" role="search" aria-label="Bộ lọc công nợ">
+          <div className="user-filters-heading">
+            <div>
+              <SlidersHorizontal size={16} aria-hidden />
+              <h2>Bộ lọc công nợ</h2>
+              {filterCount > 0 && <span className="filter-count">{filterCount} đang áp dụng</span>}
             </div>
-          ) : customerDebts.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Users size={48} className="mx-auto text-gray-300 mb-2" />
-              <p>Không có dữ liệu công nợ khách hàng</p>
+            <Button
+              variant="ghost"
+              className="filter-reset"
+              disabled={!isFiltered}
+              onClick={handleResetFilters}
+            >
+              <RotateCcw size={14} />
+              Đặt lại
+            </Button>
+          </div>
+
+          <div
+            className="user-filter-grid"
+            style={{
+              gridTemplateColumns: 'minmax(220px, 1.4fr) minmax(280px, 1.3fr) minmax(220px, 1fr)',
+            }}
+          >
+            {/* Ô tìm kiếm */}
+            <div className="user-filter-field">
+              <label htmlFor="debt-search-input">Tìm kiếm</label>
+              <div className="user-search">
+                <Search size={17} aria-hidden />
+                <input
+                  id="debt-search-input"
+                  className="input"
+                  placeholder="Nhập tên, mã đối tác hoặc SĐT..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                {query && (
+                  <button
+                    type="button"
+                    className="search-clear"
+                    aria-label="Xóa từ khóa tìm kiếm"
+                    onClick={() => setQuery('')}
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Phân loại đối tượng Tabs */}
+            <fieldset className="user-filter-field status-filter">
+              <legend>Phân loại đối tượng</legend>
+              <div className="status-segments">
+                <button
+                  type="button"
+                  className={activeTab === 'customer' ? 'selected' : ''}
+                  onClick={() => setActiveTab('customer')}
+                >
+                  Khách hàng ({customerDebts.length})
+                </button>
+                <button
+                  type="button"
+                  className={activeTab === 'supplier' ? 'selected' : ''}
+                  onClick={() => setActiveTab('supplier')}
+                >
+                  Nhà cung cấp ({supplierDebts.length})
+                </button>
+              </div>
+            </fieldset>
+
+            {/* Lọc số dư */}
+            <fieldset className="user-filter-field status-filter">
+              <legend>Lọc số dư nợ</legend>
+              <div className="status-segments">
+                <button
+                  type="button"
+                  className={!hasBalanceOnly ? 'selected' : ''}
+                  onClick={() => setHasBalanceOnly(false)}
+                >
+                  Tất cả
+                </button>
+                <button
+                  type="button"
+                  className={hasBalanceOnly ? 'selected' : ''}
+                  onClick={() => setHasBalanceOnly(true)}
+                  style={hasBalanceOnly ? { background: '#fff1f2', color: '#b42335' } : {}}
+                >
+                  Chỉ còn nợ
+                </button>
+              </div>
+            </fieldset>
+          </div>
+        </div>
+
+        {/* Nội dung bảng */}
+        {isLoading ? (
+          <Loading label="Đang tải dữ liệu sổ nợ & tín dụng…" />
+        ) : activeTab === 'customer' ? (
+          compact ? (
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {filteredCustomerDebts.map((c) => {
+                const bal = Number(c.balanceAmount || 0);
+                const limit = Number(c.creditLimit || 0);
+                const isOver = limit > 0 && bal > limit;
+                return (
+                  <div
+                    key={c.customerId}
+                    style={{
+                      border: '1px solid var(--border)',
+                      borderRadius: '10px',
+                      padding: '14px',
+                      background: 'white',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <strong style={{ fontSize: '15px' }}>{c.customerName}</strong>
+                        <div className="muted font-mono" style={{ fontSize: '12px' }}>{c.customerCode} · {c.phone}</div>
+                      </div>
+                      {isOver ? (
+                        <Badge variant="danger">Vượt hạn mức</Badge>
+                      ) : (
+                        <Badge variant="success">An toàn</Badge>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span>Dư nợ: <strong style={{ color: bal > 0 ? '#b42335' : '#172338' }}>{bal.toLocaleString('vi-VN')} đ</strong></span>
+                      <span>Hạn mức: <strong>{limit > 0 ? `${limit.toLocaleString('vi-VN')} đ` : 'Không giới hạn'}</strong></span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase">
-                    <th className="py-3 px-4">Mã KH</th>
-                    <th className="py-3 px-4">Tên khách hàng</th>
-                    <th className="py-3 px-4">Số điện thoại</th>
-                    <th className="py-3 px-4 text-right">Tổng phát sinh (VNĐ)</th>
-                    <th className="py-3 px-4 text-right">Đã thanh toán (VNĐ)</th>
-                    <th className="py-3 px-4 text-right">Dư nợ hiện tại (VNĐ)</th>
-                    <th className="py-3 px-4 text-right">Hạn mức tín dụng</th>
-                    <th className="py-3 px-4 text-center">Tình trạng tín dụng</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-sm">
-                  {customerDebts.map((c) => {
-                    const bal = Number(c.balanceAmount || 0);
-                    const limit = Number(c.creditLimit || 0);
-                    const isOverLimit = limit > 0 && bal > limit;
-
-                    return (
-                      <tr key={c.customerId} className="hover:bg-gray-50/80 transition-colors">
-                        <td className="py-3 px-4 font-mono font-medium text-gray-600">#{c.customerId}</td>
-                        <td className="py-3 px-4 font-medium text-gray-900">{c.customerName}</td>
-                        <td className="py-3 px-4 text-gray-600 font-mono text-xs">{c.phone || '—'}</td>
-                        <td className="py-3 px-4 text-right text-gray-700">
-                          {Number(c.totalInvoiced).toLocaleString('vi-VN')}
-                        </td>
-                        <td className="py-3 px-4 text-right text-green-600">
-                          {Number(c.totalPaid).toLocaleString('vi-VN')}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <span className={`font-bold ${bal > 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                            {bal.toLocaleString('vi-VN')}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right font-medium text-gray-700">
-                          {limit.toLocaleString('vi-VN')}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          {isOverLimit ? (
-                            <Badge variant="danger" className="inline-flex items-center gap-1">
-                              <AlertTriangle size={12} /> Vượt hạn mức
-                            </Badge>
-                          ) : (
-                            <Badge variant="success" className="inline-flex items-center gap-1">
-                              <CheckCircle2 size={12} /> Trong an toàn
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tab 2: Công nợ nhà cung cấp */}
-      {activeTab === 'supplier' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          {isSuppLoading ? (
-            <div className="py-12 flex justify-center">
-              <Loading />
-            </div>
-          ) : supplierDebts.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Building2 size={48} className="mx-auto text-gray-300 mb-2" />
-              <p>Không có dữ liệu công nợ nhà cung cấp</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600 uppercase">
-                    <th className="py-3 px-4">Mã NCC</th>
-                    <th className="py-3 px-4">Tên nhà cung cấp</th>
-                    <th className="py-3 px-4">Số điện thoại</th>
-                    <th className="py-3 px-4 text-right">Tổng hàng nhập (VNĐ)</th>
-                    <th className="py-3 px-4 text-right">Gara đã trả (VNĐ)</th>
-                    <th className="py-3 px-4 text-right">Gara còn nợ (VNĐ)</th>
-                    <th className="py-3 px-4 text-center">Thời hạn nợ</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 text-sm">
-                  {supplierDebts.map((s) => {
-                    const bal = Number(s.balanceAmount || 0);
-
-                    return (
-                      <tr key={s.supplierId} className="hover:bg-gray-50/80 transition-colors">
-                        <td className="py-3 px-4 font-mono font-medium text-gray-600">#{s.supplierId}</td>
-                        <td className="py-3 px-4 font-medium text-gray-900">{s.supplierName}</td>
-                        <td className="py-3 px-4 text-gray-600 font-mono text-xs">{s.phone || '—'}</td>
-                        <td className="py-3 px-4 text-right text-gray-700">
-                          {Number(s.totalPurchased).toLocaleString('vi-VN')}
-                        </td>
-                        <td className="py-3 px-4 text-right text-green-600">
-                          {Number(s.totalPaid).toLocaleString('vi-VN')}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <span className={`font-bold ${bal > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
-                            {bal.toLocaleString('vi-VN')}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <Badge variant="outline">{s.paymentTermDays} ngày</Badge>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+            <DataTable
+              caption="Sổ nợ khách hàng (Phải thu)"
+              columns={customerColumns}
+              data={filteredCustomerDebtsWithId}
+              busy={isFetching}
+            />
+          )
+        ) : compact ? (
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {filteredSupplierDebts.map((s) => {
+              const bal = Number(s.balanceAmount || 0);
+              return (
+                <div
+                  key={s.supplierId}
+                  style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: '10px',
+                    padding: '14px',
+                    background: 'white',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <strong style={{ fontSize: '15px' }}>{s.supplierName}</strong>
+                      <div className="muted font-mono" style={{ fontSize: '12px' }}>{s.supplierCode} · {s.phone}</div>
+                    </div>
+                    <Badge variant="outline">{s.paymentTermDays} ngày</Badge>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                    <span>Gara còn nợ: <strong style={{ color: bal > 0 ? '#b42335' : '#172338' }}>{bal.toLocaleString('vi-VN')} đ</strong></span>
+                    <span>Đã trả: <strong>{Number(s.totalPaid).toLocaleString('vi-VN')} đ</strong></span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <DataTable
+            caption="Sổ nợ nhà cung cấp (Phải trả)"
+            columns={supplierColumns}
+            data={filteredSupplierDebtsWithId}
+            busy={isFetching}
+          />
+        )}
+      </section>
+    </>
   );
 }
