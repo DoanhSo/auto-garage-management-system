@@ -15,6 +15,10 @@ import java.util.List;
 @Repository
 public interface EmployeeShiftRepository extends JpaRepository<EmployeeShift, Long> {
 
+    @Query("SELECT COUNT(s) > 0 FROM EmployeeShift s WHERE s.employeeId = :employeeId AND s.status = 'ACTIVE' " +
+            "AND s.startsAt <= :startsAt AND s.endsAt >= :endsAt")
+    boolean coversAssignment(@Param("employeeId") Long employeeId, @Param("startsAt") Instant startsAt, @Param("endsAt") Instant endsAt);
+
     List<EmployeeShift> findByEmployeeIdAndStatus(Long employeeId, ShiftStatus status);
 
     Page<EmployeeShift> findByEmployeeId(Long employeeId, Pageable pageable);

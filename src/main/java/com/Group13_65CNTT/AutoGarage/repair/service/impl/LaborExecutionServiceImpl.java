@@ -41,6 +41,9 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     private final TaskAssignmentRepository taskAssignmentRepository;
     private final LaborSessionRepository laborSessionRepository;
     private final EmployeeRepository employeeRepository;
+    private final com.Group13_65CNTT.AutoGarage.scheduling.repository.EmployeeShiftRepository shiftRepository;
+    private final com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository serviceRepository;
+    private final com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
 
     private final TaskAssignmentMapper taskAssignmentMapper;
     private final LaborSessionMapper laborSessionMapper;
@@ -61,14 +64,14 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         RepairTask task = repairTaskRepository.findByIdForUpdate(taskId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy công việc với ID: " + taskId));
 
-        if (task.getStatus() == TaskStatus.COMPLETED || task.getStatus() == TaskStatus.CANCELLED) {
+        if ((task.getStatus() == TaskStatus.COMPLETED && request.getAssignmentRole() != AssignmentRole.QC) || task.getStatus() == TaskStatus.CANCELLED) {
             throw new BusinessRuleException("Không thể phân công công việc đã hoàn thành hoặc đã bị hủy");
         }
 
         RepairOrder order = repairOrderRepository.findById(task.getRepairOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa của công việc này"));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED) {
+        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
             throw new BusinessRuleException("Không thể phân công công việc của phiếu sửa chữa đã kết thúc");
         }
 
@@ -97,6 +100,17 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
                 request.getEmployeeId(), request.getStartsAt(), request.getEndsAt());
         if (!overlapping.isEmpty()) {
             throw new ConflictException("Kỹ thuật viên đã có phân công công việc khác trong khoảng thời gian này");
+        }
+
+        if (!shiftRepository.coversAssignment(employee.getId(), request.getStartsAt(), request.getEndsAt())) {
+            throw new BusinessRuleException("Thời gian phân công phải nằm trong ca làm việc đang hoạt động của nhân viên");
+        }
+        if (task.getServiceId() != null) {
+            var service = serviceRepository.findById(task.getServiceId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dịch vụ của công việc"));
+            if (!skills(employee.getSkillsJson()).containsAll(skills(service.getRequiredSkillsJson()))) {
+                throw new BusinessRuleException("Nhân viên chưa có đủ kỹ năng yêu cầu của dịch vụ");
+            }
         }
 
         TaskAssignment assignment = taskAssignmentMapper.toEntity(request);
@@ -168,6 +182,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     @Override
     @Transactional
     public LaborSessionResponse startTimer(Long actorUserId, Long assignmentId) {
+        objectAccess.requireAssignmentExecutionAccess(actorUserId, assignmentId);
         log.info("Starting timer for assignment #{} by actor #{}", assignmentId, actorUserId);
 
         TaskAssignment assignment = taskAssignmentRepository.findById(assignmentId)
@@ -175,6 +190,14 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
 
         if (Boolean.FALSE.equals(assignment.getIsActive())) {
             throw new BusinessRuleException("Phân công này đã kết thúc hoặc bị giải phóng");
+        }
+
+        RepairTask task = repairTaskRepository.findByIdForUpdate(assignment.getTaskId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy công việc"));
+        requireOpenOrder(task.getRepairOrderId());
+        if (task.getStatus() == TaskStatus.COMPLETED || task.getStatus() == TaskStatus.CANCELLED
+                || assignment.getAssignmentRole() == AssignmentRole.QC) {
+            throw new BusinessRuleException("Không thể bấm giờ thi công cho công việc đã kết thúc hoặc phân công QC");
         }
 
         Employee employee = employeeRepository.findById(assignment.getEmployeeId())
@@ -198,13 +221,10 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         LaborSession savedSession = laborSessionRepository.save(session);
 
         // Cập nhật trạng thái task sang IN_PROGRESS
-        RepairTask task = repairTaskRepository.findByIdForUpdate(assignment.getTaskId())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy công việc"));
-
         if (task.getStartedAt() == null) {
             task.setStartedAt(Instant.now());
         }
-        if (task.getStatus() == TaskStatus.PENDING || task.getStatus() == TaskStatus.ASSIGNED || task.getStatus() == TaskStatus.PAUSED) {
+        if (task.getStatus() == TaskStatus.PENDING || task.getStatus() == TaskStatus.ASSIGNED || task.getStatus() == TaskStatus.PAUSED || task.getStatus() == TaskStatus.REWORK) {
             task.setStatus(TaskStatus.IN_PROGRESS);
         }
         repairTaskRepository.save(task);
@@ -215,6 +235,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     @Override
     @Transactional
     public LaborSessionResponse stopTimer(Long actorUserId, Long assignmentId, LaborSessionStopRequest request) {
+        objectAccess.requireAssignmentExecutionAccess(actorUserId, assignmentId);
         log.info("Stopping timer for assignment #{}, reason={}", assignmentId, request.getStopReason());
 
         LaborSession session = laborSessionRepository.findTopByAssignmentIdAndEndsAtIsNull(assignmentId)
@@ -250,6 +271,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     @Override
     @Transactional
     public TaskWorkSummaryResponse completeTask(Long actorUserId, Long taskId, TaskCompletionRequest request) {
+        objectAccess.requireTaskExecutionAccess(actorUserId, taskId);
         log.info("Completing task #{} by actor #{}", taskId, actorUserId);
 
         RepairTask task = repairTaskRepository.findByIdForUpdate(taskId)
@@ -261,6 +283,8 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         if (task.getStatus() == TaskStatus.CANCELLED) {
             throw new BusinessRuleException("Không thể hoàn thành công việc đã bị hủy");
         }
+
+        requireOpenOrder(task.getRepairOrderId());
 
         Instant now = Instant.now();
 
@@ -275,8 +299,11 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         // 2. Giải phóng các phân công active của task
         List<TaskAssignment> activeAssignments = taskAssignmentRepository.findByTaskIdAndIsActiveTrue(taskId);
         for (TaskAssignment a : activeAssignments) {
-            a.setIsActive(false);
-            a.setReleasedAt(now);
+            // QC assignment remains active until inspection; releasing it here blocks QC authorization.
+            if (a.getAssignmentRole() != AssignmentRole.QC) {
+                a.setIsActive(false);
+                a.setReleasedAt(now);
+            }
         }
         taskAssignmentRepository.saveAll(activeAssignments);
 
@@ -293,7 +320,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
                 task.getRepairOrderId(), TaskStatus.COMPLETED);
         if (!hasUnfinishedTasks) {
             RepairOrder order = repairOrderRepository.findByIdForUpdate(task.getRepairOrderId()).orElseThrow();
-            if (order.getStatus() == RepairOrderStatus.APPROVED || order.getStatus() == RepairOrderStatus.IN_PROGRESS || order.getStatus() == RepairOrderStatus.WAITING_PARTS) {
+            if (order.getStatus() == RepairOrderStatus.APPROVED || order.getStatus() == RepairOrderStatus.IN_PROGRESS || order.getStatus() == RepairOrderStatus.WAITING_PARTS || order.getStatus() == RepairOrderStatus.QC_FAILED) {
                 order.setStatus(RepairOrderStatus.WAITING_QC);
                 repairOrderRepository.save(order);
                 log.info("Tất cả công việc đã hoàn thành. Phiếu sửa chữa #{} chuyển sang trạng thái WAITING_QC", order.getId());
@@ -301,6 +328,32 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         }
 
         return getTaskWorkSummary(taskId);
+    }
+
+    private void requireOpenOrder(Long orderId) {
+        RepairOrder order = repairOrderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa"));
+        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED
+                || order.getStatus() == RepairOrderStatus.INVOICED) {
+            throw new BusinessRuleException("Phiếu đã kết thúc hoặc xuất hóa đơn, không thể tiếp tục thi công");
+        }
+    }
+
+    private java.util.Set<String> skills(String value) {
+        if (value == null || value.isBlank()) return java.util.Set.of();
+        try {
+            var node = tools.jackson.databind.json.JsonMapper.builder().build().readTree(value);
+            if (!node.isArray()) throw new BusinessRuleException("Danh sách kỹ năng phải là mảng JSON");
+            java.util.Set<String> result = new java.util.HashSet<>();
+            for (var skill : node) {
+                if (!skill.isString() || skill.asText().isBlank()) throw new BusinessRuleException("Mã kỹ năng không hợp lệ");
+                result.add(skill.asText());
+            }
+            return result;
+        } catch (tools.jackson.core.JacksonException failure) {
+            throw new com.Group13_65CNTT.AutoGarage.common.exception.BusinessException(
+                    com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.BAD_REQUEST, failure);
+        }
     }
 
     @Override

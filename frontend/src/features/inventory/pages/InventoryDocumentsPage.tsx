@@ -630,7 +630,7 @@ export function InventoryDocumentsPage() {
         description="Tạo phiếu nhập mua, xuất kho hoặc trả hàng (chứng từ tạo mới ở trạng thái DRAFT)."
         size="xl"
       >
-        <form onSubmit={handleCreateDocument} className="modal-form grid-3col">
+        <form onSubmit={handleCreateDocument} className="modal-form">
           <div className="form-section-label">THÔNG TIN CHỨNG TỪ KHO</div>
 
           <Field label="Loại chứng từ" required>
@@ -664,7 +664,7 @@ export function InventoryDocumentsPage() {
               </select>
             </Field>
           ) : (docType === 'OUT' || docType === 'RETURN') ? (
-            <Field label="Mã phiếu sửa chữa (RO ID)" required>
+            <Field label="Mã lệnh sửa chữa" required>
               <input
                 className="input font-mono"
                 placeholder="VD: 101"
@@ -688,7 +688,7 @@ export function InventoryDocumentsPage() {
             />
           </Field>
 
-          <div className="col-span-3">
+          <div className="full-width">
             <Field label="Lý do / Diễn giải chứng từ">
               <input
                 className="input"
@@ -700,7 +700,7 @@ export function InventoryDocumentsPage() {
           </div>
 
           {/* Danh sách mặt hàng chi tiết */}
-          <div className="col-span-3" style={{ marginTop: '4px' }}>
+          <div className="full-width" style={{ marginTop: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span className="form-section-label" style={{ margin: 0, padding: 0 }}>
                 CHI TIẾT DANH MỤC PHỤ TÙNG
@@ -793,7 +793,7 @@ export function InventoryDocumentsPage() {
             </div>
           </div>
 
-          <div className="modal-form-actions col-span-3">
+          <div className="modal-form-actions full-width">
             <Button variant="secondary" onClick={() => setCreating(false)} disabled={createMutation.isPending}>
               Hủy
             </Button>

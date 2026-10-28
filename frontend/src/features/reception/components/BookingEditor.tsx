@@ -273,6 +273,7 @@ export function BookingEditor({
       title="Đặt lịch hẹn dịch vụ mới"
       description="Ghi nhận lịch hẹn bảo dưỡng, sửa chữa cho khách hàng và phân bổ khoang dự kiến."
       placement="center"
+      size="lg"
     >
       <BookingForm onSaved={onClose} onRequestClose={registerCloseHandler} />
     </Sheet>

@@ -248,9 +248,9 @@ export function VehiclesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="TIẾP NHẬN & DỊCH VỤ · M03"
+        eyebrow="QUẢN LÝ PHƯƠNG TIỆN"
         title="Quản lý phương tiện"
-        description="Quản lý danh sách phương tiện, theo dõi số ODO, chuyển nhượng quyền sở hữu (BR04) và tra cứu lịch sử sửa chữa (UC38)."
+        description="Quản lý danh sách phương tiện, theo dõi số ODO, chuyển nhượng chủ sở hữu và tra cứu lịch sử sửa chữa."
         actions={
           canManage && (
             <Button ref={createTrigger} variant="primary" onClick={handleOpenCreate}>
@@ -264,7 +264,7 @@ export function VehiclesPage() {
       <div className="info-strip">
         <Car size={18} />
         <span>
-          Đăng ký thông tin phương tiện, theo dõi số ODO, chuyển nhượng quyền sở hữu (BR04) và tra cứu cây lịch sử sửa chữa (UC38).
+          Đăng ký thông tin phương tiện, theo dõi số ODO, chuyển nhượng chủ sở hữu và tra cứu lịch sử sửa chữa.
         </span>
       </div>
 

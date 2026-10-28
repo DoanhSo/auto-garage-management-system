@@ -65,6 +65,14 @@ class EstimateServiceTest {
     @Mock
     private NotificationAudit notificationAudit;
 
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository customerRepository;
+
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
+
     @InjectMocks
     private EstimateServiceImpl estimateService;
 
@@ -224,6 +232,11 @@ class EstimateServiceTest {
     @Test
     @DisplayName("Gửi báo giá cho khách hàng thành công chuyển status sang SENT")
     void sendEstimate_Success() {
+        mockOrder.setCustomerId(1L);
+        when(repairOrderRepository.findById(mockEstimate.getRepairOrderId())).thenReturn(Optional.of(mockOrder));
+        var customer = new com.Group13_65CNTT.AutoGarage.customer.entity.Customer();
+        customer.setUserId(10L);
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
         when(estimateRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mockEstimate));
         when(estimateRepository.save(mockEstimate)).thenReturn(mockEstimate);
         when(estimateRepository.findById(1L)).thenReturn(Optional.of(mockEstimate));

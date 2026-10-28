@@ -72,6 +72,11 @@ public final class KeycloakJwtAuthenticationConverter
             }
         }
 
-        return matched.size() == 1 ? Optional.of(matched.iterator().next()) : Optional.empty();
+        if (matched.contains(Role.ADMIN)) return Optional.of(Role.ADMIN);
+        if (matched.contains(Role.RECEPTIONIST)) return Optional.of(Role.RECEPTIONIST);
+        if (matched.contains(Role.TECHNICIAN)) return Optional.of(Role.TECHNICIAN);
+        if (matched.contains(Role.WAREHOUSE_STAFF)) return Optional.of(Role.WAREHOUSE_STAFF);
+        if (matched.contains(Role.CUSTOMER)) return Optional.of(Role.CUSTOMER);
+        return Optional.empty();
     }
 }

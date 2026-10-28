@@ -1,5 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.inventory.service.impl;
 
+import com.Group13_65CNTT.AutoGarage.common.util.RequestFingerprint;
+
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.request.InventoryDocumentCreateRequest;
@@ -204,7 +206,7 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     @Transactional
     public void post(long actorUserId, long documentId, String requestKey) {
-        String requestHash = "POST_DOCUMENT:" + documentId;
+        String requestHash = RequestFingerprint.of("POST_DOCUMENT", actorUserId, documentId);
         if (requestKey != null && !requestKey.isBlank() && notificationAudit.isPresent()) {
             String completed = notificationAudit.get().findCompletedRequest(requestKey, requestHash);
             if (completed != null) {
@@ -228,6 +230,38 @@ public class InventoryServiceImpl implements InventoryService {
         List<InventoryDocumentItem> items = itemRepository.findByDocumentIdOrderByLineNoAsc(documentId);
         if (items.isEmpty()) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
+        }
+
+        if (document.getDocumentType() == DocumentType.OUT || document.getDocumentType() == DocumentType.RETURN) {
+            List<Map<String, Object>> orders = jdbcTemplate.queryForList(
+                    "SELECT status FROM repair_orders WHERE id = ? FOR UPDATE", document.getRepairOrderId());
+            if (orders.isEmpty() || java.util.Set.of("INVOICED", "CLOSED", "CANCELLED").contains(orders.get(0).get("status"))) {
+                throw new BusinessException(ResponseCode.BAD_REQUEST);
+            }
+        }
+
+        Map<Long, Map<String, Object>> approvedItems = new java.util.HashMap<>();
+        if (document.getDocumentType() == DocumentType.OUT) {
+            for (InventoryDocumentItem item : items.stream()
+                    .sorted(java.util.Comparator.comparing(InventoryDocumentItem::getEstimateItemId,
+                            java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder()))).toList()) {
+                if (item.getEstimateItemId() == null || approvedItems.containsKey(item.getEstimateItemId())) {
+                    throw new BusinessException(ResponseCode.BAD_REQUEST);
+                }
+                List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                        "SELECT ei.part_id, ei.approval_status, ei.item_type, ei.reserved_quantity, ei.unit_price, e.repair_order_id " +
+                        "FROM estimate_items ei JOIN estimates e ON e.id = ei.estimate_id WHERE ei.id = ? FOR UPDATE",
+                        item.getEstimateItemId());
+                if (rows.isEmpty()) throw new BusinessException(ResponseCode.RESOURCE_NOT_FOUND);
+                Map<String, Object> row = rows.get(0);
+                if (!"APPROVED".equals(row.get("approval_status")) || !"PART".equals(row.get("item_type"))
+                        || ((Number) row.get("part_id")).longValue() != item.getPart().getId()
+                        || ((Number) row.get("repair_order_id")).longValue() != document.getRepairOrderId()
+                        || ((BigDecimal) row.get("reserved_quantity")).compareTo(item.getQuantity()) < 0) {
+                    throw new BusinessException(ResponseCode.BAD_REQUEST);
+                }
+                approvedItems.put(item.getEstimateItemId(), row);
+            }
         }
 
         // Lock all parts in ascending ID order to prevent deadlocks
@@ -279,19 +313,38 @@ public class InventoryServiceImpl implements InventoryService {
                     }
                     BigDecimal newStock = part.getStockQuantity().subtract(qty);
                     // Deduct reserved quantity up to qty
-                    BigDecimal deductReserved = part.getReservedQuantity().min(qty);
+                    BigDecimal deductReserved = qty;
+                    if (part.getReservedQuantity().compareTo(qty) < 0) {
+                        throw new BusinessException(ResponseCode.BAD_REQUEST);
+                    }
+                    cost = part.getPurchasePrice();
+                    item.setUnitCost(cost);
+                    item.setLineTotal(qty.multiply(cost).setScale(2, RoundingMode.HALF_UP));
                     part.setStockQuantity(newStock);
                     part.setReservedQuantity(part.getReservedQuantity().subtract(deductReserved));
+                    jdbcTemplate.update("UPDATE estimate_items SET reserved_quantity = reserved_quantity - ? WHERE id = ?",
+                            qty, item.getEstimateItemId());
 
                     recordTransaction(item, part, TransactionType.OUT, qty.negate(), newStock, cost, actorUserId, now);
 
                     // Update repair_order_parts
-                    updateRepairOrderPartOnIssue(document.getRepairOrderId(), item, part, qty, cost);
+                    updateRepairOrderPartOnIssue(document.getRepairOrderId(), item, part, qty, cost,
+                            (BigDecimal) approvedItems.get(item.getEstimateItemId()).get("unit_price"));
                 }
                 case RETURN -> {
                     if (item.getSourceItem() == null) {
                         throw new BusinessException(ResponseCode.BAD_REQUEST);
                     }
+                    InventoryDocument source = item.getSourceItem().getDocument();
+                    if (source.getDocumentType() != DocumentType.OUT || source.getStatus() != DocumentStatus.POSTED
+                            || !java.util.Objects.equals(source.getRepairOrderId(), document.getRepairOrderId())
+                            || document.getSourceDocument() == null || !source.getId().equals(document.getSourceDocument().getId())
+                            || !item.getSourceItem().getPart().getId().equals(part.getId())) {
+                        throw new BusinessException(ResponseCode.BAD_REQUEST);
+                    }
+                    cost = item.getSourceItem().getUnitCost();
+                    item.setUnitCost(cost);
+                    item.setLineTotal(qty.multiply(cost).setScale(2, RoundingMode.HALF_UP));
                     BigDecimal originalQty = item.getSourceItem().getQuantity();
                     BigDecimal alreadyReturned = itemRepository.getTotalReturnedQuantityForSourceItem(item.getSourceItem().getId());
                     if (alreadyReturned.add(qty).compareTo(originalQty) > 0) {
@@ -323,6 +376,9 @@ public class InventoryServiceImpl implements InventoryService {
 
         partRepository.saveAll(lockedParts.values());
 
+        document.setSubtotal(items.stream().map(InventoryDocumentItem::getLineTotal).reduce(BigDecimal.ZERO, BigDecimal::add));
+        document.setTotalAmount(document.getSubtotal().add(document.getTaxAmount()));
+
         document.setStatus(DocumentStatus.POSTED);
         document.setPostedBy(actorUserId);
         document.setPostedAt(now);
@@ -335,21 +391,23 @@ public class InventoryServiceImpl implements InventoryService {
         log.info("Posted inventory document id: {}, code: {} by actor: {}", document.getId(), document.getDocumentCode(), actorUserId);
     }
 
-    private void updateRepairOrderPartOnIssue(Long repairOrderId, InventoryDocumentItem item, Part part, BigDecimal qty, BigDecimal cost) {
+    private void updateRepairOrderPartOnIssue(Long repairOrderId, InventoryDocumentItem item, Part part, BigDecimal qty, BigDecimal cost, BigDecimal agreedPrice) {
         if (repairOrderId == null) return;
-        Optional<RepairOrderPart> existing = repairOrderPartRepository.findByRepairOrderIdAndPartId(repairOrderId, part.getId());
+        Optional<RepairOrderPart> existing = repairOrderPartRepository.findByEstimateItemId(item.getEstimateItemId());
         if (existing.isPresent()) {
             RepairOrderPart rop = existing.get();
-            rop.setQuantity(rop.getQuantity().add(qty));
-            rop.setUnitCost(cost);
+            BigDecimal netQuantity = rop.getQuantity().add(qty);
+            rop.setUnitCost(rop.getQuantity().multiply(rop.getUnitCost()).add(qty.multiply(cost))
+                    .divide(netQuantity, 2, RoundingMode.HALF_UP));
+            rop.setQuantity(netQuantity);
             repairOrderPartRepository.save(rop);
         } else {
             RepairOrderPart rop = RepairOrderPart.builder()
                     .repairOrderId(repairOrderId)
-                    .estimateItemId(item.getEstimateItemId() != null ? item.getEstimateItemId() : 0L)
+                    .estimateItemId(item.getEstimateItemId())
                     .part(part)
                     .quantity(qty)
-                    .unitPrice(part.getSellingPrice())
+                    .unitPrice(agreedPrice)
                     .unitCost(cost)
                     .build();
             repairOrderPartRepository.save(rop);
@@ -358,11 +416,11 @@ public class InventoryServiceImpl implements InventoryService {
 
     private void updateRepairOrderPartOnReturn(Long repairOrderId, InventoryDocumentItem item, Part part, BigDecimal returnQty) {
         if (repairOrderId == null) return;
-        Optional<RepairOrderPart> existing = repairOrderPartRepository.findByRepairOrderIdAndPartId(repairOrderId, part.getId());
+        Optional<RepairOrderPart> existing = repairOrderPartRepository.findByEstimateItemId(item.getSourceItem().getEstimateItemId());
         if (existing.isPresent()) {
             RepairOrderPart rop = existing.get();
             BigDecimal newQty = rop.getQuantity().subtract(returnQty);
-            if (newQty.compareTo(BigDecimal.ZERO) < 0) newQty = BigDecimal.ZERO;
+            if (newQty.compareTo(BigDecimal.ZERO) < 0) throw new BusinessException(ResponseCode.BAD_REQUEST);
             rop.setQuantity(newQty); // preserve row with quantity = 0
             repairOrderPartRepository.save(rop);
         }
@@ -391,6 +449,20 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public void requireIssueComplete(long repairOrderId) {
+        Integer remaining = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM estimate_items ei JOIN estimates e ON e.id = ei.estimate_id " +
+                "WHERE e.repair_order_id = ? AND ei.reserved_quantity > 0", Integer.class, repairOrderId);
+        Integer drafts = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM inventory_documents WHERE repair_order_id = ? " +
+                "AND document_type IN ('OUT','RETURN') AND status = 'DRAFT'", Integer.class, repairOrderId);
+        if ((remaining != null && remaining > 0) || (drafts != null && drafts > 0)) {
+            throw new BusinessException(ResponseCode.BAD_REQUEST);
+        }
+    }
+
+    @Override
     @Transactional
     public void reserve(long actorUserId, long estimateItemId, BigDecimal quantity) {
         if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
@@ -398,7 +470,7 @@ public class InventoryServiceImpl implements InventoryService {
         }
 
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT id, part_id, approval_status, item_type, reserved_quantity FROM estimate_items WHERE id = ?",
+                "SELECT id, part_id, approval_status, item_type, reserved_quantity, quantity FROM estimate_items WHERE id = ? FOR UPDATE",
                 estimateItemId);
 
         if (rows.isEmpty()) {
@@ -408,10 +480,14 @@ public class InventoryServiceImpl implements InventoryService {
         Map<String, Object> row = rows.get(0);
         String status = (String) row.get("approval_status");
         String itemType = (String) row.get("item_type");
-        Long partId = ((Number) row.get("part_id")).longValue();
-
         if (!"APPROVED".equals(status) || !"PART".equals(itemType)) {
             log.warn("Cannot reserve item {}: status={}, itemType={}", estimateItemId, status, itemType);
+            throw new BusinessException(ResponseCode.BAD_REQUEST);
+        }
+        Long partId = ((Number) row.get("part_id")).longValue();
+        BigDecimal reserved = (BigDecimal) row.get("reserved_quantity");
+        BigDecimal approvedQuantity = (BigDecimal) row.get("quantity");
+        if (reserved.add(quantity).compareTo(approvedQuantity) > 0) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
 
@@ -443,7 +519,7 @@ public class InventoryServiceImpl implements InventoryService {
                 "FROM estimate_items ei " +
                 "JOIN estimates e ON ei.estimate_id = e.id " +
                 "WHERE e.repair_order_id = ? AND ei.item_type = 'PART' AND ei.reserved_quantity > 0 " +
-                "ORDER BY ei.part_id ASC",
+                "ORDER BY ei.part_id ASC FOR UPDATE",
                 repairOrderId);
 
         if (rows.isEmpty()) return;

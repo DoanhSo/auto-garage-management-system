@@ -1,5 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.billing.service.impl;
 
+import com.Group13_65CNTT.AutoGarage.common.util.RequestFingerprint;
+
 import com.Group13_65CNTT.AutoGarage.billing.dto.request.InvoiceIssueRequest;
 import com.Group13_65CNTT.AutoGarage.billing.dto.request.PaymentReceiveRequest;
 import com.Group13_65CNTT.AutoGarage.billing.dto.request.SupplierPaymentRequest;
@@ -93,7 +95,7 @@ public class BillingServiceImpl implements BillingService {
     @Transactional
     public InvoiceResponse issueInvoice(long actorUserId, InvoiceIssueRequest request) {
         String requestKey = request.getRequestKey();
-        String requestHash = "ISSUE_INVOICE:" + request.getRepairOrderId();
+        String requestHash = RequestFingerprint.of("ISSUE_INVOICE", actorUserId, request.getRepairOrderId(), request.getDiscountAmount(), request.getTaxAmount(), request.getDueDate());
         if (requestKey != null && !requestKey.isBlank() && notificationAudit.isPresent()) {
             String completed = notificationAudit.get().findCompletedRequest(requestKey, requestHash);
             if (completed != null) {
@@ -115,7 +117,7 @@ public class BillingServiceImpl implements BillingService {
         // Direct DB verification of order readiness
         List<Map<String, Object>> orderRows = jdbcTemplate.queryForList(
                 "SELECT ro.id, ro.customer_id, ro.vehicle_id, ro.latest_qc_check_id, ro.status " +
-                "FROM repair_orders ro WHERE ro.id = ?",
+                "FROM repair_orders ro WHERE ro.id = ? FOR UPDATE",
                 request.getRepairOrderId());
 
         if (orderRows.isEmpty()) {
@@ -134,8 +136,8 @@ public class BillingServiceImpl implements BillingService {
 
         Long latestQcId = ((Number) latestQcObj).longValue();
         List<Map<String, Object>> qcRows = jdbcTemplate.queryForList(
-                "SELECT check_type, conclusion FROM vehicle_checks WHERE id = ?", latestQcId);
-        if (qcRows.isEmpty() || !"PASSED".equalsIgnoreCase((String) qcRows.get(0).get("conclusion"))) {
+                "SELECT check_type, result FROM vehicle_checks WHERE id = ?", latestQcId);
+        if (qcRows.isEmpty() || !"QC".equals(qcRows.get(0).get("check_type")) || !"PASSED".equals(qcRows.get(0).get("result"))) {
             log.warn("Cannot issue invoice: QC check {} is not PASSED", latestQcId);
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
@@ -167,7 +169,7 @@ public class BillingServiceImpl implements BillingService {
 
         // Capture immutable vehicle snapshot
         Map<String, Object> veh = jdbcTemplate.queryForMap(
-                "SELECT plate_number, vin, make, model, year, color, current_odometer " +
+                "SELECT license_plate AS plate_number, vin, brand AS make, model, manufacture_year AS year, color, odometer AS current_odometer " +
                 "FROM vehicles WHERE id = ?", vehicleId);
         String vehicleSnapshot = String.format(
                 "{\"plateNumber\":\"%s\",\"vin\":\"%s\",\"make\":\"%s\",\"model\":\"%s\",\"year\":%s,\"color\":\"%s\",\"odometer\":%s}",
@@ -208,19 +210,22 @@ public class BillingServiceImpl implements BillingService {
 
         // 1. Gather completed service tasks
         List<Map<String, Object>> serviceTasks = jdbcTemplate.queryForList(
-                "SELECT rt.id AS task_id, s.service_name, s.unit, rt.actual_price, rt.actual_cost, " +
-                "s.warranty_days, s.warranty_km, s.warranty_terms " +
+                "SELECT rt.id AS task_id, ei.item_name AS service_name, ei.unit, rt.quantity, rt.unit_price, ei.unit_cost, " +
+                "ei.discount_amount, ei.tax_amount, ei.warranty_days, ei.warranty_km, ei.warranty_terms " +
                 "FROM repair_tasks rt " +
-                "JOIN services s ON rt.service_id = s.id " +
-                "WHERE rt.repair_order_id = ? AND rt.status = 'COMPLETED'",
+                "JOIN estimate_items ei ON rt.estimate_item_id = ei.id " +
+                "WHERE rt.repair_order_id = ? AND rt.status = 'COMPLETED' AND rt.task_type = 'REPAIR' AND ei.approval_status = 'APPROVED'",
                 request.getRepairOrderId());
 
         for (Map<String, Object> st : serviceTasks) {
-            BigDecimal price = (BigDecimal) st.get("actual_price");
-            BigDecimal cost = (BigDecimal) st.get("actual_cost");
+            BigDecimal price = (BigDecimal) st.get("unit_price");
+            BigDecimal cost = (BigDecimal) st.get("unit_cost");
+            BigDecimal quantity = (BigDecimal) st.get("quantity");
+            BigDecimal discount = (BigDecimal) st.getOrDefault("discount_amount", BigDecimal.ZERO);
+            BigDecimal tax = (BigDecimal) st.getOrDefault("tax_amount", BigDecimal.ZERO);
             if (price == null) price = BigDecimal.ZERO;
             if (cost == null) cost = BigDecimal.ZERO;
-            BigDecimal lineTotal = price;
+            BigDecimal lineTotal = quantity.multiply(price).setScale(2, RoundingMode.HALF_UP).subtract(discount).add(tax);
             subtotal = subtotal.add(lineTotal);
 
             InvoiceItem item = InvoiceItem.builder()
@@ -230,7 +235,9 @@ public class BillingServiceImpl implements BillingService {
                     .repairTaskId(((Number) st.get("task_id")).longValue())
                     .itemName((String) st.get("service_name"))
                     .unit((String) st.get("unit"))
-                    .quantity(BigDecimal.ONE)
+                    .quantity(quantity)
+                    .discountAmount(discount)
+                    .taxAmount(tax)
                     .unitPrice(price)
                     .unitCost(cost)
                     .lineTotal(lineTotal)
@@ -244,9 +251,10 @@ public class BillingServiceImpl implements BillingService {
         // 2. Gather issued parts with quantity > 0
         List<Map<String, Object>> orderParts = jdbcTemplate.queryForList(
                 "SELECT rop.id AS rop_id, rop.quantity, rop.unit_price, rop.unit_cost, " +
-                "p.part_name, p.unit, p.warranty_days, p.warranty_km, p.warranty_terms " +
+                "ei.item_name AS part_name, ei.unit, ei.quantity AS approved_quantity, ei.discount_amount, ei.tax_amount, " +
+                "ei.warranty_days, ei.warranty_km, ei.warranty_terms " +
                 "FROM repair_order_parts rop " +
-                "JOIN parts p ON rop.part_id = p.id " +
+                "JOIN estimate_items ei ON rop.estimate_item_id = ei.id " +
                 "WHERE rop.repair_order_id = ? AND rop.quantity > 0",
                 request.getRepairOrderId());
 
@@ -254,7 +262,10 @@ public class BillingServiceImpl implements BillingService {
             BigDecimal qty = (BigDecimal) op.get("quantity");
             BigDecimal price = (BigDecimal) op.get("unit_price");
             BigDecimal cost = (BigDecimal) op.get("unit_cost");
-            BigDecimal lineTotal = qty.multiply(price).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal approvedQuantity = (BigDecimal) op.get("approved_quantity");
+            BigDecimal discount = ((BigDecimal) op.get("discount_amount")).multiply(qty).divide(approvedQuantity, 2, RoundingMode.HALF_UP);
+            BigDecimal tax = ((BigDecimal) op.get("tax_amount")).multiply(qty).divide(approvedQuantity, 2, RoundingMode.HALF_UP);
+            BigDecimal lineTotal = qty.multiply(price).setScale(2, RoundingMode.HALF_UP).subtract(discount).add(tax);
             subtotal = subtotal.add(lineTotal);
 
             InvoiceItem item = InvoiceItem.builder()
@@ -265,6 +276,8 @@ public class BillingServiceImpl implements BillingService {
                     .itemName((String) op.get("part_name"))
                     .unit((String) op.get("unit"))
                     .quantity(qty)
+                    .discountAmount(discount)
+                    .taxAmount(tax)
                     .unitPrice(price)
                     .unitCost(cost)
                     .lineTotal(lineTotal)
@@ -383,12 +396,12 @@ public class BillingServiceImpl implements BillingService {
     @Transactional
     public PaymentResponse receivePayment(long actorUserId, PaymentReceiveRequest request) {
         String requestKey = request.getRequestKey();
-        String requestHash = "RECEIVE_PAYMENT:" + request.getInvoiceId() + ":" + request.getAmount();
+        String requestHash = RequestFingerprint.of("RECEIVE_PAYMENT", actorUserId, request.getInvoiceId(), request.getAmount(), request.getPaymentMethod(), request.getProviderReference(), request.getNotes());
         if (requestKey != null && !requestKey.isBlank() && notificationAudit.isPresent()) {
             String completed = notificationAudit.get().findCompletedRequest(requestKey, requestHash);
             if (completed != null) {
                 log.info("Idempotent replay for receiving payment key: {}", requestKey);
-                Payment existing = paymentRepository.findByProviderReference(request.getProviderReference())
+                Payment existing = paymentRepository.findByTransactionCode(RequestFingerprint.resultField(completed, "transactionCode"))
                         .orElseThrow(() -> new BusinessException(ResponseCode.DUPLICATE_RESOURCE));
                 return paymentMapper.toResponse(existing);
             }
@@ -476,12 +489,12 @@ public class BillingServiceImpl implements BillingService {
         }
 
         String requestKey = request.getRequestKey();
-        String requestHash = "PAY_SUPPLIER:" + request.getInventoryDocumentId() + ":" + request.getAmount();
+        String requestHash = RequestFingerprint.of("PAY_SUPPLIER", actorUserId, request.getInventoryDocumentId(), request.getAmount(), request.getPaymentMethod(), request.getProviderReference(), request.getNotes());
         if (requestKey != null && !requestKey.isBlank() && notificationAudit.isPresent()) {
             String completed = notificationAudit.get().findCompletedRequest(requestKey, requestHash);
             if (completed != null) {
                 log.info("Idempotent replay for paying supplier key: {}", requestKey);
-                Payment existing = paymentRepository.findByProviderReference(request.getProviderReference())
+                Payment existing = paymentRepository.findByTransactionCode(RequestFingerprint.resultField(completed, "transactionCode"))
                         .orElseThrow(() -> new BusinessException(ResponseCode.DUPLICATE_RESOURCE));
                 return paymentMapper.toResponse(existing);
             }
@@ -535,10 +548,14 @@ public class BillingServiceImpl implements BillingService {
     }
 
     @Override
+    @Transactional
     public void requireHandoverAllowed(long actorUserId, long repairOrderId) {
-        Invoice invoice = invoiceRepository.findByRepairOrderId(repairOrderId)
+        Invoice invoice = invoiceRepository.findByRepairOrderIdWithLock(repairOrderId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
 
+        if (invoice.getStatus() == InvoiceStatus.VOID) {
+            throw new BusinessException(ResponseCode.BAD_REQUEST);
+        }
         if (invoice.getStatus() == InvoiceStatus.PAID) {
             return; // Handover allowed
         }
@@ -552,7 +569,7 @@ public class BillingServiceImpl implements BillingService {
 
         // Verify customer credit limits
         List<Map<String, Object>> custRows = jdbcTemplate.queryForList(
-                "SELECT credit_limit, payment_term_days FROM customers WHERE id = ?",
+                "SELECT credit_limit, payment_term_days FROM customers WHERE id = ? FOR UPDATE",
                 invoice.getCustomerId());
 
         if (custRows.isEmpty()) {
@@ -566,6 +583,11 @@ public class BillingServiceImpl implements BillingService {
 
         if (totalCustomerDebt.compareTo(creditLimit) > 0) {
             log.warn("Customer {} total debt {} exceeds credit limit {}", invoice.getCustomerId(), totalCustomerDebt, creditLimit);
+            throw new BusinessException(ResponseCode.BAD_REQUEST);
+        }
+
+        Number term = (Number) custRows.get(0).get("payment_term_days");
+        if (term == null || term.intValue() <= 0 || invoice.getDueDate() == null) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
 
@@ -641,6 +663,7 @@ public class BillingServiceImpl implements BillingService {
 
     private String escapeJson(Object val) {
         if (val == null) return "";
-        return val.toString().replace("\"", "\\\"");
+        String encoded = tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(val.toString());
+        return encoded.substring(1, encoded.length() - 1);
     }
 }

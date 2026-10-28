@@ -130,6 +130,8 @@ class ReceptionOwnershipIntegrationTest extends IntegrationTestSupport {
         Customer customer = customer("QC-OWNER", null);
         Vehicle vehicle = vehicle("QCSCOPE001", customer.getId());
         RepairOrder order = order("QC-ORDER", customer, vehicle, technician.getId());
+        order.setStatus(com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrderStatus.WAITING_QC);
+        orders.saveAndFlush(order);
         RepairTask task = tasks.saveAndFlush(RepairTask.builder()
                 .repairOrderId(order.getId()).taskName("Completed repair").status(TaskStatus.COMPLETED).build());
         String authorization = "Bearer " + issueKeycloakToken(authProperties, technician);

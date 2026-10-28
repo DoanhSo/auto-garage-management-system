@@ -130,4 +130,12 @@ SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id J
 """,
             nativeQuery = true)
     long assignedToQc(@Param("actorId") Long actorId, @Param("resourceId") Long resourceId);
+
+    @Query(value = "SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id " +
+            "WHERE e.user_id=:actorId AND e.is_active=TRUE AND a.is_active=TRUE AND a.assignment_role <> 'QC' AND a.task_id=:taskId", nativeQuery = true)
+    long assignedToTask(@Param("actorId") long actorId, @Param("taskId") long taskId);
+
+    @Query(value = "SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id " +
+            "WHERE e.user_id=:actorId AND e.is_active=TRUE AND a.is_active=TRUE AND a.assignment_role <> 'QC' AND a.id=:assignmentId", nativeQuery = true)
+    long ownsAssignment(@Param("actorId") long actorId, @Param("assignmentId") long assignmentId);
 }

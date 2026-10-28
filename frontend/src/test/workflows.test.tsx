@@ -90,7 +90,7 @@ describe('Forms against HTTP contracts', () => {
     await user.click(await screen.findByRole('button', { name: 'Thêm dịch vụ mới' }));
     const dialog = await screen.findByRole('dialog');
     await user.type(
-      within(dialog).getByLabelText('Tên dịch vụ / Gói bảo dưỡng', { exact: false }),
+      within(dialog).getByLabelText('Tên dịch vụ / Hạng mục', { exact: false }),
       'Kiểm tra định kỳ',
     );
     await user.click(within(dialog).getByRole('button', { name: /Thêm dịch vụ/ }));
@@ -123,6 +123,7 @@ describe('Forms against HTTP contracts', () => {
       version: 0,
     };
     const directory = vi.fn();
+    const ownProfile = vi.fn();
     server.use(
       http.get('/api/v1/auth/me', () =>
         HttpResponse.json(envelope({ ...member, role: 'CUSTOMER' })),
@@ -130,7 +131,10 @@ describe('Forms against HTTP contracts', () => {
       http.get('/api/v1/bookings', () => HttpResponse.json(envelope([]))),
       http.get('/api/v1/services', () => HttpResponse.json(envelope([]))),
       http.get('/api/v1/vehicles', () => HttpResponse.json(envelope([]))),
-      http.get('/api/v1/customers/me', () => HttpResponse.json(envelope(ownCustomer))),
+      http.get('/api/v1/customers/me', () => {
+        ownProfile();
+        return HttpResponse.json(envelope(ownCustomer));
+      }),
       http.get('/api/v1/customers', () => {
         directory();
         return HttpResponse.json(envelope(null, 3002), { status: 403 });
@@ -141,7 +145,8 @@ describe('Forms against HTTP contracts', () => {
     await user.click(await screen.findByRole('button', { name: 'Đặt lịch hẹn mới' }));
     const dialog = await screen.findByRole('dialog');
     const customer = within(dialog).getByLabelText('Khách hàng đặt hẹn', { exact: false });
-    await waitFor(() => expect(customer).toHaveValue('9'));
+    expect(customer).toHaveValue(member.fullName);
+    await waitFor(() => expect(ownProfile).toHaveBeenCalledTimes(1));
     expect(customer).toBeDisabled();
     expect(directory).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Tiếp nhận vãng lai' })).not.toBeInTheDocument();

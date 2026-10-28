@@ -65,6 +65,7 @@ public class ObjectAccessServiceImpl implements ObjectAccessService {
         if (user.getRole() == Role.TECHNICIAN) {
             boolean operational =
                     resource == AccessResource.REPAIR_ORDER
+                            || resource == AccessResource.ESTIMATE
                             || resource == AccessResource.TASK
                             || resource == AccessResource.ATTACHMENT;
             if (operational
@@ -79,6 +80,8 @@ public class ObjectAccessServiceImpl implements ObjectAccessService {
 
     @Override
     public void requireQualityCheckAccess(long actorId, long orderId) {
+        User user = actor(actorId);
+        if (user.getRole() == Role.ADMIN) return;
         requireRole(actorId, Role.TECHNICIAN.name());
         requireRepairOrderAccess(actorId, orderId);
         if (accessRepository.assignedToQc(actorId, orderId) == 0) forbidden();
@@ -90,6 +93,20 @@ public class ObjectAccessServiceImpl implements ObjectAccessService {
                 .findById(actorId)
                 .filter(User::isActive)
                 .orElseThrow(() -> new BusinessException(ResponseCode.UNAUTHORIZED));
+    }
+
+    @Override
+    public void requireTaskExecutionAccess(long actorId, long taskId) {
+        User user = actor(actorId);
+        if (user.getRole() == Role.ADMIN) return;
+        if (user.getRole() != Role.TECHNICIAN || accessRepository.assignedToTask(actorId, taskId) == 0) forbidden();
+    }
+
+    @Override
+    public void requireAssignmentExecutionAccess(long actorId, long assignmentId) {
+        User user = actor(actorId);
+        if (user.getRole() == Role.ADMIN) return;
+        if (user.getRole() != Role.TECHNICIAN || accessRepository.ownsAssignment(actorId, assignmentId) == 0) forbidden();
     }
 
     private Optional<ResourceOwnership> ownership(AccessResource resource, long id) {

@@ -7,4 +7,6 @@ public interface ObjectAccessService extends SecurityAccess {
     void requireResourceAccess(long actorId, AccessResource resource, long id);
 
     void requireQualityCheckAccess(long actorId, long orderId);
+    void requireTaskExecutionAccess(long actorId, long taskId);
+    void requireAssignmentExecutionAccess(long actorId, long assignmentId);
 }

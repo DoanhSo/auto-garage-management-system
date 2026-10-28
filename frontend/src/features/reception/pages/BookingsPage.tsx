@@ -266,7 +266,7 @@ export function BookingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="TIẾP NHẬN & DỊCH VỤ · M05"
+        eyebrow="ĐẶT LỊCH HẸN"
         title="Lịch hẹn & Tiếp nhận xe"
         description="Quản lý lịch hẹn dịch vụ, thực hiện quy trình tiếp nhận xe vào xưởng (Check-in) và lập biên bản kiểm tra tình trạng xe."
         actions={
@@ -294,7 +294,7 @@ export function BookingsPage() {
       <div className="info-strip">
         <CalendarCheck size={18} />
         <span>
-          Quy trình tiếp nhận xe: Đặt hẹn → Xác nhận → Tiếp nhận vào xưởng (TV2-07) → Lập biên bản kiểm tra & đính kèm ảnh (TV2-08, BR16).
+          Quy trình tiếp nhận xe: Đặt lịch hẹn → Xác nhận → Tiếp nhận vào xưởng → Lập biên bản kiểm tra & đính kèm ảnh hiện trạng.
         </span>
       </div>
 

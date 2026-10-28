@@ -86,7 +86,7 @@ export function CheckInModal({
   const generalError = checkIn.error;
 
   return (
-    <Sheet open={open} onClose={onClose} placement="center" title={title} description={description}>
+    <Sheet open={open} onClose={onClose} placement="center" size="md" title={title} description={description}>
       <form
         onSubmit={handleSubmit(onSubmit)}
         noValidate

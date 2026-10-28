@@ -65,6 +65,11 @@ class EstimateApprovalServiceTest {
     @Mock
     private NotificationAudit notificationAudit;
 
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
+
     @InjectMocks
     private EstimateServiceImpl estimateService;
 

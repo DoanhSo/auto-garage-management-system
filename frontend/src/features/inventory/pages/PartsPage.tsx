@@ -569,10 +569,10 @@ export function PartsPage() {
         description="Khai báo mã phụ tùng, đơn giá, định mức dự trữ và điều kiện bảo hành."
         size="lg"
       >
-        <form onSubmit={handleCreate} className="modal-form grid-3col">
+        <form onSubmit={handleCreate} className="modal-form">
           <div className="form-section-label">THÔNG TIN ĐỊNH DANH & QUẢN LÝ KHO</div>
 
-          <div className="col-span-2">
+          <div className="full-width">
             <Field label="Tên phụ tùng" required>
               <input
                 name="partName"
@@ -630,13 +630,13 @@ export function PartsPage() {
             <input name="warrantyKm" type="number" min="0" defaultValue="5000" className="input" />
           </Field>
 
-          <div className="col-span-2">
+          <div className="full-width">
             <Field label="Điều khoản bảo hành">
               <input name="warrantyTerms" className="input" placeholder="VD: Bảo hành 1 đổi 1 nếu lỗi từ nhà sản xuất" />
             </Field>
           </div>
 
-          <div className="col-span-3">
+          <div className="full-width">
             <Field label="Mô tả kỹ thuật / ứng dụng xe">
               <input
                 name="description"
@@ -646,7 +646,7 @@ export function PartsPage() {
             </Field>
           </div>
 
-          <div className="modal-form-actions col-span-3">
+          <div className="modal-form-actions">
             <Button variant="secondary" onClick={() => setCreating(false)} disabled={createMutation.isPending}>
               Hủy
             </Button>
@@ -666,10 +666,10 @@ export function PartsPage() {
         size="lg"
       >
         {editing && (
-          <form onSubmit={handleUpdate} className="modal-form grid-3col">
+          <form onSubmit={handleUpdate} className="modal-form">
             <div className="form-section-label">THÔNG TIN ĐỊNH DANH & QUẢN LÝ KHO</div>
 
-            <div className="col-span-2">
+            <div className="full-width">
               <Field label="Tên phụ tùng" required>
                 <input
                   name="partName"
@@ -765,7 +765,7 @@ export function PartsPage() {
               />
             </Field>
 
-            <div className="col-span-2">
+            <div className="full-width">
               <Field label="Điều khoản bảo hành">
                 <input
                   name="warrantyTerms"
@@ -783,7 +783,7 @@ export function PartsPage() {
               </select>
             </Field>
 
-            <div className="col-span-2">
+            <div className="full-width">
               <Field label="Mô tả kỹ thuật">
                 <input
                   name="description"
@@ -794,7 +794,7 @@ export function PartsPage() {
               </Field>
             </div>
 
-            <div className="modal-form-actions col-span-3">
+            <div className="modal-form-actions">
               <Button variant="secondary" onClick={() => setEditing(null)} disabled={updateMutation.isPending}>
                 Hủy
               </Button>

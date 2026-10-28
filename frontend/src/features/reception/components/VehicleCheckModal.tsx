@@ -98,8 +98,9 @@ export function VehicleCheckModal({
       open={open}
       onClose={onClose}
       placement="center"
+      size="lg"
       title={`Biên bản kiểm tra xe ${orderCode ? `#${orderCode}` : ''}`}
-      description="Ghi nhận hiện trạng ngoại thất, nội thất, đèn cảnh báo và ảnh chụp bằng chứng (BR16)."
+      description="Ghi nhận hiện trạng ngoại thất, nội thất, đèn cảnh báo và ảnh chụp tình trạng phương tiện."
     >
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -184,7 +185,7 @@ export function VehicleCheckModal({
           <div className="info-strip" style={{ marginBottom: 8 }}>
             <Upload size={18} />
             <span>
-              <strong>Tải lên ảnh chụp hiện trạng / Biên bản giấy (BR16):</strong> Hình ảnh được băm SHA-256 chống giả mạo và lưu trữ an toàn cùng lệnh sửa chữa.
+              <strong>Tải lên ảnh chụp hiện trạng / Biên bản giấy:</strong> Hình ảnh được băm SHA-256 chống giả mạo và lưu trữ an toàn cùng lệnh sửa chữa.
             </span>
           </div>
 

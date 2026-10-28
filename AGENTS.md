@@ -28,7 +28,12 @@
 
 ## Chuẩn thiết kế giao diện
 
-- Đọc `docs/UI_DESIGN_GUIDELINES.md` trước khi sửa UI. Dùng chung phong cách minimalism và design token; không để mỗi màn hình có một cách thiết kế hoặc một bộ component khác nhau.
+- Đọc `docs/UI_DESIGN_GUIDELINES.md` trước khi sửa UI. Giao diện phải được thiết kế cho người sử dụng phần mềm, không phải để thể hiện cấu trúc phân công nhóm hay tài liệu use case.
+- Đặt tên theo chức năng: Không hiển thị mã UC, tên thành viên phụ trách, tên module kỹ thuật hoặc mã task trên giao diện (menu, breadcrumb, tiêu đề, nút, bảng, dialog).
+- Mô tả ngắn, dễ hiểu: Chỉ bổ sung mô tả khi cần giải thích mục đích hoặc cách sử dụng; tránh dài dòng và không lặp lại tiêu đề.
+- Ngôn ngữ hướng đến người dùng: Nút, label, hướng dẫn, thông báo lỗi và thành công phải rõ nghĩa, không dùng thuật ngữ lập trình khó hiểu (CRUD, Payload, Schema, Endpoint...).
+- Trải nghiệm thao tác: Người dùng dễ tìm chức năng, luôn biết đang ở đâu, hiểu kết quả thao tác và không phải thực hiện các bước thừa.
+- Dùng chung phong cách minimalism và design token; không để mỗi màn hình có một cách thiết kế hoặc một bộ component khác nhau.
 - Tái sử dụng component trong `frontend/src/shared/components`, CSS/token dùng chung trong `frontend/src/styles.css`. Khi cần biến thể, mở rộng component chung; không sao chép form, button, field, table hoặc dialog rồi chỉnh riêng theo màn.
 - Form thêm/sửa dùng `Modal` hoặc `Sheet placement="center"`; xác nhận xóa dùng `ConfirmDialog`/`ConfirmModal`. Dialog nằm giữa cả hai chiều, không dùng drawer hay form cố định sát cạnh trái/phải.
 - Desktop chia field thành hai cột bằng nhau, căn thẳng hàng; mobile một cột. Trường nội dung dài, lỗi chung và hàng nút chiếm trọn hàng. Cùng một đối tượng dùng cùng thứ tự/nhóm trường ở form thêm và sửa.

@@ -20,6 +20,12 @@ public interface BayReservationRepository extends JpaRepository<BayReservation, 
 
     Page<BayReservation> findByBayId(Long bayId, Pageable pageable);
 
+    List<BayReservation> findByStatusIn(Collection<ReservationStatus> statuses);
+
+    Page<BayReservation> findByBayIdAndStatus(Long bayId, ReservationStatus status, Pageable pageable);
+
+    Page<BayReservation> findByStatus(ReservationStatus status, Pageable pageable);
+
     List<BayReservation> findByBookingIdAndStatusIn(Long bookingId, Collection<ReservationStatus> statuses);
 
     List<BayReservation> findByRepairOrderIdAndStatusIn(Long repairOrderId, Collection<ReservationStatus> statuses);

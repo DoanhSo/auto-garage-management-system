@@ -80,6 +80,7 @@ export function TransferOwnershipDialog({
       open={open}
       onClose={onClose}
       placement="center"
+      size="md"
       title={`Chuyển nhượng xe ${vehicle.licensePlate}`}
       description={`Chuyển giao quyền sở hữu xe ${vehicle.brand} ${vehicle.model} cho khách hàng mới.`}
     >
@@ -93,7 +94,7 @@ export function TransferOwnershipDialog({
         <div className="info-strip">
           <ShieldAlert size={18} />
           <span>
-            <strong>Quy tắc bảo mật lịch sử (BR04):</strong> Lịch sử sửa chữa kỹ thuật trước đây vẫn được lưu trữ trên phương tiện, nhưng toàn bộ dữ liệu tài chính của chủ cũ sẽ tự động ẩn đối với chủ mới.
+            <strong>Quy tắc bảo mật lịch sử :</strong> Lịch sử sửa chữa kỹ thuật trước đây vẫn được lưu trữ trên phương tiện, nhưng toàn bộ dữ liệu tài chính của chủ cũ sẽ tự động ẩn đối với chủ mới.
           </span>
         </div>
 

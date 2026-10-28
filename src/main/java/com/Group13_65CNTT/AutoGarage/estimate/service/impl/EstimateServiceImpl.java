@@ -1,5 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.estimate.service.impl;
 
+import com.Group13_65CNTT.AutoGarage.common.util.RequestFingerprint;
+
 import com.Group13_65CNTT.AutoGarage.inventory.entity.Part;
 import com.Group13_65CNTT.AutoGarage.catalog.entity.ServiceEntity;
 import com.Group13_65CNTT.AutoGarage.inventory.repository.PartRepository;
@@ -60,7 +62,10 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
     private final RepairTaskRepository repairTaskRepository;
     private final ServiceRepository serviceRepository;
     private final PartRepository partRepository;
+    private final com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository customerRepository;
     private final PaginationPolicy pagination;
+    private final com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    private final com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
 
     @Autowired(required = false)
     private InventoryOperations inventoryOperations;
@@ -75,13 +80,14 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
     @Override
     @Transactional
     public EstimateResponse createEstimate(Long actorUserId, EstimateCreateRequest request) {
+        objectAccess.requireRepairOrderAccess(actorUserId, request.getRepairOrderId());
         log.info("Creating estimate for order #{} by user #{}", request.getRepairOrderId(), actorUserId);
 
         // Khóa phiếu sửa chữa để đảm bảo version_no tăng tuần tự và trạng thái không bị sửa đổi đồng thời
         RepairOrder order = repairOrderRepository.findByIdForUpdate(request.getRepairOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + request.getRepairOrderId()));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED) {
+        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
             throw new BusinessRuleException("Không thể lập báo giá cho phiếu sửa chữa đã đóng hoặc bị hủy");
         }
 
@@ -211,6 +217,7 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
     @Override
     @Transactional(readOnly = true)
     public EstimateResponse getEstimateById(Long id) {
+        customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.ESTIMATE, id);
         Estimate estimate = estimateRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo giá với ID: " + id));
         List<EstimateItemResponse> items = estimateItemRepository.findByEstimateIdOrderByLineNoAsc(id).stream()
@@ -224,6 +231,7 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
     public EstimateResponse getEstimateByCode(String estimateCode) {
         Estimate estimate = estimateRepository.findByEstimateCode(estimateCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo giá với mã: " + estimateCode));
+        customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.ESTIMATE, estimate.getId());
         List<EstimateItemResponse> items = estimateItemRepository.findByEstimateIdOrderByLineNoAsc(estimate.getId()).stream()
                 .map(estimateItemMapper::toResponse)
                 .toList();
@@ -233,6 +241,7 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
     @Override
     @Transactional(readOnly = true)
     public List<EstimateResponse> getEstimatesByRepairOrderId(Long repairOrderId) {
+        customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.REPAIR_ORDER, repairOrderId);
         List<Estimate> estimates = estimateRepository.findByRepairOrderId(repairOrderId);
         List<EstimateResponse> responses = new ArrayList<>();
         for (Estimate est : estimates) {
@@ -248,6 +257,8 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
     @Transactional(readOnly = true)
     public Page<EstimateResponse> searchEstimates(Long repairOrderId, EstimateStatus status,
                                                   int page, int size, String sortBy, String sortDir) {
+        if (repairOrderId == null) customerScope.requireFrontDesk();
+        else customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.REPAIR_ORDER, repairOrderId);
         Pageable pageable = pagination.page(page, size, sortBy, sortDir,
                 Set.of("id", "estimateCode", "versionNo", "status", "createdAt", "totalAmount"));
         Page<Estimate> pageResult = estimateRepository.searchEstimates(repairOrderId, status, pageable);
@@ -262,6 +273,7 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
     @Override
     @Transactional
     public EstimateResponse sendEstimate(Long actorUserId, Long id) {
+        objectAccess.requireResourceAccess(actorUserId, com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.ESTIMATE, id);
         Estimate estimate = estimateRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo giá với ID: " + id));
 
@@ -275,11 +287,18 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
 
         // Ghi outbox thông báo nếu có NotificationAudit
         if (notificationAudit != null) {
-            notificationAudit.enqueue(new NotificationAudit.Notice(
-                        null, null, "ESTIMATE-" + estimate.getId(), null,
-                        "ESTIMATE_SENT", NotificationAudit.Channel.WEB,
-                        "{\"estimateId\":" + estimate.getId() + ",\"code\":\"" + estimate.getEstimateCode() + "\"}"
-            ));
+            RepairOrder order = repairOrderRepository.findById(estimate.getRepairOrderId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa"));
+            var customer = customerRepository.findById(order.getCustomerId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng"));
+            if (customer.getUserId() != null) {
+                notificationAudit.enqueue(new NotificationAudit.Notice(
+                            customer.getUserId(), order.getCustomerId(), "ESTIMATE-" + estimate.getId(),
+                            com.Group13_65CNTT.AutoGarage.common.constant.NotificationConstants.USER_RECIPIENT_PREFIX + customer.getUserId(),
+                            "ESTIMATE_SENT:" + estimate.getId(), NotificationAudit.Channel.WEB,
+                            "{\"estimateId\":" + estimate.getId() + ",\"code\":\"" + estimate.getEstimateCode() + "\"}"
+                ));
+            }
         }
 
         return getEstimateById(id);
@@ -299,24 +318,39 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
     @Override
     @Transactional
     public void decide(long actorUserId, long estimateId, List<LineDecision> lines, String requestKey) {
+        objectAccess.requireRole(actorUserId, com.Group13_65CNTT.AutoGarage.common.enums.Role.ADMIN.name(),
+                com.Group13_65CNTT.AutoGarage.common.enums.Role.RECEPTIONIST.name(), com.Group13_65CNTT.AutoGarage.common.enums.Role.CUSTOMER.name());
+        objectAccess.requireResourceAccess(actorUserId, com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.ESTIMATE, estimateId);
         log.info("EstimateApproval.decide: actor={}, estimateId={}, linesCount={}, requestKey={}",
-                actorUserId, estimateId, lines.size(), requestKey);
+                actorUserId, estimateId, lines == null ? 0 : lines.size(), requestKey);
 
+        String requestHash = RequestFingerprint.of("DECIDE_ESTIMATE", actorUserId, estimateId, lines);
+        if (notificationAudit != null && requestKey != null && !requestKey.isBlank()
+                && notificationAudit.findCompletedRequest(requestKey, requestHash) != null) {
+            return;
+        }
+        if (lines == null || lines.isEmpty() || lines.stream().anyMatch(line -> line.decision() == null)
+                || lines.stream().map(LineDecision::estimateItemId).distinct().count() != lines.size()) {
+            throw new BusinessRuleException("Danh sách quyết định phải hợp lệ và không trùng hạng mục");
+        }
         Estimate estimate = estimateRepository.findByIdForUpdate(estimateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy báo giá với ID: " + estimateId));
 
-        if (estimate.getStatus() == EstimateStatus.REJECTED || estimate.getStatus() == EstimateStatus.EXPIRED || estimate.getStatus() == EstimateStatus.CANCELLED) {
+        if (estimate.getStatus() == EstimateStatus.DRAFT || estimate.getStatus() == EstimateStatus.REJECTED || estimate.getStatus() == EstimateStatus.EXPIRED || estimate.getStatus() == EstimateStatus.CANCELLED) {
             throw new BusinessRuleException("Báo giá ở trạng thái " + estimate.getStatus() + " không thể phê duyệt");
         }
 
         RepairOrder order = repairOrderRepository.findByIdForUpdate(estimate.getRepairOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa của báo giá này"));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED) {
+        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
             throw new BusinessRuleException("Không thể phê duyệt báo giá của phiếu sửa chữa đã kết thúc");
         }
 
         Instant now = Instant.now();
+        if (estimate.getValidUntil() != null && !now.isBefore(estimate.getValidUntil())) {
+            throw new BusinessRuleException("Báo giá đã hết hạn phê duyệt");
+        }
         boolean hasAnyApproved = false;
 
         for (LineDecision decision : lines) {
@@ -329,6 +363,9 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
 
             // Nếu dòng đã được duyệt hoặc từ chối trước đó, bỏ qua để đảm bảo idempotency replay
             if (item.getApprovalStatus() != ApprovalStatus.PENDING) {
+                if (!item.getApprovalStatus().name().equals(decision.decision().name())) {
+                    throw new BusinessRuleException("Không được đảo quyết định hạng mục đã xử lý; hãy lập báo giá phát sinh");
+                }
                 if (item.getApprovalStatus() == ApprovalStatus.APPROVED) {
                     hasAnyApproved = true;
                 }
@@ -410,7 +447,7 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
         // Ghi completed request cho I08 nếu có requestKey
         if (notificationAudit != null && requestKey != null && !requestKey.isBlank()) {
             notificationAudit.recordCompletedRequest(actorUserId, "DECIDE_ESTIMATE", "ESTIMATE",
-                    estimateId, requestKey, requestKey, "{\"status\":\"" + estimate.getStatus() + "\"}");
+                    estimateId, requestKey, requestHash, "{\"status\":\"" + estimate.getStatus() + "\"}");
         }
 
         log.info("Decided estimate #{} successfully. New status: {}", estimateId, estimate.getStatus());

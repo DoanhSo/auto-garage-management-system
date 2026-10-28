@@ -116,7 +116,7 @@ function VehicleForm({
   return (
     <>
       <form
-        className="editor-form account-editor-form grid-3col"
+        className="editor-form account-editor-form"
         onSubmit={handleSubmit(onSubmit)}
         noValidate
       >
@@ -124,7 +124,7 @@ function VehicleForm({
 
         <div className="form-section-label">THÔNG TIN SỞ HỮU & ĐỊNH DANH</div>
 
-        <div className="col-span-2">
+        <div className="full-width-field">
           <Field
             label="Chủ sở hữu phương tiện"
             required={!existing}

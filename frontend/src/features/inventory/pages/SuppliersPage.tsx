@@ -465,10 +465,10 @@ export function SuppliersPage() {
         description="Khai báo đối tác cung ứng phụ tùng mới và điều khoản công nợ."
         size="lg"
       >
-        <form onSubmit={handleCreate} className="modal-form grid-3col">
+        <form onSubmit={handleCreate} className="modal-form">
           <div className="form-section-label">THÔNG TIN DOANH NGHIỆP & ĐỊNH DANH</div>
 
-          <div className="col-span-2">
+          <div className="full-width">
             <Field label="Tên nhà cung cấp" required>
               <input
                 name="supplierName"
@@ -514,13 +514,13 @@ export function SuppliersPage() {
             />
           </Field>
 
-          <div className="col-span-2">
+          <div className="full-width">
             <Field label="Địa chỉ trụ sở / kho hàng">
               <input name="address" className="input" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
             </Field>
           </div>
 
-          <div className="modal-form-actions col-span-3">
+          <div className="modal-form-actions">
             <Button variant="secondary" onClick={() => setCreating(false)} disabled={createMutation.isPending}>
               Hủy
             </Button>
@@ -540,10 +540,10 @@ export function SuppliersPage() {
         size="lg"
       >
         {editing && (
-          <form onSubmit={handleUpdate} className="modal-form grid-3col">
+          <form onSubmit={handleUpdate} className="modal-form">
             <div className="form-section-label">THÔNG TIN DOANH NGHIỆP & ĐỊNH DANH</div>
 
-            <div className="col-span-2">
+            <div className="full-width">
               <Field label="Tên nhà cung cấp" required>
                 <input
                   name="supplierName"
@@ -601,7 +601,7 @@ export function SuppliersPage() {
               <input name="address" className="input" defaultValue={editing.address || ''} placeholder="Số nhà, đường, tỉnh/thành..." />
             </Field>
 
-            <div className="modal-form-actions col-span-3">
+            <div className="modal-form-actions">
               <Button variant="secondary" onClick={() => setEditing(null)} disabled={updateMutation.isPending}>
                 Hủy
               </Button>

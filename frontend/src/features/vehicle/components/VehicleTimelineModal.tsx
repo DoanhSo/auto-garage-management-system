@@ -25,6 +25,7 @@ export function VehicleTimelineModal({
       open={open}
       onClose={onClose}
       placement="center"
+      size="lg"
       title="Dòng thời gian sửa chữa & bảo dưỡng"
       description={
         timeline
@@ -32,7 +33,7 @@ export function VehicleTimelineModal({
           : 'Lịch sử bảo dưỡng và sửa chữa kỹ thuật của phương tiện'
       }
     >
-      <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
+      <div className="editor-form space-y-4">
         {isLoading ? (
           <Loading label="Đang tải dòng thời gian sửa chữa…" />
         ) : isError ? (
@@ -42,7 +43,7 @@ export function VehicleTimelineModal({
             <Clock className="mx-auto mb-3 opacity-40" size={36} />
             <p className="text-base font-medium">Chưa có lịch sử dịch vụ sửa chữa</p>
             <p className="text-xs mt-1">
-              Phương tiện này chưa phát sinh lệnh sửa chữa (Repair Order) nào trong hệ thống.
+              Phương tiện này chưa phát sinh lệnh sửa chữa nào trong hệ thống.
             </p>
           </div>
         ) : (
@@ -59,10 +60,8 @@ export function VehicleTimelineModal({
                       Lệnh sửa chữa #{entry.orderCode}
                     </span>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        entry.isCurrentOwnerRecord
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'
-                          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                      className={`badge text-xs ${
+                        entry.isCurrentOwnerRecord ? 'badge-primary' : 'badge-neutral'
                       }`}
                     >
                       {entry.isCurrentOwnerRecord ? 'Chủ xe hiện tại' : 'Chủ sở hữu trước'}
@@ -82,7 +81,7 @@ export function VehicleTimelineModal({
                 </div>
 
                 {/* Card nội dung mốc sửa chữa */}
-                <div className="bg-card border border-border rounded-lg p-4 shadow-sm space-y-3">
+                <div className="panel p-4 space-y-3">
                   {/* Yêu cầu & Chẩn đoán */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                     {entry.customerComplaint && (
@@ -112,7 +111,7 @@ export function VehicleTimelineModal({
                       <ul className="grid grid-cols-1 md:grid-cols-2 gap-1.5 text-xs text-foreground">
                         {entry.tasksDone.map((task, idx) => (
                           <li key={idx} className="flex items-start gap-1.5">
-                            <CheckCircle2 size={13} className="text-emerald-500 shrink-0 mt-0.5" />
+                            <CheckCircle2 size={13} className="text-success shrink-0 mt-0.5" />
                             <span>{task}</span>
                           </li>
                         ))}
@@ -130,7 +129,7 @@ export function VehicleTimelineModal({
                         {entry.partsReplaced.map((part, idx) => (
                           <span
                             key={idx}
-                            className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border"
+                            className="badge badge-neutral text-xs"
                           >
                             {part}
                           </span>
@@ -162,15 +161,15 @@ export function VehicleTimelineModal({
                     </div>
                   )}
 
-                  {/* Chi phí thanh toán (Bảo mật tài chính UC38/BR04) */}
-                  <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
+                  {/* Chi phí thanh toán */}
+                  <div className="pt-2 border-t flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Tổng chi phí dịch vụ:</span>
                     {entry.totalAmount !== null ? (
-                      <span className="font-semibold text-sm text-foreground">
+                      <span className="font-semibold text-sm text-foreground money">
                         {money(entry.totalAmount)}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                      <span className="badge badge-warning text-xs inline-flex items-center gap-1">
                         <Lock size={11} />
                         Bảo mật tài chính theo quy định đổi chủ xe
                       </span>
@@ -182,7 +181,7 @@ export function VehicleTimelineModal({
           </div>
         )}
 
-        <div className="form-actions account-editor-actions pt-4 border-t border-border">
+        <div className="modal-form-actions">
           <Button variant="secondary" onClick={onClose}>
             Đóng
           </Button>

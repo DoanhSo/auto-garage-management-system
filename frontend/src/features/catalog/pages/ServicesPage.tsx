@@ -220,7 +220,7 @@ export function ServicesPage() {
   return (
     <>
       <PageHeader
-        eyebrow="TIẾP NHẬN & DỊCH VỤ · M04"
+        eyebrow="DANH MỤC DỊCH VỤ"
         title="Bảng giá & Dịch vụ"
         description="Quản lý bảng giá tiền công kỹ thuật, định mức thời gian tiêu chuẩn và cấu hình các gói bảo dưỡng định kỳ."
         actions={

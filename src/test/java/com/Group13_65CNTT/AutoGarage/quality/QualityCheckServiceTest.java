@@ -54,6 +54,9 @@ class QualityCheckServiceTest {
     @Mock
     private QualityCheckMapper qualityCheckMapper;
 
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.repair.repository.TaskAssignmentRepository assignmentRepository;
+
     @InjectMocks
     private QualityServiceImpl qualityService;
 

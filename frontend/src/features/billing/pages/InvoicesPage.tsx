@@ -562,10 +562,10 @@ export function InvoicesPage() {
         description="Xuất hóa đơn từ phiếu sửa chữa đã nghiệm thu QC hoàn tất."
         size="lg"
       >
-        <form onSubmit={handleIssue} className="modal-form grid-3col">
+        <form onSubmit={handleIssue} className="modal-form">
           <div className="form-section-label">THÔNG TIN PHÁT HÀNH HÓA ĐƠN DỊCH VỤ</div>
 
-          <Field label="Mã phiếu sửa chữa (RO ID)" required>
+          <Field label="Mã lệnh sửa chữa" required>
             <input
               name="repairOrderId"
               type="number"
@@ -598,7 +598,7 @@ export function InvoicesPage() {
             />
           </Field>
 
-          <div className="modal-form-actions col-span-3">
+          <div className="modal-form-actions full-width">
             <Button variant="secondary" onClick={() => setIssuing(false)} disabled={issueMutation.isPending}>
               Hủy
             </Button>
@@ -618,7 +618,7 @@ export function InvoicesPage() {
         size="lg"
       >
         {payingInvoice && (
-          <form onSubmit={handleReceivePayment} className="modal-form grid-3col">
+          <form onSubmit={handleReceivePayment} className="modal-form">
             <div className="form-section-label">THÔNG TIN PHIẾU THU TIỀN</div>
 
             <Field label="Số tiền thu (VNĐ)" required>
@@ -657,7 +657,7 @@ export function InvoicesPage() {
               />
             </Field>
 
-            <div className="col-span-3">
+            <div className="full-width">
               <Field label="Ghi chú phiếu thu">
                 <input
                   className="input"
@@ -668,7 +668,7 @@ export function InvoicesPage() {
               </Field>
             </div>
 
-            <div className="modal-form-actions col-span-3">
+            <div className="modal-form-actions full-width">
               <Button variant="secondary" onClick={() => setPayingInvoice(null)} disabled={receivePaymentMutation.isPending}>
                 Hủy
               </Button>
