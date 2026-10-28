@@ -190,7 +190,7 @@ export function SchedulingPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Khoang sửa chữa & Lịch ca kỹ thuật viên (M06)"
+        title="Khoang sửa chữa & Lịch ca làm việc"
         description="Quản lý vị trí cầu nâng, phân công ca làm việc và điều phối tài nguyên xưởng dịch vụ"
         actions={
           <div className="flex items-center gap-2">

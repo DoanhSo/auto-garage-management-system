@@ -27,7 +27,7 @@ import java.util.List;
 @RestController
 @RequestMapping(ApiPaths.ESTIMATES_BASE)
 @RequiredArgsConstructor
-@Tag(name = "Estimates", description = "Quản lý lập báo giá và phê duyệt từng dòng (TV3)")
+@Tag(name = "Estimates", description = "Quản lý lập báo giá và phê duyệt từng dòng")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class EstimateController {
 

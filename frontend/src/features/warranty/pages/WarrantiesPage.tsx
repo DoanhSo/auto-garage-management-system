@@ -168,7 +168,7 @@ export function WarrantiesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Chính sách bảo hành & Khiếu nại dịch vụ (M12)"
+        title="Sổ bảo hành & Khiếu nại dịch vụ"
         description="Tra cứu sổ bảo hành điện tử theo phương tiện, tiếp nhận và thẩm định hồ sơ khiếu nại bảo hành"
         actions={
           <Button

@@ -26,7 +26,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ApiPaths.INVENTORY_RECONCILIATION_BASE)
-@Tag(name = "Stock Reconciliation", description = "Đối soát số tồn thực tế và sổ kho (TV4-09 / UC38)")
+@Tag(name = "Stock Reconciliation", description = "Đối soát số tồn thực tế và sổ kho")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class StockReconciliationController {
     private final InventoryService inventoryService;

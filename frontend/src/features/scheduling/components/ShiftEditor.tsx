@@ -81,8 +81,8 @@ export function ShiftEditor({
       <Sheet
         open={open}
         placement="center"
-        title="Xếp ca làm việc kỹ thuật viên (M06)"
-        description="Lập lịch làm việc cho thợ kỹ thuật, hệ thống tự động kiểm tra chống trùng lặp ca làm (UC37)"
+        title="Phân ca làm việc kỹ thuật viên"
+        description="Lập lịch làm việc cho kỹ thuật viên. Hệ thống tự động kiểm tra trùng lặp thời gian ca làm."
         onClose={handleClose}
       >
         <form onSubmit={handleSubmit} noValidate className="editor-form account-editor-form">

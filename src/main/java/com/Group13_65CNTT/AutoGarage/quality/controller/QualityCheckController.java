@@ -24,7 +24,7 @@ import java.util.List;
 @RestController
 @RequestMapping(ApiPaths.QUALITY_CHECKS_BASE)
 @RequiredArgsConstructor
-@Tag(name = "Quality Checks", description = "Kiểm tra chất lượng (QC) và yêu cầu làm lại (TV3)")
+@Tag(name = "Quality Checks", description = "Kiểm tra chất lượng (QC) và yêu cầu làm lại")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class QualityCheckController {
 

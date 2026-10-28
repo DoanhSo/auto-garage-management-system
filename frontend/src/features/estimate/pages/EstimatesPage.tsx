@@ -93,7 +93,7 @@ export function EstimatesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Báo giá & Duyệt từng dòng (M07)"
+        title="Báo giá dịch vụ & phụ tùng"
         description="Quản lý các bản dự toán chi phí sửa chữa, gửi khách hàng và phê duyệt từng hạng mục"
         actions={
           <div className="flex items-center gap-2">

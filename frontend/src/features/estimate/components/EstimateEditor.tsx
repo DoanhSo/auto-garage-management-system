@@ -133,7 +133,7 @@ export function EstimateEditor({
       <Sheet
         open={open}
         placement="center"
-        title="Lập Báo giá dịch vụ & phụ tùng (M07)"
+        title="Lập báo giá dịch vụ & phụ tùng"
         description="Lập bản dự toán chi phí sửa chữa và thời hạn bảo hành gửi khách duyệt"
         onClose={handleClose}
       >

@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping(ApiPaths.WARRANTIES_BASE)
 @RequiredArgsConstructor
-@Tag(name = "Warranties", description = "Quản lý chính sách bảo hành và yêu cầu bảo hành (TV3)")
+@Tag(name = "Warranties", description = "Quản lý chính sách bảo hành và yêu cầu bảo hành")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class WarrantyController {
 
