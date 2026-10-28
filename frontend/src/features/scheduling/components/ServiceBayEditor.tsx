@@ -130,11 +130,14 @@ export function ServiceBayEditor({
               onChange={(e) => setBayType(e.target.value)}
               disabled={busy}
             >
-              <option value="GENERAL">Sửa chữa chung (GENERAL)</option>
-              <option value="QUICK">Bảo dưỡng nhanh (QUICK)</option>
-              <option value="HEAVY">Sửa chữa đại tu / Nặng (HEAVY)</option>
-              <option value="ALIGNMENT">Căn chỉnh góc đặt bánh lái (ALIGNMENT)</option>
-              <option value="PAINT">Đồng sơn sấy (PAINT)</option>
+              <option value="TWO_POST">Cầu nâng 2 trụ</option>
+              <option value="FOUR_POST">Cầu nâng 4 trụ</option>
+              <option value="SCISSOR">Cầu nâng cắt kéo</option>
+              <option value="DIAGNOSTIC">Khoang chẩn đoán điện</option>
+              <option value="INSPECTION">Khoang kiểm định QC & xuất xưởng</option>
+              <option value="PAINT">Khoang đồng sơn</option>
+              <option value="WASH">Khoang rửa xe & chăm sóc</option>
+              <option value="GENERAL">Khoang sửa chữa chung</option>
             </select>
           </Field>
 

@@ -14,7 +14,7 @@ import {
 import { ServiceBayEditor } from '../components/ServiceBayEditor';
 import { ShiftEditor } from '../components/ShiftEditor';
 import type { ServiceBay, Shift } from '../types/scheduling';
-import { shiftStatusLabels } from '../types/scheduling';
+import { shiftStatusLabels, bayTypeLabels } from '../types/scheduling';
 
 export function SchedulingPage() {
   const notify = useToast();
@@ -70,7 +70,7 @@ export function SchedulingPage() {
       header: 'Loại khoang',
       cell: ({ row }) => (
         <span className="text-xs px-2 py-0.5 rounded-full bg-muted font-medium">
-          {row.original.bayType}
+          {bayTypeLabels[row.original.bayType] || row.original.bayType}
         </span>
       ),
     },

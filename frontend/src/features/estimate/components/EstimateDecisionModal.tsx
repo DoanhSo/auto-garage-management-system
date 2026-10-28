@@ -134,7 +134,7 @@ export function EstimateDecisionModal({
                 <div>
                   <div className="font-semibold text-sm flex items-center gap-2">
                     <span className={`text-xs px-2 py-0.5 rounded font-normal ${it.itemType === 'SERVICE' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>
-                      {it.itemType}
+                      {it.itemType === 'SERVICE' ? 'Dịch vụ' : 'Phụ tùng'}
                     </span>
                     {it.itemName}
                   </div>

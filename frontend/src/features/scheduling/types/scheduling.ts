@@ -9,6 +9,20 @@ export const shiftStatusLabels: Record<ShiftStatus, string> = {
   CANCELLED: 'Đã hủy',
 };
 
+export const bayTypeLabels: Record<string, string> = {
+  TWO_POST: 'Cầu nâng 2 trụ',
+  FOUR_POST: 'Cầu nâng 4 trụ',
+  SCISSOR: 'Cầu nâng cắt kéo',
+  DIAGNOSTIC: 'Khoang chẩn đoán điện',
+  INSPECTION: 'Khoang kiểm định QC',
+  PAINT: 'Khoang đồng sơn',
+  WASH: 'Khoang rửa xe & chăm sóc',
+  GENERAL: 'Khoang sửa chữa chung',
+  QUICK: 'Bảo dưỡng nhanh',
+  HEAVY: 'Đại tu gầm máy',
+  ALIGNMENT: 'Cân chỉnh góc lái',
+};
+
 export interface ServiceBayCreateInput {
   bayCode: string;
   bayName: string;
