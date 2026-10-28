@@ -175,4 +175,19 @@ class EmployeeShiftServiceTest {
         assertThat(shift.getStatus()).isEqualTo(ShiftStatus.CANCELLED);
         verify(employeeShiftRepository).save(shift);
     }
+
+    @Test
+    @DisplayName("Lấy danh sách tất cả ca làm việc thành công")
+    void getShifts_success() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<EmployeeShift> page = new org.springframework.data.domain.PageImpl<>(List.of(shift));
+        when(employeeShiftRepository.findAll(pageable)).thenReturn(page);
+        when(employeeShiftMapper.toResponse(shift)).thenReturn(response);
+
+        org.springframework.data.domain.Page<ShiftResponse> result = schedulingService.getShifts(null, null, pageable);
+
+        assertThat(result).isNotNull();
+        assertThat(result.getContent()).hasSize(1);
+        verify(employeeShiftRepository).findAll(pageable);
+    }
 }

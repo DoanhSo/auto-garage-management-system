@@ -23,6 +23,10 @@ public interface EmployeeShiftRepository extends JpaRepository<EmployeeShift, Lo
 
     Page<EmployeeShift> findByEmployeeId(Long employeeId, Pageable pageable);
 
+    Page<EmployeeShift> findByEmployeeIdAndStatus(Long employeeId, ShiftStatus status, Pageable pageable);
+
+    Page<EmployeeShift> findByStatus(ShiftStatus status, Pageable pageable);
+
     @Query("SELECT s FROM EmployeeShift s WHERE s.employeeId = :employeeId AND s.status = :status " +
            "AND s.startsAt < :endsAt AND s.endsAt > :startsAt")
     List<EmployeeShift> findOverlappingShifts(

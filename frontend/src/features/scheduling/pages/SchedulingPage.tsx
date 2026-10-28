@@ -10,6 +10,7 @@ import {
   useDeleteServiceBayMutation,
   useShiftsQuery,
   useCancelShiftMutation,
+  useSchedulingEmployeesQuery,
 } from '../hooks/useScheduling';
 import { ServiceBayEditor } from '../components/ServiceBayEditor';
 import { ShiftEditor } from '../components/ShiftEditor';
@@ -49,6 +50,8 @@ export function SchedulingPage() {
 
   const deleteBayMutation = useDeleteServiceBayMutation();
   const cancelShiftMutation = useCancelShiftMutation();
+  const { data: employees = [] } = useSchedulingEmployeesQuery();
+  const employeeMap = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
 
   const bays = useMemo(() => baysData?.content ?? [], [baysData?.content]);
   const shifts = useMemo(() => shiftsData?.content ?? [], [shiftsData?.content]);
@@ -117,8 +120,22 @@ export function SchedulingPage() {
   const shiftColumns = useMemo<ColumnDef<Shift>[]>(() => [
     {
       accessorKey: 'employeeId',
-      header: 'Mã nhân viên (ID)',
-      cell: ({ row }) => <span className="font-semibold">NV #{row.original.employeeId}</span>,
+      header: 'Kỹ thuật viên',
+      cell: ({ row }) => {
+        const emp = employeeMap.get(row.original.employeeId);
+        return (
+          <div className="flex flex-col">
+            <span className="font-semibold text-primary">
+              {emp ? emp.employeeCode : `NV #${row.original.employeeId}`}
+            </span>
+            {emp && (
+              <span className="text-xs text-muted-foreground">
+                {emp.canQc ? 'KTV Kiểm định (QC)' : 'KTV Sửa chữa'}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'startsAt',
@@ -136,7 +153,11 @@ export function SchedulingPage() {
       cell: ({ row }) => {
         const s = row.original.status;
         const color =
-          s === 'COMPLETED' ? 'bg-green-100 text-green-800' : s === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : s === 'CANCELLED' ? 'bg-red-100 text-red-800' : 'bg-muted text-muted-foreground';
+          s === 'ACTIVE'
+            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+            : s === 'CANCELLED'
+            ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300'
+            : 'bg-muted text-muted-foreground';
         return (
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${color}`}>
             {shiftStatusLabels[s] || s}
@@ -163,7 +184,7 @@ export function SchedulingPage() {
         )
       ),
     },
-  ], []);
+  ], [employeeMap]);
 
   const handleDeleteBay = async () => {
     if (!deletingBayId) return;

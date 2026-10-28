@@ -175,6 +175,22 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<ShiftResponse> getShifts(Long employeeId, ShiftStatus status, Pageable pageable) {
+        Page<EmployeeShift> page;
+        if (employeeId != null && status != null) {
+            page = employeeShiftRepository.findByEmployeeIdAndStatus(employeeId, status, pageable);
+        } else if (employeeId != null) {
+            page = employeeShiftRepository.findByEmployeeId(employeeId, pageable);
+        } else if (status != null) {
+            page = employeeShiftRepository.findByStatus(status, pageable);
+        } else {
+            page = employeeShiftRepository.findAll(pageable);
+        }
+        return page.map(employeeShiftMapper::toResponse);
+    }
+
+    @Override
     @Transactional
     @Audited(action = "CREATE_BAY", entity = "ServiceBay")
     public ServiceBayResponse createServiceBay(ServiceBayCreateRequest request) {

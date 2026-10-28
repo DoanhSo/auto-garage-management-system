@@ -10,6 +10,7 @@ import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.BayReservationRespo
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.EmployeeResponse;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.ServiceBayResponse;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.ShiftResponse;
+import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -32,6 +33,8 @@ public interface SchedulingService {
     void cancelShift(Long actorUserId, Long shiftId);
 
     Page<ShiftResponse> getEmployeeShifts(Long employeeId, Pageable pageable);
+
+    Page<ShiftResponse> getShifts(Long employeeId, ShiftStatus status, Pageable pageable);
 
     ServiceBayResponse createServiceBay(ServiceBayCreateRequest request);
 

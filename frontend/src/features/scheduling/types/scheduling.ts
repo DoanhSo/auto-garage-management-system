@@ -1,12 +1,13 @@
 export * from './schedulingTypes';
 
-export type ShiftStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type ShiftStatus = 'ACTIVE' | 'CANCELLED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED';
 
 export const shiftStatusLabels: Record<ShiftStatus, string> = {
+  ACTIVE: 'Đang hoạt động',
+  CANCELLED: 'Đã hủy',
   SCHEDULED: 'Đã lên lịch',
   IN_PROGRESS: 'Đang trong ca',
   COMPLETED: 'Đã hoàn thành',
-  CANCELLED: 'Đã hủy',
 };
 
 export const bayTypeLabels: Record<string, string> = {

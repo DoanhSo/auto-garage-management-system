@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/components/ui';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
+import { ApiError, errorMessage } from '../../../shared/api/errors';
 import { useCreateShiftMutation, useSchedulingEmployeesQuery } from '../hooks/useScheduling';
 
 export function ShiftEditor({
@@ -27,10 +28,12 @@ export function ShiftEditor({
   useEffect(() => {
     if (open) {
       setEmployeeId('');
-      // Mặc định ca hôm nay 08:00 đến 17:00
-      const today = new Date().toISOString().slice(0, 10);
-      setStartsAt(`${today}T08:00`);
-      setEndsAt(`${today}T17:00`);
+      // Mặc định ca hôm nay theo giờ địa phương 08:00 đến 17:00
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const localToday = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      setStartsAt(`${localToday}T08:00`);
+      setEndsAt(`${localToday}T17:00`);
       setNotes('');
       setDiscard(false);
     }
@@ -65,8 +68,12 @@ export function ShiftEditor({
       notify('Phân công ca làm việc thành công');
       onSaved();
       onClose();
-    } catch {
-      notify('Không thể xếp ca làm (Kiểm tra lại xem có bị trùng lặp ca làm việc hay không)');
+    } catch (err: unknown) {
+      if (err instanceof ApiError && (err.code === 2003 || err.status === 409)) {
+        notify('Kỹ thuật viên đã có ca làm việc khác trong khoảng thời gian đã chọn (trùng ca làm)');
+      } else {
+        notify(errorMessage(err));
+      }
     }
   };
 
