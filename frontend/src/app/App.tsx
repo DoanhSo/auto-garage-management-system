@@ -118,6 +118,21 @@ const RepairOrdersPage = lazy(() =>
     default: module.RepairOrdersPage,
   })),
 );
+const EstimatesPage = lazy(() =>
+  import('../features/estimate/pages/EstimatesPage').then((module) => ({
+    default: module.EstimatesPage,
+  })),
+);
+const SchedulingPage = lazy(() =>
+  import('../features/scheduling/pages/SchedulingPage').then((module) => ({
+    default: module.SchedulingPage,
+  })),
+);
+const WarrantiesPage = lazy(() =>
+  import('../features/warranty/pages/WarrantiesPage').then((module) => ({
+    default: module.WarrantiesPage,
+  })),
+);
 
 export function RequireAuth() {
   const { user } = useAuth();
@@ -223,6 +238,10 @@ const router = createBrowserRouter([
                 element: <RequireRoles allowedRoles={STAFF_ROLES} />,
                 children: [
                   { path: 'repair-orders', element: <RepairOrdersPage /> },
+                  { path: 'repairs', element: <RepairOrdersPage /> },
+                  { path: 'estimates', element: <EstimatesPage /> },
+                  { path: 'scheduling', element: <SchedulingPage /> },
+                  { path: 'warranties', element: <WarrantiesPage /> },
                   { path: 'inventory/parts', element: <PartsPage /> },
                   { path: 'inventory/documents', element: <InventoryDocumentsPage /> },
                   { path: 'billing/invoices', element: <InvoicesPage /> },

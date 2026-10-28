@@ -52,6 +52,24 @@ const links: ReadonlyArray<{
     allowedRoles: STAFF_ROLES,
   },
   {
+    to: '/estimates',
+    label: 'Báo giá',
+    icon: FileText,
+    allowedRoles: STAFF_ROLES,
+  },
+  {
+    to: '/scheduling',
+    label: 'Khoang & Lịch ca',
+    icon: CalendarCheck,
+    allowedRoles: STAFF_ROLES,
+  },
+  {
+    to: '/warranties',
+    label: 'Bảo hành',
+    icon: ShieldCheck,
+    allowedRoles: STAFF_ROLES,
+  },
+  {
     to: '/customers',
     label: 'Khách hàng',
     icon: Contact,
