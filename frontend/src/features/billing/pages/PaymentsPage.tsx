@@ -472,9 +472,10 @@ export function PaymentsPage() {
         onOpenChange={setPayingSupplier}
         title="Lập phiếu chi trả nhà cung cấp"
         description="Thanh toán tiền hàng cho đối tác cung ứng dựa trên chứng từ nhập kho đã ghi sổ."
+        size="lg"
       >
-        <form onSubmit={handlePaySupplier} className="modal-form">
-          <div className="form-section-label">THÔNG TIN THANH TOÁN</div>
+        <form onSubmit={handlePaySupplier} className="modal-form grid-3col">
+          <div className="form-section-label">THÔNG TIN ĐỐI TÁC & CHỨNG TỪ CHI TRẢ</div>
 
           <Field label="Nhà cung cấp" required>
             <select
@@ -529,6 +530,8 @@ export function PaymentsPage() {
             />
           </Field>
 
+          <div className="form-section-label">PHƯƠNG THỨC & CHỨNG TỪ GIAO DỊCH</div>
+
           <Field label="Phương thức thanh toán" required>
             <select
               className="input"
@@ -541,7 +544,7 @@ export function PaymentsPage() {
             </select>
           </Field>
 
-          <Field label="Mã giao dịch ngân hàng / Ủy nhiệm chi" hint="Bắt buộc nếu chuyển khoản">
+          <Field label="Mã giao dịch / Ủy nhiệm chi">
             <input
               className="input font-mono"
               placeholder="VD: FT2629810239"
@@ -559,7 +562,7 @@ export function PaymentsPage() {
             />
           </Field>
 
-          <div className="modal-form-actions">
+          <div className="modal-form-actions col-span-3">
             <Button variant="secondary" onClick={() => setPayingSupplier(false)} disabled={paySupplierMutation.isPending}>
               Hủy
             </Button>

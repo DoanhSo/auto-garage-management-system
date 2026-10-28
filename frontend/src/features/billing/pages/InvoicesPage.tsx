@@ -560,11 +560,12 @@ export function InvoicesPage() {
         onOpenChange={setIssuing}
         title="Phát hành hóa đơn dịch vụ mới"
         description="Xuất hóa đơn từ phiếu sửa chữa đã nghiệm thu QC hoàn tất."
+        size="lg"
       >
-        <form onSubmit={handleIssue} className="modal-form">
-          <div className="form-section-label">THÔNG TIN PHÁT HÀNH</div>
+        <form onSubmit={handleIssue} className="modal-form grid-3col">
+          <div className="form-section-label">THÔNG TIN PHÁT HÀNH HÓA ĐƠN DỊCH VỤ</div>
 
-          <Field label="Mã phiếu sửa chữa (Repair Order ID)" required hint="Phiếu sửa chữa đã hoàn thành nghiệm thu">
+          <Field label="Mã phiếu sửa chữa (RO ID)" required>
             <input
               name="repairOrderId"
               type="number"
@@ -575,7 +576,7 @@ export function InvoicesPage() {
             />
           </Field>
 
-          <Field label="Thuế giá trị gia tăng (VAT đ)" hint="Số tiền thuế VAT tính trên doanh thu">
+          <Field label="Thuế giá trị gia tăng (VAT đ)">
             <input
               name="taxAmount"
               type="number"
@@ -586,7 +587,7 @@ export function InvoicesPage() {
             />
           </Field>
 
-          <Field label="Chiết khấu / Giảm giá (đ)" hint="Số tiền giảm trừ trực tiếp cho khách hàng">
+          <Field label="Chiết khấu / Giảm giá (đ)">
             <input
               name="discountAmount"
               type="number"
@@ -597,7 +598,7 @@ export function InvoicesPage() {
             />
           </Field>
 
-          <div className="modal-form-actions">
+          <div className="modal-form-actions col-span-3">
             <Button variant="secondary" onClick={() => setIssuing(false)} disabled={issueMutation.isPending}>
               Hủy
             </Button>
@@ -614,12 +615,13 @@ export function InvoicesPage() {
         onOpenChange={(open) => !open && setPayingInvoice(null)}
         title={`Thu tiền hóa đơn #${payingInvoice?.invoiceCode}`}
         description={`Khách hàng: ${payingInvoice?.customerSnapshot?.fullName || ''} · Biển số: ${payingInvoice?.vehicleSnapshot?.plateNumber || ''}`}
+        size="lg"
       >
         {payingInvoice && (
-          <form onSubmit={handleReceivePayment} className="modal-form">
+          <form onSubmit={handleReceivePayment} className="modal-form grid-3col">
             <div className="form-section-label">THÔNG TIN PHIẾU THU TIỀN</div>
 
-            <Field label="Số tiền thu (VNĐ)" required hint={`Còn nợ: ${Number(payingInvoice.balanceAmount || payingInvoice.totalAmount).toLocaleString('vi-VN')} đ`}>
+            <Field label="Số tiền thu (VNĐ)" required>
               <input
                 type="number"
                 min="1"
@@ -646,7 +648,7 @@ export function InvoicesPage() {
               </select>
             </Field>
 
-            <Field label="Mã giao dịch / Mã chuẩn chi ngân hàng" hint="Bắt buộc nếu chuyển khoản hoặc quét QR">
+            <Field label="Mã giao dịch / Mã chuẩn chi">
               <input
                 className="input font-mono"
                 placeholder="VD: QR-BIDV-102938"
@@ -655,16 +657,18 @@ export function InvoicesPage() {
               />
             </Field>
 
-            <Field label="Ghi chú phiếu thu">
-              <input
-                className="input"
-                placeholder="Khách thanh toán qua VietQR..."
-                value={payNotes}
-                onChange={(e) => setPayNotes(e.target.value)}
-              />
-            </Field>
+            <div className="col-span-3">
+              <Field label="Ghi chú phiếu thu">
+                <input
+                  className="input"
+                  placeholder="Khách thanh toán tiền mặt / quét mã QR qua VietQR..."
+                  value={payNotes}
+                  onChange={(e) => setPayNotes(e.target.value)}
+                />
+              </Field>
+            </div>
 
-            <div className="modal-form-actions">
+            <div className="modal-form-actions col-span-3">
               <Button variant="secondary" onClick={() => setPayingInvoice(null)} disabled={receivePaymentMutation.isPending}>
                 Hủy
               </Button>
@@ -682,10 +686,11 @@ export function InvoicesPage() {
         onOpenChange={(open) => !open && setViewingInvoice(null)}
         title={`Hóa đơn dịch vụ #${viewingInvoice?.invoiceCode}`}
         description="Chi tiết snapshot khách hàng, xe và danh mục phụ tùng & tiền công."
+        size="xl"
       >
         {viewingInvoice && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 0' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px', background: '#f8fafc', padding: '16px', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '4px 0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px 16px', background: '#f8fafc', padding: '14px 18px', borderRadius: '8px' }}>
               <div>
                 <span className="muted" style={{ fontSize: '12px' }}>Khách hàng:</span>
                 <div style={{ fontWeight: 650, fontSize: '14px' }}>{viewingInvoice.customerSnapshot?.fullName}</div>
@@ -713,15 +718,15 @@ export function InvoicesPage() {
             </div>
 
             {/* Bảng chi tiết dòng hóa đơn */}
-            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', maxHeight: '200px', overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600 }}>
+                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600, position: 'sticky', top: 0, zIndex: 1 }}>
                   <tr>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>Hạng mục</th>
                     <th style={{ padding: '8px 12px', width: '80px', textAlign: 'center' }}>Loại</th>
                     <th style={{ padding: '8px 12px', width: '70px', textAlign: 'right' }}>SL</th>
-                    <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>Đơn giá (đ)</th>
-                    <th style={{ padding: '8px 12px', width: '120px', textAlign: 'right' }}>Thành tiền</th>
+                    <th style={{ padding: '8px 12px', width: '120px', textAlign: 'right' }}>Đơn giá (đ)</th>
+                    <th style={{ padding: '8px 12px', width: '130px', textAlign: 'right' }}>Thành tiền</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -756,30 +761,31 @@ export function InvoicesPage() {
             </div>
 
             {/* Tổng hợp tài chính */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-end', paddingRight: '8px', fontSize: '13px' }}>
-              <div>Tạm tính: <strong>{Number(viewingInvoice.subtotal).toLocaleString('vi-VN')} đ</strong></div>
-              {Number(viewingInvoice.taxAmount) > 0 && (
-                <div>Thuế VAT: <strong>+{Number(viewingInvoice.taxAmount).toLocaleString('vi-VN')} đ</strong></div>
-              )}
-              {Number(viewingInvoice.discountAmount) > 0 && (
-                <div style={{ color: '#059669' }}>
-                  Giảm giá: <strong>-{Number(viewingInvoice.discountAmount).toLocaleString('vi-VN')} đ</strong>
-                </div>
-              )}
-              <div style={{ fontSize: '16px', fontWeight: 700, color: '#245bdb', marginTop: '4px' }}>
-                Tổng cộng: {Number(viewingInvoice.totalAmount).toLocaleString('vi-VN')} đ
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px', fontSize: '13px' }}>
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <span>Tạm tính: <strong>{Number(viewingInvoice.subtotal).toLocaleString('vi-VN')} đ</strong></span>
+                {Number(viewingInvoice.taxAmount) > 0 && (
+                  <span>VAT: <strong>+{Number(viewingInvoice.taxAmount).toLocaleString('vi-VN')} đ</strong></span>
+                )}
+                {Number(viewingInvoice.discountAmount) > 0 && (
+                  <span style={{ color: '#059669' }}>
+                    Giảm: <strong>-{Number(viewingInvoice.discountAmount).toLocaleString('vi-VN')} đ</strong>
+                  </span>
+                )}
               </div>
-              <div style={{ fontSize: '13px', marginTop: '2px' }}>
-                Đã thanh toán: <strong style={{ color: '#059669' }}>{Number(viewingInvoice.paidAmount || 0).toLocaleString('vi-VN')} đ</strong>
+              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                <span style={{ fontSize: '16px', fontWeight: 700, color: '#245bdb' }}>
+                  Tổng cộng: {Number(viewingInvoice.totalAmount).toLocaleString('vi-VN')} đ
+                </span>
+                {Number(viewingInvoice.balanceAmount) > 0 && (
+                  <span style={{ fontSize: '13px', color: '#b42335', fontWeight: 600 }}>
+                    (Còn nợ: {Number(viewingInvoice.balanceAmount).toLocaleString('vi-VN')} đ)
+                  </span>
+                )}
               </div>
-              {Number(viewingInvoice.balanceAmount) > 0 && (
-                <div style={{ fontSize: '13px', color: '#b42335', fontWeight: 600 }}>
-                  Còn nợ: {Number(viewingInvoice.balanceAmount).toLocaleString('vi-VN')} đ
-                </div>
-              )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
               <Button variant="secondary" onClick={() => setViewingInvoice(null)}>
                 Đóng
               </Button>
