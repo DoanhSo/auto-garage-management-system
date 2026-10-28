@@ -94,7 +94,7 @@ class InventoryServiceTest {
                 .items(new ArrayList<>())
                 .build();
         InventoryDocumentItem item = InventoryDocumentItem.builder()
-                .id(101L).document(doc).part(part).quantity(new BigDecimal("10")).unitCost(new BigDecimal("50000"))
+                .id(101L).document(doc).part(part).quantity(new BigDecimal("10")).unitCost(new BigDecimal("50000")).lineTotal(new BigDecimal("500000"))
                 .build();
         doc.getItems().add(item);
 
@@ -114,14 +114,16 @@ class InventoryServiceTest {
     void postDocument_OutgoingWithInsufficientStock_ThrowsBadRequest() {
         Part part = Part.builder().id(1L).sku("PART-1").stockQuantity(new BigDecimal("5")).reservedQuantity(BigDecimal.ZERO).purchasePrice(BigDecimal.ZERO).build();
         InventoryDocument doc = InventoryDocument.builder()
-                .id(10L).documentCode("DOC-OUT-001").documentType(DocumentType.OUT).status(DocumentStatus.DRAFT).version(0L)
+                .id(10L).repairOrderId(100L).documentCode("DOC-OUT-001").documentType(DocumentType.OUT).status(DocumentStatus.DRAFT).version(0L)
                 .items(new ArrayList<>())
                 .build();
         InventoryDocumentItem item = InventoryDocumentItem.builder()
-                .id(101L).document(doc).part(part).quantity(new BigDecimal("10")).unitCost(new BigDecimal("50000"))
+                .id(101L).estimateItemId(12L).document(doc).part(part).quantity(new BigDecimal("10")).unitCost(new BigDecimal("50000")).lineTotal(new BigDecimal("500000"))
                 .build();
         doc.getItems().add(item);
 
+        when(jdbcTemplate.queryForList(contains("SELECT status FROM repair_orders"), eq(100L))).thenReturn(List.of(Map.of("status", "IN_PROGRESS")));
+        when(jdbcTemplate.queryForList(contains("SELECT ei.part_id"), eq(12L))).thenReturn(List.of(Map.of("part_id", 1L, "repair_order_id", 100L, "approval_status", "APPROVED", "item_type", "PART", "reserved_quantity", new BigDecimal("10"), "unit_price", new BigDecimal("60000"))));
         when(documentRepository.findByIdWithLock(10L)).thenReturn(Optional.of(doc));
         when(itemRepository.findByDocumentIdOrderByLineNoAsc(10L)).thenReturn(List.of(item));
         when(partRepository.findAllByIdInOrderByIdAscWithLock(List.of(1L))).thenReturn(List.of(part));
@@ -141,6 +143,7 @@ class InventoryServiceTest {
         estimateItem.put("approval_status", "APPROVED");
         estimateItem.put("item_type", "PART");
         estimateItem.put("reserved_quantity", BigDecimal.ZERO);
+        estimateItem.put("quantity", new BigDecimal("2"));
 
         when(jdbcTemplate.queryForList(contains("SELECT id, part_id"), eq(1L)))
                 .thenReturn(List.of(estimateItem));

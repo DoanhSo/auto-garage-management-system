@@ -44,6 +44,15 @@ import java.util.*;
 @DisplayName("BillingService unit tests")
 class BillingServiceTest {
 
+    @Test
+    void voidInvoiceCannotAuthorizeHandoverEvenWithZeroBalance() {
+        Invoice invoice = Invoice.builder().id(1L).status(InvoiceStatus.VOID).totalAmount(BigDecimal.ZERO).build();
+        when(invoiceRepository.findByRepairOrderIdWithLock(500L)).thenReturn(Optional.of(invoice));
+        assertThatThrownBy(() -> service.requireHandoverAllowed(10L, 500L))
+                .isInstanceOf(BusinessException.class).hasFieldOrPropertyWithValue("responseCode", ResponseCode.BAD_REQUEST);
+        verifyNoInteractions(paymentRepository);
+    }
+
     @Mock InvoiceRepository invoiceRepository;
     @Mock InvoiceItemRepository invoiceItemRepository;
     @Mock PaymentRepository paymentRepository;
@@ -96,8 +105,8 @@ class BillingServiceTest {
 
         // Mock QC check query
         Map<String, Object> qcMap = new HashMap<>();
-        qcMap.put("check_type", "POST_REPAIR");
-        qcMap.put("conclusion", "PASSED");
+        qcMap.put("check_type", "QC");
+        qcMap.put("result", "PASSED");
         when(jdbcTemplate.queryForList(contains("FROM vehicle_checks"), eq(400L)))
                 .thenReturn(List.of(qcMap));
 
@@ -131,10 +140,11 @@ class BillingServiceTest {
         // Mock tasks & parts queries (at least one billable item)
         Map<String, Object> taskMap = new HashMap<>();
         taskMap.put("task_id", 1L);
+        taskMap.put("quantity", BigDecimal.ONE);
         taskMap.put("service_name", "Oil change");
         taskMap.put("unit", "service");
-        taskMap.put("actual_price", new BigDecimal("200000"));
-        taskMap.put("actual_cost", new BigDecimal("50000"));
+        taskMap.put("unit_price", new BigDecimal("200000"));
+        taskMap.put("unit_cost", new BigDecimal("50000"));
         taskMap.put("warranty_days", 30);
         taskMap.put("warranty_km", 1000);
         taskMap.put("warranty_terms", "Standard");
@@ -236,7 +246,7 @@ class BillingServiceTest {
                 .id(1L).customerId(100L).status(InvoiceStatus.PARTIALLY_PAID).totalAmount(new BigDecimal("5000000"))
                 .build();
 
-        when(invoiceRepository.findByRepairOrderId(500L)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.findByRepairOrderIdWithLock(500L)).thenReturn(Optional.of(invoice));
         when(paymentRepository.calculatePaidAmountForInvoice(1L)).thenReturn(new BigDecimal("1000000"));
 
         Map<String, Object> custMap = new HashMap<>();

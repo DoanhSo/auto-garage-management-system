@@ -47,8 +47,8 @@ export function DebtLedgerPage() {
       size: 100,
     });
 
-  const customerDebts = customerDebtsData?.content || [];
-  const supplierDebts = supplierDebtsData?.content || [];
+  const customerDebts = useMemo(() => customerDebtsData?.content ?? [], [customerDebtsData?.content]);
+  const supplierDebts = useMemo(() => supplierDebtsData?.content ?? [], [supplierDebtsData?.content]);
 
   const totalReceivables = customerDebts.reduce(
     (sum, c) => sum + Number(c.balanceAmount || 0),

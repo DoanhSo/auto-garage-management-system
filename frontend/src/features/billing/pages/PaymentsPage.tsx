@@ -474,7 +474,7 @@ export function PaymentsPage() {
         description="Thanh toán tiền hàng cho đối tác cung ứng dựa trên chứng từ nhập kho đã ghi sổ."
         size="lg"
       >
-        <form onSubmit={handlePaySupplier} className="modal-form grid-3col">
+        <form onSubmit={handlePaySupplier} className="modal-form">
           <div className="form-section-label">THÔNG TIN ĐỐI TÁC & CHỨNG TỪ CHI TRẢ</div>
 
           <Field label="Nhà cung cấp" required>
@@ -562,7 +562,7 @@ export function PaymentsPage() {
             />
           </Field>
 
-          <div className="modal-form-actions col-span-3">
+          <div className="modal-form-actions full-width">
             <Button variant="secondary" onClick={() => setPayingSupplier(false)} disabled={paySupplierMutation.isPending}>
               Hủy
             </Button>

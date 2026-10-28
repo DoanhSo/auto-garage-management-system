@@ -300,6 +300,7 @@ export function UserEditor({
     <Sheet
       open
       placement="center"
+      size="lg"
       title={id === 'new' ? 'Thêm tài khoản' : 'Sửa tài khoản'}
       description={
         id === 'new'

@@ -78,6 +78,13 @@ class RepairOrderServiceTest {
     @Mock
     private BayScheduling bayScheduling;
 
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUser;
+
     @InjectMocks
     private RepairServiceImpl repairService;
 
@@ -96,6 +103,7 @@ class RepairOrderServiceTest {
 
         mockVehicle = new Vehicle();
         mockVehicle.setId(1L);
+        mockVehicle.setCustomerId(1L);
         mockVehicle.setLicensePlate("29A-12345");
         mockVehicle.setOdometer(50000);
         mockVehicle.setIsActive(true);
@@ -275,8 +283,8 @@ class RepairOrderServiceTest {
     }
 
     @Test
-    @DisplayName("Thêm task vào phiếu sửa chữa")
-    void createTask_Success() {
+    @DisplayName("Không tạo task sửa chữa ngoài báo giá đã duyệt")
+    void createTask_RequiresApprovedEstimate() {
         RepairTaskCreateRequest req = RepairTaskCreateRequest.builder()
                 .taskName("Thay má phanh trước")
                 .description("Thay má phanh gốm cao cấp")
@@ -285,14 +293,8 @@ class RepairOrderServiceTest {
                 .build();
 
         when(repairOrderRepository.findById(100L)).thenReturn(Optional.of(mockOrder));
-        when(repairTaskMapper.toEntity(req)).thenReturn(mockTask);
-        when(repairTaskRepository.save(any(RepairTask.class))).thenReturn(mockTask);
-        RepairTaskResponse res = RepairTaskResponse.builder().id(200L).taskName(req.getTaskName()).build();
-        when(repairTaskMapper.toResponse(mockTask)).thenReturn(res);
-
-        RepairTaskResponse created = repairService.createTask(2L, 100L, req);
-        assertThat(created).isNotNull();
-        assertThat(created.getId()).isEqualTo(200L);
+        assertThatThrownBy(() -> repairService.createTask(2L, 100L, req)).isInstanceOf(BusinessRuleException.class);
+        verify(repairTaskRepository, never()).save(any());
     }
 
     @Test

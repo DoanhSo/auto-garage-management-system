@@ -1,5 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.repair.service.impl;
 
+import com.Group13_65CNTT.AutoGarage.common.util.RequestFingerprint;
+
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
 import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
 import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
@@ -68,6 +70,9 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 @RequiredArgsConstructor
 public class RepairServiceImpl implements RepairService, RepairWorkflow {
+    private final com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    private final com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUser;
+    private final com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
 
     private final RepairOrderRepository repairOrderRepository;
     private final RepairTaskRepository repairTaskRepository;
@@ -122,6 +127,12 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         if (Boolean.FALSE.equals(vehicle.getIsActive())) {
             throw new BusinessRuleException("Phương tiện đang bị ngừng hoạt động");
         }
+        if (!java.util.Objects.equals(vehicle.getCustomerId(), customerId)) {
+            throw new BusinessRuleException("Phương tiện không thuộc khách hàng tiếp nhận");
+        }
+        if (vehicle.getOdometer() != null && odometer < vehicle.getOdometer()) {
+            throw new BusinessRuleException("Số km tiếp nhận không được nhỏ hơn số km đã ghi nhận");
+        }
 
         Customer customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + customerId));
@@ -142,9 +153,13 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
             if (repairOrderRepository.existsByBookingId(bookingId)) {
                 throw new ConflictException("Lịch hẹn này đã được tiếp nhận tạo phiếu sửa chữa trước đó");
             }
+            if (booking.getStatus() != BookingStatus.PENDING && booking.getStatus() != BookingStatus.CONFIRMED) {
+                throw new BusinessRuleException("Lịch hẹn không còn ở trạng thái có thể tiếp nhận");
+            }
 
             booking.setStatus(BookingStatus.RECEIVED);
             bookingRepository.save(booking);
+            bayScheduling.releaseForBooking(actorUserId, bookingId);
         }
 
         String orderCode = generateOrderCode("RO");
@@ -187,6 +202,19 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
 
     @Override
     @Transactional
+    public void recordReceptionDetails(long repairOrderId, BigDecimal fuelLevelPercent, String customerComplaint) {
+        RepairOrder order = repairOrderRepository.findByIdForUpdate(repairOrderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu tiếp nhận"));
+        if (order.getStatus() != RepairOrderStatus.NEW) {
+            throw new BusinessRuleException("Chỉ ghi thông tin tiếp nhận cho phiếu mới");
+        }
+        order.setFuelLevelPercent(fuelLevelPercent);
+        order.setCustomerComplaint(customerComplaint);
+        repairOrderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
     public long createWarrantyOrder(long actorUserId, long warrantyClaimId) {
         log.info("RepairWorkflow.createWarrantyOrder: actor={}, warrantyClaimId={}", actorUserId, warrantyClaimId);
 
@@ -195,6 +223,9 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
 
         if (claim.getHandlingOrderId() != null) {
             throw new ConflictException("Yêu cầu bảo hành này đã được gắn với phiếu sửa chữa xử lý: " + claim.getHandlingOrderId());
+        }
+        if (claim.getStatus() != ClaimStatus.APPROVED) {
+            throw new BusinessRuleException("Yêu cầu bảo hành phải được duyệt trước khi tạo phiếu xử lý");
         }
 
         Warranty warranty = warrantyRepository.findById(claim.getWarrantyId())
@@ -270,6 +301,9 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         if (qcCheck.getCheckType() != CheckType.QC || qcCheck.getResult() != CheckResult.PASSED) {
             throw new BusinessRuleException("Biên bản kiểm tra chất lượng gần nhất chưa đạt yêu cầu (PASSED)");
         }
+        if (inventoryOperations != null) {
+            inventoryOperations.requireIssueComplete(repairOrderId);
+        }
     }
 
     @Override
@@ -277,6 +311,12 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
     public void handOver(long actorUserId, long repairOrderId, int odometerOut, String requestKey) {
         log.info("RepairWorkflow.handOver: actor={}, repairOrderId={}, odoOut={}, requestKey={}",
                 actorUserId, repairOrderId, odometerOut, requestKey);
+
+        String requestHash = RequestFingerprint.of("HANDOVER", actorUserId, repairOrderId, odometerOut);
+        if (notificationAudit != null && requestKey != null && !requestKey.isBlank()
+                && notificationAudit.findCompletedRequest(requestKey, requestHash) != null) {
+            return;
+        }
 
         RepairOrder order = repairOrderRepository.findByIdForUpdate(repairOrderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + repairOrderId));
@@ -290,6 +330,8 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
                     "Số km khi bàn giao (%d) không được nhỏ hơn số km vào xưởng (%d)",
                     odometerOut, order.getOdometerIn()));
         }
+
+        requireInvoiceReady(actorUserId, repairOrderId);
 
         // Kiểm tra điều kiện nợ / thanh toán nếu billing module đã sẵn sàng
         if (billingOperations != null) {
@@ -307,7 +349,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
 
         // Cập nhật Odometer của xe
         vehicleRepository.findById(order.getVehicleId()).ifPresent(v -> {
-            v.setOdometer(odometerOut);
+            v.setOdometer(v.getOdometer() == null ? odometerOut : Math.max(v.getOdometer(), odometerOut));
             vehicleRepository.save(v);
         });
 
@@ -341,7 +383,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         // Ghi completed request nếu có notificationAudit
         if (notificationAudit != null && requestKey != null && !requestKey.isBlank()) {
             notificationAudit.recordCompletedRequest(actorUserId, "HANDOVER", "REPAIR_ORDER",
-                    repairOrderId, requestKey, requestKey, "{\"status\":\"CLOSED\"}");
+                    repairOrderId, requestKey, requestHash, "{\"status\":\"CLOSED\"}");
         }
 
         log.info("Phiếu sửa chữa #{} đã được bàn giao thành công và đóng phiếu", repairOrderId);
@@ -370,6 +412,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
     @Override
     @Transactional(readOnly = true)
     public RepairOrderResponse getRepairOrderById(Long id) {
+        customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.REPAIR_ORDER, id);
         RepairOrder order = repairOrderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + id));
         return repairOrderMapper.toResponse(order);
@@ -380,6 +423,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
     public RepairOrderResponse getRepairOrderByCode(String orderCode) {
         RepairOrder order = repairOrderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với mã: " + orderCode));
+        customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.REPAIR_ORDER, order.getId());
         return repairOrderMapper.toResponse(order);
     }
 
@@ -389,7 +433,9 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
                                                         int page, int size, String sortBy, String sortDir) {
         Pageable pageable = pagination.page(page, size, sortBy, sortDir,
                 Set.of("id", "orderCode", "receivedAt", "status", "createdAt"));
-        Page<RepairOrder> resultPage = repairOrderRepository.searchOrders(keyword, status, pageable);
+        Page<RepairOrder> resultPage = currentUser.role() == com.Group13_65CNTT.AutoGarage.common.enums.Role.TECHNICIAN
+                ? repairOrderRepository.searchAssignedOrders(currentUser.userId(), keyword, status, pageable)
+                : repairOrderRepository.searchOrders(keyword, status, pageable);
         return resultPage.map(repairOrderMapper::toResponse);
     }
 
@@ -399,7 +445,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         RepairOrder order = repairOrderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + id));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED) {
+        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
             throw new BusinessRuleException("Phiếu sửa chữa đã đóng hoặc bị hủy, không thể chỉnh sửa");
         }
 
@@ -410,10 +456,11 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
     @Override
     @Transactional
     public RepairOrderResponse updateDiagnosis(Long actorUserId, Long id, DiagnosisUpdateRequest request) {
+        objectAccess.requireRepairOrderAccess(actorUserId, id);
         RepairOrder order = repairOrderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + id));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED) {
+        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
             throw new BusinessRuleException("Phiếu sửa chữa đã đóng hoặc bị hủy, không thể cập nhật chẩn đoán");
         }
 
@@ -427,6 +474,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
     @Override
     @Transactional
     public RepairOrderResponse transitionStatus(Long actorUserId, Long id, RepairOrderStatus newStatus, String note) {
+        objectAccess.requireRepairOrderAccess(actorUserId, id);
         RepairOrder order = repairOrderRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + id));
 
@@ -442,6 +490,23 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
 
         validateTransition(current, newStatus, order);
 
+        if (Set.of(RepairOrderStatus.APPROVED, RepairOrderStatus.QC_FAILED,
+                RepairOrderStatus.COMPLETED, RepairOrderStatus.INVOICED, RepairOrderStatus.CLOSED).contains(newStatus)) {
+            throw new BusinessRuleException("Trạng thái này phải được cập nhật qua nghiệp vụ duyệt báo giá, QC, hóa đơn hoặc bàn giao tương ứng");
+        }
+
+        if (newStatus == RepairOrderStatus.CANCELLED) {
+            List<RepairTask> tasks = repairTaskRepository.findByRepairOrderId(id);
+            if (laborSessionRepository.countOpenSessionsByRepairOrderId(id) > 0
+                    || tasks.stream().anyMatch(task -> task.getStartedAt() != null || task.getStatus() == TaskStatus.COMPLETED)) {
+                throw new BusinessRuleException("Phiếu đã thi công phải xử lý công việc, vật tư và chi phí trước khi hủy");
+            }
+            bayScheduling.releaseForRepair(actorUserId, id);
+            if (inventoryOperations != null) inventoryOperations.releaseForOrder(actorUserId, id);
+            tasks.forEach(task -> task.setStatus(TaskStatus.CANCELLED));
+            repairTaskRepository.saveAll(tasks);
+        }
+
         order.setStatus(newStatus);
         return repairOrderMapper.toResponse(repairOrderRepository.save(order));
     }
@@ -456,6 +521,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
     @Override
     @Transactional(readOnly = true)
     public List<RepairTaskResponse> getTasksByRepairOrderId(Long repairOrderId) {
+        customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.REPAIR_ORDER, repairOrderId);
         if (!repairOrderRepository.existsById(repairOrderId)) {
             throw new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + repairOrderId);
         }
@@ -470,15 +536,11 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         RepairOrder order = repairOrderRepository.findById(repairOrderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + repairOrderId));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED) {
+        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
             throw new BusinessRuleException("Không thể thêm công việc vào phiếu sửa chữa đã đóng hoặc bị hủy");
         }
 
-        RepairTask task = repairTaskMapper.toEntity(request);
-        task.setRepairOrderId(repairOrderId);
-        task.setTaskType(TaskType.REPAIR);
-        task.setStatus(TaskStatus.PENDING);
-        return repairTaskMapper.toResponse(repairTaskRepository.save(task));
+        throw new BusinessRuleException("Công việc sửa chữa phải được tạo từ hạng mục dịch vụ đã duyệt trong báo giá");
     }
 
     @Override
@@ -490,14 +552,17 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         RepairOrder order = repairOrderRepository.findById(task.getRepairOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa của công việc này"));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED) {
+        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
             throw new BusinessRuleException("Không thể chỉnh sửa công việc trong phiếu sửa chữa đã kết thúc");
         }
 
-        repairTaskMapper.updateEntityFromRequest(request, task);
-        if (request.getStatus() == TaskStatus.COMPLETED && task.getCompletedAt() == null) {
-            task.setCompletedAt(Instant.now());
+        if (request.getStatus() != null && request.getStatus() != task.getStatus()) {
+            throw new BusinessRuleException("Thay đổi trạng thái công việc phải qua luồng thực hiện hoặc hoàn thành công việc");
         }
+        if (task.getEstimateItemId() != null && (request.getQuantity() != null || request.getUnitPrice() != null)) {
+            throw new BusinessRuleException("Số lượng và đơn giá đã duyệt chỉ được điều chỉnh bằng báo giá phát sinh");
+        }
+        repairTaskMapper.updateEntityFromRequest(request, task);
         return repairTaskMapper.toResponse(repairTaskRepository.save(task));
     }
 
@@ -510,12 +575,16 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         RepairOrder order = repairOrderRepository.findById(task.getRepairOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa"));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED) {
+        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
             throw new BusinessRuleException("Không thể xóa công việc trong phiếu sửa chữa đã kết thúc");
         }
 
         if (task.getStatus() == TaskStatus.IN_PROGRESS || task.getStatus() == TaskStatus.COMPLETED) {
             throw new BusinessRuleException("Không thể xóa công việc đang thực hiện hoặc đã hoàn thành");
+        }
+
+        if (task.getEstimateItemId() != null) {
+            throw new BusinessRuleException("Không được xóa công việc đã sinh từ báo giá được duyệt");
         }
 
         repairTaskRepository.delete(task);
@@ -527,8 +596,8 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
 
     private void validateTransition(RepairOrderStatus from, RepairOrderStatus to, RepairOrder order) {
         if (to == RepairOrderStatus.CANCELLED) {
-            if (from == RepairOrderStatus.COMPLETED || from == RepairOrderStatus.INVOICED) {
-                throw new BusinessRuleException("Không thể hủy phiếu sửa chữa đã hoàn thành hoặc đã xuất hóa đơn");
+            if (from != RepairOrderStatus.NEW && from != RepairOrderStatus.DIAGNOSING && from != RepairOrderStatus.WAITING_APPROVAL) {
+                throw new BusinessRuleException("Chỉ hủy trực tiếp phiếu chưa được duyệt thi công");
             }
             return;
         }

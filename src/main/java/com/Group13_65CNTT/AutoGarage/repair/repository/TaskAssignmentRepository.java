@@ -16,6 +16,10 @@ import java.util.Optional;
 @Repository
 public interface TaskAssignmentRepository extends JpaRepository<TaskAssignment, Long> {
 
+    @Query("SELECT a FROM TaskAssignment a JOIN RepairTask t ON t.id = a.taskId " +
+            "WHERE t.repairOrderId = :orderId AND a.isActive = true AND a.assignmentRole = 'QC'")
+    List<TaskAssignment> findActiveQcForOrder(@Param("orderId") Long orderId);
+
     List<TaskAssignment> findByTaskId(Long taskId);
 
     List<TaskAssignment> findByTaskIdAndIsActiveTrue(Long taskId);

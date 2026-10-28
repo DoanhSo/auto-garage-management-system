@@ -21,6 +21,10 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     Optional<Invoice> findByRepairOrderId(Long repairOrderId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM Invoice i WHERE i.repairOrderId = :repairOrderId")
+    Optional<Invoice> findByRepairOrderIdWithLock(@Param("repairOrderId") Long repairOrderId);
+
     boolean existsByRepairOrderId(Long repairOrderId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

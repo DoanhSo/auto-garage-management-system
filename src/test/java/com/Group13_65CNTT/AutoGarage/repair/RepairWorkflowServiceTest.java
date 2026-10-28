@@ -49,6 +49,27 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class RepairWorkflowServiceTest {
 
+    @Test
+    void receiveRejectsWrongOwner() {
+        when(vehicleRepository.findById(2L)).thenReturn(Optional.of(mockVehicle));
+        assertThatThrownBy(() -> repairService.receive(10L, null, 99L, 2L, 20500)).isInstanceOf(BusinessRuleException.class);
+        verify(repairOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void receiveRejectsDecreasingOdometer() {
+        when(vehicleRepository.findById(2L)).thenReturn(Optional.of(mockVehicle));
+        assertThatThrownBy(() -> repairService.receive(10L, null, 1L, 2L, 19000)).isInstanceOf(BusinessRuleException.class);
+        verify(repairOrderRepository, never()).save(any());
+    }
+
+    @Test
+    void warrantyOrderRequiresAnApprovedClaim() {
+        when(warrantyClaimRepository.findById(20L)).thenReturn(Optional.of(WarrantyClaim.builder().id(20L).status(ClaimStatus.OPEN).build()));
+        assertThatThrownBy(() -> repairService.createWarrantyOrder(10L, 20L)).isInstanceOf(BusinessRuleException.class);
+        verify(repairOrderRepository, never()).save(any());
+    }
+
     @Mock
     private RepairOrderRepository repairOrderRepository;
     @Mock
@@ -83,6 +104,13 @@ class RepairWorkflowServiceTest {
     @Mock
     private NotificationAudit notificationAudit;
 
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUser;
+
     @InjectMocks
     private RepairServiceImpl repairService;
 
@@ -100,6 +128,7 @@ class RepairWorkflowServiceTest {
 
         mockVehicle = new Vehicle();
         mockVehicle.setId(2L);
+        mockVehicle.setCustomerId(1L);
         mockVehicle.setLicensePlate("30E-99999");
         mockVehicle.setOdometer(20000);
         mockVehicle.setIsActive(true);
@@ -278,6 +307,7 @@ class RepairWorkflowServiceTest {
 
     @Test
     void handOverBayReleaseFailurePropagatesAndDoesNotRecordCompletion() {
+        stubHandoverReadiness();
         when(repairOrderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(mockOrder));
         var failure = new org.springframework.dao.DataAccessResourceFailureException("private database details");
         doThrow(failure).when(bayScheduling).releaseForRepair(10L, 50L);
@@ -293,6 +323,7 @@ class RepairWorkflowServiceTest {
     @Test
     @DisplayName("I03.handOver: Bàn giao xe hợp lệ, đóng phiếu, giải phóng khoang, kho, lưu biên bản")
     void handOver_Success() {
+        stubHandoverReadiness();
         when(repairOrderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(mockOrder));
         when(vehicleRepository.findById(2L)).thenReturn(Optional.of(mockVehicle));
 
@@ -318,5 +349,45 @@ class RepairWorkflowServiceTest {
         assertThatThrownBy(() -> repairService.handOver(10L, 50L, 20400, "REQ-KEY-123"))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("không được nhỏ hơn số km vào xưởng");
+    }
+
+    @Test
+    void receiveRejectsCancelledBookingBeforeCreatingOrder() {
+        mockBooking.setStatus(BookingStatus.CANCELLED);
+        when(vehicleRepository.findById(2L)).thenReturn(Optional.of(mockVehicle));
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(mockCustomer));
+        when(bookingRepository.findById(3L)).thenReturn(Optional.of(mockBooking));
+        assertThatThrownBy(() -> repairService.receive(10L, 3L, 1L, 2L, 20500))
+                .isInstanceOf(BusinessRuleException.class);
+        verify(repairOrderRepository, never()).save(any());
+    }
+
+    private void stubHandoverReadiness() {
+        when(repairOrderRepository.findById(50L)).thenReturn(Optional.of(mockOrder));
+        VehicleCheck qc = new VehicleCheck();
+        qc.setCheckType(CheckType.QC);
+        qc.setResult(CheckResult.PASSED);
+        when(vehicleCheckRepository.findById(300L)).thenReturn(Optional.of(qc));
+    }
+
+    @Test
+    void handoverRejectsUnfinishedWorkBeforeReleasingResources() {
+        when(repairOrderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(mockOrder));
+        lenient().when(repairOrderRepository.findById(50L)).thenReturn(Optional.of(mockOrder));
+        lenient().when(repairTaskRepository.existsByRepairOrderIdAndStatusNot(50L, TaskStatus.COMPLETED)).thenReturn(true);
+        assertThatThrownBy(() -> repairService.handOver(10L, 50L, 20600, "unfinished"))
+                .isInstanceOf(BusinessRuleException.class);
+        verify(billingOperations, never()).requireHandoverAllowed(anyLong(), anyLong());
+        verify(bayScheduling, never()).releaseForRepair(anyLong(), anyLong());
+        assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.IN_PROGRESS);
+    }
+
+    @Test
+    void directStatusChangeCannotBypassHandover() {
+        mockOrder.setStatus(RepairOrderStatus.INVOICED);
+        when(repairOrderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(mockOrder));
+        assertThatThrownBy(() -> repairService.transitionStatus(10L, 50L, RepairOrderStatus.CLOSED, null))
+                .isInstanceOf(BusinessRuleException.class);
+        verify(repairOrderRepository, never()).save(any());
     }
 }

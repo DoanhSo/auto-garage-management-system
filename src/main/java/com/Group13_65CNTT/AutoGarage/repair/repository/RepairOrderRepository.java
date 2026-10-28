@@ -32,6 +32,13 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, Long> 
     @Query("SELECT ro FROM RepairOrder ro WHERE ro.id = :id")
     Optional<RepairOrder> findByIdForUpdate(@Param("id") Long id);
 
+    @Query("SELECT ro FROM RepairOrder ro WHERE (:status IS NULL OR ro.status = :status) " +
+            "AND (:keyword IS NULL OR LOWER(ro.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(ro.customerComplaint) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+            "AND EXISTS (SELECT a.id FROM TaskAssignment a JOIN RepairTask t ON t.id = a.taskId JOIN Employee e ON e.id = a.employeeId " +
+            "WHERE t.repairOrderId = ro.id AND a.isActive = true AND e.isActive = true AND e.userId = :actorId)")
+    Page<RepairOrder> searchAssignedOrders(@Param("actorId") long actorId, @Param("keyword") String keyword,
+            @Param("status") RepairOrderStatus status, Pageable pageable);
+
     @Query("SELECT ro FROM RepairOrder ro WHERE " +
            "(:status IS NULL OR ro.status = :status) AND " +
            "(:keyword IS NULL OR LOWER(ro.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%')) " +

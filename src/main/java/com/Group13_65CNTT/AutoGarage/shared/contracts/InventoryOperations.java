@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 
 /** I05 (TV4): lock parts in ascending ID order; post a document at most once. */
 public interface InventoryOperations {
+    void requireIssueComplete(long repairOrderId);
     void reserve(long actorUserId, long estimateItemId, BigDecimal quantity);
     void releaseForOrder(long actorUserId, long repairOrderId);
     void post(long actorUserId, long documentId, String requestKey);

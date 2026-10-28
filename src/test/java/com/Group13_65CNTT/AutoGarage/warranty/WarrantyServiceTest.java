@@ -71,6 +71,13 @@ class WarrantyServiceTest {
     @Mock
     private NotificationAudit notificationAudit;
 
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUser;
+
     @InjectMocks
     private WarrantyServiceImpl warrantyService;
 
@@ -203,7 +210,7 @@ class WarrantyServiceTest {
     @Test
     @DisplayName("decideClaim: Phê duyệt claim thành công -> chuyển APPROVED và gọi I03 createWarrantyOrder")
     void decideClaim_Approved_Success() {
-        when(warrantyClaimRepository.findById(500L)).thenReturn(Optional.of(mockClaim));
+        when(warrantyClaimRepository.findByIdForUpdate(500L)).thenReturn(Optional.of(mockClaim));
         when(repairWorkflow.createWarrantyOrder(1L, 500L)).thenReturn(999L);
 
         warrantyService.decideClaim(1L, 500L, true, "Lỗi từ linh kiện, chấp thuận bảo hành", "KEY-DECIDE-1");
@@ -217,7 +224,7 @@ class WarrantyServiceTest {
     @Test
     @DisplayName("decideClaim: Từ chối claim thành công -> chuyển REJECTED và đóng claim")
     void decideClaim_Rejected_Success() {
-        when(warrantyClaimRepository.findById(500L)).thenReturn(Optional.of(mockClaim));
+        when(warrantyClaimRepository.findByIdForUpdate(500L)).thenReturn(Optional.of(mockClaim));
 
         warrantyService.decideClaim(1L, 500L, false, "Do người dùng tự can thiệp sửa chữa ngoài", null);
 
@@ -231,7 +238,7 @@ class WarrantyServiceTest {
     @DisplayName("decideClaim: Báo lỗi khi claim không ở trạng thái OPEN")
     void decideClaim_FailsWhenNotOpen() {
         mockClaim.setStatus(ClaimStatus.APPROVED);
-        when(warrantyClaimRepository.findById(500L)).thenReturn(Optional.of(mockClaim));
+        when(warrantyClaimRepository.findByIdForUpdate(500L)).thenReturn(Optional.of(mockClaim));
 
         assertThatThrownBy(() -> warrantyService.decideClaim(1L, 500L, true, "Đồng ý", null))
                 .isInstanceOf(BusinessRuleException.class)

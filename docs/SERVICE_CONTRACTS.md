@@ -1,6 +1,6 @@
 # Hợp đồng giao tiếp giữa các module
 
-Tám hợp đồng I01–I08 được đề xuất trong lần khởi tạo; báo cáo không cung cấp chữ ký. Interface nằm trong `src/main/java/com/Group13_65CNTT/AutoGarage/shared/contracts`. I01 có ObjectAccessServiceImpl (JPA projections), I08 có NotificationAuditServiceImpl (audit/replay/outbox) theo cấu trúc layered; I02–I07 còn chờ các module nghiệp vụ. Xem api/SECURITY.md và api/TV1.md.
+Interface I01–I08 nằm trong `src/main/java/com/Group13_65CNTT/AutoGarage/shared/contracts` và đã có implementation backend. Tài liệu này mô tả hợp đồng nghiệp vụ; không đồng nghĩa mọi màn hình frontend hoặc mọi nhánh nghiệp vụ đã được nghiệm thu. Xem thêm api/SECURITY.md và api/TV1.md.
 
 ## Quy ước chung
 
@@ -24,6 +24,8 @@ Người dùng: TV2 đặt/dời/hủy lịch, TV3 điều phối và đóng phi
 
 Người dùng: TV2 tiếp nhận, TV4 hóa đơn, TV3 bảo hành/bàn giao. `receive` kiểm tra booking thuộc đúng xe, trạng thái nhận được và không có phiếu trùng; chốt customer lịch sử. Tạo task DIAGNOSIS nội bộ để có thể phân công chẩn đoán trước khi duyệt sửa. `requireInvoiceReady` kiểm tra QC mới nhất đúng loại QC/PASSED, task xong, không còn timer mở, phần xuất vật tư đã hoàn tất. `handOver` gọi I06 kiểm tra nợ, lưu HANDOVER qua service `reception`, cập nhật phiếu, giải phóng I02/I05, tạo I07, ghi I08 cùng commit. `createWarrantyOrder` tạo phiếu mới loại WARRANTY và trả ID.
 
+`recordReceptionDetails` của I03 lưu mức nhiên liệu và yêu cầu khách hàng vào phiếu NEW trong cùng transaction tiếp nhận; không chỉ phản hồi lại dữ liệu từ request. Tiếp nhận chỉ chấp nhận lịch PENDING/CONFIRMED, đúng chủ xe và ODO không giảm. API đổi trạng thái thông thường không thay thế duyệt báo giá, QC, xuất hóa đơn hoặc bàn giao.
+
 ## I04 EstimateApproval do TV3 cung cấp
 
 Người dùng: khách/lễ tân qua API báo giá. `decide` nhận các LineDecision; xác minh toàn bộ dòng thuộc estimate/phiếu được phép, khóa phiếu và các dòng. Chỉ APPROVED mới tạo task SERVICE hoặc gọi I05 reserve PART. Quyết định lại dòng đã triển khai phải bị chặn; phát sinh dùng SUPPLEMENTAL. TV3 quyết định trạng thái tổng báo giá từ trạng thái từng dòng. Thông báo và kết quả replay qua I08 cùng transaction.
@@ -31,6 +33,8 @@ Người dùng: khách/lễ tân qua API báo giá. `decide` nhận các LineDec
 ## I05 InventoryOperations do TV4 cung cấp
 
 Người dùng: TV3 duyệt/bàn giao và UI kho. `reserve` kiểm tra dòng PART APPROVED, lượng cần giữ và stock-reserved, khóa parts và estimate_items. `releaseForOrder` trả lượng giữ của phiếu về khả dụng mà không đổi stock. `post` khóa header DRAFT, parts theo id tăng, kiểm tra loại nguồn/số lượng, cập nhật stock/reserved/cost, repair_order_parts, ledger và POSTED nguyên tử. Mỗi inventory_document_item chỉ sinh một transaction. RETURN phải thuộc đúng OUT/dòng nguồn/phiếu/part; tổng trả không vượt đã xuất. ADJUSTMENT có số lượng signed, các loại còn lại quantity dương; sổ kho quantity_change âm cho OUT.
+
+`requireIssueComplete` của I05 chặn lập hóa đơn/bàn giao khi còn lượng vật tư đã giữ chưa xuất hoặc còn chứng từ OUT/RETURN ở DRAFT. Xuất kho trừ lượng giữ của chính dòng báo giá, chốt giá bán đã duyệt và giá vốn tại thời điểm xuất. Các dòng cùng phụ tùng trong báo giá phát sinh vẫn được theo dõi riêng theo estimate_item_id.
 
 ## I06 BillingOperations do TV4 cung cấp
 
@@ -43,3 +47,9 @@ Người dùng: I03 bàn giao và UI bảo hành. `createFromInvoice` chỉ tạ
 ## I08 NotificationAudit do TV1 cung cấp
 
 Người dùng: mọi service có thay đổi nhạy cảm. `enqueue` ghi thông báo PENDING; `recipientKey` định danh người nhận ổn định, event_key/channel/recipient_key chống trùng. `findCompletedRequest` kiểm tra hash và trả kết quả replay nếu đã có; `recordCompletedRequest` ghi actor/action/result và key/hash sau khi nghiệp vụ thành công trong cùng transaction. Worker claim bằng lease/locked_by, gửi sau commit, tăng attempt_count, đặt next_attempt_at, recovery khi lease hết hạn. Hai worker không được xử lý cùng lease; gửi mạng không đảm bảo exactly-once nếu provider không hỗ trợ idempotency.
+
+Các lệnh dùng `RequestFingerprint` để tạo SHA-256 từ action, actor, đối tượng và payload. Replay thu/chi tiền tra giao dịch đã lưu bằng transactionCode, bao gồm tiền mặt không có providerReference. Thông báo báo giá dùng khách hàng gắn với phiếu và event key riêng từng báo giá; khách vãng lai chưa có tài khoản không nhận thông báo WEB.
+
+## Kiểm thử tích hợp các hợp đồng
+
+`BusinessWorkflowIntegrationTests` chạy trên MySQL với Flyway, các service thật và dữ liệu riêng được rollback: tiếp nhận → báo giá → giữ/xuất/hoàn trả kho → hoàn thành → QC → hóa đơn → thu tiền → bàn giao → bảo hành. Bộ test kiểm tra số tiền theo số lượng, giảm giá/thuế đã duyệt, số lượng ròng sau trả kho, replay thu/chi tiền mặt, replay bàn giao/bảo hành và quyền truy cập đối tượng. Các kiểm thử unit bổ sung kiểm tra lịch hủy, sai chủ xe, ODO giảm, thao tác bỏ qua quy trình, ca làm việc và kỹ năng. Chạy Maven với profile DB test theo hướng dẫn dự án; không dùng dữ liệu demo báo cáo làm bằng chứng nghiệm thu nghiệp vụ.

@@ -206,6 +206,8 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
         open={!!selected}
         title="Chi tiết sự kiện"
         description={selected ? `Sự kiện #${selected.id}` : 'Thông tin kiểm toán'}
+        placement="center"
+        size="md"
         onClose={() => setSelected(null)}
       >
         <div className="editor-form">

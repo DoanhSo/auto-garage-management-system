@@ -244,6 +244,8 @@ function ReadyInbox({ policy }: { policy: UiPolicy }) {
       {selected && (
         <Sheet
           open
+          placement="center"
+          size="md"
           title="Chi tiết thông báo"
           description={
             selected.owned

@@ -40,6 +40,34 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class LaborExecutionServiceTest {
 
+    @Test
+    void assignmentOutsideActiveShiftIsRejected() {
+        when(repairOrderRepository.findById(100L)).thenReturn(Optional.of(mockOrder));
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(mockEmployee));
+        var request = TaskAssignmentRequest.builder().employeeId(5L).assignmentRole(AssignmentRole.MAIN)
+                .startsAt(Instant.now()).endsAt(Instant.now().plusSeconds(3600)).build();
+        assertThatThrownBy(() -> laborExecutionService.assignTask(1L, 10L, request))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("ca làm việc");
+        verify(taskAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void technicianWithoutRequiredSkillsCannotBeAssigned() {
+        mockTask.setServiceId(20L);
+        mockEmployee.setSkillsJson("[\"ENGINE\"]");
+        var catalogService = new com.Group13_65CNTT.AutoGarage.catalog.entity.ServiceEntity();
+        catalogService.setRequiredSkillsJson("[\"BRAKES\"]");
+        when(serviceRepository.findById(20L)).thenReturn(Optional.of(catalogService));
+        when(repairOrderRepository.findById(100L)).thenReturn(Optional.of(mockOrder));
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(mockEmployee));
+        when(shiftRepository.coversAssignment(eq(5L), any(), any())).thenReturn(true);
+        var request = TaskAssignmentRequest.builder().employeeId(5L).assignmentRole(AssignmentRole.MAIN)
+                .startsAt(Instant.now()).endsAt(Instant.now().plusSeconds(3600)).build();
+        assertThatThrownBy(() -> laborExecutionService.assignTask(1L, 10L, request))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("kỹ năng");
+        verify(taskAssignmentRepository, never()).save(any());
+    }
+
     @Mock
     private RepairTaskRepository repairTaskRepository;
     @Mock
@@ -57,6 +85,12 @@ class LaborExecutionServiceTest {
 
     @InjectMocks
     private LaborExecutionServiceImpl laborExecutionService;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.scheduling.repository.EmployeeShiftRepository shiftRepository;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository serviceRepository;
 
     private RepairOrder mockOrder;
     private RepairTask mockTask;
@@ -70,6 +104,7 @@ class LaborExecutionServiceTest {
                 .orderCode("RO-20261023-00001")
                 .status(RepairOrderStatus.APPROVED)
                 .build();
+        lenient().when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
 
         mockTask = RepairTask.builder()
                 .id(10L)
@@ -80,6 +115,7 @@ class LaborExecutionServiceTest {
                 .quantity(BigDecimal.ONE)
                 .unitPrice(new BigDecimal("150000.00"))
                 .build();
+        lenient().when(repairTaskRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(mockTask));
 
         mockEmployee = Employee.builder()
                 .id(5L)
@@ -108,6 +144,7 @@ class LaborExecutionServiceTest {
     @Test
     @DisplayName("TV3-06: Phân công thợ chính (MAIN) thành công, cập nhật trạng thái task và order")
     void assignTask_Main_Success() {
+        when(shiftRepository.coversAssignment(eq(5L), any(), any())).thenReturn(true);
         Instant startsAt = Instant.now();
         Instant endsAt = startsAt.plus(2, ChronoUnit.HOURS);
         TaskAssignmentRequest req = TaskAssignmentRequest.builder()

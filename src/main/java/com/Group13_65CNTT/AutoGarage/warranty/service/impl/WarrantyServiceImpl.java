@@ -1,5 +1,9 @@
 package com.Group13_65CNTT.AutoGarage.warranty.service.impl;
 
+import com.Group13_65CNTT.AutoGarage.common.util.RequestFingerprint;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+
 import com.Group13_65CNTT.AutoGarage.billing.entity.Invoice;
 import com.Group13_65CNTT.AutoGarage.billing.entity.InvoiceItem;
 import com.Group13_65CNTT.AutoGarage.billing.repository.InvoiceItemRepository;
@@ -45,6 +49,8 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 @RequiredArgsConstructor
 public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations {
+    private final com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    private final com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
 
     private final WarrantyRepository warrantyRepository;
     private final WarrantyClaimRepository warrantyClaimRepository;
@@ -115,9 +121,18 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
     @Override
     @Transactional
     public long openClaim(long actorUserId, long warrantyId, int currentOdometer, String description, String requestKey) {
+        objectAccess.requireResourceAccess(actorUserId, com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.WARRANTY, warrantyId);
         log.info("WarrantyOperations.openClaim: actor={}, warrantyId={}, odo={}, requestKey={}",
                 actorUserId, warrantyId, currentOdometer, requestKey);
 
+        String requestHash = RequestFingerprint.of("OPEN_CLAIM", actorUserId, warrantyId, currentOdometer, description);
+        if (notificationAudit != null && requestKey != null && !requestKey.isBlank()) {
+            String completed = notificationAudit.findCompletedRequest(requestKey, requestHash);
+            if (completed != null) {
+                return warrantyClaimRepository.findByClaimCode(RequestFingerprint.resultField(completed, "claimCode"))
+                        .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND)).getId();
+            }
+        }
         if (currentOdometer < 0) {
             throw new BusinessRuleException("Số km hiện tại phải >= 0");
         }
@@ -130,6 +145,9 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
 
         if (warranty.getStatus() != WarrantyStatus.ACTIVE) {
             throw new BusinessRuleException("Chính sách bảo hành không ở trạng thái ACTIVE (hiện tại: " + warranty.getStatus() + ")");
+        }
+        if (warranty.getStartOdometer() != null && currentOdometer < warranty.getStartOdometer()) {
+            throw new BusinessRuleException("Số km yêu cầu bảo hành không được nhỏ hơn số km đã bàn giao");
         }
 
         // Kiểm tra thời gian: mốc bằng hạn được coi là hết hạn
@@ -162,7 +180,7 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
 
         if (notificationAudit != null && requestKey != null && !requestKey.isBlank()) {
             notificationAudit.recordCompletedRequest(actorUserId, "OPEN_CLAIM", "WARRANTY_CLAIM",
-                    savedClaim.getId(), requestKey, requestKey, "{\"claimCode\":\"" + claimCode + "\"}");
+                    savedClaim.getId(), requestKey, requestHash, "{\"claimCode\":\"" + claimCode + "\"}");
         }
 
         log.info("Yêu cầu bảo hành được tạo thành công: id={}, code={}", savedClaim.getId(), savedClaim.getClaimCode());
@@ -172,14 +190,20 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
     @Override
     @Transactional
     public void decideClaim(long actorUserId, long claimId, boolean approved, String reason, String requestKey) {
+        objectAccess.requireRole(actorUserId, com.Group13_65CNTT.AutoGarage.common.enums.Role.ADMIN.name());
         log.info("WarrantyOperations.decideClaim: actor={}, claimId={}, approved={}, reason={}",
                 actorUserId, claimId, approved, reason);
 
+        String requestHash = RequestFingerprint.of("DECIDE_CLAIM", actorUserId, claimId, approved, reason);
+        if (notificationAudit != null && requestKey != null && !requestKey.isBlank()
+                && notificationAudit.findCompletedRequest(requestKey, requestHash) != null) {
+            return;
+        }
         if (reason == null || reason.isBlank()) {
             throw new BusinessRuleException("Lý do phê duyệt hoặc từ chối không được để trống");
         }
 
-        WarrantyClaim claim = warrantyClaimRepository.findById(claimId)
+        WarrantyClaim claim = warrantyClaimRepository.findByIdForUpdate(claimId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu bảo hành với ID: " + claimId));
 
         if (claim.getStatus() != ClaimStatus.OPEN) {
@@ -206,7 +230,7 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
 
         if (notificationAudit != null && requestKey != null && !requestKey.isBlank()) {
             notificationAudit.recordCompletedRequest(actorUserId, "DECIDE_CLAIM", "WARRANTY_CLAIM",
-                    claimId, requestKey, requestKey, "{\"status\":\"" + claim.getStatus() + "\"}");
+                    claimId, requestKey, requestHash, "{\"status\":\"" + claim.getStatus() + "\"}");
         }
     }
 
@@ -217,6 +241,7 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
     @Override
     @Transactional(readOnly = true)
     public WarrantyResponse getWarrantyById(Long id) {
+        customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.WARRANTY, id);
         Warranty warranty = warrantyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin bảo hành với ID: " + id));
         return warrantyMapper.toResponse(warranty);
@@ -227,12 +252,14 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
     public WarrantyResponse getWarrantyByCode(String warrantyCode) {
         Warranty warranty = warrantyRepository.findByWarrantyCode(warrantyCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin bảo hành với mã: " + warrantyCode));
+        customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.WARRANTY, warranty.getId());
         return warrantyMapper.toResponse(warranty);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<WarrantyResponse> getWarrantiesByVehicleId(Long vehicleId, int page, int size) {
+        customerScope.requireFrontDesk();
         Pageable pageable = PageRequest.of(page, size);
         return warrantyRepository.findByVehicleId(vehicleId, pageable).map(warrantyMapper::toResponse);
     }
@@ -240,6 +267,7 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
     @Override
     @Transactional(readOnly = true)
     public Page<WarrantyResponse> getWarrantiesByCustomerId(Long customerId, int page, int size) {
+        customerScope.requireFrontDesk();
         Pageable pageable = PageRequest.of(page, size);
         return warrantyRepository.findByCustomerId(customerId, pageable).map(warrantyMapper::toResponse);
     }
@@ -262,6 +290,7 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
     @Override
     @Transactional(readOnly = true)
     public WarrantyClaimResponse getClaimById(Long claimId) {
+        customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.WARRANTY_CLAIM, claimId);
         WarrantyClaim claim = warrantyClaimRepository.findById(claimId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu bảo hành với ID: " + claimId));
         return warrantyClaimMapper.toResponse(claim);
@@ -270,6 +299,7 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
     @Override
     @Transactional(readOnly = true)
     public Page<WarrantyClaimResponse> getClaimsByWarrantyId(Long warrantyId, int page, int size) {
+        customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.WARRANTY, warrantyId);
         Pageable pageable = PageRequest.of(page, size);
         return warrantyClaimRepository.findByWarrantyId(warrantyId, pageable).map(warrantyClaimMapper::toResponse);
     }

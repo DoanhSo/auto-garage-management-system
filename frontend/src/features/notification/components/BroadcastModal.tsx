@@ -37,6 +37,7 @@ export function BroadcastModal({ onClose }: { onClose: () => void }) {
     <Sheet
       open
       placement="center"
+      size="md"
       title="Phát thông báo"
       description="Soạn nội dung và chọn nhóm người nhận."
       onClose={onClose}

@@ -113,6 +113,11 @@ const DebtLedgerPage = lazy(() =>
     default: module.DebtLedgerPage,
   })),
 );
+const RepairOrdersPage = lazy(() =>
+  import('../features/repair/pages/RepairOrdersPage').then((module) => ({
+    default: module.RepairOrdersPage,
+  })),
+);
 
 export function RequireAuth() {
   const { user } = useAuth();
@@ -217,6 +222,7 @@ const router = createBrowserRouter([
               {
                 element: <RequireRoles allowedRoles={STAFF_ROLES} />,
                 children: [
+                  { path: 'repair-orders', element: <RepairOrdersPage /> },
                   { path: 'inventory/parts', element: <PartsPage /> },
                   { path: 'inventory/documents', element: <InventoryDocumentsPage /> },
                   { path: 'billing/invoices', element: <InvoicesPage /> },

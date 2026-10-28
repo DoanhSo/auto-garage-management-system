@@ -191,7 +191,7 @@ export function CustomersPage() {
   return (
     <>
       <PageHeader
-        eyebrow="TIẾP NHẬN & DỊCH VỤ · M02"
+        eyebrow="QUẢN LÝ KHÁCH HÀNG"
         title="Quản lý khách hàng"
         description="Tra cứu hồ sơ liên hệ, phân loại khách hàng cá nhân / doanh nghiệp và chính sách hạn mức nợ dịch vụ."
         actions={
@@ -205,7 +205,7 @@ export function CustomersPage() {
       <div className="info-strip">
         <Contact size={18} />
         <span>
-          Quản lý thông tin liên hệ, phân loại cá nhân hoặc doanh nghiệp và theo dõi hạn mức công nợ theo chuẩn TV1.
+          Quản lý thông tin liên hệ, phân loại cá nhân hoặc doanh nghiệp và theo dõi hạn mức công nợ khách hàng.
         </span>
       </div>
 

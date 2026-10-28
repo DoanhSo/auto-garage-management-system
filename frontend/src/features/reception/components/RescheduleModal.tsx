@@ -68,6 +68,7 @@ export function RescheduleModal({
       open={open}
       onClose={onClose}
       placement="center"
+      size="md"
       title={`Dời lịch hẹn #${booking.bookingCode}`}
       description={`Khách hàng: ${booking.customerName} • Xe: ${booking.licensePlate}`}
     >

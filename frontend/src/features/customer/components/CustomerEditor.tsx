@@ -301,6 +301,7 @@ export function CustomerEditor({
       }}
       onRestoreFocus={onRestoreFocus}
       placement="center"
+      size="lg"
     >
       {isEditing && detailQuery.isLoading && <Loading label="Đang lấy phiên bản mới nhất…" />}
       {isEditing && detailQuery.isError && (

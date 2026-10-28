@@ -33,7 +33,7 @@ export function StockReconciliationPage() {
 
   const { data, isLoading, refetch, isFetching } = useReconciliationQuery();
 
-  const reconciliations = data || [];
+  const reconciliations = useMemo(() => data ?? [], [data]);
   const matchedCount = reconciliations.filter((r) => r.matched).length;
   const discrepancyCount = reconciliations.filter((r) => !r.matched).length;
 

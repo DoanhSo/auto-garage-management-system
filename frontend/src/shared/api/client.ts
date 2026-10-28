@@ -18,7 +18,7 @@ export function configureSession(token: string | null, onExpired: () => void) {
   session.generation++;
 }
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   body?: unknown;
   signal?: AbortSignal;
   authenticated?: boolean;
@@ -47,7 +47,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       throw new DOMException('Session changed', 'AbortError');
   };
   try {
-    const response = await fetch(`${env.apiBase.replace(/\/$/, '')}${path}`, {
+    const base = env.apiBase.replace(/\/$/, '');
+    const cleanPath = base.endsWith('/api/v1') && path.startsWith('/api/v1/') ? path.slice('/api/v1'.length) : path;
+    const url = `${base}${cleanPath.startsWith("/") ? "" : "/"}${cleanPath}`;
+    const response = await fetch(url, {
       method: options.method ?? 'GET',
       headers,
       signal,

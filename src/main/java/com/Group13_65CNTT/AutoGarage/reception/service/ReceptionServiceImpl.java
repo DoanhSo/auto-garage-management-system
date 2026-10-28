@@ -117,8 +117,6 @@ public class ReceptionServiceImpl implements ReceptionService {
                 throw new ConflictException("Lịch hẹn này đã được tiếp nhận xe trước đó");
             }
 
-            booking.setStatus(BookingStatus.RECEIVED);
-            bookingRepository.save(booking);
         }
 
         vehicle.setOdometer(request.getOdometerIn());
@@ -134,9 +132,18 @@ public class ReceptionServiceImpl implements ReceptionService {
                             customer.getId(),
                             vehicle.getId(),
                             request.getOdometerIn());
+            repairWorkflow.recordReceptionDetails(repairOrderId, request.getFuelLevelPercent(), request.getCustomerComplaint());
         } else {
             throw new com.Group13_65CNTT.AutoGarage.common.exception.BusinessException(
                     com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.SERVICE_UNAVAILABLE);
+        }
+
+        // Chỉ đánh dấu đã tiếp nhận sau khi I03 tạo phiếu thành công.
+        if (bookingId != null) {
+            Booking booking = bookingRepository.findById(bookingId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch hẹn"));
+            booking.setStatus(BookingStatus.RECEIVED);
+            bookingRepository.save(booking);
         }
 
         CheckInVehicleResponse response = new CheckInVehicleResponse();

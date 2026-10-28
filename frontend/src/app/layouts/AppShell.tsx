@@ -30,7 +30,7 @@ import { useMeQuery, useLogoutMutation } from '../../features/auth/hooks/useAuth
 import { useUnreadCountQuery } from '../../features/notification/hooks/useNotifications';
 import { Button, RoleBadge } from '../../shared/components/ui';
 import { roles, type Role } from '../../shared/types/contracts';
-import { FRONT_DESK_ROLES, BOOKING_ROLES } from '../access';
+import { FRONT_DESK_ROLES, BOOKING_ROLES, STAFF_ROLES } from '../access';
 import { initials } from '../../shared/utils/format';
 
 const links: ReadonlyArray<{
@@ -44,6 +44,12 @@ const links: ReadonlyArray<{
     label: 'Tiếp nhận xe',
     icon: CalendarCheck,
     allowedRoles: BOOKING_ROLES,
+  },
+  {
+    to: '/repair-orders',
+    label: 'Lệnh sửa chữa',
+    icon: Wrench,
+    allowedRoles: STAFF_ROLES,
   },
   {
     to: '/customers',

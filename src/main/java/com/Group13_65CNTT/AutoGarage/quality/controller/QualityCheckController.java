@@ -32,7 +32,7 @@ public class QualityCheckController {
     private final CurrentUserProvider currentUserProvider;
 
     @PostMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_TECHNICIAN)
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
     @Operation(summary = "Thực hiện kiểm tra chất lượng (QC) cho phiếu sửa chữa")
     public ResponseEntity<ApiResponse<QualityCheckResponse>> performQualityCheck(
             @Valid @RequestBody QualityCheckCreateRequest request,

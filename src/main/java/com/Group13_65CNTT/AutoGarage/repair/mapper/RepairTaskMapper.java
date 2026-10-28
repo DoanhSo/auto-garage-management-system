@@ -28,6 +28,7 @@ public interface RepairTaskMapper {
     @Mapping(target = "repairOrderId", ignore = true)
     @Mapping(target = "estimateItemId", ignore = true)
     @Mapping(target = "serviceId", ignore = true)
+    @Mapping(target = "status", ignore = true)
     @Mapping(target = "taskType", ignore = true)
     @Mapping(target = "startedAt", ignore = true)
     @Mapping(target = "completedAt", ignore = true)

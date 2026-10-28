@@ -46,6 +46,7 @@ public class QualityServiceImpl implements QualityService {
     private final QualityCheckMapper qualityCheckMapper;
     private final ObjectAccessService objectAccess;
     private final CustomerScope customerScope;
+    private final com.Group13_65CNTT.AutoGarage.repair.repository.TaskAssignmentRepository assignmentRepository;
 
     @Override
     @Transactional
@@ -61,8 +62,8 @@ public class QualityServiceImpl implements QualityService {
         RepairOrder order = repairOrderRepository.findByIdForUpdate(request.getRepairOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + request.getRepairOrderId()));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED) {
-            throw new BusinessRuleException("Không thể thực hiện kiểm tra chất lượng cho phiếu sửa chữa đã đóng hoặc bị hủy");
+        if (order.getStatus() != RepairOrderStatus.WAITING_QC) {
+            throw new BusinessRuleException("Chỉ kiểm tra chất lượng khi phiếu đang chờ QC");
         }
 
         // 1. Kiểm tra tất cả công việc phải hoàn thành trước khi QC
@@ -83,6 +84,13 @@ public class QualityServiceImpl implements QualityService {
 
         int nextAttemptNo = vehicleCheckRepository.findMaxAttemptNo(order.getId(), CheckType.QC) + 1;
 
+        List<RepairTask> requestedRework = request.getReworkTaskIds() == null ? List.of()
+                : repairTaskRepository.findAllById(request.getReworkTaskIds());
+        if (request.getReworkTaskIds() != null && (requestedRework.size() != request.getReworkTaskIds().size()
+                || requestedRework.stream().anyMatch(task -> !task.getRepairOrderId().equals(order.getId())))) {
+            throw new BusinessRuleException("Danh sách làm lại phải gồm công việc thuộc đúng phiếu sửa chữa");
+        }
+
         VehicleCheck check = new VehicleCheck();
         check.setRepairOrderId(order.getId());
         check.setCheckType(CheckType.QC);
@@ -102,6 +110,12 @@ public class QualityServiceImpl implements QualityService {
         order.setLatestQcCheckId(savedCheck.getId());
 
         if (request.getResult() == CheckResult.PASSED) {
+            var qcAssignments = assignmentRepository.findActiveQcForOrder(order.getId());
+            qcAssignments.forEach(assignment -> {
+                assignment.setIsActive(false);
+                assignment.setReleasedAt(check.getCheckedAt());
+            });
+            assignmentRepository.saveAll(qcAssignments);
             order.setStatus(RepairOrderStatus.COMPLETED);
             repairOrderRepository.save(order);
             log.info("QC PASSED cho phiếu #{}, attempt={}. Phiếu chuyển sang COMPLETED", order.getId(), nextAttemptNo);
@@ -112,7 +126,7 @@ public class QualityServiceImpl implements QualityService {
 
             // Chuyển các task cần làm lại sang REWORK
             if (request.getReworkTaskIds() != null && !request.getReworkTaskIds().isEmpty()) {
-                List<RepairTask> reworkTasks = repairTaskRepository.findAllById(request.getReworkTaskIds());
+                List<RepairTask> reworkTasks = requestedRework;
                 for (RepairTask rt : reworkTasks) {
                     if (rt.getRepairOrderId().equals(order.getId())) {
                         rt.setStatus(TaskStatus.REWORK);

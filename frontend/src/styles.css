@@ -1085,6 +1085,15 @@ select.input {
   box-shadow: 0 18px 70px #15233929;
   animation: none;
 }
+.sheet.centered-dialog {
+  overflow-y: auto;
+}
+.sheet.centered-dialog.sheet-sm {
+  width: min(520px, calc(100vw - 32px));
+}
+.sheet.centered-dialog.sheet-md {
+  width: min(640px, calc(100vw - 32px));
+}
 .sheet.centered-dialog.sheet-lg {
   width: min(1000px, calc(100vw - 32px));
 }
@@ -1107,7 +1116,7 @@ select.input {
 .centered-dialog .account-editor-form.grid-3col,
 .centered-dialog .modal-form.grid-3col,
 .centered-dialog .form-grid.grid-3col {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px 20px;
   padding: 16px 24px 20px;
 }
@@ -1159,10 +1168,19 @@ select.input {
 .form-grid > .conflict-panel,
 .account-editor-form > .info-strip,
 .account-editor-form > .full-width-field,
-.account-editor-actions,
-.modal-form-actions,
+.account-editor-form > .full-width,
+.account-editor-form > .col-span-2,
+.account-editor-form > .col-span-3,
+.modal-form > .full-width-field,
 .modal-form > .full-width,
-.form-grid > .full-width {
+.modal-form > .col-span-2,
+.modal-form > .col-span-3,
+.form-grid > .full-width-field,
+.form-grid > .full-width,
+.form-grid > .col-span-2,
+.form-grid > .col-span-3,
+.account-editor-actions,
+.modal-form-actions {
   grid-column: 1 / -1;
 }
 .account-editor-form .form-section-label,
@@ -2771,5 +2789,105 @@ select.input {
   }
   .logout-label {
     display: none;
+  }
+}
+
+/* Workshop bay board (repair orders) */
+.bay-board {
+  display: grid;
+  gap: 20px;
+  padding: 20px;
+  border-top: 1px solid var(--border);
+}
+.bay-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.bay-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.bay-card.is-free {
+  background: #f8fafc;
+  border-style: dashed;
+}
+.bay-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.bay-card-head > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.bay-card-head strong {
+  font-size: 14px;
+  color: #263950;
+}
+.bay-card-head span:not(.badge) {
+  font-size: 12px;
+  color: var(--muted);
+}
+.bay-card-body {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.bay-card-body > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.bay-card-body dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+.bay-card-body dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.bay-card-empty {
+  font-size: 13px;
+  color: var(--muted);
+  flex: 1;
+}
+.bay-card-foot {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 1100px) {
+  .bay-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .bay-board {
+    padding: 14px;
+  }
+  .bay-grid {
+    grid-template-columns: 1fr;
+  }
+  .bay-board .period-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

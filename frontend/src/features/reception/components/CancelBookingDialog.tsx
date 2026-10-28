@@ -60,6 +60,7 @@ export function CancelBookingDialog({
       open={open}
       onClose={onClose}
       placement="center"
+      size="md"
       title={`Hủy lịch hẹn #${booking.bookingCode}`}
       description={`Khách hàng: ${booking.customerName} • Xe: ${booking.licensePlate}`}
     >

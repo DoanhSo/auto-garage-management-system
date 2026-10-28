@@ -119,7 +119,7 @@ function ServiceForm({
   return (
     <>
       <form
-        className="editor-form account-editor-form grid-3col"
+        className="editor-form account-editor-form"
         onSubmit={handleSubmit(onSubmit)}
         noValidate
       >
@@ -127,7 +127,7 @@ function ServiceForm({
 
         <div className="form-section-label">THÔNG TIN DỊCH VỤ CƠ BẢN & ĐỊNH MỨC</div>
 
-        <div className="col-span-2">
+        <div className="full-width-field">
           <Field label="Tên dịch vụ / Hạng mục" required error={errors.serviceName?.message}>
             <input
               type="text"
@@ -289,7 +289,7 @@ function ServiceForm({
               />
             </Field>
 
-            <div className="col-span-2">
+            <div className="full-width-field">
               <Field label="Mô tả chi tiết nội dung công việc" error={errors.description?.message}>
                 <input
                   type="text"
