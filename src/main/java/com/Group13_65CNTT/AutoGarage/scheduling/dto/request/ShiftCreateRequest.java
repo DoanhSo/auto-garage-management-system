@@ -1,5 +1,6 @@
 package com.Group13_65CNTT.AutoGarage.scheduling.dto.request;
 
+import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftType;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -24,6 +25,10 @@ public class ShiftCreateRequest {
 
     @NotNull(message = "Ends at time is required")
     private Instant endsAt;
+
+    private ShiftType shiftType;
+
+    private Long serviceBayId;
 
     private String notes;
 }

@@ -101,6 +101,16 @@ public final class ApiPaths {
     public static final String DEBTS_INVOICE_BALANCES = "/invoices";
     public static final String DEBTS_SUPPLIER_BALANCES = "/suppliers";
 
+    public static final String SCHEDULING_BASE = "/api/v1/scheduling";
+    public static final String SCHEDULING_WILDCARD = SCHEDULING_BASE + "/**";
+    public static final String SCHEDULING_ON_SHIFT_TECHNICIANS = "/on-shift-technicians";
+
+    public static final String PAYROLL_BASE = "/api/v1/payroll";
+    public static final String PAYROLL_WILDCARD = PAYROLL_BASE + "/**";
+    public static final String PAYROLL_PERIODS = "/periods";
+    public static final String PAYROLL_COMMISSIONS = "/commissions";
+    public static final String PAYROLL_MY_PAYSLIPS = "/my-payslips";
+
     public static final String API_CORS_PATTERN = "/api/**";
     public static final String OPENAPI_DOCS_PATTERN = "/v3/api-docs/**";
     public static final String SWAGGER_UI_PATTERN = "/swagger-ui/**";

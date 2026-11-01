@@ -22,6 +22,14 @@ public class CustomerScope {
         access.requireRole(currentUser.userId(), Role.ADMIN.name(), Role.RECEPTIONIST.name());
     }
 
+    public void requireTechnical() {
+        access.requireRole(
+                currentUser.userId(),
+                Role.ADMIN.name(),
+                Role.RECEPTIONIST.name(),
+                Role.TECHNICIAN.name());
+    }
+
     public void requireResource(AccessResource resource, Long id) {
         if (id == null || id <= 0) throw new BusinessException(ResponseCode.BAD_REQUEST);
         access.requireResourceAccess(currentUser.userId(), resource, id);
@@ -29,7 +37,6 @@ public class CustomerScope {
 
     public Long customerIdForQuery(Long requestedCustomerId) {
         if (currentUser.role() != Role.CUSTOMER) {
-            requireFrontDesk();
             return requestedCustomerId;
         }
         long ownId = currentCustomerId();

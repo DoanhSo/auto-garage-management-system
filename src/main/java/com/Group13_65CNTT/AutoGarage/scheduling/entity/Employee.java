@@ -49,6 +49,18 @@ public class Employee {
     private BigDecimal hourlyCost = BigDecimal.ZERO;
 
     @Builder.Default
+    @Column(name = "base_salary", nullable = false, precision = 18, scale = 2)
+    private BigDecimal baseSalary = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "overtime_multiplier", nullable = false, precision = 4, scale = 2)
+    private BigDecimal overtimeMultiplier = new BigDecimal("1.50");
+
+    @Builder.Default
+    @Column(name = "default_commission_rate", nullable = false, precision = 5, scale = 2)
+    private BigDecimal defaultCommissionRate = new BigDecimal("10.00");
+
+    @Builder.Default
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
@@ -76,6 +88,15 @@ public class Employee {
         }
         if (hourlyCost == null) {
             hourlyCost = BigDecimal.ZERO;
+        }
+        if (baseSalary == null) {
+            baseSalary = BigDecimal.ZERO;
+        }
+        if (overtimeMultiplier == null) {
+            overtimeMultiplier = new BigDecimal("1.50");
+        }
+        if (defaultCommissionRate == null) {
+            defaultCommissionRate = new BigDecimal("10.00");
         }
         if (isActive == null) {
             isActive = true;

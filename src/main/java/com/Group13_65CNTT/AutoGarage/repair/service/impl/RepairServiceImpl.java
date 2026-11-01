@@ -23,7 +23,9 @@ import com.Group13_65CNTT.AutoGarage.repair.dto.request.RepairTaskCreateRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.RepairTaskUpdateRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.RepairOrderResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.RepairTaskResponse;
+import com.Group13_65CNTT.AutoGarage.repair.entity.AssignmentStage;
 import com.Group13_65CNTT.AutoGarage.repair.entity.OrderType;
+import com.Group13_65CNTT.AutoGarage.repair.entity.WorkResultStatus;
 import com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrder;
 import com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrderStatus;
 import com.Group13_65CNTT.AutoGarage.repair.entity.RepairTask;
@@ -70,6 +72,9 @@ import java.util.concurrent.ThreadLocalRandom;
 @Service
 @RequiredArgsConstructor
 public class RepairServiceImpl implements RepairService, RepairWorkflow {
+
+    /** How long the reception bay stays reserved for a freshly checked-in vehicle. */
+    private static final java.time.Duration RECEPTION_BAY_HOLD = java.time.Duration.ofHours(12);
     private final com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
     private final com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUser;
     private final com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
@@ -89,10 +94,16 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
     private final WarrantyRepository warrantyRepository;
 
     private final BayScheduling bayScheduling;
+    private final com.Group13_65CNTT.AutoGarage.repair.service.WorkLogRecorder workLogRecorder;
+    private final com.Group13_65CNTT.AutoGarage.scheduling.repository.EmployeeRepository employeeRepository;
 
     @Autowired(required = false)
     @org.springframework.context.annotation.Lazy
     private BillingOperations billingOperations;
+
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.Group13_65CNTT.AutoGarage.shared.contracts.PayrollOperations payrollOperations;
 
     @Autowired(required = false)
     @org.springframework.context.annotation.Lazy
@@ -210,6 +221,36 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         }
         order.setFuelLevelPercent(fuelLevelPercent);
         order.setCustomerComplaint(customerComplaint);
+        repairOrderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
+    public void recordReceptionDispatch(
+            long actorUserId, long repairOrderId, Long diagnosticTechnicianId, Long serviceBayId) {
+        if (diagnosticTechnicianId == null && serviceBayId == null) {
+            return;
+        }
+        RepairOrder order = repairOrderRepository.findByIdForUpdate(repairOrderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu tiếp nhận"));
+        Instant now = Instant.now();
+        if (diagnosticTechnicianId != null) {
+            boolean activeEmployee = employeeRepository.findById(diagnosticTechnicianId)
+                    .map(employee -> Boolean.TRUE.equals(employee.getIsActive()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy kỹ thuật viên chẩn đoán"));
+            if (!activeEmployee) {
+                throw new BusinessRuleException("Kỹ thuật viên chẩn đoán đã ngưng hoạt động");
+            }
+            if (workLogRecorder.activeShift(diagnosticTechnicianId, now).isEmpty()) {
+                throw new BusinessRuleException("Kỹ thuật viên chẩn đoán phải đang trong ca trực");
+            }
+            order.setDiagnosticTechnicianId(diagnosticTechnicianId);
+            workLogRecorder.start(order, diagnosticTechnicianId, AssignmentStage.DIAGNOSIS, null, now, null);
+        }
+        if (serviceBayId != null) {
+            bayScheduling.reserveRepair(actorUserId, repairOrderId, serviceBayId, now, now.plus(RECEPTION_BAY_HOLD));
+            order.setServiceBayId(serviceBayId);
+        }
         repairOrderRepository.save(order);
     }
 
@@ -347,6 +388,11 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         order.setStatus(RepairOrderStatus.CLOSED);
         repairOrderRepository.save(order);
 
+        // Ghi nhận thưởng/hoa hồng cho các thợ tham gia khi phiếu đã bàn giao
+        if (payrollOperations != null) {
+            payrollOperations.recordOrderCommissions(actorUserId, repairOrderId);
+        }
+
         // Cập nhật Odometer của xe
         vehicleRepository.findById(order.getVehicleId()).ifPresent(v -> {
             v.setOdometer(v.getOdometer() == null ? odometerOut : Math.max(v.getOdometer(), odometerOut));
@@ -455,6 +501,15 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
             throw new BusinessRuleException("Phiếu sửa chữa đã đóng hoặc bị hủy, không thể chỉnh sửa");
         }
 
+        if (request.getLeadTechnicianId() != null) {
+            boolean activeEmployee = employeeRepository.findById(request.getLeadTechnicianId())
+                    .map(employee -> Boolean.TRUE.equals(employee.getIsActive()))
+                    .orElse(false);
+            if (!activeEmployee) {
+                throw new BusinessRuleException("Kỹ thuật viên trưởng không tồn tại hoặc đã ngưng hoạt động");
+            }
+        }
+
         repairOrderMapper.updateEntityFromRequest(request, order);
         return repairOrderMapper.toResponse(repairOrderRepository.save(order));
     }
@@ -471,6 +526,10 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         }
 
         order.setDiagnosis(request.getDiagnosis());
+        if (order.getDiagnosticTechnicianId() != null) {
+            workLogRecorder.finish(order.getId(), order.getDiagnosticTechnicianId(), AssignmentStage.DIAGNOSIS,
+                    Instant.now(), WorkResultStatus.COMPLETED, request.getDiagnosis());
+        }
         if (order.getStatus() == RepairOrderStatus.NEW) {
             order.setStatus(RepairOrderStatus.DIAGNOSING);
         }

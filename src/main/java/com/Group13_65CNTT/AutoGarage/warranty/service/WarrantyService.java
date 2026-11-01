@@ -4,6 +4,7 @@ import com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyClaimDecideReq
 import com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyClaimOpenRequest;
 import com.Group13_65CNTT.AutoGarage.warranty.dto.response.WarrantyClaimResponse;
 import com.Group13_65CNTT.AutoGarage.warranty.dto.response.WarrantyResponse;
+import com.Group13_65CNTT.AutoGarage.warranty.entity.WarrantyStatus;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -13,6 +14,15 @@ public interface WarrantyService {
     WarrantyResponse getWarrantyById(Long id);
 
     WarrantyResponse getWarrantyByCode(String warrantyCode);
+
+    Page<WarrantyResponse> searchWarranties(
+            Long vehicleId,
+            Long customerId,
+            WarrantyStatus status,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir);
 
     Page<WarrantyResponse> getWarrantiesByVehicleId(Long vehicleId, int page, int size);
 

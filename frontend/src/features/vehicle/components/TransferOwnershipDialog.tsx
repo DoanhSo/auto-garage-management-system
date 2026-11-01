@@ -94,7 +94,9 @@ export function TransferOwnershipDialog({
         <div className="info-strip">
           <ShieldAlert size={18} />
           <span>
-            <strong>Quy tắc bảo mật lịch sử :</strong> Lịch sử sửa chữa kỹ thuật trước đây vẫn được lưu trữ trên phương tiện, nhưng toàn bộ dữ liệu tài chính của chủ cũ sẽ tự động ẩn đối với chủ mới.
+            <strong>Quy tắc bảo mật lịch sử :</strong> Lịch sử sửa chữa kỹ thuật trước đây vẫn được
+            lưu trữ trên phương tiện, nhưng toàn bộ dữ liệu tài chính của chủ cũ sẽ tự động ẩn đối
+            với chủ mới.
           </span>
         </div>
 
@@ -145,7 +147,11 @@ export function TransferOwnershipDialog({
           />
         </Field>
 
-        <Field label="Ghi chú chuyển nhượng" error={errors.transferNote?.message} hint="Số hợp đồng mua bán hoặc giấy tờ liên quan">
+        <Field
+          label="Ghi chú chuyển nhượng"
+          error={errors.transferNote?.message}
+          hint="Số hợp đồng mua bán hoặc giấy tờ liên quan"
+        >
           <input
             type="text"
             className="input"

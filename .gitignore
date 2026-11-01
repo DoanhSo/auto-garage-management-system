@@ -50,3 +50,6 @@ release/
 .claudeignore
 CLAUDE.md
 scripts/backups/
+
+# Ảnh đính kèm lưu cục bộ khi chạy backend ngoài Docker
+/data/

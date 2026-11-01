@@ -49,13 +49,31 @@ class CustomerScopeTest {
     }
 
     @Test
-    void staffDirectoryRequiresFrontDeskRole() {
+    void staffQueriesPassTheRequestedCustomerIdThrough() {
         when(currentUser.role()).thenReturn(Role.TECHNICIAN);
+
+        assertThat(scope.customerIdForQuery(null)).isNull();
+        assertThat(scope.customerIdForQuery(9L)).isEqualTo(9L);
+        verifyNoInteractions(customers);
+    }
+
+    @Test
+    void staffDirectoryRequiresFrontDeskRole() {
         when(currentUser.userId()).thenReturn(42L);
         doThrow(new BusinessException(ResponseCode.FORBIDDEN)).when(access)
                 .requireRole(42L, "ADMIN", "RECEPTIONIST");
 
-        assertThatThrownBy(() -> scope.customerIdForQuery(null)).isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> scope.requireFrontDesk()).isInstanceOf(BusinessException.class);
+        verifyNoInteractions(customers);
+    }
+
+    @Test
+    void technicalDataRequiresTechnicalRole() {
+        when(currentUser.userId()).thenReturn(42L);
+        doThrow(new BusinessException(ResponseCode.FORBIDDEN)).when(access)
+                .requireRole(42L, "ADMIN", "RECEPTIONIST", "TECHNICIAN");
+
+        assertThatThrownBy(() -> scope.requireTechnical()).isInstanceOf(BusinessException.class);
         verifyNoInteractions(customers);
     }
 

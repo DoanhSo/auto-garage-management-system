@@ -28,6 +28,10 @@ export interface RepairOrder {
   customerComplaint?: string | null;
   diagnosis?: string | null;
   receivedBy: string;
+  leadTechnicianId?: string | null;
+  diagnosticTechnicianId?: string | null;
+  serviceBayId?: string | null;
+  qcTechnicianId?: string | null;
   receivedAt: string;
   latestQcCheckId?: string | null;
   handedOverBy?: string | null;

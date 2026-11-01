@@ -23,6 +23,7 @@ import {
   BOOKING_ROLES,
   REPAIR_VIEW_ROLES,
   INVOICE_VIEW_ROLES,
+  PAYROLL_VIEW_ROLES,
   homePathForRole,
 } from './access';
 
@@ -114,6 +115,11 @@ const InvoicesPage = lazy(() =>
 const PaymentsPage = lazy(() =>
   import('../features/billing/pages/PaymentsPage').then((module) => ({
     default: module.PaymentsPage,
+  })),
+);
+const PayrollPage = lazy(() =>
+  import('../features/payroll/pages/PayrollPage').then((module) => ({
+    default: module.PayrollPage,
   })),
 );
 const DebtLedgerPage = lazy(() =>
@@ -275,6 +281,10 @@ const router = createBrowserRouter([
               {
                 element: <RequireRoles allowedRoles={FINANCE_ROLES} />,
                 children: [{ path: 'billing/debt-ledger', element: <DebtLedgerPage /> }],
+              },
+              {
+                element: <RequireRoles allowedRoles={PAYROLL_VIEW_ROLES} />,
+                children: [{ path: 'payroll', element: <PayrollPage /> }],
               },
               {
                 element: <RequireAdmin />,

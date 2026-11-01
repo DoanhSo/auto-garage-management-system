@@ -129,11 +129,7 @@ function VehicleForm({
             label="Chủ sở hữu phương tiện"
             required={!existing}
             error={errors.customerId?.message}
-            hint={
-              existing
-                ? 'Chủ xe cố định. Để đổi chủ, hãy dùng tính năng Đổi chủ.'
-                : undefined
-            }
+            hint={existing ? 'Chủ xe cố định. Để đổi chủ, hãy dùng tính năng Đổi chủ.' : undefined}
           >
             {existing ? (
               <input
@@ -143,7 +139,11 @@ function VehicleForm({
                 disabled
               />
             ) : (
-              <select className="select" disabled={isLoadingCustomers || busy} {...register('customerId')}>
+              <select
+                className="select"
+                disabled={isLoadingCustomers || busy}
+                {...register('customerId')}
+              >
                 <option value="">-- Chọn khách hàng chủ xe --</option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -156,11 +156,7 @@ function VehicleForm({
           </Field>
         </div>
 
-        <Field
-          label="Biển số xe"
-          required={!existing}
-          error={errors.licensePlate?.message}
-        >
+        <Field label="Biển số xe" required={!existing} error={errors.licensePlate?.message}>
           <input
             type="text"
             className="input"
@@ -191,16 +187,8 @@ function VehicleForm({
           />
         </Field>
 
-        <Field
-          label="Hạn đăng kiểm tiếp theo"
-          error={errors.inspectionDueDate?.message}
-        >
-          <input
-            type="date"
-            className="input"
-            disabled={busy}
-            {...register('inspectionDueDate')}
-          />
+        <Field label="Hạn đăng kiểm tiếp theo" error={errors.inspectionDueDate?.message}>
+          <input type="date" className="input" disabled={busy} {...register('inspectionDueDate')} />
         </Field>
 
         <div className="form-section-label">THÔNG SỐ KỸ THUẬT PHƯƠNG TIỆN</div>
@@ -258,11 +246,7 @@ function VehicleForm({
           </select>
         </Field>
 
-        <Field
-          label="Số ODO hiện tại (km)"
-          required
-          error={errors.odometer?.message}
-        >
+        <Field label="Số ODO hiện tại (km)" required error={errors.odometer?.message}>
           <input
             type="number"
             className="input"

@@ -43,16 +43,12 @@ import { ShiftEditor } from '../components/ShiftEditor';
 import { BayMaintenanceModal } from '../components/BayMaintenanceModal';
 import { BayReservationsModal } from '../components/BayReservationsModal';
 import { EmployeeEditor } from '../components/EmployeeEditor';
+import { LiveDispatchBoard } from '../components/LiveDispatchBoard';
 import type { BayReservation, Employee, ServiceBay, Shift } from '../types/scheduling';
-import {
-  bayTypeLabels,
-  parseSkills,
-  SKILL_LABELS,
-  shiftStatusLabels,
-} from '../types/scheduling';
+import { bayTypeLabels, parseSkills, SKILL_LABELS, shiftStatusLabels } from '../types/scheduling';
 import type { UiPolicy } from '../../../shared/types/contracts';
 
-type Tab = 'bays' | 'shifts' | 'employees';
+type Tab = 'dispatch' | 'bays' | 'shifts' | 'employees';
 type BayFilter = 'ALL' | 'FREE' | 'BUSY' | 'INACTIVE';
 
 const hhmm = (iso: string) =>
@@ -62,9 +58,17 @@ function Occupancy({ reservation }: { reservation?: BayReservation }) {
   if (!reservation) return <Badge variant="success">Sẵn sàng nhận xe</Badge>;
   const range = `${hhmm(reservation.startsAt)}–${hhmm(reservation.endsAt)}`;
   if (reservation.reservationType === 'REPAIR')
-    return <Badge variant="primary">Đang sửa xe · #{reservation.repairOrderId} · {range}</Badge>;
+    return (
+      <Badge variant="primary">
+        Đang sửa xe · #{reservation.repairOrderId} · {range}
+      </Badge>
+    );
   if (reservation.reservationType === 'BOOKING')
-    return <Badge variant="warning">Giữ chỗ hẹn · #{reservation.bookingId} · {range}</Badge>;
+    return (
+      <Badge variant="warning">
+        Giữ chỗ hẹn · #{reservation.bookingId} · {range}
+      </Badge>
+    );
   return <Badge variant="danger">Đang bảo trì · {range}</Badge>;
 }
 
@@ -79,7 +83,7 @@ function liveShiftState(shift: Shift, now: number) {
 
 function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const notify = useToast();
-  const [activeTab, setActiveTab] = useState<Tab>('bays');
+  const [activeTab, setActiveTab] = useState<Tab>('dispatch');
   const [page, setPage] = useState(0);
   const [size, setSize] = useState(policy.paginationDefaultSize);
 
@@ -97,6 +101,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
 
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
   const [shiftPresetEmployee, setShiftPresetEmployee] = useState<string | number | null>(null);
+  const [shiftPresetBay, setShiftPresetBay] = useState<string | number | null>(null);
   const [cancelingShiftId, setCancelingShiftId] = useState<number | string | null>(null);
 
   const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
@@ -359,9 +364,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         cell: ({ row }) => {
           const s = liveShiftState(row.original, Date.now());
           return (
-            <Badge variant={s.variant}>
-              {s.label || shiftStatusLabels[row.original.status]}
-            </Badge>
+            <Badge variant={s.variant}>{s.label || shiftStatusLabels[row.original.status]}</Badge>
           );
         },
       },
@@ -444,6 +447,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
               disabled={!row.original.isActive}
               onClick={() => {
                 setShiftPresetEmployee(row.original.id);
+                setShiftPresetBay(null);
                 setShiftModalOpen(true);
               }}
             >
@@ -505,14 +509,18 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   };
 
   const current =
-    activeTab === 'bays' ? baysQuery : activeTab === 'shifts' ? shiftsQuery : employeesQuery;
+    activeTab === 'bays' || activeTab === 'dispatch'
+      ? baysQuery
+      : activeTab === 'shifts'
+        ? shiftsQuery
+        : employeesQuery;
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
     setPage(0);
   };
 
   const primaryAction =
-    activeTab === 'bays' ? (
+    activeTab === 'dispatch' ? null : activeTab === 'bays' ? (
       <Button
         variant="primary"
         onClick={() => {
@@ -527,6 +535,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         variant="primary"
         onClick={() => {
           setShiftPresetEmployee(null);
+          setShiftPresetBay(null);
           setShiftModalOpen(true);
         }}
       >
@@ -703,6 +712,12 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
 
       <section className="panel table-panel">
         <div className="tabs" role="group" aria-label="Chọn nội dung hiển thị">
+          {tabButton(
+            'dispatch',
+            <Hammer size={15} aria-hidden />,
+            'Điều phối xưởng',
+            allBays.filter((bay) => currentByBay.has(String(bay.id))).length,
+          )}
           {tabButton('bays', <Wrench size={15} aria-hidden />, 'Khoang sửa chữa', allBays.length)}
           {tabButton(
             'shifts',
@@ -718,7 +733,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
           )}
         </div>
 
-        {activeTab !== 'employees' && (
+        {activeTab !== 'employees' && activeTab !== 'dispatch' && (
           <div className="user-filters" role="search" aria-label="Bộ lọc">
             {filtersFor(activeTab)}
           </div>
@@ -728,6 +743,16 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
           <Loading label="Đang tải dữ liệu…" />
         ) : current.isError ? (
           <QueryError error={current.error} retry={() => current.refetch()} />
+        ) : activeTab === 'dispatch' ? (
+          <LiveDispatchBoard
+            bays={allBays}
+            currentByBay={currentByBay}
+            onAssignShift={(bay) => {
+              setShiftPresetEmployee(null);
+              setShiftPresetBay(bay.id);
+              setShiftModalOpen(true);
+            }}
+          />
         ) : activeTab === 'bays' ? (
           <>
             <DataTable<ServiceBay>
@@ -802,6 +827,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
       <ShiftEditor
         open={shiftModalOpen}
         initialEmployeeId={shiftPresetEmployee}
+        initialServiceBayId={shiftPresetBay}
         onClose={() => setShiftModalOpen(false)}
         onSaved={() => shiftsQuery.refetch()}
       />

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { receptionApi, type BookingQueryParams } from '../api/receptionApi';
 import { customerKeys } from '../../customer/hooks/useCustomers';
@@ -133,4 +134,58 @@ export function useUploadAttachmentMutation() {
       queryClient.invalidateQueries({ queryKey: receptionKeys.all });
     },
   });
+}
+
+export function useUploadOrderAttachmentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (values: Parameters<typeof receptionApi.uploadOrderAttachment>[0]) =>
+      receptionApi.uploadOrderAttachment(values),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: receptionKeys.attachments(variables.repairOrderId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: receptionKeys.vehicleChecks(variables.repairOrderId),
+      });
+    },
+  });
+}
+
+export function useOrderAttachmentsQuery(repairOrderId: string | null) {
+  return useQuery({
+    queryKey: repairOrderId ? receptionKeys.attachments(repairOrderId) : ['attachments', 'empty'],
+    queryFn: ({ signal }) =>
+      repairOrderId
+        ? receptionApi.getAttachmentsByOrder(repairOrderId, signal)
+        : Promise.reject('No ID'),
+    enabled: Boolean(repairOrderId),
+  });
+}
+
+/** Object URL của ảnh đính kèm (tải kèm token); revoke khi đổi ảnh hoặc unmount. */
+export function useAttachmentBlobUrl(attachmentId: string | null) {
+  const [state, setState] = useState<{ id: string; url: string | null; failed: boolean } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!attachmentId) return;
+    const controller = new AbortController();
+    let created: string | null = null;
+    receptionApi
+      .fetchAttachmentBlobUrl(attachmentId, controller.signal)
+      .then((url) => {
+        created = url;
+        setState({ id: attachmentId, url, failed: false });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setState({ id: attachmentId, url: null, failed: true });
+      });
+    return () => {
+      controller.abort();
+      if (created) URL.revokeObjectURL(created);
+    };
+  }, [attachmentId]);
+  const current = state?.id === attachmentId ? state : null;
+  return { url: current?.url ?? null, failed: current?.failed ?? false };
 }

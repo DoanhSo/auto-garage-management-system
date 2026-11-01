@@ -57,7 +57,10 @@ export function BookingTimelineBoard({
 }: BookingTimelineBoardProps) {
   const today = todayKey();
   const firstDay = weekStart(selectedDate || today);
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => shiftDate(firstDay, i)), [firstDay]);
+  const days = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => shiftDate(firstDay, i)),
+    [firstDay],
+  );
   const [focusedId, setFocusedId] = useState<string | null>(null);
 
   // Gom lịch hẹn theo ô: khóa "ngày|giờ"
@@ -72,7 +75,8 @@ export function BookingTimelineBoard({
       const key = `${day}|${row}`;
       map.set(key, [...(map.get(key) ?? []), booking]);
     }
-    for (const list of map.values()) list.sort((a, b) => a.appointmentAt.localeCompare(b.appointmentAt));
+    for (const list of map.values())
+      list.sort((a, b) => a.appointmentAt.localeCompare(b.appointmentAt));
     return map;
   }, [bookings, days]);
 

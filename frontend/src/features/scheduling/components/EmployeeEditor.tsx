@@ -35,6 +35,9 @@ export function EmployeeEditor({
   const [skills, setSkills] = useState<string[]>([]);
   const [canQc, setCanQc] = useState(false);
   const [hourlyCost, setHourlyCost] = useState('0');
+  const [baseSalary, setBaseSalary] = useState('0');
+  const [overtimeMultiplier, setOvertimeMultiplier] = useState('1.5');
+  const [commissionRate, setCommissionRate] = useState('10');
 
   useEffect(() => {
     if (!open) return;
@@ -43,12 +46,13 @@ export function EmployeeEditor({
     setSkills(parseSkills(employee?.skillsJson));
     setCanQc(employee?.canQc ?? false);
     setHourlyCost(String(employee?.hourlyCost ?? 0));
+    setBaseSalary(String(employee?.baseSalary ?? 0));
+    setOvertimeMultiplier(String(employee?.overtimeMultiplier ?? 1.5));
+    setCommissionRate(String(employee?.defaultCommissionRate ?? 10));
   }, [open, employee]);
 
   const busy = createMutation.isPending || updateMutation.isPending;
-  const candidates = (users.data?.content ?? []).filter(
-    (u) => u.role !== 'CUSTOMER',
-  );
+  const candidates = (users.data?.content ?? []).filter((u) => u.role !== 'CUSTOMER');
 
   const toggleSkill = (key: string) =>
     setSkills((prev) => (prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key]));
@@ -60,12 +64,34 @@ export function EmployeeEditor({
       notify('Đơn giá giờ công không hợp lệ');
       return;
     }
+    const salary = Number(baseSalary);
+    const multiplier = Number(overtimeMultiplier);
+    const rate = Number(commissionRate);
+    if (!Number.isFinite(salary) || salary < 0) {
+      notify('Lương cứng không hợp lệ');
+      return;
+    }
+    if (!Number.isFinite(multiplier) || multiplier < 1) {
+      notify('Hệ số tăng ca phải từ 1.0 trở lên');
+      return;
+    }
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
+      notify('Tỷ lệ hoa hồng phải nằm trong khoảng 0–100%');
+      return;
+    }
     const skillsJson = JSON.stringify(skills);
     try {
       if (employee) {
         await updateMutation.mutateAsync({
           id: employee.id,
-          data: { skillsJson, canQc, hourlyCost: cost },
+          data: {
+            skillsJson,
+            canQc,
+            hourlyCost: cost,
+            baseSalary: salary,
+            overtimeMultiplier: multiplier,
+            defaultCommissionRate: rate,
+          },
         });
         notify('Đã cập nhật hồ sơ kỹ thuật viên');
       } else {
@@ -79,6 +105,9 @@ export function EmployeeEditor({
           skillsJson,
           canQc,
           hourlyCost: cost,
+          baseSalary: salary,
+          overtimeMultiplier: multiplier,
+          defaultCommissionRate: rate,
         });
         notify('Đã tạo hồ sơ kỹ thuật viên');
       }
@@ -137,6 +166,41 @@ export function EmployeeEditor({
             value={hourlyCost}
             disabled={busy}
             onChange={(e) => setHourlyCost(e.target.value)}
+          />
+        </Field>
+        <Field label="Lương cứng cơ bản (đ/tháng)">
+          <input
+            type="number"
+            min="0"
+            step="100000"
+            className="input"
+            value={baseSalary}
+            disabled={busy}
+            onChange={(e) => setBaseSalary(e.target.value)}
+          />
+        </Field>
+        <Field label="Hệ số tăng ca">
+          <select
+            className="select"
+            value={overtimeMultiplier}
+            disabled={busy}
+            onChange={(e) => setOvertimeMultiplier(e.target.value)}
+          >
+            <option value="1">1.0x</option>
+            <option value="1.5">1.5x</option>
+            <option value="2">2.0x</option>
+          </select>
+        </Field>
+        <Field label="Tỷ lệ hoa hồng tiền công (%)">
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.5"
+            className="input"
+            value={commissionRate}
+            disabled={busy}
+            onChange={(e) => setCommissionRate(e.target.value)}
           />
         </Field>
         <Field label="Quyền kiểm định xuất xưởng">

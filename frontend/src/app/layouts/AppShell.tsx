@@ -25,6 +25,7 @@ import {
   Receipt,
   DollarSign,
   CreditCard,
+  Banknote,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from '../providers/AuthProvider';
@@ -35,10 +36,14 @@ import { roles, type Role } from '../../shared/types/contracts';
 import {
   FRONT_DESK_ROLES,
   BOOKING_ROLES,
+  ESTIMATE_VIEW_ROLES,
+  SCHEDULING_ROLES,
+  WARRANTY_ROLES,
   FINANCE_ROLES,
   STAFF_ROLES,
   REPAIR_VIEW_ROLES,
   INVOICE_VIEW_ROLES,
+  PAYROLL_VIEW_ROLES,
 } from '../access';
 import { initials } from '../../shared/utils/format';
 
@@ -56,6 +61,7 @@ const links: ReadonlyArray<{
   to: string;
   label: string;
   customerLabel?: string;
+  technicianLabel?: string;
   icon: typeof Bell;
   section: NavSection;
   allowedRoles: readonly Role[];
@@ -81,21 +87,22 @@ const links: ReadonlyArray<{
     label: 'Báo giá',
     icon: FileText,
     section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: STAFF_ROLES,
+    allowedRoles: ESTIMATE_VIEW_ROLES,
   },
   {
     to: '/scheduling',
     label: 'Khoang & Lịch ca',
     icon: CalendarCheck,
     section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: STAFF_ROLES,
+    allowedRoles: SCHEDULING_ROLES,
   },
   {
     to: '/warranties',
     label: 'Bảo hành',
+    customerLabel: 'Sổ bảo hành của tôi',
     icon: ShieldCheck,
     section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: STAFF_ROLES,
+    allowedRoles: WARRANTY_ROLES,
   },
   {
     to: '/customers',
@@ -170,6 +177,14 @@ const links: ReadonlyArray<{
     allowedRoles: FINANCE_ROLES,
   },
   {
+    to: '/payroll',
+    label: 'Bảng lương & Năng suất',
+    technicianLabel: 'Phiếu lương của tôi',
+    icon: Banknote,
+    section: 'TÀI CHÍNH & CÔNG NỢ',
+    allowedRoles: PAYROLL_VIEW_ROLES,
+  },
+  {
     to: '/admin/reports',
     label: 'Báo cáo',
     icon: ChartNoAxesCombined,
@@ -223,7 +238,11 @@ export function AppShell() {
   }, [me.data, setCurrentUser]);
 
   const labelOf = (link: (typeof links)[number]) =>
-    user?.role === 'CUSTOMER' && link.customerLabel ? link.customerLabel : link.label;
+    user?.role === 'CUSTOMER' && link.customerLabel
+      ? link.customerLabel
+      : user?.role === 'TECHNICIAN' && link.technicianLabel
+        ? link.technicianLabel
+        : link.label;
   const allowed = links.filter((link) => !!user && link.allowedRoles.includes(user.role));
   const currentLink = links.find((link) => location.pathname.startsWith(link.to));
   const title = currentLink ? labelOf(currentLink) : 'Tài khoản cá nhân';
@@ -290,7 +309,12 @@ export function AppShell() {
           </button>
         </div>
         {nav()}
-        <NavLink to="/" end className="nav-item home-link" title={collapsed ? 'Trang chủ' : undefined}>
+        <NavLink
+          to="/"
+          end
+          className="nav-item home-link"
+          title={collapsed ? 'Trang chủ' : undefined}
+        >
           <House size={19} aria-hidden />
           <span className="nav-item-label">Trang chủ</span>
         </NavLink>
@@ -335,11 +359,7 @@ export function AppShell() {
               <span className="header-name">{user?.fullName}</span>
               {user && <RoleBadge role={user.role} />}
             </div>
-            <Link
-              to="/"
-              className="button button-ghost"
-              title="Về trang chủ AutoGarage"
-            >
+            <Link to="/" className="button button-ghost" title="Về trang chủ AutoGarage">
               <Globe size={16} />
               <span className="logout-label">Trang chủ</span>
             </Link>

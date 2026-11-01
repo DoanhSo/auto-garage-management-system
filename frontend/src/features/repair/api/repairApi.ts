@@ -36,6 +36,13 @@ export const repairApi = {
     return request<RepairOrder>(`/repair-orders/${id}`);
   },
 
+  async updateOrder(
+    id: string | number,
+    data: { leadTechnicianId?: number; customerComplaint?: string; fuelLevelPercent?: number },
+  ): Promise<RepairOrder> {
+    return request<RepairOrder>(`/repair-orders/${id}`, { method: 'PUT', body: data });
+  },
+
   async updateDiagnosis(id: string | number, diagnosis: string): Promise<RepairOrder> {
     return request<RepairOrder>(`/repair-orders/${id}/diagnosis`, {
       method: 'PATCH',

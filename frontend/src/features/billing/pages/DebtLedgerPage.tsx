@@ -26,6 +26,7 @@ import {
   PageHeader,
   QueryError,
 } from '../../../shared/components/ui';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import { DataTable } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
@@ -91,7 +92,11 @@ const limitText = (limit: string) =>
   Number(limit || 0) > 0 ? money(limit) : '0 đ · Thanh toán ngay';
 
 export function DebtLedgerPage() {
-  const [activeTab, setActiveTab] = useState<'customer' | 'supplier'>('customer');
+  const { user } = useAuth();
+  // Thủ kho chỉ quản lý công nợ nhà cung cấp nên mở sẵn tab đó.
+  const [activeTab, setActiveTab] = useState<'customer' | 'supplier'>(
+    user?.role === 'WAREHOUSE_STAFF' ? 'supplier' : 'customer',
+  );
   const [hasBalanceOnly, setHasBalanceOnly] = useState(false);
   const [creditFilter, setCreditFilter] = useState<CreditFilter>('ALL');
   const [sortKey, setSortKey] = useState<SortKey>('balance-desc');

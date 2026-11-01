@@ -232,17 +232,35 @@ export const bookingSchema = z.object({
   version: z.string().regex(/^\d+$/),
 });
 
-export const checkInVehicleResultSchema = z.object({
-  repairOrderId: idSchema,
-  orderCode: z.string(),
-  bookingId: idSchema.nullable().optional(),
-  vehicleId: idSchema,
-  status: z.string(),
-  receivedAt: z.string(),
-});
+// Khớp CheckInVehicleResponse: backend không trả orderCode/status nên dùng ID lệnh làm mã hiển thị.
+export const checkInVehicleResultSchema = z
+  .object({
+    repairOrderId: idSchema,
+    orderCode: z.string().nullable().optional(),
+    bookingId: idSchema.nullable().optional(),
+    vehicleId: idSchema,
+    licensePlate: z.string().nullable().optional(),
+    customerName: z.string().nullable().optional(),
+    customerComplaint: z.string().nullable().optional(),
+    status: z.string().nullable().optional(),
+    receivedAt: z.string(),
+  })
+  .transform((value) => ({
+    ...value,
+    orderCode: value.orderCode || value.repairOrderId,
+    status: value.status || 'NEW',
+  }));
 
 export const checkTypeSchema = z.enum(['CHECK_IN', 'QC', 'HANDOVER']);
-export const checkResultSchema = z.enum(['PASS', 'FAIL', 'CONDITIONAL']);
+// Backend CheckResult: RECORDED | PASSED | FAILED; giữ giá trị cũ để tương thích ngược.
+export const checkResultSchema = z.enum([
+  'RECORDED',
+  'PASSED',
+  'FAILED',
+  'PASS',
+  'FAIL',
+  'CONDITIONAL',
+]);
 export const attachmentCategorySchema = z.enum([
   'CHECK_IN',
   'DIAGNOSIS',
@@ -251,18 +269,36 @@ export const attachmentCategorySchema = z.enum([
   'WARRANTY',
 ]);
 
-export const attachmentSchema = z.object({
-  id: idSchema,
-  repairOrderId: idSchema.nullable().optional(),
-  vehicleCheckId: idSchema.nullable().optional(),
-  warrantyClaimId: idSchema.nullable().optional(),
-  category: attachmentCategorySchema,
-  fileName: z.string(),
-  fileSize: z.number().optional(),
-  contentType: z.string().optional(),
-  fileUrl: z.string(),
-  createdAt: z.string(),
-});
+// Khớp AttachmentResponse; ánh xạ sang tên trường frontend đang dùng.
+export const attachmentSchema = z
+  .object({
+    id: idSchema,
+    repairOrderId: idSchema.nullable().optional(),
+    vehicleCheckId: idSchema.nullable().optional(),
+    warrantyClaimId: idSchema.nullable().optional(),
+    category: attachmentCategorySchema,
+    originalFilename: z.string(),
+    sizeBytes: z.union([z.number(), z.string()]).nullable().optional(),
+    contentType: z.string().nullable().optional(),
+    storageKey: z.string().nullable().optional(),
+    sha256: z.string().nullable().optional(),
+    uploadedBy: idSchema.nullable().optional(),
+    uploadedAt: z.string(),
+  })
+  .transform((value) => ({
+    id: value.id,
+    repairOrderId: value.repairOrderId ?? null,
+    vehicleCheckId: value.vehicleCheckId ?? null,
+    warrantyClaimId: value.warrantyClaimId ?? null,
+    category: value.category,
+    fileName: value.originalFilename,
+    fileSize: value.sizeBytes == null ? undefined : Number(value.sizeBytes),
+    contentType: value.contentType ?? undefined,
+    contentPath: `/attachments/${value.id}/content`,
+    sha256: value.sha256 ?? null,
+    uploadedBy: value.uploadedBy ?? null,
+    createdAt: value.uploadedAt,
+  }));
 
 export const vehicleCheckSchema = z.object({
   id: idSchema,

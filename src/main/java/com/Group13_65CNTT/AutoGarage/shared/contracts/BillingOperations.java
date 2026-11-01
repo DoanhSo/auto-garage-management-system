@@ -10,4 +10,5 @@ public interface BillingOperations {
     long receivePayment(long actorUserId, long invoiceId, PaymentCommand command);
     long paySupplier(long actorUserId, long inventoryDocumentId, PaymentCommand command);
     void requireHandoverAllowed(long actorUserId, long repairOrderId);
+    long recordPayrollDisbursement(long actorUserId, long payrollPeriodId, BigDecimal amount, String notes);
 }

@@ -17,6 +17,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
 
     boolean existsByEmployeeCode(String employeeCode);
 
+    java.util.List<Employee> findByIsActiveTrue();
+
     boolean existsByUserId(Long userId);
 
     Page<Employee> findByIsActive(Boolean isActive, Pageable pageable);

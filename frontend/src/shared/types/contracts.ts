@@ -290,20 +290,26 @@ export interface CheckInVehicle {
   odometerIn: number;
   fuelLevelPercent?: number | null;
   customerComplaint?: string | null;
+  diagnosticTechnicianId?: string | null;
+  serviceBayId?: string | null;
   actorUserId?: string;
 }
 
 export interface CheckInVehicleResult {
   repairOrderId: string;
+  /** Backend chưa trả mã lệnh; khi thiếu thì bằng repairOrderId. */
   orderCode: string;
   bookingId?: string | null;
   vehicleId: string;
+  licensePlate?: string | null;
+  customerName?: string | null;
+  customerComplaint?: string | null;
   status: string;
   receivedAt: string;
 }
 
 export type CheckType = 'CHECK_IN' | 'QC' | 'HANDOVER';
-export type CheckResult = 'PASS' | 'FAIL' | 'CONDITIONAL';
+export type CheckResult = 'RECORDED' | 'PASSED' | 'FAILED' | 'PASS' | 'FAIL' | 'CONDITIONAL';
 export type AttachmentCategory = 'CHECK_IN' | 'DIAGNOSIS' | 'QC' | 'HANDOVER' | 'WARRANTY';
 
 export interface Attachment {
@@ -315,7 +321,10 @@ export interface Attachment {
   fileName: string;
   fileSize?: number;
   contentType?: string;
-  fileUrl: string;
+  /** Đường dẫn API (tương đối với /api/v1) để tải nội dung kèm token. */
+  contentPath: string;
+  sha256?: string | null;
+  uploadedBy?: string | null;
   createdAt: string;
 }
 

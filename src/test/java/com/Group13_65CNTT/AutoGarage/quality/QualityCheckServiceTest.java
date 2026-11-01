@@ -57,6 +57,11 @@ class QualityCheckServiceTest {
     @Mock
     private com.Group13_65CNTT.AutoGarage.repair.repository.TaskAssignmentRepository assignmentRepository;
 
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.repair.service.WorkLogRecorder workLogRecorder;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderAssignmentRepository workLogRepository;
+
     @InjectMocks
     private QualityServiceImpl qualityService;
 
@@ -76,6 +81,45 @@ class QualityCheckServiceTest {
                 .userId(10L)
                 .canQc(true)
                 .build();
+        org.mockito.Mockito.lenient()
+                .when(workLogRecorder.activeShift(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Optional.of(new com.Group13_65CNTT.AutoGarage.scheduling.entity.EmployeeShift()));
+    }
+
+    @Test
+    void inspectorOffShiftCannotRecordQc() {
+        QualityCheckCreateRequest request = new QualityCheckCreateRequest();
+        request.setRepairOrderId(100L);
+        request.setResult(CheckResult.PASSED);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        when(repairTaskRepository.existsByRepairOrderIdAndStatusNot(100L, TaskStatus.COMPLETED)).thenReturn(false);
+        when(laborSessionRepository.countOpenSessionsByRepairOrderId(100L)).thenReturn(0L);
+        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.of(mockEmployee));
+        when(workLogRecorder.activeShift(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> qualityService.performQualityCheck(10L, request))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException.class);
+        verifyNoInteractions(vehicleCheckRepository);
+    }
+
+    @Test
+    void mainRepairerCannotInspectOwnWork() {
+        QualityCheckCreateRequest request = new QualityCheckCreateRequest();
+        request.setRepairOrderId(100L);
+        request.setResult(CheckResult.PASSED);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        when(repairTaskRepository.existsByRepairOrderIdAndStatusNot(100L, TaskStatus.COMPLETED)).thenReturn(false);
+        when(laborSessionRepository.countOpenSessionsByRepairOrderId(100L)).thenReturn(0L);
+        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.of(mockEmployee));
+        when(workLogRepository.findByRepairOrderIdAndAssignmentStage(
+                100L, com.Group13_65CNTT.AutoGarage.repair.entity.AssignmentStage.REPAIR_MAIN))
+                .thenReturn(List.of(com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrderAssignment.builder()
+                        .employeeId(1L).build()));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> qualityService.performQualityCheck(10L, request))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException.class);
+        verifyNoInteractions(vehicleCheckRepository);
     }
 
     @Test

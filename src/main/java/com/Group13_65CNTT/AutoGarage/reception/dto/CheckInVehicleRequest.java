@@ -28,6 +28,26 @@ public class CheckInVehicleRequest {
 
     private Long actorUserId;
 
+    private Long diagnosticTechnicianId;
+
+    private Long serviceBayId;
+
+    public Long getDiagnosticTechnicianId() {
+        return diagnosticTechnicianId;
+    }
+
+    public void setDiagnosticTechnicianId(Long diagnosticTechnicianId) {
+        this.diagnosticTechnicianId = diagnosticTechnicianId;
+    }
+
+    public Long getServiceBayId() {
+        return serviceBayId;
+    }
+
+    public void setServiceBayId(Long serviceBayId) {
+        this.serviceBayId = serviceBayId;
+    }
+
     public Long getBookingId() {
         return bookingId;
     }

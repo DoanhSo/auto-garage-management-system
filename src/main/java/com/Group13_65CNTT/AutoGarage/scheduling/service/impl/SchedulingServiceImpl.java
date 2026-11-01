@@ -23,6 +23,7 @@ import com.Group13_65CNTT.AutoGarage.scheduling.entity.ReservationStatus;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.ReservationType;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.ServiceBay;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftStatus;
+import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftType;
 import com.Group13_65CNTT.AutoGarage.scheduling.mapper.BayReservationMapper;
 import com.Group13_65CNTT.AutoGarage.scheduling.mapper.EmployeeMapper;
 import com.Group13_65CNTT.AutoGarage.scheduling.mapper.EmployeeShiftMapper;
@@ -144,6 +145,10 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
 
+        if (request.getServiceBayId() != null && !serviceBayRepository.existsById(request.getServiceBayId())) {
+            throw new BusinessException(ResponseCode.RESOURCE_NOT_FOUND);
+        }
+
         List<EmployeeShift> overlaps = employeeShiftRepository.findOverlappingShifts(
                 request.getEmployeeId(), ShiftStatus.ACTIVE, request.getStartsAt(), request.getEndsAt());
         if (!overlaps.isEmpty()) {
@@ -151,6 +156,9 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
         }
 
         EmployeeShift shift = employeeShiftMapper.toEntity(request);
+        if (shift.getShiftType() == null) {
+            shift.setShiftType(ShiftType.FULL_DAY);
+        }
         shift.setStatus(ShiftStatus.ACTIVE);
         shift.setCreatedBy(ActorIds.require(actorUserId));
         EmployeeShift saved = employeeShiftRepository.save(shift);

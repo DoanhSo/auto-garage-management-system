@@ -156,7 +156,8 @@ export function ServiceBayEditor({
           <div className="full-width-field">
             <Field label="Mô tả / Thiết bị trang bị tại khoang">
               <textarea
-                className="input" rows={3}
+                className="input"
+                rows={3}
                 placeholder="Trọng tải nâng 4 tấn, có máy hút dầu nhớt chuyên dụng..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}

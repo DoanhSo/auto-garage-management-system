@@ -1,5 +1,7 @@
 import { Calendar, CheckCircle2, Clock, Gauge, Lock, Paperclip } from 'lucide-react';
+import { useState } from 'react';
 import { Button, Loading, QueryError, Sheet } from '../../../shared/components/ui';
+import { VehicleWorkHistoryTab } from './VehicleWorkHistoryTab';
 import { useVehicleTimelineQuery } from '../hooks/useVehicles';
 import { money, formatDateTime } from '../../../shared/utils/format';
 
@@ -12,6 +14,7 @@ export function VehicleTimelineModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const [view, setView] = useState<'repairs' | 'work'>('repairs');
   const {
     data: timeline,
     isLoading,
@@ -34,7 +37,23 @@ export function VehicleTimelineModal({
       }
     >
       <div className="editor-form space-y-4">
-        {isLoading ? (
+        <div className="row-actions" role="group" aria-label="Chế độ xem">
+          <Button
+            variant={view === 'repairs' ? 'primary' : 'secondary'}
+            onClick={() => setView('repairs')}
+          >
+            Lịch sử sửa chữa
+          </Button>
+          <Button
+            variant={view === 'work' ? 'primary' : 'secondary'}
+            onClick={() => setView('work')}
+          >
+            Lịch sử thi công & Nhân sự
+          </Button>
+        </div>
+        {view === 'work' ? (
+          <VehicleWorkHistoryTab vehicleId={vehicleId} />
+        ) : isLoading ? (
           <Loading label="Đang tải dòng thời gian sửa chữa…" />
         ) : isError ? (
           <QueryError error={error} retry={() => refetch()} />
@@ -127,10 +146,7 @@ export function VehicleTimelineModal({
                       </span>
                       <div className="flex flex-wrap gap-1.5">
                         {entry.partsReplaced.map((part, idx) => (
-                          <span
-                            key={idx}
-                            className="badge badge-neutral text-xs"
-                          >
+                          <span key={idx} className="badge badge-neutral text-xs">
                             {part}
                           </span>
                         ))}

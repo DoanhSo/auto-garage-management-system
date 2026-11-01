@@ -4,6 +4,7 @@ import com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties;
 import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
 import com.Group13_65CNTT.AutoGarage.reception.repository.VehicleCheckRepository;
+import com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentContent;
 import com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentResponse;
 import com.Group13_65CNTT.AutoGarage.reception.entity.Attachment;
 import com.Group13_65CNTT.AutoGarage.reception.entity.AttachmentCategory;
@@ -19,6 +20,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
@@ -40,6 +45,8 @@ public class AttachmentServiceImpl implements AttachmentService {
             "image/heic",
             "application/pdf"
     );
+
+    private static final String PLACEHOLDER_CONTENT_TYPE = "image/svg+xml";
 
     private final AttachmentRepository attachmentRepository;
     private final VehicleCheckMapper vehicleCheckMapper;
@@ -111,7 +118,70 @@ public class AttachmentServiceImpl implements AttachmentService {
         attachment.setUploadedBy(uploadedBy);
 
         Attachment saved = attachmentRepository.save(attachment);
+        // Ghi file sau khi lưu metadata; lỗi ghi sẽ rollback bản ghi trong cùng transaction.
+        storeContent(storageKey, file);
         return vehicleCheckMapper.toAttachmentResponse(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AttachmentContent loadAttachmentContent(Long id) {
+        customerScope.requireResource(AccessResource.ATTACHMENT, id);
+        Attachment attachment = attachmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tệp đính kèm với ID: " + id));
+        Path target = resolveStoragePath(attachment.getStorageKey());
+        if (Files.isRegularFile(target)) {
+            try {
+                return new AttachmentContent(Files.readAllBytes(target), attachment.getContentType(),
+                        attachment.getOriginalFilename());
+            } catch (IOException e) {
+                throw new BusinessException(ResponseCode.INTERNAL_SERVER_ERROR, e);
+            }
+        }
+        // Bản ghi seed không có file vật lý: trả ảnh minh họa thay vì 404.
+        return new AttachmentContent(placeholderSvg(attachment).getBytes(StandardCharsets.UTF_8),
+                PLACEHOLDER_CONTENT_TYPE, attachment.getOriginalFilename());
+    }
+
+    private void storeContent(String storageKey, MultipartFile file) {
+        Path target = resolveStoragePath(storageKey);
+        try (InputStream is = file.getInputStream()) {
+            Files.createDirectories(target.getParent());
+            Files.copy(is, target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            throw new BusinessException(ResponseCode.INTERNAL_SERVER_ERROR, e);
+        }
+    }
+
+    private Path resolveStoragePath(String storageKey) {
+        Path root = Path.of(workshop.getAttachmentStorageDir()).toAbsolutePath().normalize();
+        Path target = root.resolve(storageKey).normalize();
+        if (!target.startsWith(root)) {
+            throw new BusinessException(ResponseCode.BAD_REQUEST);
+        }
+        return target;
+    }
+
+    private static String placeholderSvg(Attachment attachment) {
+        String category = attachment.getCategory() != null ? attachment.getCategory().name() : "";
+        String sha = attachment.getSha256() != null ? attachment.getSha256() : "";
+        String shortSha = sha.length() > 16 ? sha.substring(0, 16) + "…" : sha;
+        return """
+                <svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">\
+                <rect width="800" height="600" fill="#f1f5f9"/>\
+                <rect x="40" y="40" width="720" height="520" rx="16" fill="#ffffff" stroke="#cbd5e1"/>\
+                <text x="400" y="250" font-family="sans-serif" font-size="28" font-weight="700" fill="#245bdb" text-anchor="middle">%s</text>\
+                <text x="400" y="300" font-family="sans-serif" font-size="22" fill="#172338" text-anchor="middle">%s</text>\
+                <text x="400" y="345" font-family="monospace" font-size="16" fill="#64748b" text-anchor="middle">SHA-256: %s</text>\
+                <text x="400" y="395" font-family="sans-serif" font-size="15" fill="#94a3b8" text-anchor="middle">Ảnh mẫu — chưa có tệp gốc trên máy chủ</text>\
+                </svg>"""
+                .formatted(xml(category), xml(attachment.getOriginalFilename()), xml(shortSha));
+    }
+
+    private static String xml(String value) {
+        if (value == null) return "";
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&apos;");
     }
 
     @Override

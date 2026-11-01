@@ -32,6 +32,23 @@ export function useRepairTasksQuery(repairOrderId: string | number | null | unde
   });
 }
 
+export function useUpdateRepairOrderMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string | number;
+      data: { leadTechnicianId?: number; customerComplaint?: string; fuelLevelPercent?: number };
+    }) => repairApi.updateOrder(id, data),
+    onSuccess: (_, { id }) => {
+      void qc.invalidateQueries({ queryKey: ['repair-order', id] });
+      void qc.invalidateQueries({ queryKey: ['repair-orders'] });
+    },
+  });
+}
+
 export function useUpdateDiagnosisMutation() {
   const qc = useQueryClient();
   return useMutation({

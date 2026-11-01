@@ -9,6 +9,8 @@ import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
 import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
+import com.Group13_65CNTT.AutoGarage.repair.dto.response.VehicleWorkHistoryResponse;
+import com.Group13_65CNTT.AutoGarage.repair.service.WorkHistoryService;
 import com.Group13_65CNTT.AutoGarage.vehicle.dto.CreateVehicleRequest;
 import com.Group13_65CNTT.AutoGarage.vehicle.dto.TransferOwnershipRequest;
 import com.Group13_65CNTT.AutoGarage.vehicle.dto.UpdateVehicleRequest;
@@ -39,6 +41,7 @@ public class VehicleController {
     private final VehicleService vehicleService;
     private final CurrentUserProvider currentUserProvider;
     private final CustomerRepository customerRepository;
+    private final WorkHistoryService workHistoryService;
 
     @PostMapping
     @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
@@ -52,7 +55,7 @@ public class VehicleController {
     }
 
     @GetMapping
-    @PreAuthorize(SecurityConstants.HAS_BOOKING_ACCESS)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Search vehicles")
     public ResponseEntity<ApiResponse<List<VehicleResponse>>> getVehicles(
             @RequestParam(required = false) Long customerId,
@@ -61,6 +64,17 @@ public class VehicleController {
             HttpServletRequest httpRequest) {
         List<VehicleResponse> list = vehicleService.searchVehicles(customerId, search, isActive);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, list, httpRequest.getRequestURI()));
+    }
+
+    @GetMapping("/{id}/work-history")
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
+    @Operation(summary = "Lịch sử chẩn đoán, sửa chữa và kiểm thử của phương tiện theo kỹ thuật viên và ca trực")
+    public ResponseEntity<ApiResponse<List<VehicleWorkHistoryResponse>>> getVehicleWorkHistory(
+            @PathVariable Long id,
+            HttpServletRequest httpRequest) {
+        vehicleService.getVehicleById(id); // enforces ownership for customers
+        return ResponseEntity.ok(ApiResponse.success(
+                ResponseCode.SUCCESS, workHistoryService.getVehicleWorkHistory(id), httpRequest.getRequestURI()));
     }
 
     @GetMapping("/{id}")

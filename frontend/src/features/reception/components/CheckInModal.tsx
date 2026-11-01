@@ -5,7 +5,15 @@ import { applyFormError, errorMessage } from '../../../shared/api/errors';
 import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
 import type { Booking, Vehicle } from '../../../shared/types/contracts';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
-import { useCheckInVehicleMutation } from '../hooks/useReception';
+import {
+  useActiveReservationsQuery,
+  useOnShiftTechniciansQuery,
+  useServiceBaysQuery,
+} from '../../scheduling/hooks/useScheduling';
+import { SKILL_LABELS, availabilityLabels } from '../../scheduling/types/scheduling';
+import { useState } from 'react';
+import { useCheckInVehicleMutation, useUploadOrderAttachmentMutation } from '../hooks/useReception';
+import { AttachmentFilePicker } from './AttachmentFilePicker';
 import { checkInFormSchema, type CheckInFormValues } from '../schemas/receptionSchema';
 import { LogIn, Car } from 'lucide-react';
 
@@ -24,9 +32,16 @@ export function CheckInModal({
 }) {
   const notify = useToast();
   const checkIn = useCheckInVehicleMutation();
+  const uploadPhoto = useUploadOrderAttachmentMutation();
+  const [photos, setPhotos] = useState<File[]>([]);
   const { data: vehicles = [], isLoading: isLoadingVehicles } = useVehiclesQuery({
     isActive: true,
   });
+
+  const onShift = useOnShiftTechniciansQuery(open);
+  const bays = useServiceBaysQuery({ isActive: true, page: 0, size: 100 });
+  const reservations = useActiveReservationsQuery();
+  const occupiedBayIds = new Set((reservations.data ?? []).map((r) => String(r.bayId)));
 
   const activeVehicle =
     vehicle || (booking ? vehicles.find((v) => v.id === booking.vehicleId) : null);
@@ -45,6 +60,8 @@ export function CheckInModal({
       odometerIn: activeVehicle?.odometer ?? 0,
       fuelLevelPercent: 50,
       customerComplaint: booking?.requestDescription ?? '',
+      diagnosticTechnicianId: '',
+      serviceBayId: '',
     },
   });
 
@@ -65,10 +82,30 @@ export function CheckInModal({
           ? Number(values.fuelLevelPercent)
           : null,
         customerComplaint: values.customerComplaint?.trim() || null,
+        diagnosticTechnicianId: values.diagnosticTechnicianId || null,
+        serviceBayId: values.serviceBayId || null,
       });
 
-      notify(`Tiếp nhận xe thành công! Mã lệnh sửa chữa: #${result.orderCode}`);
+      // Lệnh đã mở; ảnh lỗi thì báo riêng, không hủy kết quả tiếp nhận.
+      let failed = 0;
+      for (const file of photos) {
+        try {
+          await uploadPhoto.mutateAsync({
+            repairOrderId: result.repairOrderId,
+            category: 'CHECK_IN',
+            file,
+          });
+        } catch {
+          failed += 1;
+        }
+      }
+      notify(
+        failed > 0
+          ? `Đã tiếp nhận xe (lệnh #${result.orderCode}) nhưng ${failed}/${photos.length} ảnh tải lên thất bại.`
+          : `Tiếp nhận xe thành công! Mã lệnh sửa chữa: #${result.orderCode}`,
+      );
       reset();
+      setPhotos([]);
       onClose();
       onCheckInSuccess?.(result.orderCode, result.repairOrderId);
     } catch (err: unknown) {
@@ -84,9 +121,17 @@ export function CheckInModal({
     : 'Ghi nhận hiện trạng xe, số ODO và khởi tạo lệnh sửa chữa mới.';
 
   const generalError = checkIn.error;
+  const busy = checkIn.isPending || uploadPhoto.isPending;
 
   return (
-    <Sheet open={open} onClose={onClose} placement="center" size="md" title={title} description={description}>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      placement="center"
+      size="md"
+      title={title}
+      description={description}
+    >
       <form
         onSubmit={handleSubmit(onSubmit)}
         noValidate
@@ -98,7 +143,10 @@ export function CheckInModal({
           <div className="info-strip">
             <Car size={18} />
             <span>
-              <strong>{activeVehicle.licensePlate}</strong> ({activeVehicle.brand} {activeVehicle.model}) &bull; Chủ xe: {activeVehicle.customerName} ({activeVehicle.customerPhone}) &bull; ODO trước: {activeVehicle.odometer.toLocaleString('vi-VN')} km
+              <strong>{activeVehicle.licensePlate}</strong> ({activeVehicle.brand}{' '}
+              {activeVehicle.model}) &bull; Chủ xe: {activeVehicle.customerName} (
+              {activeVehicle.customerPhone}) &bull; ODO trước:{' '}
+              {activeVehicle.odometer.toLocaleString('vi-VN')} km
             </span>
           </div>
         )}
@@ -164,6 +212,40 @@ export function CheckInModal({
           />
         </Field>
 
+        <div className="form-section-label">ĐIỀU PHỐI TIẾP NHẬN</div>
+
+        <Field
+          label="Kỹ thuật viên chẩn đoán"
+          hint={
+            onShift.data && onShift.data.length === 0
+              ? 'Hiện chưa có kỹ thuật viên nào trong ca trực'
+              : 'Chỉ hiển thị kỹ thuật viên đang trong ca trực'
+          }
+        >
+          <select className="select" disabled={busy} {...register('diagnosticTechnicianId')}>
+            <option value="">-- Chưa chỉ định --</option>
+            {(onShift.data ?? []).map((tech) => (
+              <option key={tech.employeeId} value={tech.employeeId}>
+                {tech.fullName} ·{' '}
+                {tech.skills.map((s) => SKILL_LABELS[s] ?? s).join(', ') || 'Đa năng'} ·{' '}
+                {availabilityLabels[tech.availabilityStatus]}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Khoang tiếp nhận" hint="Khoang đang có xe được đánh dấu bận">
+          <select className="select" disabled={busy} {...register('serviceBayId')}>
+            <option value="">-- Chưa chọn khoang --</option>
+            {(bays.data?.content ?? []).map((bay) => (
+              <option key={bay.id} value={bay.id} disabled={occupiedBayIds.has(String(bay.id))}>
+                {bay.bayCode} · {bay.bayName}
+                {occupiedBayIds.has(String(bay.id)) ? ' (đang bận)' : ''}
+              </option>
+            ))}
+          </select>
+        </Field>
+
         <div className="full-width-field">
           <Field
             label="Hiện tượng / Yêu cầu sửa chữa của khách hàng"
@@ -179,13 +261,26 @@ export function CheckInModal({
           </Field>
         </div>
 
+        <div className="full-width-field">
+          <Field
+            label="Ảnh hiện trạng khi tiếp nhận"
+            hint="Ngoại thất, đồng hồ ODO, vạch nhiên liệu, đèn táp-lô. Ảnh được gắn vào lệnh sau khi tiếp nhận."
+          >
+            <AttachmentFilePicker files={photos} onChange={setPhotos} disabled={busy} />
+          </Field>
+        </div>
+
         <div className="form-actions account-editor-actions">
-          <Button disabled={checkIn.isPending} onClick={onClose}>
+          <Button disabled={busy} onClick={onClose}>
             Hủy
           </Button>
-          <Button variant="primary" type="submit" pending={checkIn.isPending}>
+          <Button variant="primary" type="submit" pending={busy}>
             <LogIn size={16} />
-            {checkIn.isPending ? 'Đang tiếp nhận…' : 'Tiếp nhận xe & Mở lệnh'}
+            {uploadPhoto.isPending
+              ? 'Đang tải ảnh…'
+              : checkIn.isPending
+                ? 'Đang tiếp nhận…'
+                : 'Tiếp nhận xe & Mở lệnh'}
           </Button>
         </div>
       </form>

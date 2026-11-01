@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Wrench,
   CheckCircle,
@@ -14,11 +14,17 @@ import {
   Calendar,
   AlertTriangle,
   ArrowRight,
+  ClipboardList,
 } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { FRONT_DESK_ROLES, TECHNICAL_ROLES } from '../../../app/access';
 import { useVehicleQuery } from '../../vehicle/hooks/useVehicles';
+import {
+  useOnShiftTechniciansQuery,
+  useSchedulingEmployeesQuery,
+} from '../../scheduling/hooks/useScheduling';
+import { useUsersQuery } from '../../identity/hooks/useUsers';
 import { errorMessage } from '../../../shared/api/errors';
 import { Button, Empty, Loading, QueryError, Sheet } from '../../../shared/components/ui';
 import { formatDateTime, money } from '../../../shared/utils/format';
@@ -27,6 +33,7 @@ import {
   useRepairOrderQuery,
   useRepairTasksQuery,
   useUpdateDiagnosisMutation,
+  useUpdateRepairOrderMutation,
   useTransitionStatusMutation,
   useCompleteTaskMutation,
 } from '../hooks/useRepair';
@@ -43,6 +50,9 @@ import { CreateEstimateModal } from './CreateEstimateModal';
 import { PerformQCModal } from './PerformQCModal';
 import { HandoverModal } from './HandoverModal';
 import { VehicleLabel } from './VehicleLabel';
+import { DiagnosisAttachmentGallery, type CheckInSummary } from './DiagnosisAttachmentGallery';
+import { useVehicleChecksQuery } from '../../reception/hooks/useReception';
+import { VehicleCheckModal } from '../../reception/components/VehicleCheckModal';
 
 type Tab = 'overview' | 'estimate' | 'tasks' | 'qc' | 'handover';
 
@@ -62,6 +72,13 @@ export function RepairOrderDetailModal({
   const canFrontDesk = !!user && FRONT_DESK_ROLES.includes(user.role);
   const canDecideEstimate = isCustomer || canFrontDesk;
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const updateOrder = useUpdateRepairOrderMutation();
+  const { data: staff = [] } = useSchedulingEmployeesQuery({ active: true }, canTechnical);
+  const onShift = useOnShiftTechniciansQuery(open && canTechnical);
+  const users = useUsersQuery({ page: 0, size: 100, sortBy: 'fullName', sortDir: 'asc' });
+  const staffName = (employee: { userId: string | number; employeeCode: string }) =>
+    (users.data?.content ?? []).find((u) => String(u.id) === String(employee.userId))?.fullName ??
+    employee.employeeCode;
 
   // Sub-modals
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
@@ -77,6 +94,9 @@ export function RepairOrderDetailModal({
     error,
     refetch,
   } = useRepairOrderQuery(open ? orderId : null);
+  const diagnosticTechnician = staff.find(
+    (e) => String(e.id) === String(order?.diagnosticTechnicianId),
+  );
   const { data: tasks = [], isLoading: isLoadingTasks } = useRepairTasksQuery(
     open ? orderId : null,
   );
@@ -90,6 +110,30 @@ export function RepairOrderDetailModal({
   const { data: qcChecks = [], isLoading: isLoadingQC } = useQualityChecksQuery(
     open ? orderId : null,
   );
+  const { data: vehicleChecks = [] } = useVehicleChecksQuery(open ? orderId : null);
+  const [vehicleCheckOpen, setVehicleCheckOpen] = useState(false);
+
+  // Biên bản tiếp nhận mới nhất; checklistJson do VehicleCheckModal ghi dạng {exterior, interior, warningLights}.
+  const checkInSummary = useMemo<CheckInSummary | null>(() => {
+    const latest = vehicleChecks
+      .filter((c) => c.checkType === 'CHECK_IN')
+      .sort((a, b) => b.checkedAt.localeCompare(a.checkedAt))[0];
+    if (!latest) return null;
+    let parsed: Record<string, unknown> = {};
+    try {
+      const value: unknown = JSON.parse(latest.checklistJson);
+      if (value && typeof value === 'object') parsed = value as Record<string, unknown>;
+    } catch {
+      /* checklist không phải JSON: chỉ hiển thị ghi chú */
+    }
+    const text = (key: string) => (typeof parsed[key] === 'string' ? (parsed[key] as string) : '');
+    return {
+      exterior: text('exterior'),
+      interior: text('interior'),
+      warningLights: text('warningLights'),
+      notes: latest.notes,
+    };
+  }, [vehicleChecks]);
 
   // Mutations
   const updateDiagnosis = useUpdateDiagnosisMutation();
@@ -317,6 +361,18 @@ export function RepairOrderDetailModal({
                     </div>
 
                     <div className="space-y-2 text-sm">
+                      {canTechnical && (
+                        <div className="flex items-center justify-between py-1 border-b">
+                          <span className="muted flex items-center gap-1.5">
+                            <UserCheck size={14} /> Thợ chẩn đoán tiếp nhận
+                          </span>
+                          <strong>
+                            {diagnosticTechnician
+                              ? staffName(diagnosticTechnician)
+                              : 'Chưa chỉ định'}
+                          </strong>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between py-1 border-b">
                         <span className="muted flex items-center gap-1.5">
                           <Car size={14} /> Phương tiện
@@ -354,6 +410,37 @@ export function RepairOrderDetailModal({
                           </p>
                         </div>
                       )}
+
+                      <div className="p-3 border rounded-md text-xs space-y-1 mt-2">
+                        <div className="font-semibold flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5">
+                            <ClipboardList size={14} /> Biên bản kiểm tra tiếp nhận
+                          </span>
+                          {(canTechnical || canFrontDesk) && (
+                            <Button variant="ghost" onClick={() => setVehicleCheckOpen(true)}>
+                              <Plus size={14} /> Lập biên bản
+                            </Button>
+                          )}
+                        </div>
+                        {checkInSummary ? (
+                          <dl className="checkin-summary">
+                            <dt>Ngoại thất</dt>
+                            <dd>{checkInSummary.exterior || '—'}</dd>
+                            <dt>Nội thất</dt>
+                            <dd>{checkInSummary.interior || '—'}</dd>
+                            <dt>Đèn cảnh báo</dt>
+                            <dd>{checkInSummary.warningLights || '—'}</dd>
+                            {checkInSummary.notes && (
+                              <>
+                                <dt>Ghi chú</dt>
+                                <dd>{checkInSummary.notes}</dd>
+                              </>
+                            )}
+                          </dl>
+                        ) : (
+                          <p className="muted">Chưa lập biên bản kiểm tra khi nhận xe.</p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -389,6 +476,14 @@ export function RepairOrderDetailModal({
                     )}
                   </div>
                 </div>
+
+                <DiagnosisAttachmentGallery
+                  repairOrderId={order.id}
+                  customerComplaint={order.customerComplaint}
+                  diagnosis={currentDiagnosis}
+                  checkIn={checkInSummary}
+                  canUpload={canTechnical || canFrontDesk}
+                />
               </div>
             )}
 
@@ -577,6 +672,72 @@ export function RepairOrderDetailModal({
             {/* TAB 3: TASKS */}
             {activeTab === 'tasks' && (
               <div className="space-y-4 pt-1">
+                {canTechnical && (
+                  <div className="panel" aria-label="Kỹ thuật viên trưởng">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <span className="text-sm font-semibold">Kỹ thuật viên trưởng</span>
+                        <p className="text-xs muted mt-0.5">
+                          Chịu trách nhiệm điều phối lệnh và nhận thưởng hoàn thành khi QC đạt ngay
+                          lần đầu.
+                        </p>
+                      </div>
+                      {canFrontDesk ? (
+                        <select
+                          className="select"
+                          aria-label="Chọn kỹ thuật viên trưởng"
+                          value={order.leadTechnicianId ?? ''}
+                          disabled={updateOrder.isPending}
+                          onChange={(e) => {
+                            if (!e.target.value) return;
+                            updateOrder.mutate(
+                              { id: order.id, data: { leadTechnicianId: Number(e.target.value) } },
+                              {
+                                onSuccess: () => notify('Đã chỉ định kỹ thuật viên trưởng'),
+                                onError: (err: unknown) => notify(errorMessage(err)),
+                              },
+                            );
+                          }}
+                        >
+                          <option value="">-- Chưa chỉ định --</option>
+                          {staff.map((employee) => (
+                            <option key={employee.id} value={employee.id}>
+                              {staffName(employee)} · {employee.employeeCode}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <strong>
+                          {(() => {
+                            const lead = staff.find(
+                              (e) => String(e.id) === String(order.leadTechnicianId),
+                            );
+                            return lead ? staffName(lead) : 'Chưa chỉ định';
+                          })()}
+                        </strong>
+                      )}
+                    </div>
+                    {canTechnical &&
+                      (() => {
+                        const lead = staff.find(
+                          (e) => String(e.id) === String(order.leadTechnicianId),
+                        );
+                        const labor = tasks
+                          .filter((t) => t.taskType === 'REPAIR')
+                          .reduce(
+                            (sum, t) => sum + Number(t.quantity || 1) * Number(t.unitPrice || 0),
+                            0,
+                          );
+                        const rate = Number(lead?.defaultCommissionRate ?? 0);
+                        return lead ? (
+                          <p className="text-xs muted mt-2">
+                            Quỹ hoa hồng tiền công dự kiến: {money(String((labor * rate) / 100))} (
+                            {rate}% của {money(String(labor))}), chưa gồm thưởng hoàn thành lệnh.
+                          </p>
+                        ) : null;
+                      })()}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold">
                     Danh sách công việc sửa chữa ({tasks.length})
@@ -683,6 +844,16 @@ export function RepairOrderDetailModal({
             {/* TAB 4: QUALITY CHECK (QC) */}
             {activeTab === 'qc' && (
               <div className="space-y-4 pt-1">
+                {canTechnical && (
+                  <p className="text-xs muted" aria-label="Thợ QC đủ điều kiện">
+                    Thợ QC đủ điều kiện đang trực ca:{' '}
+                    {(onShift.data ?? [])
+                      .filter((tech) => tech.canQc)
+                      .map((tech) => tech.fullName)
+                      .join(', ') || 'chưa có'}
+                    . Thợ chính đã sửa chữa phiếu này không được tự kiểm định.
+                  </p>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold">
                     Biên bản kiểm tra chất lượng xuất xưởng ({qcChecks.length})
@@ -849,6 +1020,14 @@ export function RepairOrderDetailModal({
       />
       {order && (
         <HandoverModal order={order} open={handoverOpen} onClose={() => setHandoverOpen(false)} />
+      )}
+      {order && vehicleCheckOpen && (
+        <VehicleCheckModal
+          repairOrderId={order.id}
+          orderCode={order.orderCode}
+          open={vehicleCheckOpen}
+          onClose={() => setVehicleCheckOpen(false)}
+        />
       )}
     </Sheet>
   );

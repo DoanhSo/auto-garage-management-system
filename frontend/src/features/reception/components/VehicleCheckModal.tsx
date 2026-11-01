@@ -4,9 +4,13 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { applyFormError, errorMessage } from '../../../shared/api/errors';
 import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
-import { useRecordVehicleCheckMutation, useUploadAttachmentMutation } from '../hooks/useReception';
+import {
+  useRecordVehicleCheckMutation,
+  useUploadOrderAttachmentMutation,
+} from '../hooks/useReception';
+import { AttachmentFilePicker } from './AttachmentFilePicker';
 import { vehicleCheckFormSchema, type VehicleCheckFormValues } from '../schemas/receptionSchema';
-import { ClipboardCheck, Upload, Image } from 'lucide-react';
+import { ClipboardCheck, Upload } from 'lucide-react';
 
 export function VehicleCheckModal({
   repairOrderId,
@@ -21,7 +25,7 @@ export function VehicleCheckModal({
 }) {
   const notify = useToast();
   const recordCheck = useRecordVehicleCheckMutation();
-  const uploadAttachment = useUploadAttachmentMutation();
+  const uploadAttachment = useUploadOrderAttachmentMutation();
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -45,12 +49,6 @@ export function VehicleCheckModal({
     },
   });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setSelectedFiles(Array.from(e.target.files));
-    }
-  };
-
   async function onSubmit(values: VehicleCheckFormValues) {
     try {
       setIsUploading(true);
@@ -71,11 +69,12 @@ export function VehicleCheckModal({
 
       if (selectedFiles.length > 0) {
         for (const file of selectedFiles) {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('vehicleCheckId', checkRecord.id);
-          formData.append('attachmentType', 'CHECK_PHOTO');
-          await uploadAttachment.mutateAsync(formData);
+          await uploadAttachment.mutateAsync({
+            repairOrderId: values.repairOrderId,
+            vehicleCheckId: checkRecord.id,
+            category: values.checkType,
+            file,
+          });
         }
       }
 
@@ -113,13 +112,16 @@ export function VehicleCheckModal({
 
         <Field label="Loại kiểm tra" required error={errors.checkType?.message}>
           <select className="select" disabled={busy} {...register('checkType')}>
-            <option value="CHECK_IN">Kiểm tra tiếp nhận (Check-in)</option>
-            <option value="CHECK_OUT">Kiểm tra xuất xưởng (Check-out)</option>
-            <option value="PERIODIC">Kiểm định định kỳ</option>
+            <option value="CHECK_IN">Kiểm tra tiếp nhận</option>
+            <option value="HANDOVER">Kiểm tra trước bàn giao</option>
           </select>
         </Field>
 
-        <Field label="Số ODO kiểm tra (km)" error={errors.odometer?.message} hint="Số km tại thời điểm bàn giao kiểm tra">
+        <Field
+          label="Số ODO kiểm tra (km)"
+          error={errors.odometer?.message}
+          hint="Số km tại thời điểm bàn giao kiểm tra"
+        >
           <input
             type="number"
             className="input"
@@ -171,7 +173,11 @@ export function VehicleCheckModal({
           />
         </Field>
 
-        <Field label="Ghi chú tổng kết của người kiểm tra" error={errors.notes?.message} hint="Ghi chú thêm về tiếng ồn bất thường, rò rỉ dung dịch...">
+        <Field
+          label="Ghi chú tổng kết của người kiểm tra"
+          error={errors.notes?.message}
+          hint="Ghi chú thêm về tiếng ồn bất thường, rò rỉ dung dịch..."
+        >
           <input
             type="text"
             className="input"
@@ -185,37 +191,12 @@ export function VehicleCheckModal({
           <div className="info-strip" style={{ marginBottom: 8 }}>
             <Upload size={18} />
             <span>
-              <strong>Tải lên ảnh chụp hiện trạng / Biên bản giấy:</strong> Hình ảnh được băm SHA-256 chống giả mạo và lưu trữ an toàn cùng lệnh sửa chữa.
+              <strong>Tải lên ảnh chụp hiện trạng / Biên bản giấy:</strong> Hình ảnh được băm
+              SHA-256 chống giả mạo và lưu trữ an toàn cùng lệnh sửa chữa.
             </span>
           </div>
 
-          <label className="button button-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-            <Upload size={16} />
-            <span>Chọn tệp ảnh hoặc PDF</span>
-            <input
-              type="file"
-              multiple
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              className="sr-only"
-              onChange={handleFileChange}
-              disabled={busy}
-            />
-          </label>
-
-          {selectedFiles.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-              {selectedFiles.map((f, idx) => (
-                <span
-                  key={idx}
-                  className="badge badge-neutral"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                >
-                  <Image size={13} />
-                  <span>{f.name}</span>
-                </span>
-              ))}
-            </div>
-          )}
+          <AttachmentFilePicker files={selectedFiles} onChange={setSelectedFiles} disabled={busy} />
         </div>
 
         <div className="form-actions account-editor-actions">

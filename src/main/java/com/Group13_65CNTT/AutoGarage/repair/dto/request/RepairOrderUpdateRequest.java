@@ -20,4 +20,6 @@ public class RepairOrderUpdateRequest {
     private String customerComplaint;
 
     private String diagnosis;
+
+    private Long leadTechnicianId;
 }
