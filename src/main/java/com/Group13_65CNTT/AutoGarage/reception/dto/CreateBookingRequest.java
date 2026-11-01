@@ -1,5 +1,6 @@
 package com.Group13_65CNTT.AutoGarage.reception.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -8,13 +9,16 @@ import java.time.Instant;
 
 public class CreateBookingRequest {
 
-    @NotNull(message = "ID khách hàng không được để trống")
     private Long customerId;
 
-    @NotNull(message = "ID phương tiện không được để trống")
+    @Valid
+    private NewBookingCustomerRequest newCustomer;
+
     private Long vehicleId;
 
-    @NotNull(message = "Dịch vụ chính không được để trống")
+    @Valid
+    private NewBookingVehicleRequest newVehicle;
+
     private Long serviceId;
 
     private Long bayId;
@@ -26,8 +30,6 @@ public class CreateBookingRequest {
     @Size(max = 1000, message = "Mô tả yêu cầu tối đa 1000 ký tự")
     private String requestDescription;
 
-    private Long createdBy;
-
     public Long getCustomerId() {
         return customerId;
     }
@@ -36,12 +38,28 @@ public class CreateBookingRequest {
         this.customerId = customerId;
     }
 
+    public NewBookingCustomerRequest getNewCustomer() {
+        return newCustomer;
+    }
+
+    public void setNewCustomer(NewBookingCustomerRequest newCustomer) {
+        this.newCustomer = newCustomer;
+    }
+
     public Long getVehicleId() {
         return vehicleId;
     }
 
     public void setVehicleId(Long vehicleId) {
         this.vehicleId = vehicleId;
+    }
+
+    public NewBookingVehicleRequest getNewVehicle() {
+        return newVehicle;
+    }
+
+    public void setNewVehicle(NewBookingVehicleRequest newVehicle) {
+        this.newVehicle = newVehicle;
     }
 
     public Long getServiceId() {
@@ -74,13 +92,5 @@ public class CreateBookingRequest {
 
     public void setRequestDescription(String requestDescription) {
         this.requestDescription = requestDescription;
-    }
-
-    public Long getCreatedBy() {
-        return createdBy;
-    }
-
-    public void setCreatedBy(Long createdBy) {
-        this.createdBy = createdBy;
     }
 }

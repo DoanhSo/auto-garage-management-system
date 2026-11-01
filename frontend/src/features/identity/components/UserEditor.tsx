@@ -12,6 +12,7 @@ import {
   Field,
   FormError,
   Loading,
+  PasswordInput,
   QueryError,
   ReadOnlyField,
   RoleBadge,
@@ -26,10 +27,12 @@ import { userDefaults, userFormSchema, type UserFormValues } from '../schemas/us
 
 function UserForm({
   existing,
+  policy,
   onSaved,
   onRequestClose,
 }: {
   existing?: User;
+  policy?: UiPolicy;
   onSaved: () => void;
   onRequestClose: (handler: () => void) => void;
 }) {
@@ -49,7 +52,7 @@ function UserForm({
     getValues,
     formState: { errors, isDirty },
   } = useForm<UserFormValues>({
-    resolver: zodResolver(userFormSchema()),
+    resolver: zodResolver(userFormSchema(policy)),
     mode: 'onBlur',
     defaultValues: userDefaults(existing),
   });
@@ -101,7 +104,7 @@ function UserForm({
       onSaved();
     } catch (error) {
       setConfirmSelf(null);
-      applyFormError(error, setError, ['fullName', 'username', 'email', 'role']);
+      applyFormError(error, setError, ['fullName', 'username', 'email', 'role', 'password']);
       if (error instanceof ApiError && error.code === 2005) setConflict(true);
     } finally {
       create.reset();
@@ -180,23 +183,20 @@ function UserForm({
         ) : (
           <>
             <Field
-              label="Mật khẩu khởi tạo Keycloak"
+              label="Mật khẩu khởi tạo"
               error={errors.password?.message}
-              hint="Tùy chọn (tối thiểu 8 ký tự). Hệ thống đồng bộ trực tiếp tài khoản & vai trò sang Keycloak OIDC."
+              hint={`Không bắt buộc, tối thiểu ${policy?.passwordMinLength ?? 12} ký tự. Để trống để dùng mật khẩu khởi tạo mặc định.`}
             >
-              <input
-                className="input"
-                type="password"
+              <PasswordInput
                 {...register('password')}
-                maxLength={72}
                 disabled={busy}
                 autoComplete="new-password"
-                placeholder="Để trống để dùng mật khẩu khởi tạo mặc định"
+                placeholder={`Tối thiểu ${policy?.passwordMinLength ?? 12} ký tự`}
               />
             </Field>
             <p className="field-hint">
-              Tài khoản nhân sự (`ADMIN`, `RECEPTIONIST`, `WAREHOUSE_STAFF`, `TECHNICIAN`) chỉ được
-              cấp phát bởi Quản trị viên và đồng bộ tự động sang Keycloak.
+              Tài khoản nhân viên (Quản trị viên, Lễ tân, Thủ kho, Kỹ thuật viên) do Quản trị viên
+              cấp phát và đồng bộ tự động.
             </p>
           </>
         )}
@@ -284,6 +284,7 @@ function UserForm({
 }
 export function UserEditor({
   id,
+  policy,
   onClose,
   onRestoreFocus,
 }: {
@@ -322,6 +323,7 @@ export function UserEditor({
       ) : (
         <UserForm
           existing={id === 'new' ? undefined : user.data}
+          policy={policy}
           onSaved={onClose}
           onRequestClose={registerClose}
         />

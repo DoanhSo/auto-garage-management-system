@@ -9,7 +9,8 @@ import com.Group13_65CNTT.AutoGarage.customer.mapper.CustomerMapper;
 import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
 import com.Group13_65CNTT.AutoGarage.customer.service.CustomerServiceImpl;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
-import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+
+import java.sql.SQLIntegrityConstraintViolationException;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -56,7 +60,7 @@ class CustomerServiceTest {
     void testCreateCustomer_Success() {
         when(customerRepository.existsByPhone("0987654321")).thenReturn(false);
         when(customerRepository.existsByCustomerCode(any())).thenReturn(false);
-        when(customerRepository.save(any(Customer.class))).thenAnswer(invocation -> {
+        when(customerRepository.saveAndFlush(any(Customer.class))).thenAnswer(invocation -> {
             Customer c = invocation.getArgument(0);
             c.setId(1L);
             return c;
@@ -69,17 +73,44 @@ class CustomerServiceTest {
         assertEquals("Nguyen Van A", response.getFullName());
         assertEquals("0987654321", response.getPhone());
         assertNotNull(response.getCustomerCode());
-        verify(customerRepository, times(1)).save(any(Customer.class));
+        verify(customerRepository, times(1)).saveAndFlush(any(Customer.class));
     }
 
     @Test
-    @DisplayName("TV2-01: Báo lỗi Conflict khi số điện thoại đã tồn tại")
+    @DisplayName("TV2-01: Báo lỗi CUSTOMER_PHONE_DUPLICATE khi số điện thoại đã tồn tại")
     void testCreateCustomer_DuplicatePhone() {
         when(customerRepository.existsByPhone("0987654321")).thenReturn(true);
 
-        ConflictException ex = assertThrows(ConflictException.class, () -> customerService.createCustomer(validRequest));
+        BusinessException ex = assertThrows(BusinessException.class, () -> customerService.createCustomer(validRequest));
+        assertEquals(ResponseCode.CUSTOMER_PHONE_DUPLICATE, ex.getResponseCode());
         assertTrue(ex.getMessage().contains("đã được đăng ký"));
-        verify(customerRepository, never()).save(any());
+        verify(customerRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("TV2-01: Race condition trùng SĐT ở DB chuyển thành CUSTOMER_PHONE_DUPLICATE và giữ cause")
+    void testCreateCustomer_DuplicatePhoneRaceCondition() {
+        when(customerRepository.existsByPhone("0987654321")).thenReturn(false);
+        when(customerRepository.existsByCustomerCode(any())).thenReturn(false);
+        DataIntegrityViolationException dbFailure = new DataIntegrityViolationException(
+                "duplicate", new SQLIntegrityConstraintViolationException("Duplicate entry", "23000", 1062));
+        when(customerRepository.saveAndFlush(any(Customer.class))).thenThrow(dbFailure);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> customerService.createCustomer(validRequest));
+        assertEquals(ResponseCode.CUSTOMER_PHONE_DUPLICATE, ex.getResponseCode());
+        assertSame(dbFailure, ex.getCause());
+    }
+
+    @Test
+    @DisplayName("TV2-01: Lỗi toàn vẹn dữ liệu khác không bị đổi thành trùng SĐT")
+    void testCreateCustomer_OtherIntegrityFailureIsRethrown() {
+        when(customerRepository.existsByPhone("0987654321")).thenReturn(false);
+        when(customerRepository.existsByCustomerCode(any())).thenReturn(false);
+        DataIntegrityViolationException dbFailure = new DataIntegrityViolationException("fk failure");
+        when(customerRepository.saveAndFlush(any(Customer.class))).thenThrow(dbFailure);
+
+        assertSame(dbFailure, assertThrows(DataIntegrityViolationException.class,
+                () -> customerService.createCustomer(validRequest)));
     }
 
     @Test
@@ -89,7 +120,7 @@ class CustomerServiceTest {
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> customerService.createCustomer(validRequest));
         assertTrue(ex.getMessage().contains("không được âm"));
-        verify(customerRepository, never()).save(any());
+        verify(customerRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -104,7 +135,7 @@ class CustomerServiceTest {
         existing.setPaymentTermDays(0);
 
         when(customerRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(customerRepository.save(any(Customer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(customerRepository.saveAndFlush(any(Customer.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdateCustomerRequest updateReq = new UpdateCustomerRequest();
         updateReq.setFullName("Nguyen Van B");

@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { WAREHOUSE_ROLES } from '../../../app/access';
 import {
   Badge,
   Button,
@@ -56,6 +58,8 @@ const sortOptions = [
 export function InventoryDocumentsPage() {
   const compact = useMediaQuery('(max-width: 640px)');
   const notify = useToast();
+  const { user } = useAuth();
+  const canManage = !!user && WAREHOUSE_ROLES.includes(user.role);
 
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query);
@@ -103,9 +107,7 @@ export function InventoryDocumentsPage() {
   const cancelMutation = useCancelDocumentMutation();
 
   const filterCount =
-    (query.trim() ? 1 : 0) +
-    (selectedType !== '' ? 1 : 0) +
-    (selectedStatus !== '' ? 1 : 0);
+    (query.trim() ? 1 : 0) + (selectedType !== '' ? 1 : 0) + (selectedStatus !== '' ? 1 : 0);
 
   const isFiltered =
     query.length > 0 ||
@@ -350,7 +352,7 @@ export function InventoryDocumentsPage() {
                 <Eye size={16} />
                 <span>Xem</span>
               </Button>
-              {doc.status === 'DRAFT' && (
+              {canManage && doc.status === 'DRAFT' && (
                 <>
                   <Button
                     variant="ghost"
@@ -377,7 +379,7 @@ export function InventoryDocumentsPage() {
         },
       },
     ],
-    [],
+    [canManage],
   );
 
   const documentsList = data?.content || [];
@@ -396,21 +398,20 @@ export function InventoryDocumentsPage() {
         title="Chứng từ kho"
         description="Quản lý phiếu nhập mua, xuất kho sửa chữa, trả hàng nhà cung cấp và điều chỉnh tồn kho."
         actions={
-          <Button
-            variant="primary"
-            ref={createTrigger}
-            onClick={() => setCreating(true)}
-          >
-            <Plus size={18} />
-            <span>Lập chứng từ kho</span>
-          </Button>
+          canManage ? (
+            <Button variant="primary" ref={createTrigger} onClick={() => setCreating(true)}>
+              <Plus size={18} />
+              <span>Lập chứng từ kho</span>
+            </Button>
+          ) : undefined
         }
       />
 
       <div className="info-strip">
         <FileText size={18} />
         <span>
-          Chứng từ ở trạng thái Bản nháp (DRAFT) chưa làm thay đổi số lượng tồn kho. Khi nhấn Ghi sổ (POST), số tồn kho và giá trị bình quân gia quyền (MAC) được ghi nhận bất biến vào sổ kho.
+          Chứng từ ở trạng thái Bản nháp chưa làm thay đổi tồn kho. Khi nhấn Ghi sổ, số lượng tồn và
+          giá vốn bình quân được cập nhật vào sổ kho.
         </span>
       </div>
 
@@ -437,7 +438,8 @@ export function InventoryDocumentsPage() {
           <div
             className="user-filter-grid"
             style={{
-              gridTemplateColumns: 'minmax(220px, 1.4fr) minmax(260px, 1.3fr) minmax(180px, 1fr) minmax(200px, 1fr)',
+              gridTemplateColumns:
+                'minmax(220px, 1.4fr) minmax(260px, 1.3fr) minmax(180px, 1fr) minmax(200px, 1fr)',
             }}
           >
             {/* Ô tìm kiếm */}
@@ -485,6 +487,7 @@ export function InventoryDocumentsPage() {
                     key={opt.label}
                     type="button"
                     className={selectedType === opt.value ? 'selected' : ''}
+                    aria-pressed={selectedType === opt.value}
                     onClick={() => {
                       setSelectedType(opt.value as DocumentType | '');
                       setPage(0);
@@ -557,7 +560,13 @@ export function InventoryDocumentsPage() {
                   gap: '8px',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                  }}
+                >
                   <div>
                     <strong style={{ fontSize: '15px', fontFamily: 'monospace' }}>
                       {doc.documentCode}
@@ -567,10 +576,26 @@ export function InventoryDocumentsPage() {
                   {renderStatusBadge(doc.status)}
                 </div>
                 <div style={{ fontSize: '13px', color: '#526278' }}>
-                  {doc.supplierName && <div>NCC: <strong>{doc.supplierName}</strong></div>}
-                  {doc.repairOrderId && <div>Phiếu: <strong>#{doc.repairOrderId}</strong></div>}
+                  {doc.supplierName && (
+                    <div>
+                      NCC: <strong>{doc.supplierName}</strong>
+                    </div>
+                  )}
+                  {doc.repairOrderId && (
+                    <div>
+                      Phiếu: <strong>#{doc.repairOrderId}</strong>
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #f0f2f5' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingTop: '8px',
+                    borderTop: '1px solid #f0f2f5',
+                  }}
+                >
                   <span style={{ fontSize: '13px', fontWeight: 650, color: '#172338' }}>
                     {Number(doc.totalAmount || 0).toLocaleString('vi-VN')} đ
                   </span>
@@ -578,8 +603,12 @@ export function InventoryDocumentsPage() {
                     <Button variant="ghost" onClick={() => setViewingDoc(doc)}>
                       <Eye size={15} /> Xem
                     </Button>
-                    {doc.status === 'DRAFT' && (
-                      <Button variant="ghost" onClick={() => setPostingDoc(doc)} style={{ color: '#245bdb' }}>
+                    {canManage && doc.status === 'DRAFT' && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => setPostingDoc(doc)}
+                        style={{ color: '#245bdb' }}
+                      >
                         <CheckCircle2 size={15} /> Ghi sổ
                       </Button>
                     )}
@@ -600,8 +629,14 @@ export function InventoryDocumentsPage() {
         {/* Phân trang */}
         <div className="pagination" style={{ borderTop: '1px solid var(--border)' }}>
           <div className="pagination-info">
-            Hiển thị <strong>{documentsList.length > 0 ? 1 : 0}–{documentsList.length}</strong> trong <strong>{totalElements}</strong> kết quả
-            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>Trang {page + 1} / {totalPages}</span>
+            Hiển thị{' '}
+            <strong>
+              {documentsList.length > 0 ? 1 : 0}–{documentsList.length}
+            </strong>{' '}
+            trong <strong>{totalElements}</strong> kết quả
+            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>
+              Trang {page + 1} / {totalPages}
+            </span>
           </div>
           <div className="pagination-controls">
             <Button
@@ -639,8 +674,8 @@ export function InventoryDocumentsPage() {
               value={docType}
               onChange={(e) => setDocType(e.target.value as DocumentType)}
             >
-              <option value="IN">Nhập mua phụ tùng (IN)</option>
-              <option value="OUT">Xuất kho sửa chữa (OUT)</option>
+              <option value="IN">Nhập mua phụ tùng</option>
+              <option value="OUT">Xuất kho sửa chữa</option>
               <option value="RETURN">Trả hàng nhà cung cấp (RETURN)</option>
               <option value="ADJUSTMENT">Điều chỉnh kiểm kê (ADJUSTMENT)</option>
               <option value="OPENING">Khai báo tồn đầu kỳ (OPENING)</option>
@@ -663,7 +698,7 @@ export function InventoryDocumentsPage() {
                 ))}
               </select>
             </Field>
-          ) : (docType === 'OUT' || docType === 'RETURN') ? (
+          ) : docType === 'OUT' || docType === 'RETURN' ? (
             <Field label="Mã lệnh sửa chữa" required>
               <input
                 className="input font-mono"
@@ -701,23 +736,59 @@ export function InventoryDocumentsPage() {
 
           {/* Danh sách mặt hàng chi tiết */}
           <div className="full-width" style={{ marginTop: '4px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '8px',
+              }}
+            >
               <span className="form-section-label" style={{ margin: 0, padding: 0 }}>
                 CHI TIẾT DANH MỤC PHỤ TÙNG
               </span>
-              <Button variant="secondary" onClick={handleAddLine} style={{ minHeight: '30px', padding: '3px 10px', fontSize: '12px' }}>
+              <Button
+                variant="secondary"
+                onClick={handleAddLine}
+                style={{ minHeight: '30px', padding: '3px 10px', fontSize: '12px' }}
+              >
                 <Plus size={14} /> Thêm dòng
               </Button>
             </div>
 
-            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', maxHeight: '180px', overflowY: 'auto' }}>
+            <div
+              style={{
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                maxHeight: '180px',
+                overflowY: 'auto',
+              }}
+            >
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600, position: 'sticky', top: 0, zIndex: 1 }}>
+                <thead
+                  style={{
+                    background: '#f8fafc',
+                    borderBottom: '1px solid var(--border)',
+                    color: '#526278',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 1,
+                  }}
+                >
                   <tr>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>Phụ tùng</th>
-                    <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>Số lượng</th>
-                    <th style={{ padding: '8px 12px', width: '150px', textAlign: 'right' }}>Đơn giá (đ)</th>
-                    <th style={{ padding: '8px 12px', width: '150px', textAlign: 'right' }}>Thành tiền</th>
+                    <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>
+                      Số lượng
+                    </th>
+                    <th style={{ padding: '8px 12px', width: '150px', textAlign: 'right' }}>
+                      Đơn giá (đ)
+                    </th>
+                    <th style={{ padding: '8px 12px', width: '150px', textAlign: 'right' }}>
+                      Thành tiền
+                    </th>
                     <th style={{ padding: '8px 12px', width: '50px', textAlign: 'center' }}></th>
                   </tr>
                 </thead>
@@ -730,7 +801,9 @@ export function InventoryDocumentsPage() {
                           <select
                             className="input"
                             value={line.partId}
-                            onChange={(e) => handleLineChange(idx, 'partId', Number(e.target.value))}
+                            onChange={(e) =>
+                              handleLineChange(idx, 'partId', Number(e.target.value))
+                            }
                             required
                           >
                             <option value={0}>Chọn phụ tùng...</option>
@@ -748,7 +821,9 @@ export function InventoryDocumentsPage() {
                             className="input"
                             style={{ textAlign: 'right' }}
                             value={line.quantity}
-                            onChange={(e) => handleLineChange(idx, 'quantity', Number(e.target.value))}
+                            onChange={(e) =>
+                              handleLineChange(idx, 'quantity', Number(e.target.value))
+                            }
                             required
                           />
                         </td>
@@ -760,7 +835,9 @@ export function InventoryDocumentsPage() {
                             className="input"
                             style={{ textAlign: 'right' }}
                             value={line.unitCost}
-                            onChange={(e) => handleLineChange(idx, 'unitCost', Number(e.target.value))}
+                            onChange={(e) =>
+                              handleLineChange(idx, 'unitCost', Number(e.target.value))
+                            }
                             required
                           />
                         </td>
@@ -772,7 +849,12 @@ export function InventoryDocumentsPage() {
                             <button
                               type="button"
                               onClick={() => handleRemoveLine(idx)}
-                              style={{ background: 'transparent', border: 0, color: 'var(--danger)', cursor: 'pointer' }}
+                              style={{
+                                background: 'transparent',
+                                border: 0,
+                                color: 'var(--danger)',
+                                cursor: 'pointer',
+                              }}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -785,7 +867,15 @@ export function InventoryDocumentsPage() {
               </table>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '10px', gap: '12px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                marginTop: '10px',
+                gap: '12px',
+              }}
+            >
               <span style={{ fontSize: '13px', color: '#526278' }}>Tổng cộng ước tính:</span>
               <strong style={{ fontSize: '17px', color: '#245bdb' }}>
                 {totalCalculated.toLocaleString('vi-VN')} đ
@@ -794,7 +884,11 @@ export function InventoryDocumentsPage() {
           </div>
 
           <div className="modal-form-actions full-width">
-            <Button variant="secondary" onClick={() => setCreating(false)} disabled={createMutation.isPending}>
+            <Button
+              variant="secondary"
+              onClick={() => setCreating(false)}
+              disabled={createMutation.isPending}
+            >
               Hủy
             </Button>
             <Button variant="primary" type="submit" pending={createMutation.isPending}>
@@ -814,39 +908,86 @@ export function InventoryDocumentsPage() {
       >
         {viewingDoc && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '4px 0' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px 16px', background: '#f8fafc', padding: '14px 18px', borderRadius: '8px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                gap: '12px 16px',
+                background: '#f8fafc',
+                padding: '14px 18px',
+                borderRadius: '8px',
+              }}
+            >
               <div>
-                <span className="muted" style={{ fontSize: '12px' }}>Loại chứng từ:</span>
+                <span className="muted" style={{ fontSize: '12px' }}>
+                  Loại chứng từ:
+                </span>
                 <div style={{ marginTop: '2px' }}>{renderTypeBadge(viewingDoc.documentType)}</div>
               </div>
               <div>
-                <span className="muted" style={{ fontSize: '12px' }}>Trạng thái:</span>
+                <span className="muted" style={{ fontSize: '12px' }}>
+                  Trạng thái:
+                </span>
                 <div style={{ marginTop: '2px' }}>{renderStatusBadge(viewingDoc.status)}</div>
               </div>
               <div>
                 <span className="muted" style={{ fontSize: '12px' }}>
-                  {viewingDoc.supplierName ? 'Nhà cung cấp:' : viewingDoc.repairOrderId ? 'Mã phiếu SC:' : 'Đối tác:'}
+                  {viewingDoc.supplierName
+                    ? 'Nhà cung cấp:'
+                    : viewingDoc.repairOrderId
+                      ? 'Mã phiếu SC:'
+                      : 'Đối tác:'}
                 </span>
                 <div style={{ fontWeight: 600, marginTop: '2px' }}>
-                  {viewingDoc.supplierName || (viewingDoc.repairOrderId ? `#${viewingDoc.repairOrderId}` : '—')}
+                  {viewingDoc.supplierName ||
+                    (viewingDoc.repairOrderId ? `#${viewingDoc.repairOrderId}` : '—')}
                 </div>
               </div>
               <div>
-                <span className="muted" style={{ fontSize: '12px' }}>Hóa đơn gốc:</span>
+                <span className="muted" style={{ fontSize: '12px' }}>
+                  Hóa đơn gốc:
+                </span>
                 <div style={{ marginTop: '2px' }}>{viewingDoc.supplierInvoiceNumber || '—'}</div>
               </div>
               {viewingDoc.reason && (
-                <div style={{ gridColumn: '1 / -1', paddingTop: '4px', borderTop: '1px solid #eef2f6' }}>
-                  <span className="muted" style={{ fontSize: '12px' }}>Lý do / Diễn giải: </span>
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    paddingTop: '4px',
+                    borderTop: '1px solid #eef2f6',
+                  }}
+                >
+                  <span className="muted" style={{ fontSize: '12px' }}>
+                    Lý do / Diễn giải:{' '}
+                  </span>
                   <span style={{ fontSize: '13px' }}>{viewingDoc.reason}</span>
                 </div>
               )}
             </div>
 
             {/* Bảng danh sách dòng chứng từ */}
-            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', maxHeight: '220px', overflowY: 'auto' }}>
+            <div
+              style={{
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                maxHeight: '220px',
+                overflowY: 'auto',
+              }}
+            >
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600, position: 'sticky', top: 0, zIndex: 1 }}>
+                <thead
+                  style={{
+                    background: '#f8fafc',
+                    borderBottom: '1px solid var(--border)',
+                    color: '#526278',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 1,
+                  }}
+                >
                   <tr>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>STT</th>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>Mã SKU</th>
@@ -860,7 +1001,9 @@ export function InventoryDocumentsPage() {
                   {viewingDoc.items?.map((item, idx) => (
                     <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '8px 12px', color: '#64748b' }}>{idx + 1}</td>
-                      <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600 }}>{item.partSku}</td>
+                      <td style={{ padding: '8px 12px', fontFamily: 'monospace', fontWeight: 600 }}>
+                        {item.partSku}
+                      </td>
                       <td style={{ padding: '8px 12px' }}>{item.partName}</td>
                       <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
                         {item.quantity} {item.unit}
@@ -877,14 +1020,29 @@ export function InventoryDocumentsPage() {
               </table>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', paddingRight: '8px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                gap: '12px',
+                paddingRight: '8px',
+              }}
+            >
               <span style={{ fontSize: '13px', color: '#526278' }}>Tổng giá trị chứng từ:</span>
               <strong style={{ fontSize: '18px', color: '#245bdb' }}>
                 {Number(viewingDoc.totalAmount).toLocaleString('vi-VN')} đ
               </strong>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                paddingTop: '10px',
+                borderTop: '1px solid var(--border)',
+              }}
+            >
               <Button variant="secondary" onClick={() => setViewingDoc(null)}>
                 Đóng
               </Button>

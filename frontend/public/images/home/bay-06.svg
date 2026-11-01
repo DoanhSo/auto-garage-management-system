@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="b6Bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1120" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="b6Floor" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="b6Gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <linearGradient id="b6Car" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="60%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <pattern id="b6Stripes" width="24" height="24" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="12" height="24" fill="#eab308" />
+      <rect x="12" width="12" height="24" fill="#0f172a" />
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="500" fill="url(#b6Bg)" />
+
+  <!-- Overhead Detailing Tunnel Light Arrays -->
+  <g stroke="#ffffff" stroke-width="2" opacity="0.35">
+    <line x1="140" y1="40" x2="340" y2="40" />
+    <line x1="460" y1="40" x2="660" y2="40" />
+    <line x1="100" y1="80" x2="320" y2="80" />
+    <line x1="480" y1="80" x2="700" y2="80" />
+  </g>
+
+  <!-- High Gloss Epoxy Floor -->
+  <polygon points="40,360 760,360 800,500 0,500" fill="url(#b6Floor)" opacity="0.95" />
+  <polygon points="60,370 740,370 750,382 50,382" fill="url(#b6Stripes)" />
+  <line x1="60" y1="382" x2="740" y2="382" stroke="#eab308" stroke-width="2" />
+
+  <!-- Car Mirror Reflection on Glossy Epoxy Floor -->
+  <ellipse cx="400" cy="385" rx="200" ry="20" fill="#0284c7" opacity="0.15" />
+
+  <!-- Inspected Vehicle Pristine and Polished (Center) -->
+  <g transform="translate(220, 210)">
+    <!-- Shadow -->
+    <ellipse cx="180" cy="140" rx="170" ry="16" fill="#090d16" opacity="0.7" />
+    <!-- Car Body -->
+    <path d="M15,115 C25,85 65,70 120,65 L180,35 C230,25 300,25 330,45 L370,75 C390,85 400,98 395,115 L385,128 L15,128 Z" fill="url(#b6Car)" stroke="#0284c7" stroke-width="2" />
+    <!-- Greenhouse / Cabin Glass -->
+    <path d="M130,62 L182,37 C225,28 295,28 322,46 L355,72 Z" fill="#0f172a" opacity="0.9" />
+    <!-- Window Gloss Highlights -->
+    <polygon points="140,60 185,38 235,38 230,68 140,68" fill="#ffffff" opacity="0.4" />
+    <polygon points="245,38 315,47 348,70 240,68" fill="#ffffff" opacity="0.4" />
+    <!-- Headlight Beam (Left & Right) -->
+    <polygon points="380,95 440,80 440,120 380,110" fill="#fef08a" opacity="0.3" />
+    <!-- Wheels -->
+    <circle cx="85" cy="125" r="32" fill="#0f172a" stroke="#cbd5e1" stroke-width="5" />
+    <circle cx="85" cy="125" r="16" fill="#334155" />
+    <circle cx="330" cy="125" r="32" fill="#0f172a" stroke="#cbd5e1" stroke-width="5" />
+    <circle cx="330" cy="125" r="16" fill="#334155" />
+    <!-- Ceramic Gloss Sparkle Stars -->
+    <path d="M70,85 L73,75 L76,85 L86,88 L76,91 L73,101 L70,91 L60,88 Z" fill="#ffffff" opacity="0.9" />
+    <path d="M260,35 L262,28 L264,35 L271,37 L264,39 L262,46 L260,39 L253,37 Z" fill="#ffffff" opacity="0.9" />
+    <path d="M360,70 L363,60 L366,70 L376,73 L366,76 L363,86 L360,76 L350,73 Z" fill="#ffffff" opacity="0.9" />
+  </g>
+
+  <!-- Headlight Alignment Tester Device (Right) -->
+  <g transform="translate(640, 240)">
+    <rect x="25" y="40" width="10" height="120" fill="#475569" />
+    <rect x="5" y="150" width="50" height="12" rx="3" fill="#1e293b" />
+    <!-- Optical Box -->
+    <rect x="0" y="50" width="60" height="40" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="2" />
+    <circle cx="30" cy="70" r="14" fill="#1e293b" stroke="#fef08a" stroke-width="2" />
+    <line x1="30" y1="56" x2="30" y2="84" stroke="#ef4444" stroke-width="1" />
+    <line x1="16" y1="70" x2="44" y2="70" stroke="#ef4444" stroke-width="1" />
+  </g>
+
+  <!-- QC Inspection Checklist & Certification Seal (Left) -->
+  <g transform="translate(70, 160)">
+    <!-- Clipboard / Tablet Frame -->
+    <rect x="0" y="0" width="150" height="180" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="2" />
+    <!-- Top Clamp -->
+    <rect x="50" y="-8" width="50" height="14" rx="3" fill="#475569" stroke="#94a3b8" stroke-width="1.5" />
+    <!-- Document Title -->
+    <text x="75" y="24" font-family="system-ui, sans-serif" font-size="10" font-weight="900" fill="#38bdf8" text-anchor="middle">56-POINT QC CHECK</text>
+    <!-- Checklist items with green checkmarks -->
+    <g transform="translate(15, 36)" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#e2e8f0">
+      <text x="0" y="12" fill="#22c55e">✓ Động cơ & Hộp số</text>
+      <text x="0" y="28" fill="#22c55e">✓ Hệ thống phanh & lốp</text>
+      <text x="0" y="44" fill="#22c55e">✓ Hệ thống lái & gầm</text>
+      <text x="0" y="60" fill="#22c55e">✓ Điện & điều hòa</text>
+      <text x="0" y="76" fill="#22c55e">✓ Kiểm tra siết lực (Torque)</text>
+      <text x="0" y="92" fill="#22c55e">✓ Test lái xuất xưởng</text>
+    </g>
+    <!-- Big QC Passed Stamp -->
+    <g transform="translate(25, 135) rotate(-8)">
+      <rect x="0" y="0" width="105" height="28" rx="4" fill="none" stroke="#22c55e" stroke-width="2.5" />
+      <text x="52" y="19" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#22c55e" text-anchor="middle" letter-spacing="1">QC PASSED</text>
+    </g>
+  </g>
+
+  <!-- Bay Header Badge -->
+  <g transform="translate(40, 30)">
+    <rect x="0" y="0" width="230" height="32" rx="6" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" />
+    <circle cx="18" cy="16" r="6" fill="#22c55e" />
+    <text x="34" y="21" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#ffffff" letter-spacing="0.5">
+      BAY-06 · NGHIỆM THU QC
+    </text>
+  </g>
+
+  <!-- Bay Floor Marking -->
+  <text x="400" y="475" font-family="system-ui, sans-serif" font-size="28" font-weight="900" fill="#334155" text-anchor="middle" letter-spacing="4">
+    KHOANG 06 · FINAL QC & HANDOVER
+  </text>
+</svg>

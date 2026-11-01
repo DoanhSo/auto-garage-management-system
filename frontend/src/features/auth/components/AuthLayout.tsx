@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react';
-import { Wrench } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { MapPin, Phone, Wrench } from 'lucide-react';
 import '../auth.css';
+
+const HOTLINE = '0963 943 872';
+const GARAGE_ADDRESS = 'Số 226 Phố Tây Sơn, P. Trung Liệt, Q. Đống Đa, Hà Nội';
 
 export function AuthLayout({
   title,
@@ -15,44 +19,55 @@ export function AuthLayout({
 }) {
   return (
     <div className="auth-page">
-      <div className="auth-shell">
-        <main className={`auth-main auth-main-${variant}`} id="main-content" tabIndex={-1}>
-          <div className={`auth-content auth-content-${variant}`}>
-            <div className="auth-brand">
-              <span className="auth-brand-icon">
-                <Wrench size={22} aria-hidden />
-              </span>
-              <span>AutoGarage</span>
+      <header className="auth-header">
+        <div className="auth-header-inner">
+          <Link to="/" className="auth-brand" aria-label="AutoGarage Tây Sơn - Về trang chủ">
+            <span className="auth-brand-mark">
+              <Wrench size={18} aria-hidden />
+            </span>
+            AutoGarage Tây Sơn
+          </Link>
+          <div className="auth-header-right">
+            <a href="tel:0963943872" className="auth-hotline">
+              <Phone size={15} aria-hidden />
+              <span>{HOTLINE}</span>
+            </a>
+            <Link to="/" className="button button-ghost">
+              Trang chủ
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main className="auth-main" id="main-content" tabIndex={-1}>
+        <div className={`auth-card auth-card-${variant}`}>
+          <aside className="auth-card-media" aria-label="Hình ảnh xưởng AutoGarage Tây Sơn">
+            <img
+              src="/images/home/garage-lounge.jpg"
+              alt="Khu vực tiếp nhận và phòng chờ khách hàng AutoGarage Tây Sơn"
+            />
+            <div className="auth-card-media-overlay">
+              <span className="auth-media-badge">Xưởng dịch vụ tiêu chuẩn hãng</span>
+              <p>Chẩn đoán số hóa OBD-II · Cân chỉnh 3D Hunter · 100% Phụ tùng chính hãng</p>
+              <small>
+                <MapPin size={13} aria-hidden /> {GARAGE_ADDRESS} · Hotline {HOTLINE}
+              </small>
             </div>
-            <header className="auth-heading">
+          </aside>
+
+          <section className="auth-card-form">
+            <header className="auth-form-header">
               <h1>{title}</h1>
               <p>{description}</p>
             </header>
             {children}
-          </div>
-        </main>
-        <aside className="auth-visual" aria-label="Giới thiệu AutoGarage">
-          <span className="auth-eyebrow">GARA CỦA BẠN, TRONG TẦM TAY</span>
-          <h2>
-            Chăm sóc xe,
-            <br />
-            thật đơn giản.
-          </h2>
-          <p>Đặt lịch thuận tiện, theo dõi dịch vụ và đồng hành cùng chiếc xe của bạn.</p>
-          <img
-            className="auth-photo"
-            src="/images/login-background.jpg"
-            alt="Xe ô tô trong xưởng dịch vụ hiện đại"
-            width={1920}
-            height={1080}
-          />
-          <div className="auth-visual-footer">
-            <span className="auth-visual-line" aria-hidden />
-            Một nơi cho mọi nhu cầu chăm sóc xe.
-          </div>
-        </aside>
-      </div>
-      <p className="auth-footer">AutoGarage · Quản lý và chăm sóc xe</p>
+            <p className="auth-legal-text">
+              Khi tiếp tục, tôi đồng ý với các <a href="/#services">Điều khoản sử dụng</a> và{' '}
+              <a href="/#contact">Chính sách bảo mật</a> của AutoGarage Tây Sơn.
+            </p>
+          </section>
+        </div>
+      </main>
     </div>
   );
 }

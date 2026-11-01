@@ -43,8 +43,7 @@ public class BookingController {
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
             @Valid @RequestBody CreateBookingRequest request,
             HttpServletRequest httpRequest) {
-        request.setCreatedBy(currentUserProvider.userId());
-        BookingResponse response = bookingService.createBooking(request);
+        BookingResponse response = bookingService.createBooking(request, currentUserProvider.userId());
         return ResponseEntity.created(URI.create(ApiPaths.BOOKINGS_BASE + "/" + response.getId()))
                 .body(ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
     }

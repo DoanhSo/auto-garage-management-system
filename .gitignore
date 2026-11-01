@@ -46,3 +46,7 @@ frontend/.playwright-cli/
 *.DS_Store
 .docker-local/
 release/
+.claude/
+.claudeignore
+CLAUDE.md
+scripts/backups/

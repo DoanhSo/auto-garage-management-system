@@ -15,14 +15,9 @@ import {
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
-import {
-  Badge,
-  Button,
-  Field,
-  Loading,
-  Modal,
-  PageHeader,
-} from '../../../shared/components/ui';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { FRONT_DESK_ROLES } from '../../../app/access';
+import { Badge, Button, Field, Loading, Modal, PageHeader } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
@@ -52,6 +47,10 @@ const sortOptions = [
 export function InvoicesPage() {
   const compact = useMediaQuery('(max-width: 640px)');
   const notify = useToast();
+  const { user } = useAuth();
+  const isCustomer = user?.role === 'CUSTOMER';
+  const canCollect = !!user && FRONT_DESK_ROLES.includes(user.role);
+  const canVoidInvoice = user?.role === 'ADMIN';
 
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query);
@@ -88,7 +87,8 @@ export function InvoicesPage() {
   const receivePaymentMutation = useReceivePaymentMutation();
 
   const filterCount = (query.trim() ? 1 : 0) + (selectedStatus !== '' ? 1 : 0);
-  const isFiltered = query.length > 0 || selectedStatus !== '' || sortField !== 'id' || sortDir !== 'desc';
+  const isFiltered =
+    query.length > 0 || selectedStatus !== '' || sortField !== 'id' || sortDir !== 'desc';
 
   const handleResetFilters = () => {
     setQuery('');
@@ -160,7 +160,9 @@ export function InvoicesPage() {
 
     try {
       await receivePaymentMutation.mutateAsync(input);
-      notify(`Đã ghi nhận thanh toán ${payAmount.toLocaleString('vi-VN')} đ cho hóa đơn ${payingInvoice.invoiceCode}.`);
+      notify(
+        `Đã ghi nhận thanh toán ${payAmount.toLocaleString('vi-VN')} đ cho hóa đơn ${payingInvoice.invoiceCode}.`,
+      );
       setPayingInvoice(null);
     } catch (err: unknown) {
       notify(errorMessage(err) ?? 'Ghi nhận thanh toán thất bại.');
@@ -290,8 +292,8 @@ export function InvoicesPage() {
         header: 'Thao tác',
         cell: ({ row }) => {
           const inv = row.original;
-          const canPay = inv.status === 'UNPAID' || inv.status === 'PARTIALLY_PAID';
-          const canVoid = inv.status === 'UNPAID';
+          const canPay = canCollect && (inv.status === 'UNPAID' || inv.status === 'PARTIALLY_PAID');
+          const canVoid = canVoidInvoice && inv.status === 'UNPAID';
 
           return (
             <div className="row-actions">
@@ -333,7 +335,7 @@ export function InvoicesPage() {
         },
       },
     ],
-    [],
+    [canCollect, canVoidInvoice],
   );
 
   const invoicesList = data?.content || [];
@@ -344,24 +346,27 @@ export function InvoicesPage() {
     <>
       <PageHeader
         eyebrow="QUẢN LÝ TÀI CHÍNH & THANH TOÁN"
-        title="Hóa đơn dịch vụ"
-        description="Xuất hóa đơn dịch vụ sửa chữa, theo dõi thanh toán và quản lý công nợ khách hàng."
+        title={isCustomer ? 'Hóa đơn của tôi' : 'Hóa đơn dịch vụ'}
+        description={
+          isCustomer
+            ? 'Xem hóa đơn dịch vụ sửa chữa và tình trạng thanh toán của bạn.'
+            : 'Xuất hóa đơn dịch vụ sửa chữa, theo dõi thanh toán và quản lý công nợ khách hàng.'
+        }
         actions={
-          <Button
-            variant="primary"
-            ref={createTrigger}
-            onClick={() => setIssuing(true)}
-          >
-            <Plus size={18} />
-            <span>Phát hành hóa đơn</span>
-          </Button>
+          canCollect ? (
+            <Button variant="primary" ref={createTrigger} onClick={() => setIssuing(true)}>
+              <Plus size={18} />
+              <span>Phát hành hóa đơn</span>
+            </Button>
+          ) : undefined
         }
       />
 
       <div className="info-strip">
         <Receipt size={18} />
         <span>
-          Hóa đơn dịch vụ lưu snapshot bất biến thông tin khách hàng, thông số xe và đơn giá phụ tùng/tiền công tại thời điểm xuất hóa đơn. Mỗi phiếu sửa chữa chỉ phát hành tối đa 1 hóa đơn.
+          Hóa đơn dịch vụ ghi nhận cố định thông tin khách hàng, phương tiện và chi tiết phụ tùng,
+          tiền công tại thời điểm phát hành. Mỗi lệnh sửa chữa chỉ xuất tối đa một hóa đơn.
         </span>
       </div>
 
@@ -436,6 +441,7 @@ export function InvoicesPage() {
                     key={opt.label}
                     type="button"
                     className={selectedStatus === opt.value ? 'selected' : ''}
+                    aria-pressed={selectedStatus === opt.value}
                     onClick={() => {
                       setSelectedStatus(opt.value as InvoiceStatus | '');
                       setPage(0);
@@ -489,29 +495,57 @@ export function InvoicesPage() {
                   gap: '8px',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                  }}
+                >
                   <div>
-                    <strong style={{ fontSize: '15px', fontFamily: 'monospace' }}>{inv.invoiceCode}</strong>
-                    <div className="muted" style={{ fontSize: '12px' }}>{inv.customerSnapshot?.fullName}</div>
+                    <strong style={{ fontSize: '15px', fontFamily: 'monospace' }}>
+                      {inv.invoiceCode}
+                    </strong>
+                    <div className="muted" style={{ fontSize: '12px' }}>
+                      {inv.customerSnapshot?.fullName}
+                    </div>
                   </div>
                   {renderStatusBadge(inv.status)}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                  <span>Tổng tiền: <strong>{Number(inv.totalAmount).toLocaleString('vi-VN')} đ</strong></span>
+                  <span>
+                    Tổng tiền: <strong>{Number(inv.totalAmount).toLocaleString('vi-VN')} đ</strong>
+                  </span>
                   {Number(inv.balanceAmount) > 0 ? (
-                    <span style={{ color: '#b42335' }}>Nợ: <strong>{Number(inv.balanceAmount).toLocaleString('vi-VN')} đ</strong></span>
+                    <span style={{ color: '#b42335' }}>
+                      Nợ: <strong>{Number(inv.balanceAmount).toLocaleString('vi-VN')} đ</strong>
+                    </span>
                   ) : (
                     <span style={{ color: '#059669' }}>Đã thu đủ</span>
                   )}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #f0f2f5' }}>
-                  <span className="muted" style={{ fontSize: '11px' }}>Biển số: {inv.vehicleSnapshot?.plateNumber || '—'}</span>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingTop: '8px',
+                    borderTop: '1px solid #f0f2f5',
+                  }}
+                >
+                  <span className="muted" style={{ fontSize: '11px' }}>
+                    Biển số: {inv.vehicleSnapshot?.plateNumber || '—'}
+                  </span>
                   <div className="row-actions">
                     <Button variant="ghost" onClick={() => setViewingInvoice(inv)}>
                       <Eye size={15} /> Xem
                     </Button>
-                    {(inv.status === 'UNPAID' || inv.status === 'PARTIALLY_PAID') && (
-                      <Button variant="ghost" onClick={() => handleOpenPayment(inv)} style={{ color: '#059669' }}>
+                    {canCollect && (inv.status === 'UNPAID' || inv.status === 'PARTIALLY_PAID') && (
+                      <Button
+                        variant="ghost"
+                        onClick={() => handleOpenPayment(inv)}
+                        style={{ color: '#059669' }}
+                      >
                         <CreditCard size={15} /> Thu
                       </Button>
                     )}
@@ -532,8 +566,14 @@ export function InvoicesPage() {
         {/* Phân trang */}
         <div className="pagination" style={{ borderTop: '1px solid var(--border)' }}>
           <div className="pagination-info">
-            Hiển thị <strong>{invoicesList.length > 0 ? 1 : 0}–{invoicesList.length}</strong> trong <strong>{totalElements}</strong> kết quả
-            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>Trang {page + 1} / {totalPages}</span>
+            Hiển thị{' '}
+            <strong>
+              {invoicesList.length > 0 ? 1 : 0}–{invoicesList.length}
+            </strong>{' '}
+            trong <strong>{totalElements}</strong> kết quả
+            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>
+              Trang {page + 1} / {totalPages}
+            </span>
           </div>
           <div className="pagination-controls">
             <Button
@@ -599,7 +639,11 @@ export function InvoicesPage() {
           </Field>
 
           <div className="modal-form-actions full-width">
-            <Button variant="secondary" onClick={() => setIssuing(false)} disabled={issueMutation.isPending}>
+            <Button
+              variant="secondary"
+              onClick={() => setIssuing(false)}
+              disabled={issueMutation.isPending}
+            >
               Hủy
             </Button>
             <Button variant="primary" type="submit" pending={issueMutation.isPending}>
@@ -669,7 +713,11 @@ export function InvoicesPage() {
             </div>
 
             <div className="modal-form-actions full-width">
-              <Button variant="secondary" onClick={() => setPayingInvoice(null)} disabled={receivePaymentMutation.isPending}>
+              <Button
+                variant="secondary"
+                onClick={() => setPayingInvoice(null)}
+                disabled={receivePaymentMutation.isPending}
+              >
                 Hủy
               </Button>
               <Button variant="primary" type="submit" pending={receivePaymentMutation.isPending}>
@@ -690,14 +738,31 @@ export function InvoicesPage() {
       >
         {viewingInvoice && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '4px 0' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '12px 16px', background: '#f8fafc', padding: '14px 18px', borderRadius: '8px' }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                gap: '12px 16px',
+                background: '#f8fafc',
+                padding: '14px 18px',
+                borderRadius: '8px',
+              }}
+            >
               <div>
-                <span className="muted" style={{ fontSize: '12px' }}>Khách hàng:</span>
-                <div style={{ fontWeight: 650, fontSize: '14px' }}>{viewingInvoice.customerSnapshot?.fullName}</div>
-                <div className="muted" style={{ fontSize: '12px' }}>SĐT: {viewingInvoice.customerSnapshot?.phone || '—'}</div>
+                <span className="muted" style={{ fontSize: '12px' }}>
+                  Khách hàng:
+                </span>
+                <div style={{ fontWeight: 650, fontSize: '14px' }}>
+                  {viewingInvoice.customerSnapshot?.fullName}
+                </div>
+                <div className="muted" style={{ fontSize: '12px' }}>
+                  SĐT: {viewingInvoice.customerSnapshot?.phone || '—'}
+                </div>
               </div>
               <div>
-                <span className="muted" style={{ fontSize: '12px' }}>Xe sửa chữa:</span>
+                <span className="muted" style={{ fontSize: '12px' }}>
+                  Xe sửa chữa:
+                </span>
                 <div style={{ fontWeight: 650, fontSize: '14px', color: '#245bdb' }}>
                   {viewingInvoice.vehicleSnapshot?.plateNumber}
                 </div>
@@ -706,11 +771,15 @@ export function InvoicesPage() {
                 </div>
               </div>
               <div>
-                <span className="muted" style={{ fontSize: '12px' }}>Trạng thái thanh toán:</span>
+                <span className="muted" style={{ fontSize: '12px' }}>
+                  Trạng thái thanh toán:
+                </span>
                 <div style={{ marginTop: '2px' }}>{renderStatusBadge(viewingInvoice.status)}</div>
               </div>
               <div>
-                <span className="muted" style={{ fontSize: '12px' }}>Ngày phát hành:</span>
+                <span className="muted" style={{ fontSize: '12px' }}>
+                  Ngày phát hành:
+                </span>
                 <div style={{ fontWeight: 550, fontSize: '13px' }}>
                   {new Date(viewingInvoice.issuedAt).toLocaleString('vi-VN')}
                 </div>
@@ -718,15 +787,40 @@ export function InvoicesPage() {
             </div>
 
             {/* Bảng chi tiết dòng hóa đơn */}
-            <div style={{ border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', maxHeight: '200px', overflowY: 'auto' }}>
+            <div
+              style={{
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                maxHeight: '200px',
+                overflowY: 'auto',
+              }}
+            >
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead style={{ background: '#f8fafc', borderBottom: '1px solid var(--border)', color: '#526278', fontSize: '11px', fontWeight: 600, position: 'sticky', top: 0, zIndex: 1 }}>
+                <thead
+                  style={{
+                    background: '#f8fafc',
+                    borderBottom: '1px solid var(--border)',
+                    color: '#526278',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 1,
+                  }}
+                >
                   <tr>
                     <th style={{ padding: '8px 12px', textAlign: 'left' }}>Hạng mục</th>
-                    <th style={{ padding: '8px 12px', width: '80px', textAlign: 'center' }}>Loại</th>
+                    <th style={{ padding: '8px 12px', width: '80px', textAlign: 'center' }}>
+                      Loại
+                    </th>
                     <th style={{ padding: '8px 12px', width: '70px', textAlign: 'right' }}>SL</th>
-                    <th style={{ padding: '8px 12px', width: '120px', textAlign: 'right' }}>Đơn giá (đ)</th>
-                    <th style={{ padding: '8px 12px', width: '130px', textAlign: 'right' }}>Thành tiền</th>
+                    <th style={{ padding: '8px 12px', width: '120px', textAlign: 'right' }}>
+                      Đơn giá (đ)
+                    </th>
+                    <th style={{ padding: '8px 12px', width: '130px', textAlign: 'right' }}>
+                      Thành tiền
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -761,15 +855,32 @@ export function InvoicesPage() {
             </div>
 
             {/* Tổng hợp tài chính */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px', fontSize: '13px' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '0 8px',
+                fontSize: '13px',
+              }}
+            >
               <div style={{ display: 'flex', gap: '16px' }}>
-                <span>Tạm tính: <strong>{Number(viewingInvoice.subtotal).toLocaleString('vi-VN')} đ</strong></span>
+                <span>
+                  Tạm tính:{' '}
+                  <strong>{Number(viewingInvoice.subtotal).toLocaleString('vi-VN')} đ</strong>
+                </span>
                 {Number(viewingInvoice.taxAmount) > 0 && (
-                  <span>VAT: <strong>+{Number(viewingInvoice.taxAmount).toLocaleString('vi-VN')} đ</strong></span>
+                  <span>
+                    VAT:{' '}
+                    <strong>+{Number(viewingInvoice.taxAmount).toLocaleString('vi-VN')} đ</strong>
+                  </span>
                 )}
                 {Number(viewingInvoice.discountAmount) > 0 && (
                   <span style={{ color: '#059669' }}>
-                    Giảm: <strong>-{Number(viewingInvoice.discountAmount).toLocaleString('vi-VN')} đ</strong>
+                    Giảm:{' '}
+                    <strong>
+                      -{Number(viewingInvoice.discountAmount).toLocaleString('vi-VN')} đ
+                    </strong>
                   </span>
                 )}
               </div>
@@ -785,7 +896,15 @@ export function InvoicesPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '10px', borderTop: '1px solid var(--border)' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '8px',
+                paddingTop: '10px',
+                borderTop: '1px solid var(--border)',
+              }}
+            >
               <Button variant="secondary" onClick={() => setViewingInvoice(null)}>
                 Đóng
               </Button>
@@ -813,7 +932,11 @@ export function InvoicesPage() {
             />
           </Field>
           <div className="modal-form-actions">
-            <Button variant="secondary" onClick={() => setVoidingInvoice(null)} disabled={voidMutation.isPending}>
+            <Button
+              variant="secondary"
+              onClick={() => setVoidingInvoice(null)}
+              disabled={voidMutation.isPending}
+            >
               Bỏ qua
             </Button>
             <Button variant="danger" onClick={handleVoid} pending={voidMutation.isPending}>

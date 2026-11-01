@@ -47,7 +47,7 @@ public class RepairOrderController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Lấy chi tiết phiếu sửa chữa theo ID")
     public ResponseEntity<ApiResponse<RepairOrderResponse>> getRepairOrderById(
             @PathVariable Long id,
@@ -57,7 +57,7 @@ public class RepairOrderController {
     }
 
     @GetMapping("/code/{orderCode}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Lấy chi tiết phiếu sửa chữa theo mã phiếu")
     public ResponseEntity<ApiResponse<RepairOrderResponse>> getRepairOrderByCode(
             @PathVariable String orderCode,
@@ -67,7 +67,7 @@ public class RepairOrderController {
     }
 
     @GetMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Tìm kiếm và phân trang danh sách phiếu sửa chữa")
     public ResponseEntity<ApiResponse<Page<RepairOrderResponse>>> searchRepairOrders(
             @RequestParam(required = false) String keyword,
@@ -132,7 +132,7 @@ public class RepairOrderController {
     }
 
     @GetMapping("/{id}/tasks")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Lấy danh sách công việc của phiếu sửa chữa")
     public ResponseEntity<ApiResponse<List<RepairTaskResponse>>> getTasksByRepairOrderId(
             @PathVariable Long id,

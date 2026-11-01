@@ -13,12 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
-import {
-  Badge,
-  Button,
-  Loading,
-  PageHeader,
-} from '../../../shared/components/ui';
+import { Badge, Button, Loading, PageHeader } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
@@ -35,29 +30,35 @@ export function DebtLedgerPage() {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query);
 
-  const { data: customerDebtsData, isLoading: isCustLoading, isFetching: isCustFetching } =
-    useCustomerDebtsQuery({
-      hasBalance: hasBalanceOnly ? true : undefined,
-      size: 100,
-    });
+  const {
+    data: customerDebtsData,
+    isLoading: isCustLoading,
+    isFetching: isCustFetching,
+  } = useCustomerDebtsQuery({
+    hasBalance: hasBalanceOnly ? true : undefined,
+    size: 100,
+  });
 
-  const { data: supplierDebtsData, isLoading: isSuppLoading, isFetching: isSuppFetching } =
-    useSupplierDebtsQuery({
-      hasBalance: hasBalanceOnly ? true : undefined,
-      size: 100,
-    });
+  const {
+    data: supplierDebtsData,
+    isLoading: isSuppLoading,
+    isFetching: isSuppFetching,
+  } = useSupplierDebtsQuery({
+    hasBalance: hasBalanceOnly ? true : undefined,
+    size: 100,
+  });
 
-  const customerDebts = useMemo(() => customerDebtsData?.content ?? [], [customerDebtsData?.content]);
-  const supplierDebts = useMemo(() => supplierDebtsData?.content ?? [], [supplierDebtsData?.content]);
-
-  const totalReceivables = customerDebts.reduce(
-    (sum, c) => sum + Number(c.balanceAmount || 0),
-    0,
+  const customerDebts = useMemo(
+    () => customerDebtsData?.content ?? [],
+    [customerDebtsData?.content],
   );
-  const totalPayables = supplierDebts.reduce(
-    (sum, s) => sum + Number(s.balanceAmount || 0),
-    0,
+  const supplierDebts = useMemo(
+    () => supplierDebtsData?.content ?? [],
+    [supplierDebtsData?.content],
   );
+
+  const totalReceivables = customerDebts.reduce((sum, c) => sum + Number(c.balanceAmount || 0), 0);
+  const totalPayables = supplierDebts.reduce((sum, s) => sum + Number(s.balanceAmount || 0), 0);
 
   const filterCount = (query.trim() ? 1 : 0) + (hasBalanceOnly ? 1 : 0);
   const isFiltered = query.length > 0 || hasBalanceOnly;
@@ -277,9 +278,7 @@ export function DebtLedgerPage() {
       {
         accessorKey: 'paymentTermDays',
         header: 'Thời hạn công nợ',
-        cell: ({ row }) => (
-          <Badge variant="outline">{row.original.paymentTermDays} ngày</Badge>
-        ),
+        cell: ({ row }) => <Badge variant="outline">{row.original.paymentTermDays} ngày</Badge>,
       },
     ],
     [],
@@ -299,90 +298,36 @@ export function DebtLedgerPage() {
       <div className="info-strip">
         <CreditCard size={18} />
         <span>
-          Hạn mức tín dụng khách hàng được kiểm tra tự động khi bàn giao xe (canCloseOrder). Chỉ khi công nợ nằm trong hạn mức an toàn thì xe mới được phép bàn giao ra khỏi xưởng.
+          Hạn mức tín dụng của khách hàng được kiểm tra tự động trước khi bàn giao xe. Xe chỉ được
+          xuất xưởng khi dư nợ nằm trong hạn mức cho phép.
         </span>
       </div>
 
       {/* KPI Cards Thống kê công nợ */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '16px',
-        }}
-      >
-        <div
-          style={{
-            background: 'white',
-            border: '1px solid var(--border)',
-            borderRadius: '12px',
-            padding: '18px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div
-              style={{
-                padding: '10px',
-                borderRadius: '8px',
-                background: '#fff1f2',
-                color: '#b42335',
-              }}
-            >
-              <TrendingUp size={22} />
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: '#526278', fontWeight: 550 }}>
-                Tổng nợ phải thu (Khách nợ gara)
-              </div>
-              <div style={{ fontSize: '22px', fontWeight: 700, color: '#b42335' }}>
-                {totalReceivables.toLocaleString('vi-VN')} đ
-              </div>
-            </div>
+      <section className="metric-grid snapshot-metrics" aria-label="Tổng quan công nợ">
+        <article className="metric-card metric-tone-danger">
+          <div className="metric-label">
+            <span>Tổng nợ phải thu từ khách</span>
+            <span className="metric-icon">
+              <TrendingUp size={18} />
+            </span>
           </div>
-          <Badge variant="danger">
-            {customerDebts.filter((c) => Number(c.balanceAmount) > 0).length} khách còn nợ
-          </Badge>
-        </div>
-
-        <div
-          style={{
-            background: 'white',
-            border: '1px solid var(--border)',
-            borderRadius: '12px',
-            padding: '18px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div
-              style={{
-                padding: '10px',
-                borderRadius: '8px',
-                background: '#fff7ed',
-                color: '#c2410c',
-              }}
-            >
-              <TrendingDown size={22} />
-            </div>
-            <div>
-              <div style={{ fontSize: '12px', color: '#526278', fontWeight: 550 }}>
-                Tổng nợ phải trả (Gara nợ NCC)
-              </div>
-              <div style={{ fontSize: '22px', fontWeight: 700, color: '#c2410c' }}>
-                {totalPayables.toLocaleString('vi-VN')} đ
-              </div>
-            </div>
+          <strong className="metric-value">{totalReceivables.toLocaleString('vi-VN')} đ</strong>
+          <p>{customerDebts.filter((c) => Number(c.balanceAmount) > 0).length} khách còn nợ</p>
+        </article>
+        <article className="metric-card metric-tone-warning">
+          <div className="metric-label">
+            <span>Tổng nợ phải trả nhà cung cấp</span>
+            <span className="metric-icon">
+              <TrendingDown size={18} />
+            </span>
           </div>
-          <Badge variant="warning">
-            {supplierDebts.filter((s) => Number(s.balanceAmount) > 0).length} NCC còn nợ
-          </Badge>
-        </div>
-      </div>
+          <strong className="metric-value">{totalPayables.toLocaleString('vi-VN')} đ</strong>
+          <p>
+            {supplierDebts.filter((s) => Number(s.balanceAmount) > 0).length} nhà cung cấp còn nợ
+          </p>
+        </article>
+      </section>
 
       <section className="panel table-panel">
         {/* Bộ lọc công nợ */}
@@ -442,6 +387,7 @@ export function DebtLedgerPage() {
                 <button
                   type="button"
                   className={activeTab === 'customer' ? 'selected' : ''}
+                  aria-pressed={activeTab === 'customer'}
                   onClick={() => setActiveTab('customer')}
                 >
                   Khách hàng ({customerDebts.length})
@@ -449,6 +395,7 @@ export function DebtLedgerPage() {
                 <button
                   type="button"
                   className={activeTab === 'supplier' ? 'selected' : ''}
+                  aria-pressed={activeTab === 'supplier'}
                   onClick={() => setActiveTab('supplier')}
                 >
                   Nhà cung cấp ({supplierDebts.length})
@@ -463,6 +410,7 @@ export function DebtLedgerPage() {
                 <button
                   type="button"
                   className={!hasBalanceOnly ? 'selected' : ''}
+                  aria-pressed={!hasBalanceOnly}
                   onClick={() => setHasBalanceOnly(false)}
                 >
                   Tất cả
@@ -470,6 +418,7 @@ export function DebtLedgerPage() {
                 <button
                   type="button"
                   className={hasBalanceOnly ? 'selected' : ''}
+                  aria-pressed={hasBalanceOnly}
                   onClick={() => setHasBalanceOnly(true)}
                   style={hasBalanceOnly ? { background: '#fff1f2', color: '#b42335' } : {}}
                 >
@@ -503,10 +452,18 @@ export function DebtLedgerPage() {
                       gap: '8px',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                      }}
+                    >
                       <div>
                         <strong style={{ fontSize: '15px' }}>{c.customerName}</strong>
-                        <div className="muted font-mono" style={{ fontSize: '12px' }}>{c.customerCode} · {c.phone}</div>
+                        <div className="muted font-mono" style={{ fontSize: '12px' }}>
+                          {c.customerCode} · {c.phone}
+                        </div>
                       </div>
                       {isOver ? (
                         <Badge variant="danger">Vượt hạn mức</Badge>
@@ -514,9 +471,21 @@ export function DebtLedgerPage() {
                         <Badge variant="success">An toàn</Badge>
                       )}
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span>Dư nợ: <strong style={{ color: bal > 0 ? '#b42335' : '#172338' }}>{bal.toLocaleString('vi-VN')} đ</strong></span>
-                      <span>Hạn mức: <strong>{limit > 0 ? `${limit.toLocaleString('vi-VN')} đ` : 'Không giới hạn'}</strong></span>
+                    <div
+                      style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}
+                    >
+                      <span>
+                        Dư nợ:{' '}
+                        <strong style={{ color: bal > 0 ? '#b42335' : '#172338' }}>
+                          {bal.toLocaleString('vi-VN')} đ
+                        </strong>
+                      </span>
+                      <span>
+                        Hạn mức:{' '}
+                        <strong>
+                          {limit > 0 ? `${limit.toLocaleString('vi-VN')} đ` : 'Không giới hạn'}
+                        </strong>
+                      </span>
                     </div>
                   </div>
                 );
@@ -547,16 +516,33 @@ export function DebtLedgerPage() {
                     gap: '8px',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <div>
                       <strong style={{ fontSize: '15px' }}>{s.supplierName}</strong>
-                      <div className="muted font-mono" style={{ fontSize: '12px' }}>{s.supplierCode} · {s.phone}</div>
+                      <div className="muted font-mono" style={{ fontSize: '12px' }}>
+                        {s.supplierCode} · {s.phone}
+                      </div>
                     </div>
                     <Badge variant="outline">{s.paymentTermDays} ngày</Badge>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span>Gara còn nợ: <strong style={{ color: bal > 0 ? '#b42335' : '#172338' }}>{bal.toLocaleString('vi-VN')} đ</strong></span>
-                    <span>Đã trả: <strong>{Number(s.totalPaid).toLocaleString('vi-VN')} đ</strong></span>
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}
+                  >
+                    <span>
+                      Gara còn nợ:{' '}
+                      <strong style={{ color: bal > 0 ? '#b42335' : '#172338' }}>
+                        {bal.toLocaleString('vi-VN')} đ
+                      </strong>
+                    </span>
+                    <span>
+                      Đã trả: <strong>{Number(s.totalPaid).toLocaleString('vi-VN')} đ</strong>
+                    </span>
                   </div>
                 </div>
               );

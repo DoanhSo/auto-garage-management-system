@@ -1,6 +1,9 @@
 package com.Group13_65CNTT.AutoGarage.customer.service;
 
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
+import com.Group13_65CNTT.AutoGarage.common.util.DatabaseFailures;
 import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
 import com.Group13_65CNTT.AutoGarage.customer.dto.CreateCustomerRequest;
 import com.Group13_65CNTT.AutoGarage.customer.dto.CustomerResponse;
@@ -11,6 +14,7 @@ import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,7 +46,9 @@ public class CustomerServiceImpl implements CustomerService {
 
         String normalizedPhone = normalizePhone(request.getPhone());
         if (customerRepository.existsByPhone(normalizedPhone)) {
-            throw new ConflictException("Số điện thoại " + normalizedPhone + " đã được đăng ký bởi khách hàng khác");
+            throw new BusinessException(
+                    ResponseCode.CUSTOMER_PHONE_DUPLICATE,
+                    "Số điện thoại " + normalizedPhone + " đã được đăng ký bởi khách hàng khác");
         }
         request.setPhone(normalizedPhone);
 
@@ -57,8 +63,7 @@ public class CustomerServiceImpl implements CustomerService {
         }
 
         Customer customer = customerMapper.toEntity(request);
-        Customer saved = customerRepository.save(customer);
-        return customerMapper.toResponse(saved);
+        return customerMapper.toResponse(saveCustomer(customer));
     }
 
     @Override
@@ -111,14 +116,15 @@ public class CustomerServiceImpl implements CustomerService {
         if (request.getPhone() != null) {
             String normalizedPhone = normalizePhone(request.getPhone());
             if (customerRepository.existsByPhoneAndIdNot(normalizedPhone, id)) {
-                throw new ConflictException("Số điện thoại " + normalizedPhone + " đã được đăng ký bởi khách hàng khác");
+                throw new BusinessException(
+                        ResponseCode.CUSTOMER_PHONE_DUPLICATE,
+                        "Số điện thoại " + normalizedPhone + " đã được đăng ký bởi khách hàng khác");
             }
             request.setPhone(normalizedPhone);
         }
 
         customerMapper.updateEntity(customer, request);
-        Customer updated = customerRepository.save(customer);
-        return customerMapper.toResponse(updated);
+        return customerMapper.toResponse(saveCustomer(customer));
     }
 
     @Override
@@ -128,6 +134,17 @@ public class CustomerServiceImpl implements CustomerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + id));
         customer.setIsActive(false);
         customerRepository.save(customer);
+    }
+
+    private Customer saveCustomer(Customer customer) {
+        try {
+            return customerRepository.saveAndFlush(customer);
+        } catch (DataIntegrityViolationException ex) {
+            if (DatabaseFailures.isDuplicateKey(ex)) {
+                throw new BusinessException(ResponseCode.CUSTOMER_PHONE_DUPLICATE, ex);
+            }
+            throw ex;
+        }
     }
 
     private void validateCreditAndTerm(BigDecimal creditLimit, Integer paymentTermDays) {

@@ -1,5 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.vehicle.service;
 
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
 import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
 import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
@@ -45,7 +47,9 @@ public class VehicleServiceImpl implements VehicleService {
 
         String normalizedPlate = normalizePlate(request.getLicensePlate());
         if (vehicleRepository.existsByLicensePlate(normalizedPlate)) {
-            throw new ConflictException("Biển số xe " + normalizedPlate + " đã tồn tại trong hệ thống");
+            throw new BusinessException(
+                    ResponseCode.VEHICLE_PLATE_DUPLICATE,
+                    "Biển số xe " + normalizedPlate + " đã tồn tại trong hệ thống");
         }
         request.setLicensePlate(normalizedPlate);
 
@@ -117,7 +121,9 @@ public class VehicleServiceImpl implements VehicleService {
 
         String normalizedPlate = normalizePlate(request.getLicensePlate());
         if (vehicleRepository.existsByLicensePlateAndIdNot(normalizedPlate, id)) {
-            throw new ConflictException("Biển số xe " + normalizedPlate + " đã tồn tại ở phương tiện khác");
+            throw new BusinessException(
+                    ResponseCode.VEHICLE_PLATE_DUPLICATE,
+                    "Biển số xe " + normalizedPlate + " đã tồn tại ở phương tiện khác");
         }
         request.setLicensePlate(normalizedPlate);
 

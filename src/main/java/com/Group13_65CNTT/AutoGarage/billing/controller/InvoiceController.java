@@ -60,7 +60,7 @@ public class InvoiceController {
     }
 
     @GetMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Tìm kiếm và phân trang hóa đơn")
     public ApiResponse<Page<InvoiceResponse>> search(
             @RequestParam(required = false) InvoiceStatus status,
@@ -82,7 +82,7 @@ public class InvoiceController {
     }
 
     @GetMapping(ApiPaths.BY_ID)
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Xem chi tiết hóa đơn theo ID")
     public ApiResponse<InvoiceResponse> getById(
             @PathVariable Long id,
@@ -94,7 +94,7 @@ public class InvoiceController {
     }
 
     @GetMapping("/order/{orderId}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Xem hóa đơn theo ID phiếu sửa chữa")
     public ApiResponse<InvoiceResponse> getByOrderId(
             @PathVariable Long orderId,

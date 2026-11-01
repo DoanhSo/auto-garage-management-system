@@ -2,11 +2,18 @@ package com.Group13_65CNTT.AutoGarage.reception;
 
 import com.Group13_65CNTT.AutoGarage.catalog.entity.ServiceEntity;
 import com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.customer.dto.CreateCustomerRequest;
+import com.Group13_65CNTT.AutoGarage.customer.dto.CustomerResponse;
 import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
 import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
+import com.Group13_65CNTT.AutoGarage.customer.service.CustomerService;
 import com.Group13_65CNTT.AutoGarage.reception.dto.BookingResponse;
 import com.Group13_65CNTT.AutoGarage.reception.dto.CancelBookingRequest;
 import com.Group13_65CNTT.AutoGarage.reception.dto.CreateBookingRequest;
+import com.Group13_65CNTT.AutoGarage.reception.dto.NewBookingCustomerRequest;
+import com.Group13_65CNTT.AutoGarage.reception.dto.NewBookingVehicleRequest;
 import com.Group13_65CNTT.AutoGarage.reception.dto.RescheduleBookingRequest;
 import com.Group13_65CNTT.AutoGarage.reception.entity.Booking;
 import com.Group13_65CNTT.AutoGarage.reception.entity.BookingStatus;
@@ -16,12 +23,16 @@ import com.Group13_65CNTT.AutoGarage.reception.service.BookingServiceImpl;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.BayScheduling;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
+import com.Group13_65CNTT.AutoGarage.vehicle.dto.CreateVehicleRequest;
+import com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleResponse;
 import com.Group13_65CNTT.AutoGarage.vehicle.entity.Vehicle;
 import com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleRepository;
+import com.Group13_65CNTT.AutoGarage.vehicle.service.VehicleService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -55,8 +66,16 @@ class BookingServiceTest {
     @Mock
     private BayScheduling bayScheduling;
 
+    @Mock
+    private CustomerService customerService;
+
+    @Mock
+    private VehicleService vehicleService;
+
     @Spy
     private BookingMapper bookingMapper = new BookingMapper();
+
+    private static final Long ACTOR_USER_ID = 2L;
 
     @InjectMocks
     private BookingServiceImpl bookingService;
@@ -100,7 +119,6 @@ class BookingServiceTest {
         createReq.setBayId(5L);
         createReq.setAppointmentAt(futureTime);
         createReq.setRequestDescription("Kiem tra dinh ky");
-        createReq.setCreatedBy(2L);
     }
 
     @Test
@@ -124,7 +142,7 @@ class BookingServiceTest {
             return booking;
         });
 
-        BookingResponse response = bookingService.createBooking(createReq);
+        BookingResponse response = bookingService.createBooking(createReq, ACTOR_USER_ID);
         assertEquals(futureTime.plus(Duration.ofMinutes(45)), response.getExpectedEndAt());
     }
 
@@ -144,7 +162,7 @@ class BookingServiceTest {
             return b;
         });
 
-        BookingResponse response = bookingService.createBooking(createReq);
+        BookingResponse response = bookingService.createBooking(createReq, ACTOR_USER_ID);
 
         assertNotNull(response);
         assertEquals(500L, response.getId());
@@ -166,7 +184,7 @@ class BookingServiceTest {
         when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
         when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
 
-        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(createReq));
+        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
         assertTrue(ex.getMessage().contains("quá khứ"));
         verify(bookingRepository, never()).save(any());
     }
@@ -180,9 +198,188 @@ class BookingServiceTest {
         when(bookingRepository.hasOverlappingBookingForVehicle(eq(10L), eq(futureTime), any(Instant.class), isNull()))
                 .thenReturn(true);
 
-        ConflictException ex = assertThrows(ConflictException.class, () -> bookingService.createBooking(createReq));
+        ConflictException ex = assertThrows(ConflictException.class, () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
         assertTrue(ex.getMessage().contains("đã có lịch hẹn khác"));
         verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("TV2-05: Đặt lịch cho khách mới + xe mới trong cùng một request")
+    void testCreateBooking_NewCustomerAndNewVehicle() {
+        createReq.setCustomerId(null);
+        createReq.setVehicleId(null);
+        createReq.setNewCustomer(newCustomerRequest());
+        createReq.setNewVehicle(newVehicleRequest());
+        stubCreatedCustomerAndVehicle();
+        when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
+            Booking b = invocation.getArgument(0);
+            b.setId(501L);
+            return b;
+        });
+
+        BookingResponse response = bookingService.createBooking(createReq, ACTOR_USER_ID);
+
+        assertEquals(501L, response.getId());
+        assertEquals(1L, response.getCustomerId());
+        assertEquals(10L, response.getVehicleId());
+        verify(customerScope).requireFrontDesk();
+
+        ArgumentCaptor<CreateCustomerRequest> customerCaptor = ArgumentCaptor.forClass(CreateCustomerRequest.class);
+        verify(customerService).createCustomer(customerCaptor.capture());
+        assertEquals("Tran Thi B", customerCaptor.getValue().getFullName());
+        assertEquals("0911222333", customerCaptor.getValue().getPhone());
+        assertNull(customerCaptor.getValue().getEmail());
+
+        ArgumentCaptor<CreateVehicleRequest> vehicleCaptor = ArgumentCaptor.forClass(CreateVehicleRequest.class);
+        verify(vehicleService).createVehicle(vehicleCaptor.capture());
+        assertEquals(1L, vehicleCaptor.getValue().getCustomerId());
+        assertEquals("30A-999.99", vehicleCaptor.getValue().getLicensePlate());
+
+        ArgumentCaptor<Booking> bookingCaptor = ArgumentCaptor.forClass(Booking.class);
+        verify(bookingRepository).save(bookingCaptor.capture());
+        assertEquals(ACTOR_USER_ID, bookingCaptor.getValue().getCreatedBy());
+    }
+
+    @Test
+    @DisplayName("TV2-05: serviceId null dùng thời lượng mặc định của xưởng")
+    void testCreateBooking_WithoutServiceUsesDefaultDuration() {
+        workshop.setDefaultServiceMinutes(60);
+        createReq.setServiceId(null);
+        createReq.setBayId(null);
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
+            Booking b = invocation.getArgument(0);
+            b.setId(502L);
+            return b;
+        });
+
+        BookingResponse response = bookingService.createBooking(createReq, ACTOR_USER_ID);
+
+        assertNull(response.getServiceId());
+        assertNull(response.getServiceName());
+        assertEquals(futureTime.plus(Duration.ofMinutes(60)), response.getExpectedEndAt());
+        verify(serviceRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("TV2-05: Gửi cả customerId và newCustomer bị từ chối")
+    void testCreateBooking_BothCustomerSources() {
+        createReq.setNewCustomer(newCustomerRequest());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
+        assertEquals(ResponseCode.BOOKING_CUSTOMER_SOURCE_INVALID, ex.getResponseCode());
+        verifyNoInteractions(customerService, vehicleService);
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("TV2-05: Thiếu cả customerId và newCustomer bị từ chối")
+    void testCreateBooking_MissingCustomerSource() {
+        createReq.setCustomerId(null);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
+        assertEquals(ResponseCode.BOOKING_CUSTOMER_SOURCE_INVALID, ex.getResponseCode());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("TV2-05: Gửi cả vehicleId và newVehicle bị từ chối")
+    void testCreateBooking_BothVehicleSources() {
+        createReq.setNewVehicle(newVehicleRequest());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
+        assertEquals(ResponseCode.BOOKING_VEHICLE_SOURCE_INVALID, ex.getResponseCode());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("TV2-05: Khách mới nhưng chọn xe có sẵn bị từ chối")
+    void testCreateBooking_NewCustomerWithExistingVehicle() {
+        createReq.setCustomerId(null);
+        createReq.setNewCustomer(newCustomerRequest());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
+        assertEquals(ResponseCode.BOOKING_VEHICLE_SOURCE_INVALID, ex.getResponseCode());
+        verifyNoInteractions(customerService, vehicleService);
+    }
+
+    @Test
+    @DisplayName("TV2-05: Xe không thuộc khách đã chọn bị từ chối")
+    void testCreateBooking_VehicleOwnerMismatch() {
+        vehicle.setCustomerId(99L);
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
+        assertEquals(ResponseCode.BOOKING_VEHICLE_OWNER_MISMATCH, ex.getResponseCode());
+        verify(bookingRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("TV2-05: Trùng giờ hẹn khi tạo khách mới thì không lưu lịch (transaction rollback)")
+    void testCreateBooking_NewCustomerOverlapRejected() {
+        createReq.setCustomerId(null);
+        createReq.setVehicleId(null);
+        createReq.setNewCustomer(newCustomerRequest());
+        createReq.setNewVehicle(newVehicleRequest());
+        stubCreatedCustomerAndVehicle();
+        when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
+        when(bookingRepository.hasOverlappingBookingForVehicle(eq(10L), eq(futureTime), any(Instant.class), isNull()))
+                .thenReturn(true);
+
+        assertThrows(ConflictException.class, () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
+        verify(bookingRepository, never()).save(any());
+        verifyNoInteractions(bayScheduling);
+    }
+
+    @Test
+    @DisplayName("TV2-05: Vai trò CUSTOMER không được tạo khách mới khi đặt lịch")
+    void testCreateBooking_CustomerRoleCannotCreateNewCustomer() {
+        createReq.setCustomerId(null);
+        createReq.setVehicleId(null);
+        createReq.setNewCustomer(newCustomerRequest());
+        createReq.setNewVehicle(newVehicleRequest());
+        doThrow(new BusinessException(ResponseCode.FORBIDDEN)).when(customerScope).requireFrontDesk();
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
+        assertEquals(ResponseCode.FORBIDDEN, ex.getResponseCode());
+        verifyNoInteractions(customerService, vehicleService);
+        verify(bookingRepository, never()).save(any());
+    }
+
+    private void stubCreatedCustomerAndVehicle() {
+        CustomerResponse createdCustomer = new CustomerResponse();
+        createdCustomer.setId(1L);
+        VehicleResponse createdVehicle = new VehicleResponse();
+        createdVehicle.setId(10L);
+        when(customerService.createCustomer(any(CreateCustomerRequest.class))).thenReturn(createdCustomer);
+        when(vehicleService.createVehicle(any(CreateVehicleRequest.class))).thenReturn(createdVehicle);
+        when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+    }
+
+    private NewBookingCustomerRequest newCustomerRequest() {
+        NewBookingCustomerRequest request = new NewBookingCustomerRequest();
+        request.setFullName("  Tran Thi B ");
+        request.setPhone("0911222333");
+        request.setEmail("   ");
+        return request;
+    }
+
+    private NewBookingVehicleRequest newVehicleRequest() {
+        NewBookingVehicleRequest request = new NewBookingVehicleRequest();
+        request.setLicensePlate("30A-999.99");
+        request.setBrand("Honda");
+        request.setModel("City");
+        return request;
     }
 
     @Test

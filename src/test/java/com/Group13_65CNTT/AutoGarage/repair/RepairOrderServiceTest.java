@@ -308,4 +308,34 @@ class RepairOrderServiceTest {
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Không thể xóa công việc đang thực hiện hoặc đã hoàn thành");
     }
+
+    @Test
+    @DisplayName("Khách hàng chỉ tìm thấy phiếu sửa chữa của chính mình")
+    void searchRepairOrders_Customer_ScopedToOwnCustomerId() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        when(pagination.page(anyInt(), anyInt(), anyString(), anyString(), anySet())).thenReturn((org.springframework.data.domain.PageRequest) pageable);
+        when(currentUser.role()).thenReturn(com.Group13_65CNTT.AutoGarage.common.enums.Role.CUSTOMER);
+        when(customerScope.currentCustomerId()).thenReturn(5L);
+        when(repairOrderRepository.searchOrders(5L, null, null, pageable))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(mockOrder)));
+
+        assertThat(repairService.searchRepairOrders(null, null, 0, 10, "createdAt", "desc").getContent()).hasSize(1);
+
+        verify(repairOrderRepository).searchOrders(5L, null, null, pageable);
+        verify(repairOrderRepository, never()).searchAssignedOrders(anyLong(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Nhân viên lễ tân xem toàn bộ phiếu, không bị giới hạn theo khách")
+    void searchRepairOrders_Staff_NotScopedByCustomer() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        when(pagination.page(anyInt(), anyInt(), anyString(), anyString(), anySet())).thenReturn((org.springframework.data.domain.PageRequest) pageable);
+        when(currentUser.role()).thenReturn(com.Group13_65CNTT.AutoGarage.common.enums.Role.RECEPTIONIST);
+        when(repairOrderRepository.searchOrders(null, null, null, pageable))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(mockOrder)));
+
+        assertThat(repairService.searchRepairOrders(null, null, 0, 10, "createdAt", "desc").getContent()).hasSize(1);
+
+        verify(customerScope, never()).currentCustomerId();
+    }
 }

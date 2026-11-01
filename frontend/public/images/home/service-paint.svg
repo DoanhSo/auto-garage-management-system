@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="pntBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#180b24" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="paintSpray" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#a855f7" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="carFender" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e11d48" />
+      <stop offset="50%" stop-color="#be123c" />
+      <stop offset="100%" stop-color="#881337" />
+    </linearGradient>
+    <filter id="ceramicGlow">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="800" height="500" fill="url(#pntBg)" />
+
+  <rect x="50" y="40" width="160" height="34" rx="6" fill="#4a044e" stroke="#c026d3" stroke-width="1.5" />
+  <text x="130" y="62" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#f0abfc" text-anchor="middle" letter-spacing="1">
+    SƠN SẤY HẤP &amp; CERAMIC
+  </text>
+
+  <!-- Car Fender in Paint Booth & Spray Gun -->
+  <g transform="translate(130, 90)">
+    <!-- High End Spray Gun (Súng phun sơn Anest Iwata) -->
+    <g transform="translate(60, 40) rotate(-15)">
+      <!-- Paint Cup -->
+      <path d="M40,-30 L80,-30 L70,30 L50,30 Z" fill="#f8fafc" stroke="#94a3b8" stroke-width="2" />
+      <!-- Gun Body -->
+      <path d="M50,30 L90,30 L80,90 L60,110 L50,160 L30,150 L40,90 Z" fill="#38bdf8" stroke="#0284c7" stroke-width="2.5" />
+      <!-- Nozzle -->
+      <polygon points="90,26 115,22 115,38 90,34" fill="#f59e0b" stroke="#d97706" />
+      <!-- Trigger -->
+      <path d="M60,50 C75,60 70,85 55,85" fill="none" stroke="#64748b" stroke-width="4" stroke-linecap="round" />
+    </g>
+
+    <!-- Fine Atomized Paint Spray Mist Cone -->
+    <polygon points="175,70 360,10 370,170" fill="url(#paintSpray)" opacity="0.85" filter="url(#ceramicGlow)" />
+
+    <!-- Car Fender Curve Bodywork (Gò cản và tai xe) -->
+    <g transform="translate(320, 20)">
+      <path d="M0,80 C60,40 140,40 200,90 C220,110 230,150 220,200 L160,200 C170,160 150,130 110,130 C70,130 50,160 60,200 L0,200 Z" fill="url(#carFender)" stroke="#fda4af" stroke-width="2" />
+      
+      <!-- Ceramic Mirror Reflection Highlight -->
+      <path d="M20,70 C70,45 130,45 180,85" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" filter="url(#ceramicGlow)" />
+
+      <!-- Sparkling Diamond Stars (Ceramic Coating Gloss) -->
+      <g fill="#ffffff" filter="url(#ceramicGlow)">
+        <polygon points="120,45 124,53 132,57 124,61 120,69 116,61 108,57 116,53" />
+        <polygon points="170,85 173,91 179,94 173,97 170,103 167,97 161,94 167,91" transform="scale(0.8)" />
+      </g>
+    </g>
+
+    <!-- Infrared Curing Lamp (Đèn sấy sơn hồng ngoại) -->
+    <g transform="translate(240, -10)">
+      <rect x="0" y="0" width="130" height="24" rx="4" fill="#0f172a" stroke="#ef4444" stroke-width="2" />
+      <!-- Ruby Quartz Infrared Tubes -->
+      <line x1="15" y1="12" x2="115" y2="12" stroke="#ef4444" stroke-width="6" stroke-linecap="round" filter="url(#ceramicGlow)" />
+      <line x1="20" y1="12" x2="110" y2="12" stroke="#fef08a" stroke-width="2" stroke-linecap="round" />
+    </g>
+  </g>
+
+  <text x="400" y="445" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#f8fafc" text-anchor="middle">
+    GÒ PHỤC HỒI THÂN VỎ &amp; SƠN SẤY HẤP CÔNG NGHỆ CAO
+  </text>
+  <text x="400" y="470" font-family="system-ui, sans-serif" font-size="13" font-weight="500" fill="#94a3b8" text-anchor="middle">
+    Phòng sơn sấy đối lưu tiêu chuẩn · Sơn chính hãng Dupont/PPG · Phủ Ceramic 9H
+  </text>
+</svg>

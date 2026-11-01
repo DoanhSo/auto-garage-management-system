@@ -24,7 +24,7 @@ public class Booking {
     @Column(name = "vehicle_id", nullable = false)
     private Long vehicleId;
 
-    @Column(name = "service_id", nullable = false)
+    @Column(name = "service_id")
     private Long serviceId;
 
     @Column(name = "appointment_at", nullable = false)

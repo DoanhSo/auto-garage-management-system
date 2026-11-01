@@ -28,7 +28,10 @@ import com.Group13_65CNTT.AutoGarage.billing.repository.PaymentRepository;
 import com.Group13_65CNTT.AutoGarage.billing.repository.SupplierBalanceViewRepository;
 import com.Group13_65CNTT.AutoGarage.billing.service.BillingService;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
+import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
+import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
@@ -75,6 +78,8 @@ public class BillingServiceImpl implements BillingService {
     private final PaymentMapper paymentMapper;
     private final DebtMapper debtMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final CustomerScope customerScope;
+    private final CurrentUserProvider currentUser;
     private final Optional<RepairWorkflow> repairWorkflow;
     private final Optional<NotificationAudit> notificationAudit;
 
@@ -324,6 +329,7 @@ public class BillingServiceImpl implements BillingService {
     public InvoiceResponse getInvoiceById(Long id) {
         Invoice invoice = invoiceRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        requireOwnInvoiceForCustomer(invoice);
         return enrichInvoiceResponse(invoice);
     }
 
@@ -331,6 +337,7 @@ public class BillingServiceImpl implements BillingService {
     public InvoiceResponse getInvoiceByCode(String code) {
         Invoice invoice = invoiceRepository.findByInvoiceCode(code.trim())
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        requireOwnInvoiceForCustomer(invoice);
         return enrichInvoiceResponse(invoice);
     }
 
@@ -338,7 +345,14 @@ public class BillingServiceImpl implements BillingService {
     public InvoiceResponse getInvoiceByOrderId(Long repairOrderId) {
         Invoice invoice = invoiceRepository.findByRepairOrderId(repairOrderId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        requireOwnInvoiceForCustomer(invoice);
         return enrichInvoiceResponse(invoice);
+    }
+
+    private void requireOwnInvoiceForCustomer(Invoice invoice) {
+        if (currentUser.role() == Role.CUSTOMER) {
+            customerScope.requireResource(AccessResource.INVOICE, invoice.getId());
+        }
     }
 
     @Override
@@ -349,7 +363,10 @@ public class BillingServiceImpl implements BillingService {
             String query,
             Pageable pageable) {
         String cleanQuery = (query != null && !query.trim().isEmpty()) ? query.trim() : null;
-        return invoiceRepository.searchInvoices(status, customerId, orderId, cleanQuery, pageable)
+        Long scopedCustomerId = currentUser.role() == Role.CUSTOMER
+                ? customerScope.customerIdForQuery(customerId)
+                : customerId;
+        return invoiceRepository.searchInvoices(status, scopedCustomerId, orderId, cleanQuery, pageable)
                 .map(this::enrichInvoiceResponse);
     }
 

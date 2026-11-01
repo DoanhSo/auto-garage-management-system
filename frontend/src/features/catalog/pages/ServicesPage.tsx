@@ -87,7 +87,7 @@ export function ServicesPage() {
           <div>
             <strong>{row.original.serviceName}</strong>
             {row.original.description && (
-              <div className="muted nowrap" style={{ marginTop: 2 }}>
+              <div className="muted" style={{ marginTop: 2 }}>
                 {row.original.description}
               </div>
             )}
@@ -140,7 +140,7 @@ export function ServicesPage() {
         cell: ({ row }) => {
           const s = row.original;
           return (
-            <div className="muted nowrap" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div className="muted" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {s.requiredBayType ? (
                 <div className="flex items-center gap-1">
                   <Box size={12} />

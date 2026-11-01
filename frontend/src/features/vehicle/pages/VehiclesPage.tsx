@@ -108,7 +108,7 @@ export function VehiclesPage() {
           <div>
             <span className="plate-badge">{row.original.licensePlate}</span>
             {row.original.vin && (
-              <div className="muted nowrap" style={{ marginTop: 4 }}>
+              <div className="muted" style={{ marginTop: 4 }}>
                 <span className="code-tag">VIN: {row.original.vin}</span>
               </div>
             )}
@@ -123,7 +123,7 @@ export function VehiclesPage() {
             <strong>
               {row.original.brand} {row.original.model}
             </strong>
-            <div className="muted nowrap">
+            <div className="muted">
               {[
                 row.original.manufactureYear ? `Năm ${row.original.manufactureYear}` : null,
                 row.original.color,

@@ -3,7 +3,8 @@ package com.Group13_65CNTT.AutoGarage.vehicle;
 import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
 import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
-import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.vehicle.dto.CreateVehicleRequest;
 import com.Group13_65CNTT.AutoGarage.vehicle.dto.TransferOwnershipRequest;
 import com.Group13_65CNTT.AutoGarage.vehicle.dto.UpdateVehicleRequest;
@@ -109,7 +110,8 @@ class VehicleServiceTest {
         when(customerRepository.findById(10L)).thenReturn(Optional.of(owner));
         when(vehicleRepository.existsByLicensePlate("51F12345")).thenReturn(true);
 
-        ConflictException ex = assertThrows(ConflictException.class, () -> vehicleService.createVehicle(createReq));
+        BusinessException ex = assertThrows(BusinessException.class, () -> vehicleService.createVehicle(createReq));
+        assertEquals(ResponseCode.VEHICLE_PLATE_DUPLICATE, ex.getResponseCode());
         assertTrue(ex.getMessage().contains("đã tồn tại"));
         verify(vehicleRepository, never()).save(any());
     }

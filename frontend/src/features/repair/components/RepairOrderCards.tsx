@@ -3,6 +3,7 @@ import { Button, Empty } from '../../../shared/components/ui';
 import { formatDateTime } from '../../../shared/utils/format';
 import type { RepairOrder, RepairOrderStatus } from '../types/repairTypes';
 import { REPAIR_STATUS_LABELS } from './RepairOrderFilters';
+import { VehicleLabel } from './VehicleLabel';
 
 const STATUS_TONE: Record<RepairOrderStatus, string> = {
   NEW: 'badge-neutral',
@@ -48,7 +49,7 @@ export function RepairOrderCards({
             </span>
             <div>
               <strong>{order.orderCode}</strong>
-              <span>Xe #{order.vehicleId}</span>
+              <VehicleLabel vehicleId={order.vehicleId} />
             </div>
             <RepairOrderStatusBadge status={order.status} />
           </div>

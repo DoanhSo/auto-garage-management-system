@@ -67,7 +67,7 @@ function ReadyRegistration({ policy }: { policy: UiPolicy }) {
   return (
     <AuthLayout
       title="Đăng ký tài khoản"
-      description="Tạo tài khoản khách hàng để bắt đầu chăm sóc xe."
+      description="Tạo tài khoản để đặt lịch hẹn ưu tiên, theo dõi tiến độ sửa chữa và quản lý xe."
       variant="register"
     >
       {created ? (
@@ -89,6 +89,7 @@ function ReadyRegistration({ policy }: { policy: UiPolicy }) {
             {...register('fullName')}
             autoComplete="name"
             maxLength={150}
+            placeholder="Ví dụ: Nguyễn Văn An"
             disabled={isSubmitting || created}
           />
         </Field>
@@ -111,6 +112,7 @@ function ReadyRegistration({ policy }: { policy: UiPolicy }) {
             {...register('email')}
             autoComplete="email"
             maxLength={254}
+            placeholder="Ví dụ: nguyenvanan@gmail.com"
             disabled={isSubmitting || created}
           />
         </Field>
@@ -123,6 +125,7 @@ function ReadyRegistration({ policy }: { policy: UiPolicy }) {
           <PasswordInput
             {...register('password')}
             autoComplete="new-password"
+            placeholder="Tạo mật khẩu của bạn"
             disabled={isSubmitting || created}
           />
         </Field>
@@ -130,19 +133,28 @@ function ReadyRegistration({ policy }: { policy: UiPolicy }) {
           <PasswordInput
             {...register('confirmPassword')}
             autoComplete="new-password"
+            placeholder="Nhập lại mật khẩu"
             disabled={isSubmitting || created}
           />
         </Field>
         <FormError message={errors.root?.server?.message} />
         {!created && (
-          <Button type="submit" variant="primary" className="full-width" pending={isSubmitting}>
+          <Button
+            type="submit"
+            variant="primary"
+            className="full-width auth-submit-btn"
+            pending={isSubmitting}
+          >
             {isSubmitting ? 'Đang tạo tài khoản…' : 'Đăng ký'}
           </Button>
         )}
       </form>
-      <p className="auth-switch">
-        Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
-      </p>
+      <div className="auth-divider" aria-hidden>
+        hoặc
+      </div>
+      <Link to="/login" className="auth-alt-action">
+        Đăng nhập bằng tài khoản đã có
+      </Link>
     </AuthLayout>
   );
 }

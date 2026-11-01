@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, Navigate, useLocation } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { ArrowRight, ShieldCheck, UserCheck } from 'lucide-react';
 import { useAuth } from '../../../app/providers/AuthProvider';
-import { useLoginMutation } from '../hooks/useAuthQueries';
+import { useLoginMutation, usePkceCallbackMutation } from '../hooks/useAuthQueries';
+import { authApi } from '../api/authApi';
 import { loginSchema } from '../schemas/authSchemas';
 import { Button, Field, FormError, PasswordInput } from '../../../shared/components/ui';
 import { errorMessage } from '../../../shared/api/errors';
@@ -15,6 +16,16 @@ export function LoginPage() {
   const auth = useAuth();
   const location = useLocation();
   const mutation = useLoginMutation();
+  const pkce = usePkceCallbackMutation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const callbackCode = searchParams.get('code');
+  const callbackState = searchParams.get('state');
+  const callbackError = searchParams.get('error');
+  const callbackHandled = useRef(false);
+  const [callbackReturnTo, setCallbackReturnTo] = useState<string | undefined>();
+  const [pageError, setPageError] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
+
   const {
     register,
     handleSubmit,
@@ -26,18 +37,40 @@ export function LoginPage() {
     mode: 'onBlur',
     defaultValues: { identifier: '', password: '' },
   });
+
   const { reset } = mutation;
   useEffect(() => () => reset(), [reset]);
-  if (auth.user)
-    return (
-      <Navigate
-        to={safeReturnTo(
-          (location.state as { returnTo?: unknown } | null)?.returnTo,
-          auth.user.role === 'ADMIN' ? '/admin/reports' : '/notifications',
-        )}
-        replace
-      />
+  const { mutateAsync: completePkce } = pkce;
+
+  useEffect(() => {
+    if (callbackHandled.current || (!callbackCode && !callbackError)) return;
+    callbackHandled.current = true;
+    const session = authApi.consumePkceState(callbackState);
+    setSearchParams({}, { replace: true });
+    if (callbackError || !callbackCode || !session) {
+      setPageError('Đăng nhập chưa hoàn tất hoặc phiên đã hết hạn. Vui lòng thử lại.');
+      return;
+    }
+    setCallbackReturnTo(session.returnTo);
+    completePkce({
+      code: callbackCode,
+      codeVerifier: session.verifier,
+      redirectUri: session.redirectUri,
+    }).catch((error: unknown) => {
+      setCallbackReturnTo(undefined);
+      setPageError(errorMessage(error));
+    });
+  }, [callbackCode, callbackState, callbackError, completePkce, setSearchParams]);
+
+  if (auth.user) {
+    const target = safeReturnTo(
+      (location.state as { returnTo?: unknown } | null)?.returnTo ?? callbackReturnTo,
+      auth.user.role === 'ADMIN' ? '/admin/reports' : '/notifications',
     );
+    // '/' là trang chủ công khai; sau đăng nhập đưa người dùng vào không gian làm việc theo vai trò.
+    return <Navigate to={target === '/' ? '/workspace' : target} replace />;
+  }
+
   const submit = handleSubmit(async (values) => {
     if (mutation.isPending) return;
     try {
@@ -49,13 +82,30 @@ export function LoginPage() {
       mutation.reset();
     }
   });
+
   return (
-    <AuthLayout title="Đăng nhập" description="Chào mừng bạn trở lại. Nhập thông tin để tiếp tục.">
+    <AuthLayout
+      title="Đăng nhập"
+      description="Chào mừng bạn quay lại. Đăng nhập để theo dõi lệnh sửa chữa và dịch vụ."
+    >
+      {pageError && (
+        <div className="alert" role="alert">
+          {pageError}
+        </div>
+      )}
       {auth.notice && (
         <div className="alert" role="status">
           {auth.notice}
         </div>
       )}
+
+      <div className="auth-role-hint">
+        <UserCheck size={16} aria-hidden />
+        <span>
+          Cổng dịch vụ dành cho <strong>Khách hàng</strong> và <strong>Nhân viên</strong> xưởng ô tô.
+        </span>
+      </div>
+
       <form noValidate onSubmit={submit} className="form-stack">
         <Field label="Tên đăng nhập hoặc email" required error={errors.identifier?.message}>
           <input
@@ -64,10 +114,11 @@ export function LoginPage() {
             autoComplete="username"
             autoFocus
             maxLength={254}
-            placeholder="Tên đăng nhập hoặc email"
+            placeholder="Nhập tên đăng nhập hoặc email"
             disabled={mutation.isPending}
           />
         </Field>
+
         <Field label="Mật khẩu" required error={errors.password?.message}>
           <PasswordInput
             {...register('password')}
@@ -76,16 +127,49 @@ export function LoginPage() {
             disabled={mutation.isPending}
           />
         </Field>
+
+        <div className="auth-form-options">
+          <label className="auth-checkbox-label">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            />
+            <span>Ghi nhớ đăng nhập</span>
+          </label>
+          <a
+            href="tel:0963943872"
+            className="auth-forgot-link"
+            title="Liên hệ hotline nếu bạn quên thông tin tài khoản"
+          >
+            Quên mật khẩu?
+          </a>
+        </div>
+
         <FormError message={errors.root?.server?.message} />
-        <Button type="submit" variant="primary" pending={mutation.isPending} className="full-width">
+
+        <Button
+          type="submit"
+          variant="primary"
+          pending={mutation.isPending}
+          className="full-width auth-submit-btn"
+        >
           {mutation.isPending ? 'Đang đăng nhập…' : 'Đăng nhập'}
           <ArrowRight size={17} aria-hidden />
         </Button>
       </form>
-      <p className="auth-switch">
-        Chưa có tài khoản? <Link to="/register">Đăng ký tài khoản</Link>
-      </p>
-      <p className="auth-note">Tài khoản nhân viên do quản trị viên gara cấp.</p>
+
+      <div className="auth-divider" aria-hidden>
+        hoặc
+      </div>
+      <Link to="/register" className="auth-alt-action">
+        Tạo tài khoản khách hàng mới
+      </Link>
+
+      <div className="auth-security-footer-note">
+        <ShieldCheck size={14} aria-hidden />
+        <span>Tài khoản nhân viên gara do quản trị viên cấp quyền trực tiếp.</span>
+      </div>
     </AuthLayout>
   );
 }

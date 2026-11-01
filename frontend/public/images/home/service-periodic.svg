@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="pBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="pOil" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <linearGradient id="pSteel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#94a3b8" />
+      <stop offset="100%" stop-color="#475569" />
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="500" fill="url(#pBg)" />
+
+  <!-- Technical Grid Background -->
+  <g stroke="#334155" stroke-width="1" opacity="0.3">
+    <line x1="0" y1="100" x2="800" y2="100" />
+    <line x1="0" y1="200" x2="800" y2="200" />
+    <line x1="0" y1="300" x2="800" y2="300" />
+    <line x1="0" y1="400" x2="800" y2="400" />
+    <line x1="200" y1="0" x2="200" y2="500" />
+    <line x1="400" y1="0" x2="400" y2="500" />
+    <line x1="600" y1="0" x2="600" y2="500" />
+  </g>
+
+  <!-- Service Badge -->
+  <rect x="50" y="40" width="160" height="34" rx="6" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" />
+  <text x="130" y="62" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#60a5fa" text-anchor="middle" letter-spacing="1">
+    CẤP 1 - CẤP 4 (56 HẠNG MỤC)
+  </text>
+
+  <!-- Engine Silhouette Outline -->
+  <g transform="translate(140, 110)">
+    <!-- Engine Block Base -->
+    <path d="M100,240 L420,240 L440,200 L450,150 L420,130 L420,90 L380,80 L380,40 L140,40 L140,80 L100,90 L70,130 L80,180 Z" fill="#1e293b" stroke="#64748b" stroke-width="3" />
+    
+    <!-- Cylinders / Valve Cover -->
+    <rect x="160" y="55" width="50" height="60" rx="4" fill="#334155" stroke="#94a3b8" stroke-width="2" />
+    <rect x="230" y="55" width="50" height="60" rx="4" fill="#334155" stroke="#94a3b8" stroke-width="2" />
+    <rect x="300" y="55" width="50" height="60" rx="4" fill="#334155" stroke="#94a3b8" stroke-width="2" />
+
+    <!-- Denso Oil Filter -->
+    <g transform="translate(380, 170)">
+      <rect x="0" y="0" width="65" height="80" rx="6" fill="#0284c7" stroke="#38bdf8" stroke-width="2" />
+      <text x="32" y="36" font-family="system-ui, sans-serif" font-size="11" font-weight="900" fill="#ffffff" text-anchor="middle">
+        DENSO
+      </text>
+      <text x="32" y="52" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#bae6fd" text-anchor="middle">
+        OIL FILTER
+      </text>
+    </g>
+
+    <!-- Motul Synthetic Oil Canister -->
+    <g transform="translate(30, 80)">
+      <!-- Canister Body -->
+      <path d="M10,60 L70,40 L120,40 L135,200 L5,200 Z" fill="#dc2626" stroke="#f87171" stroke-width="2.5" />
+      <rect x="30" y="20" width="30" height="25" rx="3" fill="#f8fafc" />
+      <text x="68" y="105" font-family="system-ui, sans-serif" font-size="18" font-weight="900" fill="#ffffff" text-anchor="middle" font-style="italic">
+        MOTUL
+      </text>
+      <text x="68" y="125" font-family="system-ui, sans-serif" font-size="11" font-weight="700" fill="#fef08a" text-anchor="middle">
+        5W-40 100% SYNTHETIC
+      </text>
+      <text x="68" y="145" font-family="system-ui, sans-serif" font-size="9" font-weight="600" fill="#ffffff" text-anchor="middle">
+        8100 X-cess
+      </text>
+      <!-- Golden Oil Stream -->
+      <path d="M45,20 C45,0 95,-20 140,-10 C160,-5 170,25 170,55" fill="none" stroke="url(#pOil)" stroke-width="8" stroke-linecap="round" />
+    </g>
+
+    <!-- Professional Torque Wrench -->
+    <g transform="translate(180, 180) rotate(-25)">
+      <rect x="0" y="0" width="220" height="14" rx="4" fill="url(#pSteel)" stroke="#cbd5e1" stroke-width="1.5" />
+      <circle cx="10" cy="7" r="14" fill="#334155" stroke="#94a3b8" stroke-width="2" />
+      <rect x="160" y="-3" width="60" height="20" rx="3" fill="#0f172a" stroke="#64748b" stroke-width="1" />
+      <!-- Scale ticks -->
+      <line x1="120" y1="2" x2="120" y2="12" stroke="#ffffff" stroke-width="1.5" />
+      <line x1="130" y1="2" x2="130" y2="12" stroke="#ffffff" stroke-width="1.5" />
+      <line x1="140" y1="2" x2="140" y2="12" stroke="#ffffff" stroke-width="1.5" />
+    </g>
+
+    <!-- Pressure Gauge Indicator -->
+    <g transform="translate(240, -10)">
+      <circle cx="25" cy="25" r="28" fill="#0f172a" stroke="#38bdf8" stroke-width="3" />
+      <path d="M10,32 A18,18 0 1,1 40,32" fill="none" stroke="#64748b" stroke-width="3" stroke-dasharray="2,3" />
+      <line x1="25" y1="25" x2="35" y2="14" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
+      <circle cx="25" cy="25" r="4" fill="#f8fafc" />
+    </g>
+  </g>
+
+  <!-- Bottom Caption -->
+  <text x="400" y="450" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#f8fafc" text-anchor="middle">
+    BẢO DƯỠNG ĐỊNH KỲ CHUẨN QUY TRÌNH HÃNG
+  </text>
+  <text x="400" y="475" font-family="system-ui, sans-serif" font-size="13" font-weight="500" fill="#94a3b8" text-anchor="middle">
+    Kiểm tra 56 hạng mục · Dầu nhớt &amp; lọc chính hãng · AutoGarage Tây Sơn
+  </text>
+</svg>

@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0f1d" />
+      <stop offset="50%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#070a12" />
+    </linearGradient>
+
+    <!-- Floor Metallic Gradient -->
+    <linearGradient id="floorGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="30%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+
+    <!-- Neon Cyan & Amber Glow -->
+    <linearGradient id="glowCyan" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8" />
+      <stop offset="50%" stop-color="#818cf8" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.8" />
+    </linearGradient>
+
+    <linearGradient id="liftGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="50%" stop-color="#64748b" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <linearGradient id="carBody" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="40%" stop-color="#3b82f6" />
+      <stop offset="70%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <filter id="neonBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1600" height="900" fill="url(#bgGrad)" />
+
+  <!-- Ceiling Hexagonal Detailing LED Lights -->
+  <g stroke="#38bdf8" stroke-width="2" fill="none" opacity="0.35" filter="url(#neonBlur)">
+    <!-- Row 1 -->
+    <polygon points="300,60 360,25 420,60 420,130 360,165 300,130" />
+    <polygon points="430,60 490,25 550,60 550,130 490,165 430,130" />
+    <polygon points="560,60 620,25 680,60 680,130 620,165 560,130" />
+    <polygon points="690,60 750,25 810,60 810,130 750,165 690,130" />
+    <polygon points="820,60 880,25 940,60 940,130 880,165 820,130" />
+    <polygon points="950,60 1010,25 1070,60 1070,130 1010,165 950,130" />
+    <polygon points="1080,60 1140,25 1200,60 1200,130 1140,165 1080,130" />
+    <polygon points="1210,60 1270,25 1330,60 1330,130 1270,165 1210,130" />
+
+    <!-- Row 2 -->
+    <polygon points="365,175 425,140 485,175 485,245 425,280 365,245" />
+    <polygon points="495,175 555,140 615,175 615,245 555,280 495,245" />
+    <polygon points="625,175 685,140 745,175 745,245 685,280 625,245" />
+    <polygon points="755,175 815,140 875,175 875,245 815,280 755,245" />
+    <polygon points="885,175 945,140 1005,175 1005,245 945,280 885,245" />
+    <polygon points="1015,175 1075,140 1135,175 1135,245 1075,280 1015,245" />
+    <polygon points="1145,175 1205,140 1265,175 1265,245 1205,280 1145,245" />
+  </g>
+
+  <!-- Workshop Floor with Perspective Lines -->
+  <polygon points="0,520 1600,520 1600,900 0,900" fill="url(#floorGrad)" />
+
+  <!-- Floor Grid / Epoxy Finish Reflections -->
+  <g stroke="#334155" stroke-width="1.5" opacity="0.4">
+    <line x1="800" y1="520" x2="800" y2="900" />
+    <line x1="800" y1="520" x2="400" y2="900" />
+    <line x1="800" y1="520" x2="0" y2="850" />
+    <line x1="800" y1="520" x2="1200" y2="900" />
+    <line x1="800" y1="520" x2="1600" y2="850" />
+    <!-- Horizontal distance lines -->
+    <line x1="100" y1="580" x2="1500" y2="580" />
+    <line x1="50" y1="670" x2="1550" y2="670" />
+    <line x1="0" y1="780" x2="1600" y2="780" />
+  </g>
+
+  <!-- Yellow/Black Safety Zone Demarcation Line -->
+  <g transform="translate(480, 560)">
+    <rect x="0" y="0" width="640" height="14" fill="#eab308" />
+    <!-- Diagonal hazard stripes -->
+    <path d="M10,0 L25,14 M40,0 L55,14 M70,0 L85,14 M100,0 L115,14 M130,0 L145,14 M160,0 L175,14 M190,0 L205,14 M220,0 L235,14 M250,0 L265,14 M280,0 L295,14 M310,0 L325,14 M340,0 L355,14 M370,0 L385,14 M400,0 L415,14 M430,0 L445,14 M460,0 L475,14 M490,0 L505,14 M520,0 L535,14 M550,0 L565,14 M580,0 L595,14 M610,0 L625,14" stroke="#0f172a" stroke-width="8" />
+  </g>
+
+  <!-- Left 2-Post Car Lift Column -->
+  <rect x="520" y="240" width="36" height="420" fill="url(#liftGrad)" rx="4" />
+  <rect x="505" y="650" width="66" height="24" fill="#475569" rx="3" />
+  <rect x="528" y="260" width="20" height="380" fill="#0f172a" rx="2" />
+  <!-- Lift Arm Left -->
+  <rect x="548" y="460" width="160" height="20" fill="#f59e0b" rx="4" />
+
+  <!-- Right 2-Post Car Lift Column -->
+  <rect x="1044" y="240" width="36" height="420" fill="url(#liftGrad)" rx="4" />
+  <rect x="1029" y="650" width="66" height="24" fill="#475569" rx="3" />
+  <rect x="1052" y="260" width="20" height="380" fill="#0f172a" rx="2" />
+  <!-- Lift Arm Right -->
+  <rect x="892" y="460" width="160" height="20" fill="#f59e0b" rx="4" />
+
+  <!-- Modern Luxury Sedan on the Lift -->
+  <g transform="translate(600, 310)">
+    <!-- Wheels -->
+    <!-- Front Wheel -->
+    <circle cx="60" cy="180" r="44" fill="#1e293b" stroke="#64748b" stroke-width="8" />
+    <circle cx="60" cy="180" r="28" fill="#334155" />
+    <!-- Disc brake with Brembo Red Caliper -->
+    <circle cx="60" cy="180" r="20" fill="#94a3b8" />
+    <path d="M48,165 A20,20 0 0,1 66,160 L62,175 Z" fill="#ef4444" />
+    <circle cx="60" cy="180" r="8" fill="#f8fafc" />
+
+    <!-- Rear Wheel -->
+    <circle cx="340" cy="180" r="44" fill="#1e293b" stroke="#64748b" stroke-width="8" />
+    <circle cx="340" cy="180" r="28" fill="#334155" />
+    <circle cx="340" cy="180" r="20" fill="#94a3b8" />
+    <path d="M328,165 A20,20 0 0,1 346,160 L342,175 Z" fill="#ef4444" />
+    <circle cx="340" cy="180" r="8" fill="#f8fafc" />
+
+    <!-- Car Body Silhouette -->
+    <path d="M0,165 
+             C10,140 30,135 70,135 
+             L110,135 
+             L160,80 
+             C180,60 270,55 300,75 
+             L350,135 
+             L390,140 
+             C410,145 415,160 410,175 
+             L385,180 
+             C380,150 360,145 330,150 
+             C300,155 295,185 300,195 
+             L105,195 
+             C100,155 80,145 50,150 
+             C20,155 15,185 20,195 
+             L-5,190 Z" 
+          fill="url(#carBody)" />
+
+    <!-- Windows & Roof Pillars -->
+    <path d="M125,130 L168,85 C185,72 230,68 250,68 L250,130 Z" fill="#0f172a" opacity="0.85" />
+    <path d="M260,68 C275,68 290,75 302,85 L338,130 L260,130 Z" fill="#0f172a" opacity="0.85" />
+
+    <!-- Headlight & Taillight Neon -->
+    <path d="M5,145 L35,150 L20,160 Z" fill="#38bdf8" filter="url(#neonBlur)" />
+    <path d="M395,145 L412,150 L405,160 Z" fill="#ef4444" filter="url(#neonBlur)" />
+
+    <!-- Body Accent Reflection Line -->
+    <path d="M70,140 L380,145" stroke="#93c5fd" stroke-width="2" opacity="0.7" />
+  </g>
+
+  <!-- Glowing Signboard on Back Wall -->
+  <g transform="translate(560, 140)">
+    <rect x="0" y="0" width="480" height="70" rx="8" fill="#0b1329" stroke="#1d4ed8" stroke-width="2" />
+    <text x="240" y="32" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="900" fill="#38bdf8" text-anchor="middle" letter-spacing="4">
+      AUTOGARAGE TÂY SƠN
+    </text>
+    <text x="240" y="54" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="600" fill="#94a3b8" text-anchor="middle" letter-spacing="2">
+      TRUNG TÂM BẢO DƯỠNG &amp; SỬA CHỮA Ô TÔ TIÊU CHUẨN HÃNG
+    </text>
+  </g>
+
+  <!-- Tech Specs Badge on Bottom Left -->
+  <g transform="translate(60, 700)">
+    <rect x="0" y="0" width="280" height="130" rx="8" fill="#0f172a" opacity="0.9" stroke="#334155" stroke-width="1.5" />
+    <text x="20" y="30" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#38bdf8" letter-spacing="1.5">
+      KHU VỰC KỸ THUẬT SỐ HÓA
+    </text>
+    <text x="20" y="58" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#f8fafc">
+      • 226 Tây Sơn, Đống Đa, Hà Nội
+    </text>
+    <text x="20" y="82" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#f8fafc">
+      • Hotline: 0963 943 872
+    </text>
+    <text x="20" y="106" font-family="system-ui, sans-serif" font-size="13" font-weight="500" fill="#94a3b8">
+      • Cầu nâng 2 trụ &amp; 4 trụ Hunter 3D
+    </text>
+  </g>
+
+  <!-- Ambient Light Cone -->
+  <polygon points="800,100 450,850 1150,850" fill="url(#glowCyan)" opacity="0.08" />
+</svg>

@@ -248,14 +248,29 @@ export interface Booking {
   version: string;
 }
 
+export interface BookingNewCustomer {
+  fullName: string;
+  phone: string;
+  email?: string | null;
+}
+
+export interface BookingNewVehicle {
+  licensePlate: string;
+  brand: string;
+  model: string;
+  manufactureYear?: number | null;
+  color?: string | null;
+}
+
 export interface BookingCreate {
-  customerId: string;
-  vehicleId: string;
+  customerId?: string | null;
+  newCustomer?: BookingNewCustomer | null;
+  vehicleId?: string | null;
+  newVehicle?: BookingNewVehicle | null;
   serviceId?: string | null;
   bayId?: string | null;
   appointmentAt: string;
   requestDescription?: string | null;
-  createdBy?: string;
 }
 
 export interface BookingReschedule {

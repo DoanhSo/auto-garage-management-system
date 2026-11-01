@@ -12,6 +12,28 @@ quy chuẩn bắt buộc cho code mới và phần UI được chỉnh sửa; t�
 - Design token và quy tắc layout nằm ở CSS dùng chung; không khai báo palette hoặc kích thước control riêng rải rác trong từng màn.
 - Các màn có thể khác nội dung và bố cục nghiệp vụ, nhưng cùng một loại thành phần phải có cùng hình thức và hành vi. Trang đăng nhập/đăng ký vẫn theo hệ thống nhận diện chung.
 
+## Hệ thống Design Token & Tương tác (Chuẩn `DESIGN.md` & Micro-interactions)
+
+### Bảng màu & Typography cốt lõi (`frontend/src/styles.css`)
+| Vai trò | Giá trị / Token | Quy tắc sử dụng |
+| :--- | :--- | :--- |
+| **Nền trang / Nền card** | `#f6f8fb` / `#ffffff` | Không tự tạo nền gradient lòe loẹt hoặc dark-mode cục bộ lệch tông |
+| **Chữ chính / Chữ phụ** | `#172338` / `var(--muted)` (`#526278`) | Dùng `font-variant-numeric: tabular-nums` cho cột số tiền, số lượng, mã đơn, thời gian |
+| **Hành động chính (Primary)** | `var(--primary)` (`#245bdb`) | Chỉ 1 nút `variant="primary"` cho mỗi vùng hành động chính / mỗi bước của dialog |
+| **Viền & Phân tách** | `var(--border)` (`#e3e8f0`) | Ưu tiên khoảng trắng và 1 đường viền mảnh; không lồng card trong card trong modal |
+| **Cảnh báo phá hủy (Danger)** | `var(--danger)` (`#b42335`) | Chỉ dùng cho hành động xóa/hủy không thể hoàn tác và thông báo lỗi |
+| **Focus ring** | `outline: 3px solid #93b4ff` / `box-shadow: 0 0 0 3px #245bdb16` | Luôn giữ rõ cho điều hướng bàn phím (`:focus-visible`), không `outline: none` mà thiếu thay thế |
+
+### Chuyển động & Vi tương tác (Nguyên tắc Emil Kowalski)
+- **Tốc độ phản hồi tức thì:** Mọi chuyển động đóng/mở dialog, popover, hover hoặc đổi bước chỉ dùng `150ms–200ms` với `cubic-bezier(0.16, 1, 0.3, 1)` hoặc `ease-out`. Không dùng animation chậm (`>300ms`), nảy quá đà (spring bounce) hoặc hiệu ứng trang trí gây trễ thao tác của lễ tân/kỹ thuật viên.
+- **Không dịch chuyển bố cục (Zero Layout Shift):** Khi nút chuyển sang trạng thái `pending` (hiện spinner) hoặc khi hiển thị lỗi/gợi ý cạnh trường, kích thước nút và vị trí các cột không được nhảy làm lệch khung bấm.
+- **Tôn trọng `prefers-reduced-motion`:** Tắt hoặc giảm tối thiểu thời gian chuyển động khi hệ điều hành bật chế độ giảm chuyển động.
+
+### Quy tắc chống "AI Slop" (Nguyên tắc Impeccable)
+- **Không lạm dụng trang trí rập khuôn của AI:** Không tự ý thêm icon vô nghĩa vào mọi label của form, không dùng bóng đổ dày (`box-shadow` nặng), viền tím/xanh neon, hay badge cầu vồng.
+- **Nhịp điệu & Căn hàng thị giác (Optical Alignment):** Trong lưới 2 cột `repeat(2, minmax(0, 1fr))`, đỉnh của các input trên cùng một hàng phải thẳng tuyệt đối; nếu một trường có `hint` dài hơn trường bên cạnh, chiều cao hàng tự cân bằng mà không làm lệch vị trí input.
+- **Đầy đủ 4 trạng thái dữ liệu:** Mọi danh sách/bảng và vùng tra cứu đều phải có đủ 4 trạng thái dùng component chung: `Loading`, `Empty` (kèm hướng dẫn hành động tiếp theo), `QueryError` (kèm nút thử lại) và `Data`.
+
 ## Quy chuẩn nội dung, ngôn ngữ và đặt tên hướng người dùng
 
 ### Đặt tên theo chức năng
