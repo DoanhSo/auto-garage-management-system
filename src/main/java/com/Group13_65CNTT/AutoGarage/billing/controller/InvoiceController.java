@@ -39,7 +39,7 @@ import java.util.Set;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ApiPaths.INVOICES_BASE)
-@Tag(name = "Invoices", description = "Quản lý hóa đơn dịch vụ và phụ tùng (UC28)")
+@Tag(name = "Invoices", description = "Quản lý hóa đơn dịch vụ và phụ tùng")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class InvoiceController {
     private final BillingService billingService;

@@ -39,7 +39,7 @@ import java.util.Set;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ApiPaths.SUPPLIERS_BASE)
-@Tag(name = "Suppliers", description = "Quản lý nhà cung cấp phụ tùng (UC20)")
+@Tag(name = "Suppliers", description = "Quản lý nhà cung cấp phụ tùng")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class SupplierController {
     private final SupplierService supplierService;

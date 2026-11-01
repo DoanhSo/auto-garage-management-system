@@ -8,6 +8,7 @@ import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ShiftCreateRequest;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.ShiftResponse;
+import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftStatus;
 import com.Group13_65CNTT.AutoGarage.scheduling.service.SchedulingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -66,6 +67,22 @@ public class EmployeeShiftController {
         Long actorId = currentUserProvider.userId();
         schedulingService.cancelShift(actorId, id);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, null, httpRequest.getRequestURI()));
+    }
+
+    @GetMapping
+    @PreAuthorize(SecurityConstants.HAS_ROLE_STAFF)
+    @Operation(summary = "List shifts with pagination and optional filters")
+    public ResponseEntity<ApiResponse<Page<ShiftResponse>>> getShifts(
+            @RequestParam(required = false) Long employeeId,
+            @RequestParam(required = false) ShiftStatus status,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(defaultValue = "startsAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            HttpServletRequest httpRequest) {
+        Page<ShiftResponse> responses = schedulingService.getShifts(
+                employeeId, status, pagination.page(page, size != null ? size : pagination.defaultSize(), sortBy, sortDir, SORT_FIELDS));
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, responses, httpRequest.getRequestURI()));
     }
 
     @GetMapping("/employee/{employeeId}")

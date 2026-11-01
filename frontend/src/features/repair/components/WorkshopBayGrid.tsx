@@ -42,7 +42,7 @@ export function WorkshopBayGrid({
   const { data: baysData, isLoading: isLoadingBays, isError: isErrorBays, error: errorBays, refetch: refetchBays } = useServiceBaysQuery();
   const { data: reservations = [], isLoading: isLoadingRes, isError: isErrorRes, error: errorRes, refetch: refetchRes } = useActiveReservationsQuery();
 
-  const bays: ServiceBay[] = baysData?.content ?? [];
+  const bays = useMemo<ServiceBay[]>(() => baysData?.content ?? [], [baysData?.content]);
 
   // Map each bay to its active reservation and matching repair order
   const bayStatusList = useMemo(() => {

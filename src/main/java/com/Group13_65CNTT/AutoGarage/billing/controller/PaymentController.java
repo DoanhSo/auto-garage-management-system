@@ -40,7 +40,7 @@ import java.util.Set;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ApiPaths.PAYMENTS_BASE)
-@Tag(name = "Payments", description = "Quản lý thu tiền khách và chi trả NCC (UC29, UC30)")
+@Tag(name = "Payments", description = "Quản lý thu tiền khách và chi trả nhà cung cấp")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class PaymentController {
     private final BillingService billingService;
@@ -49,7 +49,7 @@ public class PaymentController {
 
     @PostMapping(ApiPaths.PAYMENTS_RECEIVE)
     @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTION_OR_ADMIN)
-    @Operation(summary = "Thu tiền khách hàng theo hóa đơn (direction = IN, UC29)")
+    @Operation(summary = "Thu tiền khách hàng theo hóa đơn")
     public ApiResponse<PaymentResponse> receivePayment(
             @Valid @RequestBody PaymentReceiveRequest request,
             HttpServletRequest http) {
@@ -62,7 +62,7 @@ public class PaymentController {
 
     @PostMapping(ApiPaths.PAYMENTS_PAY_SUPPLIER)
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
-    @Operation(summary = "Chi trả tiền cho nhà cung cấp theo chứng từ nhập kho (direction = OUT, UC30, chỉ ADMIN)")
+    @Operation(summary = "Chi trả tiền cho nhà cung cấp theo chứng từ nhập kho")
     public ApiResponse<PaymentResponse> paySupplier(
             @Valid @RequestBody SupplierPaymentRequest request,
             HttpServletRequest http) {

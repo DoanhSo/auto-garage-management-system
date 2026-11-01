@@ -40,7 +40,7 @@ import java.util.Set;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ApiPaths.PARTS_BASE)
-@Tag(name = "Parts", description = "Quản lý danh mục phụ tùng vật tư (UC21)")
+@Tag(name = "Parts", description = "Quản lý danh mục phụ tùng vật tư")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class PartController {
     private final PartService partService;

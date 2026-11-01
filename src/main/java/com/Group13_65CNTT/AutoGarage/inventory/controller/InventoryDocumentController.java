@@ -40,7 +40,7 @@ import java.util.Set;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping(ApiPaths.INVENTORY_DOCUMENTS_BASE)
-@Tag(name = "Inventory Documents", description = "Quản lý chứng từ nhập/xuất/trả/điều chỉnh kho (UC22, UC24, UC25, UC26)")
+@Tag(name = "Inventory Documents", description = "Quản lý chứng từ nhập/xuất/trả/điều chỉnh kho")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class InventoryDocumentController {
     private final InventoryService inventoryService;

@@ -28,7 +28,7 @@ import java.util.List;
 @RestController
 @RequestMapping(ApiPaths.REPAIR_TASKS_BASE)
 @RequiredArgsConstructor
-@Tag(name = "Labor Execution", description = "Phân công kỹ thuật viên, bấm giờ timer và hoàn thành công việc (TV3)")
+@Tag(name = "Labor Execution", description = "Phân công kỹ thuật viên, bấm giờ timer và hoàn thành công việc")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class LaborExecutionController {
 

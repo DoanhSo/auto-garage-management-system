@@ -105,7 +105,7 @@ public class ServiceBayController {
 
     @PostMapping("/{id}/maintenance")
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
-    @Operation(summary = "Schedule bay maintenance (UC37)")
+    @Operation(summary = "Lập lịch bảo trì khoang sửa chữa")
     public ResponseEntity<ApiResponse<BayReservationResponse>> scheduleMaintenance(
             @PathVariable Long id,
             @Valid @RequestBody MaintenanceReservationRequest request,

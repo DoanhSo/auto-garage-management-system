@@ -27,7 +27,7 @@ import java.util.List;
 @RestController
 @RequestMapping(ApiPaths.REPAIR_ORDERS_BASE)
 @RequiredArgsConstructor
-@Tag(name = "Repair Orders", description = "Quản lý vòng đời phiếu sửa chữa và công việc (TV3)")
+@Tag(name = "Repair Orders", description = "Quản lý vòng đời phiếu sửa chữa và công việc")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class RepairOrderController {
 

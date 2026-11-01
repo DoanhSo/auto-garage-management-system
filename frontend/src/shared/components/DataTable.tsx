@@ -4,7 +4,7 @@ import { Button, Empty } from './ui';
 import { pageSizes } from '../config/policy';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { pageEntries } from '../utils/pagination';
-export function DataTable<T extends { id: string }>({
+export function DataTable<T extends { id: string | number }>({
   columns,
   data,
   busy = false,
@@ -21,7 +21,7 @@ export function DataTable<T extends { id: string }>({
     columns,
     data,
     getCoreRowModel: getCoreRowModel(),
-    getRowId: (row) => row.id,
+    getRowId: (row) => String(row.id),
     manualPagination: true,
     manualSorting: true,
   });
