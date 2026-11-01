@@ -28,20 +28,20 @@ export interface EstimateCreateInput {
   repairOrderId: number;
   estimateKind: 'INITIAL' | 'SUPPLEMENTAL';
   parentEstimateId?: number | null;
-  discountAmount?: number;
-  taxAmount?: number;
+  /** ISO-8601, khớp EstimateCreateRequest.validUntil (Instant). */
+  validUntil?: string | null;
   notes?: string | null;
-  validDays?: number;
   items: EstimateItemCreateInput[];
 }
 
+/** Khớp EstimateApproval.LineDecision của backend. */
 export interface LineDecisionInput {
-  itemId: number;
-  status: 'APPROVED' | 'REJECTED';
+  estimateItemId: number;
+  decision: 'APPROVED' | 'REJECTED';
   note?: string;
 }
 
 export interface EstimateDecisionInput {
-  decisions: LineDecisionInput[];
-  decisionNote?: string;
+  lines: LineDecisionInput[];
+  requestKey?: string;
 }

@@ -11,6 +11,7 @@ import { useCustomersQuery, useMyCustomerQuery } from '../../customer/hooks/useC
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
 import { useServicesQuery } from '../../catalog/hooks/useCatalog';
 import { useCreateBookingMutation } from '../hooks/useReception';
+import { BookingTimeSlotPicker } from './BookingTimeSlotPicker';
 import {
   bookingDefaults,
   bookingFormSchema,
@@ -44,9 +45,11 @@ const STEPS: { step: BookingStep; label: string }[] = [
 function BookingForm({
   onSaved,
   onRequestClose,
+  initialAppointmentAt,
 }: {
   onSaved: () => void;
   onRequestClose: (handler: () => void) => void;
+  initialAppointmentAt?: string;
 }) {
   const notify = useToast();
   const { user } = useAuth();
@@ -83,7 +86,7 @@ function BookingForm({
   } = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
     mode: 'onBlur',
-    defaultValues: bookingDefaults(),
+    defaultValues: { ...bookingDefaults(), appointmentAt: initialAppointmentAt ?? '' },
   });
 
   useEffect(() => {
@@ -494,6 +497,13 @@ function BookingForm({
             >
               <input type="datetime-local" className="input" disabled={busy} {...register('appointmentAt')} />
             </Field>
+            <BookingTimeSlotPicker
+              value={watch('appointmentAt')}
+              disabled={busy}
+              onChange={(next) =>
+                setValue('appointmentAt', next, { shouldDirty: true, shouldValidate: true })
+              }
+            />
 
             <Field
               label="Dịch vụ yêu cầu chính"
@@ -560,10 +570,12 @@ export function BookingEditor({
   open,
   onClose,
   onRestoreFocus,
+  initialAppointmentAt,
 }: {
   open: boolean;
   onClose: () => void;
   onRestoreFocus?: () => void;
+  initialAppointmentAt?: string;
 }) {
   const [closeHandler, setCloseHandler] = useState<(() => void) | null>(null);
   const registerCloseHandler = useCallback(
@@ -584,7 +596,11 @@ export function BookingEditor({
       placement="center"
       size="lg"
     >
-      <BookingForm onSaved={onClose} onRequestClose={registerCloseHandler} />
+      <BookingForm
+        onSaved={onClose}
+        onRequestClose={registerCloseHandler}
+        initialAppointmentAt={initialAppointmentAt}
+      />
     </Sheet>
   );
 }

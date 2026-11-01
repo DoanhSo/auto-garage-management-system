@@ -1,5 +1,5 @@
 export type WarrantyStatus = 'ACTIVE' | 'EXPIRED' | 'VOID';
-export type ClaimStatus = 'OPEN' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED';
+export type ClaimStatus = 'OPEN' | 'IN_REVIEW' | 'APPROVED' | 'IN_PROGRESS' | 'REJECTED' | 'CLOSED';
 
 export const warrantyStatusLabels: Record<WarrantyStatus, string> = {
   ACTIVE: 'Còn hiệu lực',
@@ -11,7 +11,9 @@ export const claimStatusLabels: Record<ClaimStatus, string> = {
   OPEN: 'Mới tiếp nhận',
   IN_REVIEW: 'Đang xem xét',
   APPROVED: 'Chấp thuận bảo hành',
+  IN_PROGRESS: 'Đang sửa chữa bảo hành',
   REJECTED: 'Từ chối bảo hành',
+  CLOSED: 'Đã hoàn tất',
 };
 
 export interface Warranty {
@@ -54,7 +56,9 @@ export interface WarrantyClaimOpenInput {
   description: string;
 }
 
+/** Khớp WarrantyClaimDecideRequest của backend. */
 export interface WarrantyClaimDecideInput {
-  status: 'APPROVED' | 'REJECTED';
-  decisionReason: string;
+  approved: boolean;
+  reason: string;
+  requestKey?: string;
 }

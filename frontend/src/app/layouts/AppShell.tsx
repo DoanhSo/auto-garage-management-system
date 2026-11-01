@@ -271,12 +271,12 @@ export function AppShell() {
     <div className={`app-layout ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="sidebar">
         <div className="sidebar-brand-row">
-          <NavLink to="/" className="brand" title="Về trang chủ AutoGarage Tây Sơn">
+          <NavLink to="/" className="brand" title="Về trang chủ AutoGarage">
             <span className="brand-mark">
               <Wrench size={20} />
             </span>
             <span className="brand-text">
-              AutoGarage Tây Sơn<small>Quản lý gara</small>
+              AutoGarage<small>Quản lý gara</small>
             </span>
           </NavLink>
           <button
@@ -338,7 +338,7 @@ export function AppShell() {
             <Link
               to="/"
               className="button button-ghost"
-              title="Về trang chủ AutoGarage Tây Sơn"
+              title="Về trang chủ AutoGarage"
             >
               <Globe size={16} />
               <span className="logout-label">Trang chủ</span>

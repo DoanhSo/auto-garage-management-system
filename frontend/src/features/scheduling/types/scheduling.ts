@@ -62,3 +62,58 @@ export interface ShiftCreateInput {
   endsAt: string;
   notes?: string | null;
 }
+
+export interface MaintenanceInput {
+  startsAt: string;
+  endsAt: string;
+  notes?: string | null;
+}
+
+export interface EmployeeCreateInput {
+  userId: number;
+  employeeCode: string;
+  skillsJson?: string | null;
+  canQc: boolean;
+  hourlyCost: number;
+}
+
+export interface EmployeeUpdateInput {
+  skillsJson?: string | null;
+  canQc?: boolean;
+  hourlyCost?: number;
+  isActive?: boolean;
+}
+
+export const reservationTypeLabels: Record<string, string> = {
+  BOOKING: 'Giữ chỗ lịch hẹn',
+  REPAIR: 'Đang sửa xe',
+  MAINTENANCE: 'Bảo trì cầu nâng',
+};
+
+export const reservationStatusLabels: Record<string, string> = {
+  HELD: 'Đang giữ chỗ',
+  IN_USE: 'Đang sử dụng',
+  RELEASED: 'Đã trả khoang',
+  EXPIRED: 'Hết hạn giữ',
+  CANCELLED: 'Đã hủy',
+};
+
+export const SKILL_LABELS: Record<string, string> = {
+  ENGINE: 'Máy',
+  CHASSIS: 'Gầm',
+  ELECTRIC: 'Điện',
+  BODY: 'Đồng sơn',
+  AC: 'Điều hòa',
+  GENERAL: 'Bảo dưỡng chung',
+};
+
+/** skillsJson do backend lưu dạng chuỗi JSON (mảng mã kỹ năng). */
+export function parseSkills(skillsJson?: string | null): string[] {
+  if (!skillsJson) return [];
+  try {
+    const parsed: unknown = JSON.parse(skillsJson);
+    return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [];
+  } catch {
+    return [];
+  }
+}

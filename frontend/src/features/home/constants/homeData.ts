@@ -47,7 +47,7 @@ export interface NavAnchor {
 export const FALLBACK_IMAGE = '/images/home/hero-banner.jpg';
 
 export const GARAGE_INFO = {
-  name: 'AutoGarage Tây Sơn',
+  name: 'AutoGarage',
   hotline: '0963 943 872',
   mobile: '0963 943 872',
   address: 'Số 226 Phố Tây Sơn, P. Trung Liệt, Q. Đống Đa, Hà Nội',

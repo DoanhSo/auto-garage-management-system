@@ -365,6 +365,62 @@ public class KeycloakIdentityServiceImpl implements KeycloakIdentityService {
                 .body(List.of(roleRep))
                 .retrieve()
                 .toBodilessEntity();
+        ensureAccountClientRoles(token, userId);
+    }
+
+    /**
+     * Gỡ default-roles-{realm} khiến nhân sự mất quyền client "account", làm Account Console trả 401.
+     * Cấp lại manage-account và view-profile; lỗi ở bước này không được làm hỏng việc gán role chính.
+     */
+    private void ensureAccountClientRoles(String token, String userId) {
+        try {
+            List<Map<String, Object>> clients =
+                    restClient
+                            .get()
+                            .uri(serverUrl + "/admin/realms/" + realm + "/clients?clientId=account")
+                            .header("Authorization", "Bearer " + token)
+                            .retrieve()
+                            .body(LIST_MAP_TYPE);
+            if (clients == null || clients.isEmpty()) return;
+            Object clientUuid = clients.getFirst().get("id");
+            if (!(clientUuid instanceof String clientId)) return;
+            List<Map<String, Object>> accountRoles = new ArrayList<>();
+            for (String roleName : List.of("manage-account", "view-profile")) {
+                Map<String, Object> roleRep =
+                        restClient
+                                .get()
+                                .uri(
+                                        serverUrl
+                                                + "/admin/realms/"
+                                                + realm
+                                                + "/clients/"
+                                                + clientId
+                                                + "/roles/"
+                                                + roleName)
+                                .header("Authorization", "Bearer " + token)
+                                .retrieve()
+                                .body(MAP_TYPE);
+                if (roleRep != null) accountRoles.add(roleRep);
+            }
+            if (accountRoles.isEmpty()) return;
+            restClient
+                    .post()
+                    .uri(
+                            serverUrl
+                                    + "/admin/realms/"
+                                    + realm
+                                    + "/users/"
+                                    + userId
+                                    + "/role-mappings/clients/"
+                                    + clientId)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(accountRoles)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException failure) {
+            SafeFailureLog.error(log, "Unable to grant Keycloak account console roles", failure);
+        }
     }
 
     private void logoutKeycloakUser(String token, String userId) {

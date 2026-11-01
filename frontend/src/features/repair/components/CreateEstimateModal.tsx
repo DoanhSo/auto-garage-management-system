@@ -2,10 +2,21 @@ import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { errorMessage } from '../../../shared/api/errors';
-import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
+import { Badge, Button, Field, FormError, Sheet } from '../../../shared/components/ui';
 import { money } from '../../../shared/utils/format';
 import { useCreateEstimateMutation } from '../../estimate/hooks/useEstimates';
+import { EstimateLinePicker } from '../../estimate/components/EstimateLinePicker';
 import type { EstimateItemCreate, ItemType } from '../../estimate/types/estimateTypes';
+
+const emptyItem = (itemType: ItemType): EstimateItemCreate => ({
+  itemType,
+  serviceId: null,
+  partId: null,
+  itemName: '',
+  unit: '',
+  quantity: 1,
+  unitPrice: 0,
+});
 
 export function CreateEstimateModal({
   orderId,
@@ -20,38 +31,10 @@ export function CreateEstimateModal({
   const createEstimate = useCreateEstimateMutation();
 
   const [notes, setNotes] = useState('');
-  const [items, setItems] = useState<EstimateItemCreate[]>([
-    {
-      itemType: 'SERVICE',
-      itemName: 'Công kiểm tra và sửa chữa',
-      unit: 'Gói',
-      quantity: 1,
-      unitPrice: 200000,
-    },
-  ]);
+  const [items, setItems] = useState<EstimateItemCreate[]>([emptyItem('SERVICE')]);
 
-  const handleAddItem = (type: ItemType) => {
-    setItems((prev) => [
-      ...prev,
-      {
-        itemType: type,
-        itemName: type === 'SERVICE' ? 'Dịch vụ bảo dưỡng' : 'Phụ tùng thay thế',
-        unit: type === 'SERVICE' ? 'Lần' : 'Cái',
-        quantity: 1,
-        unitPrice: 100000,
-      },
-    ]);
-  };
-
-  const handleRemoveItem = (index: number) => {
-    setItems((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleItemChange = (index: number, field: keyof EstimateItemCreate, value: unknown) => {
-    setItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
-    );
-  };
+  const updateItem = (index: number, patch: Partial<EstimateItemCreate>) =>
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
 
   const totalAmount = items.reduce(
     (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
@@ -60,8 +43,11 @@ export function CreateEstimateModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (items.length === 0) {
-      notify('Báo giá phải có ít nhất 1 hạng mục');
+    const missing = items.findIndex((item) =>
+      item.itemType === 'SERVICE' ? !item.serviceId : !item.partId,
+    );
+    if (missing >= 0) {
+      notify(`Hạng mục ${missing + 1}: hãy chọn dịch vụ hoặc phụ tùng từ danh mục.`);
       return;
     }
 
@@ -71,6 +57,8 @@ export function CreateEstimateModal({
         notes: notes.trim() || undefined,
         items: items.map((item) => ({
           itemType: item.itemType,
+          serviceId: item.serviceId,
+          partId: item.partId,
           itemName: item.itemName.trim(),
           unit: item.unit.trim() || 'Cái',
           quantity: Number(item.quantity) || 1,
@@ -91,9 +79,9 @@ export function CreateEstimateModal({
       placement="center"
       size="lg"
       title="Lập bản báo giá mới"
-      description="Lập danh sách chi phí dịch vụ và phụ tùng dự kiến để gửi khách hàng phê duyệt."
+      description="Chọn dịch vụ và phụ tùng từ danh mục để gửi khách hàng phê duyệt."
     >
-      <form onSubmit={handleSubmit} noValidate className="editor-form space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="editor-form">
         <FormError message={createEstimate.error ? errorMessage(createEstimate.error) : undefined} />
 
         <Field label="Ghi chú báo giá">
@@ -105,118 +93,92 @@ export function CreateEstimateModal({
           />
         </Field>
 
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-sm">Danh mục dịch vụ & Phụ tùng ({items.length})</span>
-            <div className="flex gap-2">
+        <div className="estimate-lines">
+          <div className="estimate-lines-head">
+            <span>Dịch vụ & phụ tùng ({items.length})</span>
+            <div className="row-actions">
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => handleAddItem('SERVICE')}
+                onClick={() => setItems((prev) => [...prev, emptyItem('SERVICE')])}
               >
-                <Plus size={14} /> + Tiền công
+                <Plus size={14} /> Thêm dịch vụ
               </Button>
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() => handleAddItem('PART')}
+                onClick={() => setItems((prev) => [...prev, emptyItem('PART')])}
               >
-                <Plus size={14} /> + Phụ tùng
+                <Plus size={14} /> Thêm phụ tùng
               </Button>
             </div>
           </div>
 
-          <div className="table-scroll border rounded-lg overflow-hidden">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '14%' }}>Phân loại</th>
-                  <th style={{ width: '38%' }}>Tên hạng mục</th>
-                  <th style={{ width: '12%' }}>ĐVT</th>
-                  <th style={{ width: '10%' }} className="text-right">Số lượng</th>
-                  <th style={{ width: '14%' }} className="text-right">Đơn giá</th>
-                  <th style={{ width: '16%' }} className="text-right">Thành tiền</th>
-                  <th style={{ width: '6%' }} className="text-center">Xóa</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td>
-                      <span
-                        className={`badge text-xs ${item.itemType === 'SERVICE' ? 'badge-info' : 'badge-neutral'}`}
-                      >
-                        {item.itemType === 'SERVICE' ? 'Dịch vụ' : 'Phụ tùng'}
-                      </span>
-                    </td>
-                    <td>
-                      <input
-                        className="input text-sm"
-                        placeholder="Tên hạng mục"
-                        value={item.itemName}
-                        onChange={(e) => handleItemChange(idx, 'itemName', e.target.value)}
-                        required
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="input text-sm"
-                        placeholder="ĐVT"
-                        value={item.unit}
-                        onChange={(e) => handleItemChange(idx, 'unit', e.target.value)}
-                        required
-                      />
-                    </td>
-                    <td className="text-right">
-                      <input
-                        type="number"
-                        min="1"
-                        className="input text-sm text-right"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          handleItemChange(idx, 'quantity', Number(e.target.value))
-                        }
-                        required
-                      />
-                    </td>
-                    <td className="text-right">
-                      <input
-                        type="number"
-                        step="1000"
-                        min="0"
-                        className="input text-sm text-right"
-                        value={item.unitPrice}
-                        onChange={(e) =>
-                          handleItemChange(idx, 'unitPrice', Number(e.target.value))
-                        }
-                        required
-                      />
-                    </td>
-                    <td className="text-right font-medium money">
-                      {money((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0))}
-                    </td>
-                    <td className="text-center">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => handleRemoveItem(idx)}
-                        disabled={items.length === 1}
-                        title="Xóa dòng"
-                      >
-                        <Trash2 size={15} className="text-danger" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {items.map((item, idx) => (
+            <div key={idx} className="estimate-line">
+              <div className="estimate-line-main">
+                <Badge variant={item.itemType === 'SERVICE' ? 'primary' : 'warning'}>
+                  {item.itemType === 'SERVICE' ? 'Dịch vụ' : 'Phụ tùng'}
+                </Badge>
+                <EstimateLinePicker
+                  itemType={item.itemType}
+                  serviceId={item.serviceId}
+                  partId={item.partId}
+                  onPick={(line) => updateItem(idx, line)}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="delete-action"
+                  aria-label={`Xóa hạng mục ${idx + 1}`}
+                  onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+                  disabled={items.length === 1}
+                >
+                  <Trash2 size={15} />
+                </Button>
+              </div>
+              <div className="estimate-line-fields">
+                <label>
+                  Đơn vị
+                  <input className="input" value={item.unit} readOnly tabIndex={-1} />
+                </label>
+                <label>
+                  Số lượng
+                  <input
+                    type="number"
+                    min="1"
+                    className="input"
+                    value={item.quantity}
+                    onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })}
+                  />
+                </label>
+                <label>
+                  Đơn giá
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    className="input"
+                    value={item.unitPrice}
+                    onChange={(e) => updateItem(idx, { unitPrice: Number(e.target.value) })}
+                  />
+                </label>
+                <label>
+                  Thành tiền
+                  <input
+                    className="input"
+                    readOnly
+                    tabIndex={-1}
+                    value={money((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0))}
+                  />
+                </label>
+              </div>
+            </div>
+          ))}
 
-          <div className="flex justify-between items-center p-3 bg-muted/15 border rounded-lg font-bold">
-            <span className="text-sm">Tổng cộng dự kiến:</span>
-            <span className="text-primary text-base money">
-              {money(totalAmount)}
-            </span>
+          <div className="estimate-total">
+            <span>Tổng cộng dự kiến</span>
+            <span>{money(totalAmount)}</span>
           </div>
         </div>
 

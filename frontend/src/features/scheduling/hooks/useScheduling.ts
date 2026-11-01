@@ -4,6 +4,9 @@ import type {
   ServiceBayCreateInput,
   ShiftCreateInput,
   ShiftStatus,
+  MaintenanceInput,
+  EmployeeCreateInput,
+  EmployeeUpdateInput,
 } from '../types/scheduling';
 
 export function useServiceBaysQuery(params?: {
@@ -105,6 +108,38 @@ export function useCancelShiftMutation() {
       schedulingApi.cancelShift(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employee-shifts'] });
+    },
+  });
+}
+
+export function useScheduleMaintenanceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bayId, data }: { bayId: string | number; data: MaintenanceInput }) =>
+      schedulingApi.scheduleMaintenance(bayId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bay-reservations'] });
+    },
+  });
+}
+
+export function useCreateEmployeeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: EmployeeCreateInput) => schedulingApi.createEmployee(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scheduling-employees'] });
+    },
+  });
+}
+
+export function useUpdateEmployeeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string | number; data: EmployeeUpdateInput }) =>
+      schedulingApi.updateEmployee(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scheduling-employees'] });
     },
   });
 }

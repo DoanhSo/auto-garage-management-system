@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
+import { errorMessage } from '../../../shared/api/errors';
+import { Button, Field, FormError, ReadOnlyField, Sheet } from '../../../shared/components/ui';
 import { useDecideClaimMutation } from '../hooks/useWarranty';
 import type { WarrantyClaim } from '../types/warranty';
 
@@ -34,8 +35,8 @@ export function DecideClaimModal({
       await decideMutation.mutateAsync({
         claimId: claim.id,
         data: {
-          status,
-          decisionReason: decisionReason.trim(),
+          approved: status === 'APPROVED',
+          reason: decisionReason.trim(),
         },
       });
       notify(
@@ -45,8 +46,8 @@ export function DecideClaimModal({
       );
       onSaved();
       onClose();
-    } catch {
-      notify('Không thể duyệt yêu cầu bảo hành');
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Không thể duyệt yêu cầu bảo hành');
     }
   };
 
@@ -59,12 +60,14 @@ export function DecideClaimModal({
       onClose={onClose}
     >
       <form onSubmit={handleSubmit} noValidate className="editor-form account-editor-form">
-        <FormError message={decideMutation.error?.message} />
+        <FormError message={decideMutation.error ? errorMessage(decideMutation.error) : undefined} />
 
-        <div className="full-width-field p-3 bg-muted/40 rounded-lg border text-xs space-y-1">
-          <div><strong>Nội dung khách khiếu nại:</strong> {claim.description}</div>
-          <div><strong>Số ODO ghi nhận:</strong> {claim.currentOdometer.toLocaleString('vi-VN')} km</div>
-        </div>
+        <dl className="full-width-field detail-list">
+          <ReadOnlyField label="Nội dung khách khiếu nại">{claim.description}</ReadOnlyField>
+          <ReadOnlyField label="Số ODO ghi nhận">
+            {claim.currentOdometer.toLocaleString('vi-VN')} km
+          </ReadOnlyField>
+        </dl>
 
         <div className="full-width-field">
           <Field label="Quyết định xử lý" required>
@@ -73,8 +76,8 @@ export function DecideClaimModal({
               value={status}
               onChange={(e) => setStatus(e.target.value as 'APPROVED' | 'REJECTED')}
             >
-              <option value="APPROVED">CHẤP THUẬN (APPROVED) - Tự động mở phiếu sửa chữa bảo hành miễn phí</option>
-              <option value="REJECTED">TỪ CHỐI (REJECTED) - Lỗi không thuộc phạm vi bảo hành hoặc quá hạn</option>
+              <option value="APPROVED">Chấp thuận — tự động mở phiếu sửa chữa bảo hành miễn phí</option>
+              <option value="REJECTED">Từ chối — lỗi không thuộc phạm vi bảo hành hoặc quá hạn</option>
             </select>
           </Field>
         </div>
@@ -82,7 +85,8 @@ export function DecideClaimModal({
         <div className="full-width-field">
           <Field label="Lý do & Căn cứ kỹ thuật" required>
             <textarea
-              className="input min-h-[85px] resize-none"
+              className="input"
+              rows={4}
               placeholder="Nêu rõ kết quả giám định kỹ thuật và lý do chấp thuận / từ chối..."
               value={decisionReason}
               onChange={(e) => setDecisionReason(e.target.value)}
@@ -96,7 +100,8 @@ export function DecideClaimModal({
             Hủy
           </Button>
           <Button
-            variant={status === 'APPROVED' ? 'primary' : 'danger'}
+            variant={status === 'APPROVED' ? 'primary' : 'secondary'}
+            className={status === 'APPROVED' ? undefined : 'delete-action'}
             type="submit"
             pending={decideMutation.isPending}
           >

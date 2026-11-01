@@ -21,11 +21,11 @@ export function AuthLayout({
     <div className="auth-page">
       <header className="auth-header">
         <div className="auth-header-inner">
-          <Link to="/" className="auth-brand" aria-label="AutoGarage Tây Sơn - Về trang chủ">
+          <Link to="/" className="auth-brand" aria-label="AutoGarage - Về trang chủ">
             <span className="auth-brand-mark">
               <Wrench size={18} aria-hidden />
             </span>
-            AutoGarage Tây Sơn
+            AutoGarage
           </Link>
           <div className="auth-header-right">
             <a href="tel:0963943872" className="auth-hotline">
@@ -41,10 +41,10 @@ export function AuthLayout({
 
       <main className="auth-main" id="main-content" tabIndex={-1}>
         <div className={`auth-card auth-card-${variant}`}>
-          <aside className="auth-card-media" aria-label="Hình ảnh xưởng AutoGarage Tây Sơn">
+          <aside className="auth-card-media" aria-label="Hình ảnh xưởng AutoGarage">
             <img
               src="/images/home/garage-lounge.jpg"
-              alt="Khu vực tiếp nhận và phòng chờ khách hàng AutoGarage Tây Sơn"
+              alt="Khu vực tiếp nhận và phòng chờ khách hàng AutoGarage"
             />
             <div className="auth-card-media-overlay">
               <span className="auth-media-badge">Xưởng dịch vụ tiêu chuẩn hãng</span>
@@ -63,7 +63,7 @@ export function AuthLayout({
             {children}
             <p className="auth-legal-text">
               Khi tiếp tục, tôi đồng ý với các <a href="/#services">Điều khoản sử dụng</a> và{' '}
-              <a href="/#contact">Chính sách bảo mật</a> của AutoGarage Tây Sơn.
+              <a href="/#contact">Chính sách bảo mật</a> của AutoGarage.
             </p>
           </section>
         </div>

@@ -109,6 +109,18 @@ export interface SupplierPaymentInput {
   requestKey?: string;
 }
 
+export interface InvoiceBalanceItem {
+  invoiceId: string;
+  invoiceCode: string;
+  repairOrderId: string | null;
+  issuedAt: string | null;
+  dueDate: string | null;
+  status: string;
+  totalAmount: string;
+  paidAmount: string;
+  balanceAmount: string;
+}
+
 export interface CustomerDebtBalance {
   customerId: string;
   customerCode: string;
@@ -119,6 +131,11 @@ export interface CustomerDebtBalance {
   totalInvoiced: string;
   totalPaid: string;
   balanceAmount: string;
+  invoiceCount: number;
+  overdueCount: number;
+  overdueAmount: string;
+  nearestDueDate: string | null;
+  invoices: InvoiceBalanceItem[];
 }
 
 export interface SupplierDebtBalance {

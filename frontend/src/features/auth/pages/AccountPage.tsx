@@ -21,7 +21,7 @@ export function AccountPage() {
   const isCustomer = user?.role === 'CUSTOMER';
   const customer = useMyCustomerQuery(isCustomer);
   if (!user) return null;
-  const keycloakAccountUrl = `${env.keycloakPublicOrigin.replace(/\/$/, '')}/account`;
+  const keycloakAccountUrl = `${env.keycloakPublicOrigin.replace(/\/$/, '')}/account/`;
   return (
     <>
       <PageHeader
@@ -55,6 +55,11 @@ export function AccountPage() {
             <ReadOnlyField label="Vai trò">
               <RoleBadge role={user.role} />
             </ReadOnlyField>
+            {user.identityId && (
+              <ReadOnlyField label="Mã định danh (Keycloak)">
+                <code>{user.identityId}</code>
+              </ReadOnlyField>
+            )}
           </dl>
           <p className="field-hint">
             Liên hệ quản trị viên khi cần cập nhật thông tin hoặc quyền truy cập.

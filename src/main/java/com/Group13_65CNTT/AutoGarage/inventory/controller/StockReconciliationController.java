@@ -29,9 +29,12 @@ import java.util.List;
 @Tag(name = "Stock Reconciliation", description = "Đối soát số tồn thực tế và sổ kho")
 @SecurityRequirement(name = SecurityConstants.OPENAPI_SECURITY_SCHEME_NAME)
 public class StockReconciliationController {
+    private static final String PARTS_ALIAS = "/parts";
+    private static final String PART_BY_ID_ALIAS = PARTS_ALIAS + ApiPaths.BY_ID;
+
     private final InventoryService inventoryService;
 
-    @GetMapping
+    @GetMapping({"", PARTS_ALIAS})
     @PreAuthorize(SecurityConstants.HAS_ROLE_WAREHOUSE_OR_ADMIN)
     @Operation(summary = "Đối soát toàn bộ danh mục phụ tùng giữa số tồn và sổ kho")
     public ApiResponse<List<StockReconciliationResponse>> reconcileAll(HttpServletRequest http) {
@@ -41,7 +44,7 @@ public class StockReconciliationController {
                 http.getRequestURI());
     }
 
-    @GetMapping({ApiPaths.BY_ID, "/parts/{id}"})
+    @GetMapping({ApiPaths.BY_ID, PART_BY_ID_ALIAS})
     @PreAuthorize(SecurityConstants.HAS_ROLE_WAREHOUSE_OR_ADMIN)
     @Operation(summary = "Đối soát số tồn và sổ kho cho một phụ tùng")
     public ApiResponse<StockReconciliationResponse> reconcilePart(

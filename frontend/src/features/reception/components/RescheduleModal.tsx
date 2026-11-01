@@ -8,6 +8,7 @@ import type { Booking } from '../../../shared/types/contracts';
 import { useRescheduleBookingMutation } from '../hooks/useReception';
 import { rescheduleFormSchema, type RescheduleFormValues } from '../schemas/receptionSchema';
 import { CalendarClock } from 'lucide-react';
+import { BookingTimeSlotPicker } from './BookingTimeSlotPicker';
 
 export function RescheduleModal({
   booking,
@@ -26,6 +27,8 @@ export function RescheduleModal({
     handleSubmit,
     setError,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<RescheduleFormValues>({
     resolver: zodResolver(rescheduleFormSchema),
@@ -95,6 +98,17 @@ export function RescheduleModal({
               {...register('newAppointmentAt')}
             />
           </Field>
+        </div>
+
+        <div className="full-width-field">
+          <BookingTimeSlotPicker
+            value={watch('newAppointmentAt')}
+            excludeBookingId={booking.id}
+            disabled={reschedule.isPending}
+            onChange={(next) =>
+              setValue('newAppointmentAt', next, { shouldDirty: true, shouldValidate: true })
+            }
+          />
         </div>
 
         <div className="form-actions account-editor-actions">

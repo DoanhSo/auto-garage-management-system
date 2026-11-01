@@ -23,6 +23,7 @@ import {
   Modal,
   PageHeader,
   StatusBadge,
+  QueryError,
 } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
@@ -74,7 +75,7 @@ export function PartsPage() {
   const { data: suppliersData } = useSuppliersQuery({ size: 100, active: true });
   const suppliers = suppliersData?.content || [];
 
-  const { data, isLoading, isFetching } = usePartsQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = usePartsQuery({
     query: debouncedQuery.trim() || undefined,
     supplierId: supplierId ? Number(supplierId) : undefined,
     active,
@@ -489,6 +490,8 @@ export function PartsPage() {
         {/* Nội dung bảng */}
         {isLoading ? (
           <Loading label="Đang tải danh mục phụ tùng…" />
+        ) : isError ? (
+          <QueryError error={error} retry={() => refetch()} />
         ) : compact ? (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {displayList.map((p) => {

@@ -10,6 +10,8 @@ import {
   UserX,
   Calendar,
   CalendarCheck,
+  Clock,
+  List,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
@@ -37,6 +39,8 @@ import { RescheduleModal } from '../components/RescheduleModal';
 import { CancelBookingDialog } from '../components/CancelBookingDialog';
 import { VehicleCheckModal } from '../components/VehicleCheckModal';
 import { BookingCards, BookingStatusBadge } from '../components/BookingCards';
+import { BookingTimelineBoard } from '../components/BookingTimelineBoard';
+import { todayKey } from '../constants/bookingSlots';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 
 export function BookingsPage() {
@@ -49,6 +53,9 @@ export function BookingsPage() {
   const [status, setStatus] = useState('ALL');
 
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorSlot, setEditorSlot] = useState<string | undefined>();
+  const [view, setView] = useState<'list' | 'timeline'>('list');
+  const [timelineDate, setTimelineDate] = useState(todayKey);
 
   const [checkInBooking, setCheckInBooking] = useState<Booking | null>(null);
   const [checkInOpen, setCheckInOpen] = useState(false);
@@ -283,7 +290,14 @@ export function BookingsPage() {
                 Tiếp nhận vãng lai
               </Button>
             )}
-            <Button ref={createTrigger} variant="primary" onClick={() => setEditorOpen(true)}>
+            <Button
+              ref={createTrigger}
+              variant="primary"
+              onClick={() => {
+                setEditorSlot(undefined);
+                setEditorOpen(true);
+              }}
+            >
               <Plus size={16} aria-hidden />
               Đặt lịch hẹn mới
             </Button>
@@ -296,6 +310,25 @@ export function BookingsPage() {
         <span>
           Quy trình tiếp nhận xe: Đặt lịch hẹn → Xác nhận → Tiếp nhận vào xưởng → Lập biên bản kiểm tra & đính kèm ảnh hiện trạng.
         </span>
+      </div>
+
+      <div className="booking-view-switch" role="group" aria-label="Chế độ xem lịch hẹn">
+        <Button
+          variant={view === 'list' ? 'primary' : 'ghost'}
+          aria-pressed={view === 'list'}
+          onClick={() => setView('list')}
+        >
+          <List size={16} aria-hidden />
+          Danh sách lịch hẹn
+        </Button>
+        <Button
+          variant={view === 'timeline' ? 'primary' : 'ghost'}
+          aria-pressed={view === 'timeline'}
+          onClick={() => setView('timeline')}
+        >
+          <Clock size={16} aria-hidden />
+          Sơ đồ thời gian theo giờ
+        </Button>
       </div>
 
       <section className="panel table-panel">
@@ -314,6 +347,31 @@ export function BookingsPage() {
           <Loading label="Đang tải danh sách lịch hẹn…" />
         ) : isError ? (
           <QueryError error={error} retry={() => refetch()} />
+        ) : view === 'timeline' ? (
+          <BookingTimelineBoard
+            bookings={bookings}
+            selectedDate={timelineDate}
+            onDateChange={setTimelineDate}
+            canManage={canManage}
+            onQuickBookSlot={(slot) => {
+              setEditorSlot(slot);
+              setEditorOpen(true);
+            }}
+            onConfirm={handleConfirm}
+            onCheckIn={(b) => {
+              setCheckInBooking(b);
+              setCheckInOpen(true);
+            }}
+            onReschedule={(b) => {
+              setRescheduleBooking(b);
+              setRescheduleOpen(true);
+            }}
+            onCancel={(b) => {
+              setCancelBooking(b);
+              setCancelOpen(true);
+            }}
+            onNoShow={setNoShowBooking}
+          />
         ) : compact ? (
           <BookingCards
             canManage={canManage}
@@ -342,7 +400,13 @@ export function BookingsPage() {
         )}
       </section>
 
-      {editorOpen && <BookingEditor open={editorOpen} onClose={() => setEditorOpen(false)} />}
+      {editorOpen && (
+        <BookingEditor
+          open={editorOpen}
+          initialAppointmentAt={editorSlot}
+          onClose={() => setEditorOpen(false)}
+        />
+      )}
 
       {checkInOpen && (
         <CheckInModal

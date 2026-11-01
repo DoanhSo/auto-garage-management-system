@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { money } from '../../../shared/utils/format';
-import { Button, Field, Sheet } from '../../../shared/components/ui';
+import { errorMessage } from '../../../shared/api/errors';
+import { money, formatDate, formatDateTime } from '../../../shared/utils/format';
+import { Badge, Button, Field, ReadOnlyField, Sheet } from '../../../shared/components/ui';
 import { useDecideEstimateMutation, useSendEstimateMutation } from '../hooks/useEstimate';
 import type { Estimate, LineDecisionInput } from '../types/estimate';
 import { estimateStatusLabels } from '../types/estimate';
+
+type Decision = LineDecisionInput['decision'];
 
 export function EstimateDecisionModal({
   estimate,
@@ -20,12 +23,12 @@ export function EstimateDecisionModal({
   const decideMutation = useDecideEstimateMutation();
   const sendMutation = useSendEstimateMutation();
 
-  const [decisions, setDecisions] = useState<Record<string, 'APPROVED' | 'REJECTED'>>({});
+  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [decisionNote, setDecisionNote] = useState('');
 
   useEffect(() => {
     if (estimate?.items) {
-      const initial: Record<string, 'APPROVED' | 'REJECTED'> = {};
+      const initial: Record<string, Decision> = {};
       estimate.items.forEach((item) => {
         initial[item.id] = item.approvalStatus === 'REJECTED' ? 'REJECTED' : 'APPROVED';
       });
@@ -36,22 +39,10 @@ export function EstimateDecisionModal({
 
   if (!estimate) return null;
 
-  const handleToggle = (itemId: string, status: 'APPROVED' | 'REJECTED') => {
-    setDecisions((prev) => ({ ...prev, [itemId]: status }));
-  };
-
-  const handleApproveAll = () => {
-    const next: Record<string, 'APPROVED' | 'REJECTED'> = {};
+  const setAll = (decision: Decision) => {
+    const next: Record<string, Decision> = {};
     estimate.items.forEach((it) => {
-      next[it.id] = 'APPROVED';
-    });
-    setDecisions(next);
-  };
-
-  const handleRejectAll = () => {
-    const next: Record<string, 'APPROVED' | 'REJECTED'> = {};
-    estimate.items.forEach((it) => {
-      next[it.id] = 'REJECTED';
+      next[it.id] = decision;
     });
     setDecisions(next);
   };
@@ -59,142 +50,157 @@ export function EstimateDecisionModal({
   const handleSend = async () => {
     try {
       await sendMutation.mutateAsync(estimate.id);
-      notify('Đã chuyển trạng thái báo giá sang ĐÃ GỬI (SENT)');
-    } catch {
-      notify('Không thể gửi báo giá');
+      notify('Đã chuyển báo giá sang trạng thái Đã gửi khách');
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Không thể gửi báo giá');
     }
   };
 
-  const handleSubmit = async () => {
-    const payload: LineDecisionInput[] = Object.entries(decisions).map(([itemId, status]) => ({
-      itemId: Number(itemId),
-      status,
-    }));
+  const handleSubmit = async (sendFirst = false) => {
+    const note = decisionNote.trim() || undefined;
+    const pending = new Set(
+      estimate.items.filter((it) => it.approvalStatus === 'PENDING').map((it) => it.id),
+    );
+    const lines: LineDecisionInput[] = Object.entries(decisions)
+      .filter(([itemId]) => pending.has(itemId))
+      .map(([itemId, decision]) => ({ estimateItemId: Number(itemId), decision, note }));
 
     try {
-      await decideMutation.mutateAsync({
-        id: estimate.id,
-        data: {
-          decisions: payload,
-          decisionNote: decisionNote.trim() || undefined,
-        },
-      });
+      if (sendFirst) await sendMutation.mutateAsync(estimate.id);
+      await decideMutation.mutateAsync({ id: estimate.id, data: { lines } });
       notify('Đã lưu quyết định phê duyệt từng dòng báo giá');
       onClose();
-    } catch {
-      notify('Lỗi khi phê duyệt báo giá');
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Lỗi khi phê duyệt báo giá');
     }
   };
 
   const approvedTotal = estimate.items
     .filter((it) => decisions[it.id] === 'APPROVED')
-    .reduce((sum, it) => sum + (Number(it.lineTotal) || (Number(it.quantity) * Number(it.unitPrice))), 0);
+    .reduce((sum, it) => sum + (Number(it.lineTotal) || Number(it.quantity) * Number(it.unitPrice)), 0);
 
   return (
     <Sheet
       open={open}
       placement="center"
-      title={`Chi tiết & Phê duyệt Báo giá #${estimate.estimateCode}`}
-      description={`Trạng thái: ${estimateStatusLabels[estimate.status]} • Bản số: v${estimate.versionNo} (${estimate.estimateKind})`}
+      size="lg"
+      title={`Chi tiết & phê duyệt báo giá #${estimate.estimateCode}`}
+      description={`Trạng thái: ${estimateStatusLabels[estimate.status] ?? estimate.status} • Bản v${estimate.versionNo}`}
       onClose={onClose}
     >
-      <div className="space-y-4">
+      <div className="editor-form">
+        <dl className="detail-list">
+          <ReadOnlyField label="Loại báo giá">
+            {estimate.estimateKind === 'INITIAL' ? 'Ban đầu' : 'Phát sinh'}
+          </ReadOnlyField>
+          <ReadOnlyField label="Gửi khách lúc">
+            {estimate.sentAt ? formatDateTime(estimate.sentAt) : 'Chưa gửi'}
+          </ReadOnlyField>
+          <ReadOnlyField label="Hiệu lực đến">
+            {estimate.validUntil ? formatDate(estimate.validUntil) : 'Không giới hạn'}
+          </ReadOnlyField>
+          <ReadOnlyField label="Ghi chú">{estimate.notes || '—'}</ReadOnlyField>
+        </dl>
+
         {estimate.status === 'DRAFT' && (
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg flex justify-between items-center text-xs">
-            <span>Báo giá đang ở trạng thái <strong>Bản nháp</strong>. Gửi cho khách để chính thức bắt đầu duyệt.</span>
+          <div className="info-strip">
+            <span>
+              Báo giá đang là <strong>bản nháp</strong>. Gửi cho khách để bắt đầu duyệt.
+            </span>
             <Button variant="primary" onClick={handleSend} pending={sendMutation.isPending}>
               Gửi khách hàng
             </Button>
           </div>
         )}
 
-        <div className="flex justify-between items-center text-xs text-muted-foreground pt-1">
-          <span>Duyệt từng dòng: Dòng <strong>APPROVED</strong> sẽ tự động tạo Task sửa chữa & giữ phụ tùng trong kho.</span>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleApproveAll}>
+        <div className="estimate-lines-head">
+          <span>Duyệt từng dòng — dòng được duyệt sẽ tạo việc sửa chữa và giữ phụ tùng trong kho</span>
+          <div className="row-actions">
+            <Button variant="secondary" onClick={() => setAll('APPROVED')}>
               Duyệt tất cả
             </Button>
-            <Button variant="secondary" onClick={handleRejectAll}>
+            <Button variant="secondary" onClick={() => setAll('REJECTED')}>
               Từ chối tất cả
             </Button>
           </div>
         </div>
 
-        {/* Danh sách dòng duyệt */}
-        <div className="space-y-2 max-h-[300px] overflow-y-auto border rounded-lg p-2 bg-card">
+        <div className="estimate-lines">
           {estimate.items.map((it) => {
-            const currentDecision = decisions[it.id] || 'APPROVED';
+            const current = decisions[it.id] ?? 'APPROVED';
             return (
               <div
                 key={it.id}
-                className={`p-3 border rounded-lg flex flex-wrap justify-between items-center gap-2 transition-colors ${
-                  currentDecision === 'APPROVED' ? 'bg-green-50/40 dark:bg-green-950/20 border-green-200' : 'bg-red-50/40 dark:bg-red-950/20 border-red-200'
+                className={`estimate-decision-row ${
+                  current === 'APPROVED' ? 'is-approved' : 'is-rejected'
                 }`}
               >
-                <div>
-                  <div className="font-semibold text-sm flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded font-normal ${it.itemType === 'SERVICE' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>
+                <div className="estimate-decision-meta">
+                  <strong>
+                    <Badge variant={it.itemType === 'SERVICE' ? 'primary' : 'warning'}>
                       {it.itemType === 'SERVICE' ? 'Dịch vụ' : 'Phụ tùng'}
-                    </span>
+                    </Badge>{' '}
                     {it.itemName}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-0.5">
-                    Số lượng: {it.quantity} {it.unit} • Đơn giá: {money(it.unitPrice)} • Thành tiền: <strong className="text-foreground">{money(it.lineTotal || it.quantity * it.unitPrice)}</strong>
-                  </div>
+                  </strong>
+                  <span>
+                    {it.quantity} {it.unit} × {money(it.unitPrice)} ={' '}
+                    <strong>{money(it.lineTotal || it.quantity * it.unitPrice)}</strong>
+                  </span>
+                  {(it.warrantyDays || it.warrantyKm || it.reservedQuantity) && (
+                    <span className="muted">
+                      {it.warrantyDays ? `Bảo hành ${it.warrantyDays} ngày` : ''}
+                      {it.warrantyKm ? ` / ${it.warrantyKm.toLocaleString('vi-VN')} km` : ''}
+                      {it.reservedQuantity ? ` · Đã giữ kho ${it.reservedQuantity} ${it.unit}` : ''}
+                    </span>
+                  )}
                 </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleToggle(it.id, 'APPROVED')}
-                    className={`px-3 py-1 text-xs rounded-md font-medium flex items-center gap-1 transition-all ${
-                      currentDecision === 'APPROVED'
-                        ? 'bg-green-600 text-white shadow-sm'
-                        : 'bg-muted text-muted-foreground hover:bg-green-100'
-                    }`}
+                <div className="estimate-decision-actions">
+                  <Button
+                    variant={current === 'APPROVED' ? 'primary' : 'ghost'}
+                    disabled={it.approvalStatus !== 'PENDING'}
+                    aria-pressed={current === 'APPROVED'}
+                    onClick={() => setDecisions((prev) => ({ ...prev, [it.id]: 'APPROVED' }))}
                   >
                     <Check size={13} /> Duyệt
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleToggle(it.id, 'REJECTED')}
-                    className={`px-3 py-1 text-xs rounded-md font-medium flex items-center gap-1 transition-all ${
-                      currentDecision === 'REJECTED'
-                        ? 'bg-red-600 text-white shadow-sm'
-                        : 'bg-muted text-muted-foreground hover:bg-red-100'
-                    }`}
+                  </Button>
+                  <Button
+                    variant={current === 'REJECTED' ? 'primary' : 'ghost'}
+                    className={current === 'REJECTED' ? 'delete-action' : undefined}
+                    disabled={it.approvalStatus !== 'PENDING'}
+                    aria-pressed={current === 'REJECTED'}
+                    onClick={() => setDecisions((prev) => ({ ...prev, [it.id]: 'REJECTED' }))}
                   >
                     <X size={13} /> Bỏ qua
-                  </button>
+                  </Button>
                 </div>
               </div>
             );
           })}
         </div>
 
-        <div className="p-3 bg-muted/40 rounded-lg flex justify-between items-center text-sm">
-          <span>Tổng dự toán được duyệt:</span>
-          <span className="text-lg font-bold text-green-600 dark:text-green-400">{money(approvedTotal)}</span>
+        <div className="estimate-total">
+          <span>Tổng dự toán được duyệt</span>
+          <span>{money(approvedTotal)}</span>
         </div>
 
         <Field label="Ghi chú phê duyệt">
           <input
             type="text"
             className="input"
-            placeholder="Ghi chú ý kiến khách hàng, thỏa thuận thanh toán..."
+            placeholder="Ý kiến của khách hàng, thỏa thuận thanh toán..."
             value={decisionNote}
             onChange={(e) => setDecisionNote(e.target.value)}
           />
         </Field>
 
-        <div className="form-actions account-editor-actions pt-2 border-t">
+        <div className="form-actions account-editor-actions">
           <Button onClick={onClose}>Đóng</Button>
           <Button
             variant="primary"
-            pending={decideMutation.isPending}
-            onClick={handleSubmit}
+            pending={decideMutation.isPending || sendMutation.isPending}
+            onClick={() => handleSubmit(estimate.status === 'DRAFT')}
           >
-            Lưu quyết định phê duyệt
+            {estimate.status === 'DRAFT' ? 'Gửi khách & lưu phê duyệt' : 'Lưu quyết định phê duyệt'}
           </Button>
         </div>
       </div>

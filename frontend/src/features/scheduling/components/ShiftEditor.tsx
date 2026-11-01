@@ -3,14 +3,24 @@ import { useToast } from '../../../app/providers/ToastProvider';
 import { Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/components/ui';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { ApiError, errorMessage } from '../../../shared/api/errors';
+import { useUsersQuery } from '../../identity/hooks/useUsers';
 import { useCreateShiftMutation, useSchedulingEmployeesQuery } from '../hooks/useScheduling';
+import { SKILL_LABELS, parseSkills } from '../types/scheduling';
+
+const SHIFT_PRESETS = [
+  { label: 'Ca sáng 08:00–12:00', start: '08:00', end: '12:00' },
+  { label: 'Ca chiều 13:00–17:30', start: '13:00', end: '17:30' },
+  { label: 'Cả ngày 08:00–17:30', start: '08:00', end: '17:30' },
+];
 
 export function ShiftEditor({
   open,
+  initialEmployeeId,
   onClose,
   onSaved,
 }: {
   open: boolean;
+  initialEmployeeId?: string | number | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -24,10 +34,18 @@ export function ShiftEditor({
   const [notes, setNotes] = useState('');
 
   const { data: employees = [] } = useSchedulingEmployeesQuery({ active: true });
+  const users = useUsersQuery({ page: 0, size: 100, sortBy: 'fullName', sortDir: 'asc' });
+  const userNames = new Map((users.data?.content ?? []).map((u) => [String(u.id), u.fullName] as const));
+
+  const applyPreset = (start: string, end: string) => {
+    const day = startsAt.slice(0, 10);
+    setStartsAt(`${day}T${start}`);
+    setEndsAt(`${day}T${end}`);
+  };
 
   useEffect(() => {
     if (open) {
-      setEmployeeId('');
+      setEmployeeId(initialEmployeeId ? String(initialEmployeeId) : '');
       // Mặc định ca hôm nay theo giờ địa phương 08:00 đến 17:00
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
@@ -37,7 +55,7 @@ export function ShiftEditor({
       setNotes('');
       setDiscard(false);
     }
-  }, [open]);
+  }, [open, initialEmployeeId]);
 
   const isDirty = !!employeeId;
   const busy = createMutation.isPending;
@@ -107,11 +125,30 @@ export function ShiftEditor({
                 <option value="">-- Chọn kỹ thuật viên --</option>
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
-                    {emp.employeeCode} {emp.canQc ? '(Có quyền QC)' : ''}
+                    {userNames.get(String(emp.userId)) ?? emp.employeeCode} · {emp.employeeCode}
+                    {parseSkills(emp.skillsJson).length > 0 &&
+                      ` · ${parseSkills(emp.skillsJson)
+                        .map((s) => SKILL_LABELS[s] ?? s)
+                        .join(', ')}`}
+                    {emp.canQc ? ' · QC' : ''}
                   </option>
                 ))}
               </select>
             </Field>
+          </div>
+
+          <div className="full-width-field row-actions" aria-label="Chọn nhanh ca chuẩn">
+            {SHIFT_PRESETS.map((p) => (
+              <Button
+                key={p.label}
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => applyPreset(p.start, p.end)}
+              >
+                {p.label}
+              </Button>
+            ))}
           </div>
 
           <Field label="Thời gian bắt đầu ca" required>

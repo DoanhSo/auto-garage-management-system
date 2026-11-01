@@ -8,6 +8,7 @@ import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.util.PasswordPolicy;
+import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
 import com.Group13_65CNTT.AutoGarage.identity.service.KeycloakIdentityService;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class RegistrationServiceTest {
     @Mock KeycloakIdentityService identities;
     @Mock PasswordPolicy passwordPolicy;
+    @Mock UserRepository users;
     @InjectMocks RegistrationServiceImpl service;
 
     @Test
@@ -32,6 +34,14 @@ class RegistrationServiceTest {
         var order = inOrder(passwordPolicy, identities);
         order.verify(passwordPolicy).validateNewPassword("  test-password-123  ");
         order.verify(identities).createOrLinkUser("customer.one", "customer@gmail.com", "Customer Name", Role.CUSTOMER, "  test-password-123  ");
+    }
+
+    @Test
+    void localDuplicateEmailOrUsernameNeverCreatesAnIdentity() {
+        when(users.existsByEmail(anyString())).thenReturn(true);
+        assertThatThrownBy(() -> service.register(request())).isInstanceOfSatisfying(BusinessException.class,
+                error -> assertThat(error.getResponseCode()).isEqualTo(ResponseCode.DUPLICATE_RESOURCE));
+        verifyNoInteractions(identities);
     }
 
     @Test

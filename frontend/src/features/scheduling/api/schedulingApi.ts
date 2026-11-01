@@ -8,6 +8,9 @@ import type {
   Shift,
   ShiftCreateInput,
   ShiftStatus,
+  MaintenanceInput,
+  EmployeeCreateInput,
+  EmployeeUpdateInput,
 } from '../types/scheduling';
 
 export const schedulingApi = {
@@ -39,7 +42,7 @@ export const schedulingApi = {
       '/service-bays' +
         queryString({
           keyword: params?.keyword,
-          active: params?.active,
+          isActive: params?.active,
           page: params?.page ?? 0,
           size: params?.size ?? 50,
           sortBy: 'bayCode',
@@ -87,11 +90,27 @@ export const schedulingApi = {
     request<Page<Employee>>(
       '/employees' +
         queryString({
-          active: params?.active,
+          isActive: params?.active,
           page: params?.page ?? 0,
           size: params?.size ?? 50,
         }),
     ),
+
+
+  scheduleMaintenance: (bayId: string | number, data: MaintenanceInput) =>
+    request<BayReservation>(`/service-bays/${bayId}/maintenance`, {
+      method: 'POST',
+      body: data,
+    }),
+
+  createEmployee: (data: EmployeeCreateInput) =>
+    request<Employee>('/employees', { method: 'POST', body: data }),
+
+  updateEmployee: (id: string | number, data: EmployeeUpdateInput) =>
+    request<Employee>(`/employees/${id}`, { method: 'PUT', body: data }),
+
+  deactivateEmployee: (id: string | number) =>
+    request<void>(`/employees/${id}`, { method: 'DELETE' }),
 
   // Shifts
   listShifts: (params?: {
