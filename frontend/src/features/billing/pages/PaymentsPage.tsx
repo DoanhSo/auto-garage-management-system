@@ -12,7 +12,15 @@ import {
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
-import { Badge, Button, Field, Loading, Modal, PageHeader } from '../../../shared/components/ui';
+import {
+  Badge,
+  Button,
+  Field,
+  Loading,
+  Modal,
+  PageHeader,
+  QueryError,
+} from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
@@ -69,7 +77,7 @@ export function PaymentsPage() {
   });
   const supplierDocuments = documentsData?.content || [];
 
-  const { data, isLoading, isFetching } = usePaymentsQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = usePaymentsQuery({
     direction: direction || undefined,
     query: debouncedQuery.trim() || undefined,
     page,
@@ -384,6 +392,8 @@ export function PaymentsPage() {
         {/* Nội dung bảng */}
         {isLoading ? (
           <Loading label="Đang tải dữ liệu sổ quỹ…" />
+        ) : isError ? (
+          <QueryError error={error} retry={() => refetch()} />
         ) : compact ? (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {paymentsList.map((p) => {

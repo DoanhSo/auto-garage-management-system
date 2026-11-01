@@ -410,9 +410,13 @@ export interface NoticeBroadcastResult {
 export interface AuditEvent {
   id: string;
   actorUserId: string | null;
+  actorFullName?: string | null;
+  actorUsername?: string | null;
+  actorRole?: Role | null;
   action: string;
   entityType: string;
   entityId: string | null;
+  entityLabel?: string | null;
   afterJson: string | null;
   createdAt: string;
 }

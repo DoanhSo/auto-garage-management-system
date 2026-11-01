@@ -7,6 +7,7 @@ import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.util.PasswordPolicy;
+import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
 import com.Group13_65CNTT.AutoGarage.identity.service.KeycloakIdentityService;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 public class RegistrationServiceImpl implements RegistrationService {
     private final KeycloakIdentityService keycloakIdentityService;
     private final PasswordPolicy passwordPolicy;
+    private final UserRepository userRepository;
 
     @Override
     @PreAuthorize(SecurityConstants.PERMIT_ALL)
@@ -27,6 +29,10 @@ public class RegistrationServiceImpl implements RegistrationService {
         passwordPolicy.validateNewPassword(request.getPassword());
         String username = request.getUsername().strip().toLowerCase(Locale.ROOT);
         String email = request.getEmail().strip().toLowerCase(Locale.ROOT);
+        // Chặn trùng trong MySQL trước khi tạo danh tính trên Keycloak để không để lại tài khoản mồ côi.
+        if (userRepository.existsByUsername(username) || userRepository.existsByEmail(email)) {
+            throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
+        }
         // Keycloak owns credentials; the existing authenticated /me flow provisions
         // the garage CUSTOMER and customer profile after the first successful login.
         keycloakIdentityService.createOrLinkUser(

@@ -1,5 +1,7 @@
 import { request, queryString } from '../../../shared/api/client';
 import type { Page } from '../../../shared/types/contracts';
+import { customerApi } from '../../customer/api/customerApi';
+import type { Supplier } from '../../inventory/types/inventory';
 import type {
   Invoice,
   InvoiceIssueInput,
@@ -8,6 +10,7 @@ import type {
   PaymentReceiveInput,
   SupplierPaymentInput,
   CustomerDebtBalance,
+  InvoiceBalanceItem,
   SupplierDebtBalance,
   InvoiceStatus,
   PaymentDirection,
@@ -46,7 +49,7 @@ export const billingApi = {
     request<Invoice>(`/billing/invoices/order/${orderId}`),
 
   issueInvoice: (data: InvoiceIssueInput) =>
-    request<Invoice>('/billing/invoices', {
+    request<Invoice>('/billing/invoices/issue', {
       method: 'POST',
       body: data,
     }),
@@ -83,13 +86,13 @@ export const billingApi = {
     ),
 
   receiveCustomerPayment: (data: PaymentReceiveInput) =>
-    request<Payment>('/billing/payments/customer', {
+    request<Payment>('/billing/payments/receive', {
       method: 'POST',
       body: data,
     }),
 
   paySupplier: (data: SupplierPaymentInput) =>
-    request<Payment>('/billing/payments/supplier', {
+    request<Payment>('/billing/payments/pay-supplier', {
       method: 'POST',
       body: data,
     }),
@@ -101,7 +104,8 @@ export const billingApi = {
     request<Payment[]>(`/billing/payments/document/${documentId}`),
 
   // Debts
-  getCustomerDebts: (params: {
+  // Backend chỉ có sổ theo hóa đơn (v_invoice_balances) nên công nợ khách hàng được gộp theo customerId.
+  getCustomerDebts: async (params: {
     customerId?: string | number;
     hasBalance?: boolean;
     query?: string;
@@ -109,37 +113,159 @@ export const billingApi = {
     size?: number;
     sortBy?: string;
     sortDir?: string;
-  }) =>
-    request<Page<CustomerDebtBalance>>(
-      '/billing/debts/customers' +
-        queryString({
-          customerId: params.customerId,
-          hasBalance: params.hasBalance,
-          query: params.query,
-          page: params.page ?? 0,
-          size: params.size ?? 20,
-          sortBy: params.sortBy ?? 'id',
-          sortDir: params.sortDir ?? 'desc',
-        }),
-    ),
+  }): Promise<Page<CustomerDebtBalance>> => {
+    const [customers, invoices] = await Promise.all([
+      customerApi.list({ isActive: true }),
+      request<Page<InvoiceBalanceRow>>(
+        '/billing/debts/invoices' +
+          queryString({
+            customerId: params.customerId,
+            page: 0,
+            size: DEBT_FETCH_SIZE,
+            sortBy: 'issuedAt',
+            sortDir: 'desc',
+          }),
+      ),
+    ]);
+    const totals = new Map<
+      string,
+      { invoiced: number; paid: number; balance: number; items: InvoiceBalanceItem[] }
+    >();
+    for (const invoice of invoices.content) {
+      const sum = totals.get(invoice.customerId) ?? { invoiced: 0, paid: 0, balance: 0, items: [] };
+      sum.invoiced += Number(invoice.totalAmount ?? 0);
+      sum.paid += Number(invoice.paidAmount ?? 0);
+      sum.balance += Number(invoice.balanceAmount ?? 0);
+      sum.items.push({
+        invoiceId: invoice.invoiceId,
+        invoiceCode: invoice.invoiceCode,
+        repairOrderId: invoice.repairOrderId ?? null,
+        issuedAt: invoice.issuedAt ?? null,
+        dueDate: invoice.dueDate ?? null,
+        status: invoice.status ?? '',
+        totalAmount: String(invoice.totalAmount ?? 0),
+        paidAmount: String(invoice.paidAmount ?? 0),
+        balanceAmount: String(invoice.balanceAmount ?? 0),
+      });
+      totals.set(invoice.customerId, sum);
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const keyword = params.query?.trim().toLowerCase();
+    let rows: CustomerDebtBalance[] = customers
+      .filter((customer) => !params.customerId || customer.id === String(params.customerId))
+      .map((customer) => {
+        const sum = totals.get(customer.id) ?? { invoiced: 0, paid: 0, balance: 0, items: [] };
+        const open = sum.items.filter((item) => Number(item.balanceAmount) > 0);
+        const overdue = open.filter((item) => item.dueDate && item.dueDate.slice(0, 10) < today);
+        const dueDates = open.map((item) => item.dueDate).filter((d): d is string => !!d).sort();
+        return {
+          customerId: customer.id,
+          customerCode: customer.customerCode,
+          customerName: customer.fullName,
+          phone: customer.phone,
+          creditLimit: customer.creditLimit,
+          paymentTermDays: customer.paymentTermDays,
+          totalInvoiced: String(sum.invoiced),
+          totalPaid: String(sum.paid),
+          balanceAmount: String(sum.balance),
+          invoiceCount: open.length,
+          overdueCount: overdue.length,
+          overdueAmount: String(overdue.reduce((s, i) => s + Number(i.balanceAmount), 0)),
+          nearestDueDate: dueDates[0] ?? null,
+          invoices: sum.items,
+        };
+      })
+      .filter((row) => !params.hasBalance || Number(row.balanceAmount) > 0)
+      .filter(
+        (row) =>
+          !keyword ||
+          row.customerName.toLowerCase().includes(keyword) ||
+          row.customerCode.toLowerCase().includes(keyword) ||
+          (row.phone ?? '').includes(keyword),
+      );
+    const sortKey = (params.sortBy ?? 'balanceAmount') as keyof CustomerDebtBalance;
+    const direction = params.sortDir === 'asc' ? 1 : -1;
+    rows = rows.sort((a, b) => {
+      const left = a[sortKey];
+      const right = b[sortKey];
+      return typeof left === 'string' && Number.isNaN(Number(left))
+        ? direction * left.localeCompare(String(right), 'vi')
+        : direction * (Number(left) - Number(right));
+    });
+    return toPage(rows, params.page ?? 0, params.size ?? 20);
+  },
 
-  getSupplierDebts: (params: {
+  getSupplierDebts: async (params: {
     hasBalance?: boolean;
     query?: string;
     page?: number;
     size?: number;
     sortBy?: string;
     sortDir?: string;
-  }) =>
-    request<Page<SupplierDebtBalance>>(
-      '/billing/debts/suppliers' +
-        queryString({
-          hasBalance: params.hasBalance,
-          query: params.query,
-          page: params.page ?? 0,
-          size: params.size ?? 20,
-          sortBy: params.sortBy ?? 'id',
-          sortDir: params.sortDir ?? 'desc',
-        }),
-    ),
+  }): Promise<Page<SupplierDebtBalance>> => {
+    const [balances, suppliers] = await Promise.all([
+      request<Page<SupplierBalanceRow>>(
+        '/billing/debts/suppliers' +
+          queryString({
+            hasBalance: params.hasBalance,
+            query: params.query,
+            page: params.page ?? 0,
+            size: params.size ?? 20,
+            sortBy: params.sortBy ?? 'supplierName',
+            sortDir: params.sortDir ?? 'asc',
+          }),
+      ),
+      request<Page<Supplier>>(
+        '/inventory/suppliers' + queryString({ page: 0, size: DEBT_FETCH_SIZE }),
+      ),
+    ]);
+    const directory = new Map(suppliers.content.map((supplier) => [supplier.id, supplier]));
+    return {
+      ...balances,
+      content: balances.content.map((row) => ({
+        supplierId: row.supplierId,
+        supplierCode: row.supplierCode,
+        supplierName: row.supplierName,
+        phone: directory.get(row.supplierId)?.phone ?? null,
+        paymentTermDays: directory.get(row.supplierId)?.paymentTermDays ?? 0,
+        totalPurchased: String(row.purchaseAmount ?? 0),
+        totalPaid: String(row.paidAmount ?? 0),
+        balanceAmount: String(row.balanceAmount ?? 0),
+      })),
+    };
+  },
 };
+
+const DEBT_FETCH_SIZE = 100;
+
+interface InvoiceBalanceRow {
+  invoiceId: string;
+  invoiceCode: string;
+  repairOrderId?: string | null;
+  issuedAt?: string | null;
+  dueDate?: string | null;
+  status?: string;
+  customerId: string;
+  totalAmount: string | number;
+  paidAmount: string | number;
+  balanceAmount: string | number;
+}
+
+interface SupplierBalanceRow {
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  purchaseAmount: string | number | null;
+  paidAmount: string | number | null;
+  balanceAmount: string | number | null;
+}
+
+function toPage<T>(rows: T[], page: number, size: number): Page<T> {
+  return {
+    content: rows.slice(page * size, page * size + size),
+    totalElements: String(rows.length),
+    totalPages: Math.max(1, Math.ceil(rows.length / size)),
+    number: page,
+    size,
+  };
+}

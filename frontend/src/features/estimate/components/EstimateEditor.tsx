@@ -1,12 +1,27 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
+import { errorMessage } from '../../../shared/api/errors';
 import { money } from '../../../shared/utils/format';
-import { Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/components/ui';
+import { Badge, Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/components/ui';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { useRepairOrdersQuery } from '../../repair/hooks/useRepair';
 import { useCreateEstimateMutation } from '../hooks/useEstimate';
 import type { EstimateKind, EstimateItemCreateInput, ItemType } from '../types/estimate';
+import { EstimateLinePicker, type PickedCatalogLine } from './EstimateLinePicker';
+
+const DEFAULT_VALID_DAYS = 7;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const emptyItem = (itemType: ItemType): EstimateItemCreateInput => ({
+  itemType,
+  serviceId: null,
+  partId: null,
+  itemName: '',
+  unit: '',
+  quantity: 1,
+  unitPrice: 0,
+});
 
 export function EstimateEditor({
   open,
@@ -21,24 +36,12 @@ export function EstimateEditor({
   const createMutation = useCreateEstimateMutation();
   const [discard, setDiscard] = useState(false);
 
-  // Form states
   const [repairOrderId, setRepairOrderId] = useState<string>('');
   const [estimateKind, setEstimateKind] = useState<EstimateKind>('INITIAL');
   const [notes, setNotes] = useState('');
-  const [validDays, setValidDays] = useState(7);
+  const [validDays, setValidDays] = useState(DEFAULT_VALID_DAYS);
+  const [items, setItems] = useState<EstimateItemCreateInput[]>([emptyItem('SERVICE')]);
 
-  // Line items state
-  const [items, setItems] = useState<EstimateItemCreateInput[]>([
-    {
-      itemType: 'SERVICE',
-      itemName: 'Công khám & chẩn đoán tổng quát',
-      unit: 'Gói',
-      quantity: 1,
-      unitPrice: 200000,
-    },
-  ]);
-
-  // Active repair orders
   const { data: ordersData } = useRepairOrdersQuery({ size: 100 });
   const orders = ordersData?.content ?? [];
 
@@ -47,49 +50,30 @@ export function EstimateEditor({
       setRepairOrderId('');
       setEstimateKind('INITIAL');
       setNotes('');
-      setValidDays(7);
-      setItems([
-        {
-          itemType: 'SERVICE',
-          itemName: 'Công khám & chẩn đoán tổng quát',
-          unit: 'Gói',
-          quantity: 1,
-          unitPrice: 200000,
-        },
-      ]);
+      setValidDays(DEFAULT_VALID_DAYS);
+      setItems([emptyItem('SERVICE')]);
       setDiscard(false);
     }
   }, [open]);
 
-  const isDirty = !!repairOrderId || items.length > 1;
+  const isDirty = !!repairOrderId || items.length > 1 || items.some((item) => item.itemName);
   const busy = createMutation.isPending;
   const blocker = useUnsavedChangesGuard(isDirty && !busy);
 
-  const handleAddItem = (type: ItemType) => {
-    setItems((prev) => [
-      ...prev,
-      {
-        itemType: type,
-        itemName: type === 'SERVICE' ? 'Công dịch vụ mới' : 'Phụ tùng thay thế',
-        unit: type === 'SERVICE' ? 'Lượt' : 'Cái',
-        quantity: 1,
-        unitPrice: type === 'SERVICE' ? 150000 : 350000,
-      },
-    ]);
-  };
+  const updateItem = (index: number, patch: Partial<EstimateItemCreateInput>) =>
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+
+  const pickCatalog = (index: number, line: PickedCatalogLine) => updateItem(index, line);
 
   const handleRemoveItem = (index: number) => {
     if (items.length <= 1) return;
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleItemChange = (index: number, field: keyof EstimateItemCreateInput, val: string | number) => {
-    setItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: val } : item)),
-    );
-  };
-
-  const subtotal = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
+  const subtotal = items.reduce(
+    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+    0,
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,8 +81,11 @@ export function EstimateEditor({
       notify('Vui lòng chọn Lệnh sửa chữa');
       return;
     }
-    if (items.length === 0) {
-      notify('Báo giá phải có ít nhất một hạng mục');
+    const missing = items.findIndex((item) =>
+      item.itemType === 'SERVICE' ? !item.serviceId : !item.partId,
+    );
+    if (missing >= 0) {
+      notify(`Hạng mục ${missing + 1}: hãy chọn dịch vụ hoặc phụ tùng từ danh mục.`);
       return;
     }
 
@@ -107,18 +94,18 @@ export function EstimateEditor({
         repairOrderId: Number(repairOrderId),
         estimateKind,
         notes: notes.trim() || undefined,
-        validDays: Number(validDays),
-        items: items.map((it) => ({
-          ...it,
-          quantity: Number(it.quantity),
-          unitPrice: Number(it.unitPrice),
+        validUntil: new Date(Date.now() + Number(validDays) * MS_PER_DAY).toISOString(),
+        items: items.map((item) => ({
+          ...item,
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
         })),
       });
       notify('Lập báo giá thành công');
       onSaved();
       onClose();
-    } catch {
-      notify('Không thể tạo báo giá');
+    } catch (err: unknown) {
+      notify(errorMessage(err) ?? 'Không thể tạo báo giá');
     }
   };
 
@@ -133,12 +120,13 @@ export function EstimateEditor({
       <Sheet
         open={open}
         placement="center"
+        size="lg"
         title="Lập báo giá dịch vụ & phụ tùng"
         description="Lập bản dự toán chi phí sửa chữa và thời hạn bảo hành gửi khách duyệt"
         onClose={handleClose}
       >
         <form onSubmit={handleSubmit} noValidate className="editor-form account-editor-form">
-          <FormError message={createMutation.error?.message} />
+          <FormError message={createMutation.error ? errorMessage(createMutation.error) : undefined} />
 
           <div className="form-section-label">THÔNG TIN CHUNG BÁO GIÁ</div>
 
@@ -150,10 +138,10 @@ export function EstimateEditor({
               disabled={busy}
               required
             >
-              <option value="">-- Chọn phiếu sửa chữa --</option>
+              <option value="">Chọn phiếu sửa chữa</option>
               {orders.map((o) => (
                 <option key={o.id} value={o.id}>
-                  #{o.orderCode} (Xe: {o.vehicleId})
+                  #{o.orderCode} · {o.status}
                 </option>
               ))}
             </select>
@@ -166,12 +154,12 @@ export function EstimateEditor({
               onChange={(e) => setEstimateKind(e.target.value as EstimateKind)}
               disabled={busy}
             >
-              <option value="INITIAL">Báo giá ban đầu (INITIAL)</option>
-              <option value="SUPPLEMENTAL">Báo giá phát sinh thêm (SUPPLEMENTAL)</option>
+              <option value="INITIAL">Báo giá ban đầu</option>
+              <option value="SUPPLEMENTAL">Báo giá phát sinh thêm</option>
             </select>
           </Field>
 
-          <Field label="Hiệu lực báo giá (Số ngày)">
+          <Field label="Hiệu lực báo giá (số ngày)">
             <input
               type="number"
               min="1"
@@ -194,77 +182,95 @@ export function EstimateEditor({
             />
           </Field>
 
-          {/* Danh sách các dòng báo giá */}
-          <div className="full-width-field space-y-2 mt-2">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-semibold text-muted-foreground uppercase">Hạng mục báo giá</span>
-              <div className="flex gap-2">
-                <Button type="button" variant="secondary" onClick={() => handleAddItem('SERVICE')}>
-                  <Plus size={13} /> Thêm Dịch vụ
+          <div className="full-width-field estimate-lines">
+            <div className="estimate-lines-head">
+              <span>Hạng mục báo giá ({items.length})</span>
+              <div className="row-actions">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setItems((prev) => [...prev, emptyItem('SERVICE')])}
+                >
+                  <Plus size={13} /> Thêm dịch vụ
                 </Button>
-                <Button type="button" variant="secondary" onClick={() => handleAddItem('PART')}>
-                  <Plus size={13} /> Thêm Phụ tùng
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setItems((prev) => [...prev, emptyItem('PART')])}
+                >
+                  <Plus size={13} /> Thêm phụ tùng
                 </Button>
               </div>
             </div>
 
-            <div className="space-y-2 max-h-[220px] overflow-y-auto border rounded-lg p-2 bg-card/40">
-              {items.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center p-2 border rounded bg-card text-xs">
-                  <div className="md:col-span-2">
-                    <span className={`px-2 py-0.5 rounded font-medium ${item.itemType === 'SERVICE' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>
-                      {item.itemType === 'SERVICE' ? 'Dịch vụ' : 'Phụ tùng'}
-                    </span>
-                  </div>
-                  <div className="md:col-span-4">
-                    <input
-                      type="text"
-                      className="input text-xs py-1"
-                      placeholder="Tên hạng mục"
-                      value={item.itemName}
-                      onChange={(e) => handleItemChange(idx, 'itemName', e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="md:col-span-2">
+            {items.map((item, idx) => (
+              <div key={idx} className="estimate-line">
+                <div className="estimate-line-main">
+                  <Badge variant={item.itemType === 'SERVICE' ? 'primary' : 'warning'}>
+                    {item.itemType === 'SERVICE' ? 'Dịch vụ' : 'Phụ tùng'}
+                  </Badge>
+                  <EstimateLinePicker
+                    itemType={item.itemType}
+                    serviceId={item.serviceId}
+                    partId={item.partId}
+                    disabled={busy}
+                    onPick={(line) => pickCatalog(idx, line)}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="delete-action"
+                    aria-label={`Xóa hạng mục ${idx + 1}`}
+                    onClick={() => handleRemoveItem(idx)}
+                    disabled={items.length <= 1 || busy}
+                  >
+                    <Trash2 size={15} />
+                  </Button>
+                </div>
+                <div className="estimate-line-fields">
+                  <label>
+                    Đơn vị
+                    <input className="input" value={item.unit} readOnly tabIndex={-1} />
+                  </label>
+                  <label>
+                    Số lượng
                     <input
                       type="number"
                       min="1"
-                      className="input text-xs py-1"
-                      placeholder="Số lượng"
+                      className="input"
                       value={item.quantity}
-                      onChange={(e) => handleItemChange(idx, 'quantity', e.target.value)}
-                      required
+                      onChange={(e) => updateItem(idx, { quantity: Number(e.target.value) })}
+                      disabled={busy}
                     />
-                  </div>
-                  <div className="md:col-span-3">
+                  </label>
+                  <label>
+                    Đơn giá
                     <input
                       type="number"
-                      step="50000"
                       min="0"
-                      className="input text-xs py-1"
-                      placeholder="Đơn giá"
+                      step="1000"
+                      className="input"
                       value={item.unitPrice}
-                      onChange={(e) => handleItemChange(idx, 'unitPrice', e.target.value)}
-                      required
+                      onChange={(e) => updateItem(idx, { unitPrice: Number(e.target.value) })}
+                      disabled={busy}
                     />
-                  </div>
-                  <div className="md:col-span-1 text-right">
-                    <button
-                      type="button"
-                      className="text-red-500 hover:text-red-700 p-1"
-                      onClick={() => handleRemoveItem(idx)}
-                      disabled={items.length <= 1}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+                  </label>
+                  <label>
+                    Thành tiền
+                    <input
+                      className="input"
+                      readOnly
+                      tabIndex={-1}
+                      value={money((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0))}
+                    />
+                  </label>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
 
-            <div className="text-right text-sm font-semibold pt-1">
-              Tổng cộng dự toán: <span className="text-primary text-base">{money(subtotal)}</span>
+            <div className="estimate-total">
+              <span>Tổng cộng dự toán</span>
+              <span>{money(subtotal)}</span>
             </div>
           </div>
 
@@ -273,7 +279,7 @@ export function EstimateEditor({
               Hủy
             </Button>
             <Button variant="primary" type="submit" pending={busy}>
-              {busy ? 'Đang tạo…' : 'Lập Báo giá'}
+              {busy ? 'Đang tạo…' : 'Lập báo giá'}
             </Button>
           </div>
         </form>

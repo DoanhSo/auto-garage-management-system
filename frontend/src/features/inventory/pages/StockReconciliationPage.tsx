@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Badge, Button, Loading, PageHeader } from '../../../shared/components/ui';
+import { Badge, Button, Loading, PageHeader, QueryError } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
@@ -26,7 +26,7 @@ export function StockReconciliationPage() {
   const debouncedQuery = useDebouncedValue(query);
   const [filterDiscrepancyOnly, setFilterDiscrepancyOnly] = useState(false);
 
-  const { data, isLoading, refetch, isFetching } = useReconciliationQuery();
+  const { data, isLoading, isError, error, refetch, isFetching } = useReconciliationQuery();
 
   const reconciliations = useMemo(() => data ?? [], [data]);
   const matchedCount = reconciliations.filter((r) => r.matched).length;
@@ -296,14 +296,22 @@ export function StockReconciliationPage() {
         {/* Nội dung đối soát */}
         {isLoading ? (
           <Loading label="Đang kiểm tra và đối soát sổ kho…" />
+        ) : isError ? (
+          <QueryError error={error} retry={() => refetch()} />
         ) : filteredList.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '48px 16px' }}>
             <CheckCircle2 size={44} style={{ color: '#059669', margin: '0 auto 8px' }} />
             <h3 style={{ fontSize: '16px', fontWeight: 650, color: '#172338' }}>
-              Tất cả dữ liệu sổ kho đều hoàn toàn khớp 100%!
+              {isFiltered
+                ? 'Không có phụ tùng nào phù hợp bộ lọc'
+                : reconciliations.length === 0
+                  ? 'Chưa có phụ tùng nào để đối soát'
+                  : 'Tất cả dữ liệu sổ kho đều hoàn toàn khớp 100%!'}
             </h3>
             <p className="muted" style={{ fontSize: '13px', marginTop: '4px' }}>
-              Không phát hiện bất kỳ sai lệch nào giữa số tồn thực tế và lũy kế các giao dịch kho.
+              {isFiltered
+                ? 'Thử đổi từ khóa hoặc bấm "Đặt lại" để xem toàn bộ danh sách.'
+                : 'Không phát hiện bất kỳ sai lệch nào giữa số tồn thực tế và lũy kế các giao dịch kho.'}
             </p>
           </div>
         ) : compact ? (

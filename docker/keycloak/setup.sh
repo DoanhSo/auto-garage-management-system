@@ -51,6 +51,8 @@ while IFS= read -r role; do
     esac
 done <<< "$roles"
 kc add-roles -r "$realm" --uid "$GARAGE_ADMIN_ID" --rolename ADMIN
+# Gỡ default-roles làm mất quyền của client "account"; cấp lại để mở được cổng /account.
+kc add-roles -r "$realm" --uid "$GARAGE_ADMIN_ID" --cclientid account --rolename manage-account --rolename view-profile
 touch /run/autogarage/ready
 chmod 644 /run/autogarage/ready
 echo 'Garage administrator created with the configured identity and ADMIN role.'

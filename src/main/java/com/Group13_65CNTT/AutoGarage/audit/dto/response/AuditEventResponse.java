@@ -12,9 +12,13 @@ import java.time.Instant;
 public class AuditEventResponse {
     private Long id;
     private Long actorUserId;
+    private String actorFullName;
+    private String actorUsername;
+    private String actorRole;
     private String action;
     private String entityType;
     private Long entityId;
+    private String entityLabel;
     private String afterJson;
     private Instant createdAt;
 }

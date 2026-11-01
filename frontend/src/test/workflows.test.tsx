@@ -343,7 +343,7 @@ describe('Forms against HTTP contracts', () => {
     expect(await screen.findByRole('heading', { name: 'Tài khoản của tôi' })).toBeVisible();
     expect(screen.getByRole('link', { name: /Mở cổng tài khoản Keycloak/i })).toHaveAttribute(
       'href',
-      '/realms/autogarage-realm/account',
+      '/realms/autogarage-realm/account/',
     );
     await user.click(screen.getByRole('button', { name: /Thu hồi mọi phiên đăng nhập/i }));
     await waitFor(() => expect(logoutCalls).toBe(1));

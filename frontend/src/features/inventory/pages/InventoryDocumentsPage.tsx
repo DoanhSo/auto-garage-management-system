@@ -25,6 +25,7 @@ import {
   Loading,
   Modal,
   PageHeader,
+  QueryError,
 } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
@@ -89,10 +90,10 @@ export function InventoryDocumentsPage() {
   const { data: suppliersData } = useSuppliersQuery({ size: 100, active: true });
   const suppliers = suppliersData?.content || [];
 
-  const { data: partsData } = usePartsQuery({ size: 200, active: true });
+  const { data: partsData } = usePartsQuery({ size: 100, active: true });
   const parts = partsData?.content || [];
 
-  const { data, isLoading, isFetching } = useDocumentsQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useDocumentsQuery({
     type: selectedType || undefined,
     status: selectedStatus || undefined,
     query: debouncedQuery.trim() || undefined,
@@ -545,6 +546,8 @@ export function InventoryDocumentsPage() {
         {/* Bảng danh sách */}
         {isLoading ? (
           <Loading label="Đang tải danh sách chứng từ kho…" />
+        ) : isError ? (
+          <QueryError error={error} retry={() => refetch()} />
         ) : compact ? (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {documentsList.map((doc) => (

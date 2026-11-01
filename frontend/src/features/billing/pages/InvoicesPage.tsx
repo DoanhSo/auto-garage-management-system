@@ -17,11 +17,20 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { FRONT_DESK_ROLES } from '../../../app/access';
-import { Badge, Button, Field, Loading, Modal, PageHeader } from '../../../shared/components/ui';
+import {
+  Badge,
+  Button,
+  Field,
+  Loading,
+  Modal,
+  PageHeader,
+  QueryError,
+} from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { errorMessage } from '../../../shared/api/errors';
+import { useRepairOrdersQuery } from '../../repair/hooks/useRepair';
 import {
   useInvoicesQuery,
   useIssueInvoiceMutation,
@@ -41,7 +50,8 @@ const sortOptions = [
   ['id:asc', 'Mã hóa đơn · Cũ nhất'],
   ['totalAmount:desc', 'Tổng tiền · Cao nhất'],
   ['totalAmount:asc', 'Tổng tiền · Thấp nhất'],
-  ['balanceAmount:desc', 'Còn nợ · Nhiều nhất'],
+  ['issuedAt:desc', 'Ngày phát hành · Mới nhất'],
+  ['issuedAt:asc', 'Ngày phát hành · Cũ nhất'],
 ];
 
 export function InvoicesPage() {
@@ -73,7 +83,7 @@ export function InvoicesPage() {
 
   const createTrigger = useRef<HTMLButtonElement>(null);
 
-  const { data, isLoading, isFetching } = useInvoicesQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useInvoicesQuery({
     status: selectedStatus || undefined,
     query: debouncedQuery.trim() || undefined,
     page,
@@ -82,6 +92,9 @@ export function InvoicesPage() {
     sortDir,
   });
 
+  const completedOrders = useRepairOrdersQuery(
+    { status: 'COMPLETED', size: 100, sortBy: 'id', sortDir: 'desc' },
+  );
   const issueMutation = useIssueInvoiceMutation();
   const voidMutation = useVoidInvoiceMutation();
   const receivePaymentMutation = useReceivePaymentMutation();
@@ -480,6 +493,8 @@ export function InvoicesPage() {
         {/* Nội dung bảng */}
         {isLoading ? (
           <Loading label="Đang tải danh sách hóa đơn…" />
+        ) : isError ? (
+          <QueryError error={error} retry={() => refetch()} />
         ) : compact ? (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {invoicesList.map((inv) => (
@@ -605,15 +620,26 @@ export function InvoicesPage() {
         <form onSubmit={handleIssue} className="modal-form">
           <div className="form-section-label">THÔNG TIN PHÁT HÀNH HÓA ĐƠN DỊCH VỤ</div>
 
-          <Field label="Mã lệnh sửa chữa" required>
-            <input
-              name="repairOrderId"
-              type="number"
-              className="input font-mono"
-              placeholder="VD: 101"
-              required
-              autoFocus
-            />
+          <Field
+            label="Lệnh sửa chữa đã hoàn thành"
+            required
+            className="full-width-field"
+            hint={
+              completedOrders.data && completedOrders.data.content.length === 0
+                ? 'Chưa có lệnh sửa chữa nào hoàn thành để phát hành hóa đơn.'
+                : undefined
+            }
+          >
+            <select name="repairOrderId" className="input" required autoFocus defaultValue="">
+              <option value="" disabled>
+                {completedOrders.isLoading ? 'Đang tải danh sách…' : 'Chọn lệnh sửa chữa'}
+              </option>
+              {(completedOrders.data?.content ?? []).map((order) => (
+                <option key={order.id} value={order.id}>
+                  #{order.orderCode} · nhận xe {new Date(order.receivedAt).toLocaleDateString('vi-VN')}
+                </option>
+              ))}
+            </select>
           </Field>
 
           <Field label="Thuế giá trị gia tăng (VAT đ)">

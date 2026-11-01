@@ -21,6 +21,7 @@ import {
   Modal,
   PageHeader,
   StatusBadge,
+  QueryError,
 } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
@@ -40,8 +41,8 @@ const sortOptions = [
   ['id:asc', 'Mã NCC · Tăng dần'],
   ['supplierName:asc', 'Tên nhà cung cấp · A → Z'],
   ['supplierName:desc', 'Tên nhà cung cấp · Z → A'],
-  ['paymentTermDays:asc', 'Hạn nợ · Tăng dần'],
-  ['paymentTermDays:desc', 'Hạn nợ · Giảm dần'],
+  ['supplierCode:asc', 'Mã NCC · A → Z'],
+  ['createdAt:desc', 'Ngày tạo · Mới nhất'],
 ];
 
 export function SuppliersPage() {
@@ -61,7 +62,7 @@ export function SuppliersPage() {
 
   const createTrigger = useRef<HTMLButtonElement>(null);
 
-  const { data, isLoading, isFetching } = useSuppliersQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useSuppliersQuery({
     query: debouncedQuery.trim() || undefined,
     active,
     page,
@@ -394,6 +395,8 @@ export function SuppliersPage() {
         {/* Nội dung bảng */}
         {isLoading ? (
           <Loading label="Đang tải danh sách nhà cung cấp…" />
+        ) : isError ? (
+          <QueryError error={error} retry={() => refetch()} />
         ) : compact ? (
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {suppliersList.map((s) => (

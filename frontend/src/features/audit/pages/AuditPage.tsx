@@ -16,7 +16,7 @@ import { DataTable, Pagination } from '../../../shared/components/DataTable';
 import { useTableSearchParams } from '../../../shared/hooks/useTableSearchParams';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { dateTime } from '../../../shared/utils/format';
-import type { AuditEvent, UiPolicy } from '../../../shared/types/contracts';
+import { roleLabels, type AuditEvent, type UiPolicy } from '../../../shared/types/contracts';
 import { useAuditEventsQuery } from '../hooks/useAuditEvents';
 const actionInfo: Record<string, { label: string; description: string }> = {
   AUTH_LOGIN: { label: 'Đăng nhập', description: 'Đăng nhập vào hệ thống thành công.' },
@@ -84,8 +84,27 @@ const entityLabels: Record<string, string> = {
   BayReservation: 'Lịch giữ khoang',
 };
 const actionLabel = (action: string) => actionInfo[action]?.label ?? action;
-const entityText = (type: string, id: string | null) =>
-  `${entityLabels[type] ?? type}${id ? ` #${id}` : ''}`;
+const entityText = (type: string, id: string | null, label?: string | null) =>
+  `${entityLabels[type] ?? type}${label ? `: ${label}` : id ? ` #${id}` : ''}`;
+function ActorCell({ event }: { event: AuditEvent }) {
+  if (!event.actorUserId) return <span className="muted">Hệ thống (tự động)</span>;
+  if (!event.actorFullName) return <span>Tài khoản #{event.actorUserId}</span>;
+  return (
+    <div className="two-lines">
+      <strong>{event.actorFullName}</strong>
+      <span>
+        @{event.actorUsername}
+        {event.actorRole ? ` · ${roleLabels[event.actorRole]}` : ''}
+      </span>
+    </div>
+  );
+}
+const actorText = (event: AuditEvent) =>
+  !event.actorUserId
+    ? 'Hệ thống (tự động)'
+    : event.actorFullName
+      ? `${event.actorFullName} (@${event.actorUsername}${event.actorRole ? ` · ${roleLabels[event.actorRole]}` : ''})`
+      : `Tài khoản #${event.actorUserId}`;
 const actionLabels = Object.fromEntries(
   Object.entries(actionInfo).map(([code, info]) => [code, info.label]),
 );
@@ -148,15 +167,16 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
       {
         accessorKey: 'actorUserId',
         header: 'Người thực hiện',
-        cell: ({ row }) =>
-          row.original.actorUserId
-            ? `Tài khoản #${row.original.actorUserId}`
-            : 'Không xác định / hệ thống',
+        cell: ({ row }) => <ActorCell event={row.original} />,
       },
       {
         accessorKey: 'entityType',
         header: 'Đối tượng',
-        cell: ({ row }) => <span>{entityText(row.original.entityType, row.original.entityId)}</span>,
+        cell: ({ row }) => (
+          <span>
+            {entityText(row.original.entityType, row.original.entityId, row.original.entityLabel)}
+          </span>
+        ),
       },
       {
         id: 'details',
@@ -277,13 +297,9 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
                 <ReadOnlyField label="Thời gian">
                   {dateTime(selected.createdAt, policy.garageTimeZone)}
                 </ReadOnlyField>
-                <ReadOnlyField label="Người thực hiện">
-                  {selected.actorUserId
-                    ? `Tài khoản #${selected.actorUserId}`
-                    : 'Không xác định / hệ thống'}
-                </ReadOnlyField>
+                <ReadOnlyField label="Người thực hiện">{actorText(selected)}</ReadOnlyField>
                 <ReadOnlyField label="Đối tượng">
-                  {entityText(selected.entityType, selected.entityId)}
+                  {entityText(selected.entityType, selected.entityId, selected.entityLabel)}
                 </ReadOnlyField>
               </dl>
               <h3>Metadata</h3>

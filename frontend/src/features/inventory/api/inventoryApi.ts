@@ -158,8 +158,7 @@ export const inventoryApi = {
 
   // Reconciliation
   reconcilePart: (partId: string | number) =>
-    request<StockReconciliation>(`/inventory/reconciliation/parts/${partId}`),
+    request<StockReconciliation>(`/inventory/reconciliation/${partId}`),
 
-  reconcileAllParts: () =>
-    request<StockReconciliation[]>('/inventory/reconciliation/parts'),
+  reconcileAllParts: () => request<StockReconciliation[]>('/inventory/reconciliation'),
 };

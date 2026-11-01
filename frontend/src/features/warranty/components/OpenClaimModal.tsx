@@ -99,7 +99,7 @@ export function OpenClaimModal({
           <div className="full-width-field">
             <Field label="Mô tả chi tiết lỗi phát sinh cần bảo hành" required>
               <textarea
-                className="input min-h-[85px] resize-none"
+                className="input" rows={4}
                 placeholder="Ví dụ: Phụ tùng thay thế phát ra tiếng kêu lạ, dầu nhớt bị rò rỉ sau khi nhận xe..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}

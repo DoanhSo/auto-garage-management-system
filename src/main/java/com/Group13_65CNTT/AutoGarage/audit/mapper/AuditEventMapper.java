@@ -7,5 +7,9 @@ import org.mapstruct.*;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface AuditEventMapper {
+    @Mapping(target = "actorFullName", ignore = true)
+    @Mapping(target = "actorUsername", ignore = true)
+    @Mapping(target = "actorRole", ignore = true)
+    @Mapping(target = "entityLabel", ignore = true)
     AuditEventResponse toResponse(AuditEvent event);
 }
