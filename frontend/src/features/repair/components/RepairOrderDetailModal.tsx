@@ -16,6 +16,9 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { FRONT_DESK_ROLES, TECHNICAL_ROLES } from '../../../app/access';
+import { useVehicleQuery } from '../../vehicle/hooks/useVehicles';
 import { errorMessage } from '../../../shared/api/errors';
 import { Button, Empty, Loading, QueryError, Sheet } from '../../../shared/components/ui';
 import { formatDateTime, money } from '../../../shared/utils/format';
@@ -39,6 +42,7 @@ import { CreateTaskModal } from './CreateTaskModal';
 import { CreateEstimateModal } from './CreateEstimateModal';
 import { PerformQCModal } from './PerformQCModal';
 import { HandoverModal } from './HandoverModal';
+import { VehicleLabel } from './VehicleLabel';
 
 type Tab = 'overview' | 'estimate' | 'tasks' | 'qc' | 'handover';
 
@@ -52,6 +56,11 @@ export function RepairOrderDetailModal({
   onClose: () => void;
 }) {
   const notify = useToast();
+  const { user } = useAuth();
+  const isCustomer = user?.role === 'CUSTOMER';
+  const canTechnical = !!user && TECHNICAL_ROLES.includes(user.role);
+  const canFrontDesk = !!user && FRONT_DESK_ROLES.includes(user.role);
+  const canDecideEstimate = isCustomer || canFrontDesk;
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   // Sub-modals
@@ -61,10 +70,26 @@ export function RepairOrderDetailModal({
   const [handoverOpen, setHandoverOpen] = useState(false);
 
   // Queries
-  const { data: order, isLoading, isError, error, refetch } = useRepairOrderQuery(open ? orderId : null);
-  const { data: tasks = [], isLoading: isLoadingTasks } = useRepairTasksQuery(open ? orderId : null);
-  const { data: estimates = [], isLoading: isLoadingEstimates } = useEstimatesQuery(open ? orderId : null);
-  const { data: qcChecks = [], isLoading: isLoadingQC } = useQualityChecksQuery(open ? orderId : null);
+  const {
+    data: order,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useRepairOrderQuery(open ? orderId : null);
+  const { data: tasks = [], isLoading: isLoadingTasks } = useRepairTasksQuery(
+    open ? orderId : null,
+  );
+  const { data: allEstimates = [], isLoading: isLoadingEstimates } = useEstimatesQuery(
+    open ? orderId : null,
+  );
+  const { data: vehicle } = useVehicleQuery(open && order ? order.vehicleId : null);
+  const estimates = isCustomer
+    ? allEstimates.filter((est) => est.status !== 'DRAFT')
+    : allEstimates;
+  const { data: qcChecks = [], isLoading: isLoadingQC } = useQualityChecksQuery(
+    open ? orderId : null,
+  );
 
   // Mutations
   const updateDiagnosis = useUpdateDiagnosisMutation();
@@ -126,7 +151,9 @@ export function RepairOrderDetailModal({
           lines: [{ estimateItemId: itemId, decision }],
         },
       });
-      notify(decision === 'APPROVED' ? 'Đã duyệt hạng mục báo giá.' : 'Đã từ chối hạng mục báo giá.');
+      notify(
+        decision === 'APPROVED' ? 'Đã duyệt hạng mục báo giá.' : 'Đã từ chối hạng mục báo giá.',
+      );
     } catch (err: unknown) {
       notify(errorMessage(err));
     }
@@ -155,7 +182,7 @@ export function RepairOrderDetailModal({
       title={order ? `Lệnh sửa chữa #${order.orderCode}` : 'Chi tiết lệnh sửa chữa'}
       description={
         order
-          ? `Tiếp nhận lúc ${formatDateTime(order.receivedAt)} · Phương tiện #${order.vehicleId} · Khách hàng #${order.customerId}`
+          ? `Tiếp nhận lúc ${formatDateTime(order.receivedAt)} · ${vehicle ? `${vehicle.licensePlate} · ${vehicle.brand} ${vehicle.model} · ${vehicle.customerName}` : 'Đang tải thông tin xe…'}`
           : 'Xem thông tin chẩn đoán, báo giá, tiến độ thi công và bàn giao xe'
       }
     >
@@ -167,24 +194,33 @@ export function RepairOrderDetailModal({
         ) : (
           <>
             {/* Top Workflow Summary Banner */}
-            <div className="p-3.5 bg-muted/15 border rounded-lg flex flex-wrap items-center justify-between gap-3">
+            <div className="p-3.5 ro-summary-banner border rounded-lg flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">Trạng thái:</span>
+                  <span className="text-xs font-medium muted">Trạng thái:</span>
                   <RepairOrderStatusBadge status={order.status} />
                 </div>
                 <div className="h-4 w-px bg-border hidden sm:block" />
-                <div className="text-xs text-muted-foreground flex items-center gap-2">
-                  <span>Phương tiện: <strong className="text-foreground">Xe #{order.vehicleId}</strong></span>
+                <div className="text-xs muted flex items-center gap-2">
+                  <span>
+                    Phương tiện:{' '}
+                    <span>
+                      <VehicleLabel vehicleId={order.vehicleId} />
+                    </span>
+                  </span>
                   <span>•</span>
-                  <span>ODO vào: <strong className="text-foreground">{order.odometerIn.toLocaleString('vi-VN')} km</strong></span>
+                  <span>
+                    ODO vào: <strong>{order.odometerIn.toLocaleString('vi-VN')} km</strong>
+                  </span>
                   <span>•</span>
-                  <span>Tiếp nhận: <strong className="text-foreground">{formatDateTime(order.receivedAt)}</strong></span>
+                  <span>
+                    Tiếp nhận: <strong>{formatDateTime(order.receivedAt)}</strong>
+                  </span>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                {order.status === 'NEW' && (
+                {canTechnical && order.status === 'NEW' && (
                   <Button
                     variant="primary"
                     onClick={() => handleTransitionStatus('DIAGNOSING')}
@@ -193,15 +229,12 @@ export function RepairOrderDetailModal({
                     Bắt đầu chẩn đoán
                   </Button>
                 )}
-                {order.status === 'DIAGNOSING' && (
-                  <Button
-                    variant="primary"
-                    onClick={() => setActiveTab('estimate')}
-                  >
+                {canTechnical && order.status === 'DIAGNOSING' && (
+                  <Button variant="primary" onClick={() => setActiveTab('estimate')}>
                     Lập báo giá dịch vụ
                   </Button>
                 )}
-                {order.status === 'APPROVED' && (
+                {canTechnical && order.status === 'APPROVED' && (
                   <Button
                     variant="primary"
                     onClick={() => handleTransitionStatus('IN_PROGRESS')}
@@ -210,7 +243,7 @@ export function RepairOrderDetailModal({
                     Bắt đầu sửa chữa
                   </Button>
                 )}
-                {order.status === 'IN_PROGRESS' && (
+                {canTechnical && order.status === 'IN_PROGRESS' && (
                   <Button
                     variant="primary"
                     onClick={() => handleTransitionStatus('WAITING_QC')}
@@ -219,19 +252,14 @@ export function RepairOrderDetailModal({
                     <ArrowRight size={15} /> Yêu cầu kiểm tra QC
                   </Button>
                 )}
-                {(order.status === 'WAITING_QC' || order.status === 'QC_FAILED') && (
-                  <Button
-                    variant="primary"
-                    onClick={() => setPerformQCOpen(true)}
-                  >
-                    <ShieldCheck size={15} /> Kiểm tra chất lượng (QC)
-                  </Button>
-                )}
-                {order.status === 'COMPLETED' && (
-                  <Button
-                    variant="primary"
-                    onClick={() => setHandoverOpen(true)}
-                  >
+                {canTechnical &&
+                  (order.status === 'WAITING_QC' || order.status === 'QC_FAILED') && (
+                    <Button variant="primary" onClick={() => setPerformQCOpen(true)}>
+                      <ShieldCheck size={15} /> Kiểm tra chất lượng (QC)
+                    </Button>
+                  )}
+                {canFrontDesk && order.status === 'COMPLETED' && (
+                  <Button variant="primary" onClick={() => setHandoverOpen(true)}>
                     <UserCheck size={15} /> Bàn giao xe
                   </Button>
                 )}
@@ -290,38 +318,38 @@ export function RepairOrderDetailModal({
 
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center justify-between py-1 border-b">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
+                        <span className="muted flex items-center gap-1.5">
                           <Car size={14} /> Phương tiện
                         </span>
-                        <strong>Xe #{order.vehicleId}</strong>
+                        <VehicleLabel vehicleId={order.vehicleId} />
                       </div>
                       <div className="flex items-center justify-between py-1 border-b">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
+                        <span className="muted flex items-center gap-1.5">
                           <Gauge size={14} /> Số ODO khi nhận xe
                         </span>
                         <strong>{order.odometerIn.toLocaleString('vi-VN')} km</strong>
                       </div>
                       {order.fuelLevelPercent !== null && order.fuelLevelPercent !== undefined && (
                         <div className="flex items-center justify-between py-1 border-b">
-                          <span className="text-muted-foreground flex items-center gap-1.5">
+                          <span className="muted flex items-center gap-1.5">
                             <Fuel size={14} /> Mức nhiên liệu
                           </span>
                           <span>{order.fuelLevelPercent}%</span>
                         </div>
                       )}
                       <div className="flex items-center justify-between py-1 border-b">
-                        <span className="text-muted-foreground flex items-center gap-1.5">
+                        <span className="muted flex items-center gap-1.5">
                           <Calendar size={14} /> Thời gian nhận xe
                         </span>
                         <span className="muted">{formatDateTime(order.receivedAt)}</span>
                       </div>
                       {order.customerComplaint && (
-                        <div className="p-3 bg-muted/20 border rounded-md text-xs space-y-1 mt-2">
-                          <div className="font-semibold text-foreground flex items-center gap-1.5">
-                            <AlertTriangle size={14} className="text-warning" />
+                        <div className="p-3 ro-BayBanner border rounded-md text-xs space-y-1 mt-2">
+                          <div className="font-semibold flex items-center gap-1.5">
+                            <AlertTriangle size={14} className="status-text-warning" />
                             <span>Triệu chứng / Yêu cầu của khách hàng:</span>
                           </div>
-                          <p className="italic text-muted-foreground pl-5">
+                          <p className="italic muted pl-5">
                             &ldquo;{order.customerComplaint}&rdquo;
                           </p>
                         </div>
@@ -339,6 +367,7 @@ export function RepairOrderDetailModal({
                       <textarea
                         className="input w-full"
                         rows={7}
+                        readOnly={!canTechnical}
                         placeholder="Ghi nhận hiện tượng hư hỏng, nguyên nhân kỹ thuật và phương án sửa chữa đề xuất..."
                         value={currentDiagnosis}
                         onChange={(e) => {
@@ -347,15 +376,17 @@ export function RepairOrderDetailModal({
                         }}
                       />
                     </div>
-                    <div className="flex justify-end pt-2 border-t">
-                      <Button
-                        variant="primary"
-                        onClick={handleSaveDiagnosis}
-                        pending={updateDiagnosis.isPending}
-                      >
-                        Lưu chẩn đoán kỹ thuật
-                      </Button>
-                    </div>
+                    {canTechnical && (
+                      <div className="flex justify-end pt-2 border-t">
+                        <Button
+                          variant="primary"
+                          onClick={handleSaveDiagnosis}
+                          pending={updateDiagnosis.isPending}
+                        >
+                          Lưu chẩn đoán kỹ thuật
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -365,12 +396,11 @@ export function RepairOrderDetailModal({
             {activeTab === 'estimate' && (
               <div className="space-y-4 pt-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold">Danh sách bản báo giá ({estimates.length})</span>
-                  {estimates.length > 0 && (
-                    <Button
-                      variant="primary"
-                      onClick={() => setCreateEstimateOpen(true)}
-                    >
+                  <span className="text-sm font-semibold">
+                    Danh sách bản báo giá ({estimates.length})
+                  </span>
+                  {canTechnical && estimates.length > 0 && (
+                    <Button variant="primary" onClick={() => setCreateEstimateOpen(true)}>
                       <Plus size={15} /> Lập báo giá mới
                     </Button>
                   )}
@@ -381,14 +411,17 @@ export function RepairOrderDetailModal({
                 ) : estimates.length === 0 ? (
                   <Empty
                     title="Chưa có bản báo giá nào cho phiếu này"
-                    description="Lập báo giá dịch vụ và phụ tùng để gửi khách hàng duyệt trước khi thi công."
+                    description={
+                      isCustomer
+                        ? 'Gara sẽ gửi báo giá cho bạn duyệt sau khi chẩn đoán xong.'
+                        : 'Lập báo giá dịch vụ và phụ tùng để gửi khách hàng duyệt trước khi thi công.'
+                    }
                     action={
-                      <Button
-                        variant="primary"
-                        onClick={() => setCreateEstimateOpen(true)}
-                      >
-                        <Plus size={15} /> Lập bản báo giá đầu tiên
-                      </Button>
+                      canTechnical ? (
+                        <Button variant="primary" onClick={() => setCreateEstimateOpen(true)}>
+                          <Plus size={15} /> Lập bản báo giá đầu tiên
+                        </Button>
+                      ) : undefined
                     }
                   />
                 ) : (
@@ -398,24 +431,33 @@ export function RepairOrderDetailModal({
                         <div className="panel-heading">
                           <div className="flex items-center gap-2">
                             <span className="code-cell font-bold text-sm">#{est.estimateCode}</span>
-                            <span className="badge badge-info text-xs">Bản #{est.versionNo}</span>
+                            <span className="badge badge-primary text-xs">
+                              Bản #{est.versionNo}
+                            </span>
                             <span
                               className={`badge text-xs ${
                                 est.status === 'APPROVED'
                                   ? 'badge-success'
                                   : est.status === 'SENT'
-                                    ? 'badge-info'
+                                    ? 'badge-primary'
                                     : 'badge-neutral'
                               }`}
                             >
-                              {est.status === 'APPROVED' ? 'Đã duyệt' : est.status === 'SENT' ? 'Đã gửi' : 'Bản nháp'}
+                              {est.status === 'APPROVED'
+                                ? 'Đã duyệt'
+                                : est.status === 'SENT'
+                                  ? 'Đã gửi'
+                                  : 'Bản nháp'}
                             </span>
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-sm font-semibold text-muted-foreground">
-                              Tổng cộng: <strong className="money text-base text-primary">{money(est.totalAmount)}</strong>
+                            <span className="text-sm font-semibold muted">
+                              Tổng cộng:{' '}
+                              <strong className="money text-base text-primary">
+                                {money(est.totalAmount)}
+                              </strong>
                             </span>
-                            {est.status === 'DRAFT' && (
+                            {canTechnical && est.status === 'DRAFT' && (
                               <Button
                                 variant="secondary"
                                 onClick={() => handleSendEstimate(est.id)}
@@ -435,21 +477,33 @@ export function RepairOrderDetailModal({
                                 <th style={{ width: '35%' }}>Hạng mục dịch vụ / phụ tùng</th>
                                 <th style={{ width: '13%' }}>Phân loại</th>
                                 <th style={{ width: '8%' }}>ĐVT</th>
-                                <th style={{ width: '10%' }} className="text-right">Số lượng</th>
-                                <th style={{ width: '14%' }} className="text-right">Đơn giá</th>
-                                <th style={{ width: '14%' }} className="text-right">Thành tiền</th>
-                                <th style={{ width: '12%' }} className="text-center">Trạng thái</th>
-                                <th style={{ width: '10%' }} className="text-right">Thao tác</th>
+                                <th style={{ width: '10%' }} className="text-right">
+                                  Số lượng
+                                </th>
+                                <th style={{ width: '14%' }} className="text-right">
+                                  Đơn giá
+                                </th>
+                                <th style={{ width: '14%' }} className="text-right">
+                                  Thành tiền
+                                </th>
+                                <th style={{ width: '12%' }} className="text-center">
+                                  Trạng thái
+                                </th>
+                                <th style={{ width: '10%' }} className="text-right">
+                                  Thao tác
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
                               {est.items.map((item) => (
                                 <tr key={item.id}>
-                                  <td className="font-medium text-foreground">{item.itemName}</td>
+                                  <td className="font-medium">{item.itemName}</td>
                                   <td>
                                     <span
                                       className={`badge text-xs ${
-                                        item.itemType === 'SERVICE' ? 'badge-info' : 'badge-neutral'
+                                        item.itemType === 'SERVICE'
+                                          ? 'badge-primary'
+                                          : 'badge-neutral'
                                       }`}
                                     >
                                       {item.itemType === 'SERVICE' ? 'Dịch vụ' : 'Phụ tùng'}
@@ -458,7 +512,7 @@ export function RepairOrderDetailModal({
                                   <td>{item.unit}</td>
                                   <td className="text-right font-medium">{item.quantity}</td>
                                   <td className="text-right money">{money(item.unitPrice)}</td>
-                                  <td className="text-right font-bold money text-foreground">
+                                  <td className="text-right font-bold money">
                                     {money(item.lineTotal)}
                                   </td>
                                   <td className="text-center">
@@ -479,30 +533,34 @@ export function RepairOrderDetailModal({
                                     </span>
                                   </td>
                                   <td className="text-right">
-                                    {est.status !== 'APPROVED' && item.approvalStatus === 'PENDING' && (
-                                      <div className="flex justify-end gap-1">
-                                        <button
-                                          type="button"
-                                          className="p-1 rounded bg-success/20 text-success hover:bg-success/30"
-                                          title="Duyệt hạng mục này"
-                                          onClick={() =>
-                                            handleDecideLine(est.id, item.id, 'APPROVED')
-                                          }
-                                        >
-                                          <Check size={14} />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="p-1 rounded bg-danger/20 text-danger hover:bg-danger/30"
-                                          title="Từ chối hạng mục này"
-                                          onClick={() =>
-                                            handleDecideLine(est.id, item.id, 'REJECTED')
-                                          }
-                                        >
-                                          <X size={14} />
-                                        </button>
-                                      </div>
-                                    )}
+                                    {canDecideEstimate &&
+                                      (isCustomer
+                                        ? est.status === 'SENT'
+                                        : est.status !== 'APPROVED') &&
+                                      item.approvalStatus === 'PENDING' && (
+                                        <div className="flex justify-end gap-1">
+                                          <button
+                                            type="button"
+                                            className="p-1 rounded bg-success/20 text-success hover:bg-success/30"
+                                            title="Duyệt hạng mục này"
+                                            onClick={() =>
+                                              handleDecideLine(est.id, item.id, 'APPROVED')
+                                            }
+                                          >
+                                            <Check size={14} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="p-1 rounded bg-danger/20 text-danger hover:bg-danger/30"
+                                            title="Từ chối hạng mục này"
+                                            onClick={() =>
+                                              handleDecideLine(est.id, item.id, 'REJECTED')
+                                            }
+                                          >
+                                            <X size={14} />
+                                          </button>
+                                        </div>
+                                      )}
                                   </td>
                                 </tr>
                               ))}
@@ -523,11 +581,8 @@ export function RepairOrderDetailModal({
                   <span className="text-sm font-semibold">
                     Danh sách công việc sửa chữa ({tasks.length})
                   </span>
-                  {tasks.length > 0 && (
-                    <Button
-                      variant="primary"
-                      onClick={() => setCreateTaskOpen(true)}
-                    >
+                  {canTechnical && tasks.length > 0 && (
+                    <Button variant="primary" onClick={() => setCreateTaskOpen(true)}>
                       <Plus size={15} /> Thêm công việc
                     </Button>
                   )}
@@ -540,12 +595,11 @@ export function RepairOrderDetailModal({
                     title="Chưa có công việc nào trong phiếu sửa chữa"
                     description="Công việc được tạo tự động khi khách duyệt báo giá hoặc bạn có thể bổ sung thủ công."
                     action={
-                      <Button
-                        variant="primary"
-                        onClick={() => setCreateTaskOpen(true)}
-                      >
-                        <Plus size={15} /> Thêm công việc đầu tiên
-                      </Button>
+                      canTechnical ? (
+                        <Button variant="primary" onClick={() => setCreateTaskOpen(true)}>
+                          <Plus size={15} /> Thêm công việc đầu tiên
+                        </Button>
+                      ) : undefined
                     }
                   />
                 ) : (
@@ -556,9 +610,15 @@ export function RepairOrderDetailModal({
                           <tr>
                             <th style={{ width: '45%' }}>Tên công việc & Yêu cầu kỹ thuật</th>
                             <th style={{ width: '15%' }}>Phân loại</th>
-                            <th style={{ width: '10%' }} className="text-right">Số lượng</th>
-                            <th style={{ width: '15%' }} className="text-center">Trạng thái</th>
-                            <th style={{ width: '15%' }} className="text-right">Thao tác</th>
+                            <th style={{ width: '10%' }} className="text-right">
+                              Số lượng
+                            </th>
+                            <th style={{ width: '15%' }} className="text-center">
+                              Trạng thái
+                            </th>
+                            <th style={{ width: '15%' }} className="text-right">
+                              Thao tác
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -566,9 +626,9 @@ export function RepairOrderDetailModal({
                             <tr key={task.id}>
                               <td>
                                 <div>
-                                  <strong className="text-foreground">{task.taskName}</strong>
+                                  <strong>{task.taskName}</strong>
                                   {task.description && (
-                                    <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
+                                    <p className="text-xs muted mt-0.5">{task.description}</p>
                                   )}
                                 </div>
                               </td>
@@ -600,7 +660,7 @@ export function RepairOrderDetailModal({
                                 </span>
                               </td>
                               <td className="text-right">
-                                {task.status !== 'COMPLETED' && (
+                                {canTechnical && task.status !== 'COMPLETED' && (
                                   <Button
                                     variant="secondary"
                                     onClick={() => handleCompleteTask(task.id)}
@@ -627,11 +687,8 @@ export function RepairOrderDetailModal({
                   <span className="text-sm font-semibold">
                     Biên bản kiểm tra chất lượng xuất xưởng ({qcChecks.length})
                   </span>
-                  {qcChecks.length > 0 && (
-                    <Button
-                      variant="primary"
-                      onClick={() => setPerformQCOpen(true)}
-                    >
+                  {canTechnical && qcChecks.length > 0 && (
+                    <Button variant="primary" onClick={() => setPerformQCOpen(true)}>
                       <ShieldCheck size={15} /> Bắt đầu kiểm tra QC
                     </Button>
                   )}
@@ -644,12 +701,11 @@ export function RepairOrderDetailModal({
                     title="Chưa có biên bản kiểm tra chất lượng"
                     description="Kỹ thuật viên QC sẽ tiến hành kiểm tra xe sau khi hoàn tất các hạng mục sửa chữa."
                     action={
-                      <Button
-                        variant="primary"
-                        onClick={() => setPerformQCOpen(true)}
-                      >
-                        <ShieldCheck size={15} /> Bắt đầu kiểm tra QC
-                      </Button>
+                      canTechnical ? (
+                        <Button variant="primary" onClick={() => setPerformQCOpen(true)}>
+                          <ShieldCheck size={15} /> Bắt đầu kiểm tra QC
+                        </Button>
+                      ) : undefined
                     }
                   />
                 ) : (
@@ -671,20 +727,21 @@ export function RepairOrderDetailModal({
                                 qc.result === 'PASSED' ? 'badge-success' : 'badge-danger'
                               }`}
                             >
-                              {qc.result === 'PASSED' ? '✓ Đạt tiêu chuẩn xuất xưởng' : '✗ Cần làm lại (Rework)'}
+                              {qc.result === 'PASSED'
+                                ? '✓ Đạt tiêu chuẩn xuất xưởng'
+                                : '✗ Cần làm lại (Rework)'}
                             </span>
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {formatDateTime(qc.checkedAt)}
-                          </span>
+                          <span className="text-xs muted">{formatDateTime(qc.checkedAt)}</span>
                         </div>
                         {qc.odometer && (
                           <div className="text-xs">
-                            Số ODO khi chạy thử: <strong>{qc.odometer.toLocaleString('vi-VN')} km</strong>
+                            Số ODO khi chạy thử:{' '}
+                            <strong>{qc.odometer.toLocaleString('vi-VN')} km</strong>
                           </div>
                         )}
                         {qc.notes && (
-                          <p className="text-xs text-muted-foreground italic bg-background/50 p-2 rounded">
+                          <p className="text-xs muted italic bg-background/50 p-2 rounded">
                             Nhận xét kiểm định: {qc.notes}
                           </p>
                         )}
@@ -705,32 +762,38 @@ export function RepairOrderDetailModal({
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                    <div className="p-3 bg-muted/15 border rounded-lg space-y-1">
+                    <div className="p-3 ro-summary-banner border rounded-lg space-y-1">
                       <div className="flex items-center gap-2 font-semibold text-primary">
-                        <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">1</span>
+                        <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">
+                          1
+                        </span>
                         <span>Hoàn tất thi công & QC</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs muted">
                         Các hạng mục công việc đã hoàn thành và có biên bản kiểm tra QC đạt chuẩn.
                       </p>
                     </div>
 
-                    <div className="p-3 bg-muted/15 border rounded-lg space-y-1">
+                    <div className="p-3 ro-summary-banner border rounded-lg space-y-1">
                       <div className="flex items-center gap-2 font-semibold text-primary">
-                        <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">2</span>
+                        <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">
+                          2
+                        </span>
                         <span>Quyết toán chi phí</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs muted">
                         Khách hàng thanh toán hóa đơn dịch vụ hoặc xác nhận ghi sổ công nợ hợp lệ.
                       </p>
                     </div>
 
-                    <div className="p-3 bg-muted/15 border rounded-lg space-y-1">
+                    <div className="p-3 ro-summary-banner border rounded-lg space-y-1">
                       <div className="flex items-center gap-2 font-semibold text-primary">
-                        <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">3</span>
+                        <span className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">
+                          3
+                        </span>
                         <span>Bàn giao chìa khóa</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs muted">
                         Ghi nhận số ODO xuất xưởng, bàn giao phương tiện và chính thức đóng phiếu.
                       </p>
                     </div>
@@ -744,18 +807,19 @@ export function RepairOrderDetailModal({
                           {order.handedOverAt ? formatDateTime(order.handedOverAt) : 'N/A'}
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">
-                          Trạng thái phiếu hiện tại: <strong>{REPAIR_STATUS_LABELS[order.status] || order.status}</strong>
+                        <span className="text-xs muted">
+                          Trạng thái phiếu hiện tại:{' '}
+                          <strong>{REPAIR_STATUS_LABELS[order.status] || order.status}</strong>
                         </span>
                       )}
                     </div>
 
-                    {order.status === 'COMPLETED' ? (
+                    {order.status === 'COMPLETED' && canFrontDesk ? (
                       <Button variant="primary" onClick={() => setHandoverOpen(true)}>
                         <UserCheck size={15} /> Tiến hành bàn giao xe
                       </Button>
-                    ) : order.status !== 'CLOSED' ? (
-                      <span className="text-xs text-muted-foreground italic">
+                    ) : order.status !== 'CLOSED' && canFrontDesk ? (
+                      <span className="text-xs muted italic">
                         Cần hoàn thành sửa chữa và kiểm định QC đạt chuẩn trước khi bàn giao xe.
                       </span>
                     ) : null}
@@ -784,11 +848,7 @@ export function RepairOrderDetailModal({
         onClose={() => setPerformQCOpen(false)}
       />
       {order && (
-        <HandoverModal
-          order={order}
-          open={handoverOpen}
-          onClose={() => setHandoverOpen(false)}
-        />
+        <HandoverModal order={order} open={handoverOpen} onClose={() => setHandoverOpen(false)} />
       )}
     </Sheet>
   );

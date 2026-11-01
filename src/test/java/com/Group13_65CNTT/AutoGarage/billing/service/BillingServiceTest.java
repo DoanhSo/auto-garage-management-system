@@ -64,6 +64,8 @@ class BillingServiceTest {
     @Mock PaymentMapper paymentMapper;
     @Mock DebtMapper debtMapper;
     @Mock JdbcTemplate jdbcTemplate;
+    @Mock com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    @Mock com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUser;
     @Spy Optional<RepairWorkflow> repairWorkflow = Optional.empty();
     @Spy Optional<NotificationAudit> notificationAudit = Optional.empty();
 
@@ -262,5 +264,49 @@ class BillingServiceTest {
         assertThatThrownBy(() -> service.requireHandoverAllowed(10L, 500L))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("responseCode", ResponseCode.BAD_REQUEST);
+    }
+
+    @Test
+    @DisplayName("Khách hàng chỉ được xem hóa đơn của chính mình")
+    void getInvoiceById_Customer_RequiresOwnership() {
+        Invoice invoice = new Invoice();
+        invoice.setId(7L);
+        when(invoiceRepository.findById(7L)).thenReturn(Optional.of(invoice));
+        when(currentUser.role()).thenReturn(Role.CUSTOMER);
+        doThrow(new BusinessException(ResponseCode.FORBIDDEN))
+                .when(customerScope).requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.INVOICE, 7L);
+
+        assertThatThrownBy(() -> service.getInvoiceById(7L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.FORBIDDEN);
+        verify(invoiceMapper, never()).toResponse(any());
+    }
+
+    @Test
+    @DisplayName("Khách hàng tìm hóa đơn bị ép theo mã khách hàng của mình")
+    void searchInvoices_Customer_ForcesOwnCustomerId() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        when(currentUser.role()).thenReturn(Role.CUSTOMER);
+        when(customerScope.customerIdForQuery(null)).thenReturn(5L);
+        when(invoiceRepository.searchInvoices(null, 5L, null, null, pageable))
+                .thenReturn(org.springframework.data.domain.Page.empty(pageable));
+
+        service.searchInvoices(null, null, null, null, pageable);
+
+        verify(invoiceRepository).searchInvoices(null, 5L, null, null, pageable);
+    }
+
+    @Test
+    @DisplayName("Nhân viên tìm hóa đơn giữ nguyên bộ lọc khách hàng")
+    void searchInvoices_Staff_KeepsRequestedCustomerId() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        when(currentUser.role()).thenReturn(Role.RECEPTIONIST);
+        when(invoiceRepository.searchInvoices(null, 9L, null, null, pageable))
+                .thenReturn(org.springframework.data.domain.Page.empty(pageable));
+
+        service.searchInvoices(null, 9L, null, null, pageable);
+
+        verify(customerScope, never()).customerIdForQuery(any());
+        verify(invoiceRepository).searchInvoices(null, 9L, null, null, pageable);
     }
 }

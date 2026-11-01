@@ -45,6 +45,7 @@ class SecurityRollbackTests extends IntegrationTestSupport {
         assertTrue(
                 jdbc.queryForObject("SELECT DATABASE()", String.class)
                         .startsWith("autogarage_test"));
+        cleanup();
         jdbc.update(
                 "INSERT INTO users(id,identity_id,username,full_name,role)"
                     + " VALUES(950001,'550e8400-e29b-41d4-a716-446655950001','rollback.admin','Admin','ADMIN'),"
@@ -53,6 +54,7 @@ class SecurityRollbackTests extends IntegrationTestSupport {
 
     @AfterEach
     void cleanup() {
+        jdbc.update("DELETE FROM customers WHERE user_id IN (950001, 950002)");
         jdbc.update("DELETE FROM users WHERE username LIKE 'rollback.%'");
     }
 

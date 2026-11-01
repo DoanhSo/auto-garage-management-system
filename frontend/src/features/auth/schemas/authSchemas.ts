@@ -17,7 +17,7 @@ export function validNewPassword(value: string, policy: UiPolicy) {
   );
 }
 export function passwordRequirement(policy: UiPolicy) {
-  return `Ít nhất ${policy.passwordMinLength} ký tự, tối đa ${policy.passwordMaxUtf8Bytes} byte UTF-8.`;
+  return `Từ ${policy.passwordMinLength} đến ${policy.passwordMaxUtf8Bytes} ký tự (nên dùng chữ không dấu).`;
 }
 export function registrationSchema(policy: UiPolicy) {
   return z

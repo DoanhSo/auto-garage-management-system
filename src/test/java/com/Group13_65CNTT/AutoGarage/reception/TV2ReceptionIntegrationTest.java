@@ -111,9 +111,9 @@ class TV2ReceptionIntegrationTest {
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setAppointmentAt(appointmentTime);
         booking.setExpectedEndAt(appointmentTime.plus(Duration.ofMinutes(120)));
-        when(bookingService.createBooking(any())).thenReturn(booking);
+        when(bookingService.createBooking(any(), any())).thenReturn(booking);
 
-        BookingResponse createdBooking = bookingService.createBooking(new CreateBookingRequest());
+        BookingResponse createdBooking = bookingService.createBooking(new CreateBookingRequest(), 1L);
         assertEquals(BookingStatus.CONFIRMED, createdBooking.getStatus());
 
         // 5. Tiếp nhận xe vào xưởng

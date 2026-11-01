@@ -433,9 +433,15 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
                                                         int page, int size, String sortBy, String sortDir) {
         Pageable pageable = pagination.page(page, size, sortBy, sortDir,
                 Set.of("id", "orderCode", "receivedAt", "status", "createdAt"));
-        Page<RepairOrder> resultPage = currentUser.role() == com.Group13_65CNTT.AutoGarage.common.enums.Role.TECHNICIAN
-                ? repairOrderRepository.searchAssignedOrders(currentUser.userId(), keyword, status, pageable)
-                : repairOrderRepository.searchOrders(keyword, status, pageable);
+        com.Group13_65CNTT.AutoGarage.common.enums.Role role = currentUser.role();
+        Page<RepairOrder> resultPage;
+        if (role == com.Group13_65CNTT.AutoGarage.common.enums.Role.TECHNICIAN) {
+            resultPage = repairOrderRepository.searchAssignedOrders(currentUser.userId(), keyword, status, pageable);
+        } else if (role == com.Group13_65CNTT.AutoGarage.common.enums.Role.CUSTOMER) {
+            resultPage = repairOrderRepository.searchOrders(customerScope.currentCustomerId(), keyword, status, pageable);
+        } else {
+            resultPage = repairOrderRepository.searchOrders(null, keyword, status, pageable);
+        }
         return resultPage.map(repairOrderMapper::toResponse);
     }
 

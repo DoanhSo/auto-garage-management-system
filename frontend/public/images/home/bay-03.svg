@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="b3Bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1120" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="b3Crane" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ea580c" />
+      <stop offset="100%" stop-color="#f97316" />
+    </linearGradient>
+    <pattern id="b3Stripes" width="24" height="24" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="12" height="24" fill="#eab308" />
+      <rect x="12" width="12" height="24" fill="#0f172a" />
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="500" fill="url(#b3Bg)" />
+
+  <!-- Floor Perspective -->
+  <polygon points="50,370 750,370 800,500 0,500" fill="#1e293b" opacity="0.9" />
+  <polygon points="70,380 730,380 740,392 60,392" fill="url(#b3Stripes)" />
+  <line x1="70" y1="392" x2="730" y2="392" stroke="#eab308" stroke-width="2" />
+
+  <!-- Engine Hoist / Palăng Crane (Left to Center) -->
+  <g transform="translate(180, 100)">
+    <!-- Vertical Mast -->
+    <rect x="60" y="80" width="26" height="230" rx="3" fill="url(#b3Crane)" stroke="#c2410c" stroke-width="2" />
+    <!-- Hydraulic Cylinder -->
+    <line x1="73" y1="200" x2="140" y2="70" stroke="#cbd5e1" stroke-width="8" stroke-linecap="round" />
+    <rect x="68" y="150" width="14" height="60" rx="2" fill="#475569" />
+    <!-- Boom / Cantilever Arm -->
+    <polygon points="50,90 260,30 260,50 60,115" fill="url(#b3Crane)" stroke="#c2410c" stroke-width="2" />
+    <!-- Base Legs with Casters -->
+    <polygon points="40,300 240,320 230,335 30,315" fill="url(#b3Crane)" stroke="#c2410c" stroke-width="2" />
+    <polygon points="40,300 160,340 150,355 30,315" fill="url(#b3Crane)" stroke="#c2410c" stroke-width="2" />
+    <circle cx="235" cy="335" r="7" fill="#0f172a" />
+    <circle cx="155" cy="355" r="7" fill="#0f172a" />
+    <circle cx="35" cy="315" r="7" fill="#0f172a" />
+    
+    <!-- Hoist Chain & Hook -->
+    <line x1="250" y1="45" x2="250" y2="105" stroke="#94a3b8" stroke-width="4" stroke-dasharray="6,3" />
+    <path d="M245,105 C245,120 255,120 255,110" fill="none" stroke="#e2e8f0" stroke-width="5" stroke-linecap="round" />
+
+    <!-- Suspended Engine Block (V6 / 2.0 Turbo) -->
+    <g transform="translate(180, 115)">
+      <!-- Engine Block -->
+      <path d="M20,60 L120,60 L135,110 L115,150 L25,150 L5,110 Z" fill="#334155" stroke="#94a3b8" stroke-width="2" />
+      <!-- Valve Cover -->
+      <polygon points="35,60 105,60 95,30 45,30" fill="#dc2626" stroke="#991b1b" stroke-width="2" />
+      <!-- Belt and Pulleys -->
+      <circle cx="30" cy="95" r="14" fill="#1e293b" stroke="#cbd5e1" stroke-width="2" />
+      <circle cx="110" cy="95" r="14" fill="#1e293b" stroke="#cbd5e1" stroke-width="2" />
+      <circle cx="70" cy="130" r="18" fill="#1e293b" stroke="#cbd5e1" stroke-width="2" />
+      <path d="M30,81 L110,81 L124,95 L88,130 L52,130 L16,95 Z" fill="none" stroke="#0f172a" stroke-width="4" />
+      <!-- Turbo Charger -->
+      <ellipse cx="140" cy="80" rx="14" ry="18" fill="#64748b" stroke="#94a3b8" stroke-width="1.5" />
+    </g>
+  </g>
+
+  <!-- Heavy Duty Engine Stand with Disassembled Block (Right side) -->
+  <g transform="translate(560, 210)">
+    <!-- Stand -->
+    <rect x="40" y="70" width="16" height="120" fill="#0284c7" />
+    <rect x="20" y="185" width="70" height="15" rx="3" fill="#1e293b" />
+    <circle cx="25" cy="202" r="6" fill="#0f172a" />
+    <circle cx="85" cy="202" r="6" fill="#0f172a" />
+    <!-- Engine Head & Cylinders Disassembled -->
+    <rect x="15" y="40" width="90" height="40" rx="4" fill="#475569" stroke="#94a3b8" stroke-width="2" />
+    <circle cx="35" cy="60" r="10" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5" />
+    <circle cx="60" cy="60" r="10" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5" />
+    <circle cx="85" cy="60" r="10" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.5" />
+    <!-- Digital Torque Wrench resting on workbench -->
+    <g transform="translate(-40, 130) rotate(-15)">
+      <rect x="0" y="0" width="100" height="8" rx="2" fill="#cbd5e1" />
+      <rect x="80" y="-3" width="25" height="14" rx="2" fill="#0284c7" />
+      <rect x="85" y="0" width="12" height="8" rx="1" fill="#0f172a" />
+      <circle cx="91" cy="4" r="2" fill="#22c55e" />
+    </g>
+  </g>
+
+  <!-- Bay Header Badge -->
+  <g transform="translate(40, 30)">
+    <rect x="0" y="0" width="220" height="32" rx="6" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" />
+    <circle cx="18" cy="16" r="6" fill="#f97316" />
+    <text x="34" y="21" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#ffffff" letter-spacing="0.5">
+      BAY-03 · MÁY - GẦM - SỐ
+    </text>
+  </g>
+
+  <!-- Bay Floor Marking -->
+  <text x="400" y="475" font-family="system-ui, sans-serif" font-size="28" font-weight="900" fill="#334155" text-anchor="middle" letter-spacing="4">
+    KHOANG 03 · ENGINE & TRANSMISSION
+  </text>
+</svg>

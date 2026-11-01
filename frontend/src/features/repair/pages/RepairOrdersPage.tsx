@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Eye, Info, RefreshCw } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import { Button, Loading, PageHeader, QueryError } from '../../../shared/components/ui';
 import { DataTable, Pagination } from '../../../shared/components/DataTable';
 import { useUiPolicy } from '../../../shared/config/policy';
@@ -15,16 +16,19 @@ import { RepairOrderCards, RepairOrderStatusBadge } from '../components/RepairOr
 import { REPAIR_STATUS_LABELS, RepairOrderFilters } from '../components/RepairOrderFilters';
 import { RepairOrderDetailModal } from '../components/RepairOrderDetailModal';
 import { WorkshopBayGrid } from '../components/WorkshopBayGrid';
+import { VehicleLabel } from '../components/VehicleLabel';
 
 const sortFields = ['id', 'orderCode', 'receivedAt', 'status', 'createdAt'];
 type ViewMode = 'list' | 'bays';
 
 function ReadyRepairOrders({ policy }: { policy: UiPolicy }) {
+  const { user } = useAuth();
+  const isCustomer = user?.role === 'CUSTOMER';
   const compact = useMediaQuery('(max-width: 640px)');
   const table = useTableSearchParams(policy);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
-  const view: ViewMode = table.params.get('view') === 'bays' ? 'bays' : 'list';
+  const view: ViewMode = !isCustomer && table.params.get('view') === 'bays' ? 'bays' : 'list';
   const keyword = table.params.get('keyword')?.slice(0, 254) ?? '';
   const debounced = useDebouncedValue(keyword);
   const rawStatus = table.params.get('status');
@@ -56,7 +60,7 @@ function ReadyRepairOrders({ policy }: { policy: UiPolicy }) {
       {
         accessorKey: 'vehicleId',
         header: 'Phương tiện',
-        cell: ({ row }) => <span>Xe #{row.original.vehicleId}</span>,
+        cell: ({ row }) => <VehicleLabel vehicleId={row.original.vehicleId} />,
       },
       {
         accessorKey: 'customerComplaint',
@@ -108,9 +112,13 @@ function ReadyRepairOrders({ policy }: { policy: UiPolicy }) {
   return (
     <>
       <PageHeader
-        eyebrow="ĐIỀU HÀNH XƯỞNG"
-        title="Lệnh sửa chữa"
-        description="Theo dõi tiến độ sửa chữa, phân bổ khoang làm việc và bàn giao xe cho khách."
+        eyebrow={isCustomer ? 'XE CỦA TÔI' : 'ĐIỀU HÀNH XƯỞNG'}
+        title={isCustomer ? 'Tiến độ sửa xe' : 'Lệnh sửa chữa'}
+        description={
+          isCustomer
+            ? 'Theo dõi tiến độ sửa chữa và duyệt báo giá cho xe của bạn.'
+            : 'Theo dõi tiến độ sửa chữa, phân bổ khoang làm việc và bàn giao xe cho khách.'
+        }
         actions={
           <Button
             variant="secondary"
@@ -127,27 +135,30 @@ function ReadyRepairOrders({ policy }: { policy: UiPolicy }) {
       <div className="info-strip">
         <Info size={18} />
         <span>
-          Lệnh sửa chữa được tạo khi tiếp nhận xe. Mở chi tiết để chẩn đoán, lập báo giá, phân công
-          và bàn giao.
+          {isCustomer
+            ? 'Mở chi tiết phiếu để xem chẩn đoán, duyệt hoặc từ chối từng hạng mục báo giá.'
+            : 'Lệnh sửa chữa được tạo khi tiếp nhận xe. Mở chi tiết để chẩn đoán, lập báo giá, phân công và bàn giao.'}
         </span>
       </div>
       <section className="panel table-panel">
-        <div className="tabs" role="group" aria-label="Chế độ hiển thị">
-          <button
-            type="button"
-            aria-pressed={view === 'list'}
-            onClick={() => table.update({ view: undefined })}
-          >
-            Danh sách lệnh
-          </button>
-          <button
-            type="button"
-            aria-pressed={view === 'bays'}
-            onClick={() => table.update({ view: 'bays' })}
-          >
-            Sơ đồ khoang xưởng
-          </button>
-        </div>
+        {!isCustomer && (
+          <div className="tabs" role="group" aria-label="Chế độ hiển thị">
+            <button
+              type="button"
+              aria-pressed={view === 'list'}
+              onClick={() => table.update({ view: undefined })}
+            >
+              Danh sách lệnh
+            </button>
+            <button
+              type="button"
+              aria-pressed={view === 'bays'}
+              onClick={() => table.update({ view: 'bays' })}
+            >
+              Sơ đồ khoang xưởng
+            </button>
+          </div>
+        )}
         <RepairOrderFilters
           keyword={keyword}
           status={status}

@@ -40,10 +40,12 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, Long> 
             @Param("status") RepairOrderStatus status, Pageable pageable);
 
     @Query("SELECT ro FROM RepairOrder ro WHERE " +
+           "(:customerId IS NULL OR ro.customerId = :customerId) AND " +
            "(:status IS NULL OR ro.status = :status) AND " +
            "(:keyword IS NULL OR LOWER(ro.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
            "OR LOWER(ro.customerComplaint) LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    Page<RepairOrder> searchOrders(@Param("keyword") String keyword,
+    Page<RepairOrder> searchOrders(@Param("customerId") Long customerId,
+                                   @Param("keyword") String keyword,
                                    @Param("status") RepairOrderStatus status,
                                    Pageable pageable);
 }

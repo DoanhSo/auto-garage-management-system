@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="ptBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a101d" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="boxBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8" />
+      <stop offset="100%" stop-color="#1e3a8a" />
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="500" fill="url(#ptBg)" />
+
+  <rect x="50" y="40" width="170" height="34" rx="6" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" />
+  <text x="135" y="62" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#93c5fd" text-anchor="middle" letter-spacing="1">
+    100% PHỤ TÙNG CHÍNH HÃNG
+  </text>
+
+  <!-- Warehouse Parts Rack Shelf Assembly -->
+  <g transform="translate(140, 100)">
+    <!-- Metal Storage Shelf Racks -->
+    <rect x="40" y="240" width="440" height="12" fill="#475569" stroke="#64748b" />
+    <rect x="40" y="120" width="440" height="12" fill="#475569" stroke="#64748b" />
+    <rect x="30" y="20" width="14" height="260" fill="#334155" />
+    <rect x="476" y="20" width="14" height="260" fill="#334155" />
+
+    <!-- Top Shelf Items -->
+    <!-- Bosch Filter Box -->
+    <g transform="translate(70, 35)">
+      <polygon points="10,20 70,0 120,20 60,40" fill="#3b82f6" stroke="#1d4ed8" />
+      <polygon points="10,20 60,40 60,85 10,65" fill="#1d4ed8" stroke="#1e3a8a" />
+      <polygon points="60,40 120,20 120,65 60,85" fill="#2563eb" stroke="#1d4ed8" />
+      <text x="35" y="55" font-family="sans-serif" font-size="10" font-weight="900" fill="#ffffff">BOSCH</text>
+    </g>
+
+    <!-- Denso Iridium Spark Plug Box -->
+    <g transform="translate(200, 45)">
+      <polygon points="10,15 50,0 90,15 50,30" fill="#0284c7" />
+      <polygon points="10,15 50,30 50,75 10,60" fill="#0369a1" />
+      <polygon points="50,30 90,15 90,60 50,75" fill="#38bdf8" />
+      <text x="25" y="48" font-family="sans-serif" font-size="8" font-weight="900" fill="#ffffff">DENSO</text>
+    </g>
+
+    <!-- Motul Synthetic Oil Can -->
+    <g transform="translate(310, 30)">
+      <rect x="10" y="15" width="60" height="75" rx="5" fill="#dc2626" stroke="#f87171" stroke-width="2" />
+      <rect x="25" y="0" width="20" height="15" rx="3" fill="#f8fafc" />
+      <text x="40" y="50" font-family="sans-serif" font-size="12" font-weight="900" fill="#ffffff" text-anchor="middle" font-style="italic">MOTUL</text>
+      <text x="40" y="65" font-family="sans-serif" font-size="8" font-weight="700" fill="#fef08a" text-anchor="middle">5W-30</text>
+    </g>
+
+    <!-- Prestone Coolant Jug -->
+    <g transform="translate(390, 35)">
+      <rect x="0" y="15" width="65" height="70" rx="6" fill="#facc15" stroke="#eab308" stroke-width="2" />
+      <rect x="15" y="2" width="20" height="13" rx="3" fill="#0f172a" />
+      <text x="32" y="52" font-family="sans-serif" font-size="10" font-weight="900" fill="#0f172a" text-anchor="middle">PRESTONE</text>
+      <text x="32" y="65" font-family="sans-serif" font-size="7" font-weight="700" fill="#0f172a" text-anchor="middle">COOLANT</text>
+    </g>
+
+    <!-- Bottom Shelf Items -->
+    <!-- Michelin Tire -->
+    <g transform="translate(100, 150)">
+      <circle cx="45" cy="45" r="42" fill="#0f172a" stroke="#334155" stroke-width="14" />
+      <circle cx="45" cy="45" r="28" fill="#1e293b" />
+      <text x="45" y="48" font-family="sans-serif" font-size="7" font-weight="900" fill="#facc15" text-anchor="middle">MICHELIN</text>
+    </g>
+
+    <!-- Castrol Brake Fluid DOT4 -->
+    <g transform="translate(210, 160)">
+      <rect x="0" y="10" width="45" height="70" rx="4" fill="#16a34a" stroke="#22c55e" stroke-width="2" />
+      <rect x="12" y="0" width="15" height="10" rx="2" fill="#f8fafc" />
+      <text x="22" y="42" font-family="sans-serif" font-size="9" font-weight="900" fill="#ffffff" text-anchor="middle">Castrol</text>
+      <text x="22" y="56" font-family="sans-serif" font-size="8" font-weight="700" fill="#fef08a" text-anchor="middle">DOT 4</text>
+    </g>
+
+    <!-- Brembo Ceramic Brake Pad Box -->
+    <g transform="translate(280, 175)">
+      <polygon points="10,15 70,0 130,15 70,30" fill="#ef4444" />
+      <polygon points="10,15 70,30 70,65 10,50" fill="#b91c1c" />
+      <polygon points="70,30 130,15 130,50 70,65" fill="#dc2626" />
+      <text x="40" y="44" font-family="sans-serif" font-size="10" font-weight="900" fill="#ffffff" font-style="italic">brembo</text>
+    </g>
+
+    <!-- QR Code Authenticity Stamp -->
+    <g transform="translate(415, 170)">
+      <rect x="0" y="0" width="55" height="55" rx="4" fill="#ffffff" stroke="#94a3b8" stroke-width="2" />
+      <!-- Simulated QR pattern -->
+      <rect x="6" y="6" width="16" height="16" fill="#0f172a" />
+      <rect x="9" y="9" width="10" height="10" fill="#ffffff" />
+      <rect x="12" y="12" width="4" height="4" fill="#0f172a" />
+      <rect x="33" y="6" width="16" height="16" fill="#0f172a" />
+      <rect x="36" y="9" width="10" height="10" fill="#ffffff" />
+      <rect x="39" y="12" width="4" height="4" fill="#0f172a" />
+      <rect x="6" y="33" width="16" height="16" fill="#0f172a" />
+      <rect x="9" y="36" width="10" height="10" fill="#ffffff" />
+      <rect x="12" y="39" width="4" height="4" fill="#0f172a" />
+      <text x="27" y="66" font-family="sans-serif" font-size="7" font-weight="700" fill="#22c55e" text-anchor="middle">CHÍNH HÃNG</text>
+    </g>
+  </g>
+
+  <text x="400" y="445" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#f8fafc" text-anchor="middle">
+    KHO PHỤ TÙNG &amp; VẬT TƯ TIÊU CHUẨN CHÍNH HÃNG
+  </text>
+  <text x="400" y="470" font-family="system-ui, sans-serif" font-size="13" font-weight="500" fill="#94a3b8" text-anchor="middle">
+    Tem mã QR truy xuất nguồn gốc · Bảo hành điện tử 36 tháng · AutoGarage Tây Sơn
+  </text>
+</svg>

@@ -18,18 +18,77 @@ import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { dateTime } from '../../../shared/utils/format';
 import type { AuditEvent, UiPolicy } from '../../../shared/types/contracts';
 import { useAuditEventsQuery } from '../hooks/useAuditEvents';
-const actionLabels: Record<string, string> = {
-  USER_DELETED: 'Xóa tài khoản',
-  AUTH_LOGIN: 'Đăng nhập',
-  AUTH_LOGIN_FAILED: 'Đăng nhập thất bại',
-  AUTH_LOGOUT_ALL: 'Đăng xuất',
-  ADMIN_BOOTSTRAPPED: 'Khởi tạo quản trị viên',
-  USER_CREATED: 'Tạo tài khoản',
-  USER_UPDATED: 'Cập nhật tài khoản',
-  USER_PASSWORD_CHANGED: 'Đổi mật khẩu',
-  NOTIFICATION_ENQUEUED: 'Tạo thông báo',
-  NOTIFICATION_READ: 'Đọc thông báo',
+const actionInfo: Record<string, { label: string; description: string }> = {
+  AUTH_LOGIN: { label: 'Đăng nhập', description: 'Đăng nhập vào hệ thống thành công.' },
+  AUTH_LOGIN_FAILED: {
+    label: 'Đăng nhập thất bại',
+    description: 'Nhập sai thông tin hoặc tài khoản bị khóa.',
+  },
+  AUTH_LOGOUT_ALL: {
+    label: 'Đăng xuất',
+    description: 'Đăng xuất và thu hồi mọi phiên đăng nhập trên các thiết bị.',
+  },
+  ADMIN_BOOTSTRAPPED: {
+    label: 'Khởi tạo quản trị viên',
+    description: 'Tạo tài khoản quản trị đầu tiên của hệ thống.',
+  },
+  CUSTOMER_JIT_PROVISIONED: {
+    label: 'Tự tạo hồ sơ khách hàng',
+    description: 'Hệ thống tự tạo tài khoản khách hàng ở lần đăng nhập đầu tiên.',
+  },
+  USER_CREATED: { label: 'Tạo tài khoản', description: 'Thêm một tài khoản người dùng mới.' },
+  USER_UPDATED: {
+    label: 'Cập nhật tài khoản',
+    description: 'Sửa thông tin, vai trò hoặc trạng thái của tài khoản.',
+  },
+  USER_DELETED: { label: 'Xóa tài khoản', description: 'Xóa một tài khoản người dùng.' },
+  USER_PASSWORD_CHANGED: {
+    label: 'Đổi mật khẩu',
+    description: 'Mật khẩu của tài khoản đã được thay đổi.',
+  },
+  NOTIFICATION_ENQUEUED: {
+    label: 'Tạo thông báo',
+    description: 'Gửi một thông báo tới người dùng.',
+  },
+  NOTIFICATION_BROADCAST: {
+    label: 'Gửi thông báo hàng loạt',
+    description: 'Gửi một thông báo tới nhiều người dùng cùng lúc.',
+  },
+  NOTIFICATION_READ: { label: 'Đọc thông báo', description: 'Người dùng đã đọc một thông báo.' },
+  NOTIFICATION_DELETED: { label: 'Xóa thông báo', description: 'Xóa một thông báo.' },
+  CREATE_EMPLOYEE: { label: 'Thêm nhân viên', description: 'Thêm một nhân viên mới vào xưởng.' },
+  UPDATE_EMPLOYEE: { label: 'Cập nhật nhân viên', description: 'Sửa thông tin nhân viên.' },
+  DEACTIVATE_EMPLOYEE: {
+    label: 'Ngừng hoạt động nhân viên',
+    description: 'Nhân viên không còn được xếp ca làm việc.',
+  },
+  CREATE_SHIFT: { label: 'Tạo ca làm việc', description: 'Xếp một ca làm việc cho nhân viên.' },
+  CANCEL_SHIFT: { label: 'Hủy ca làm việc', description: 'Hủy một ca làm việc đã xếp.' },
+  CREATE_BAY: { label: 'Thêm khoang sửa chữa', description: 'Thêm một khoang sửa chữa mới.' },
+  UPDATE_BAY: { label: 'Cập nhật khoang sửa chữa', description: 'Sửa thông tin khoang sửa chữa.' },
+  DEACTIVATE_BAY: {
+    label: 'Ngừng sử dụng khoang',
+    description: 'Khoang sửa chữa không còn nhận xe.',
+  },
+  SCHEDULE_MAINTENANCE: {
+    label: 'Lên lịch bảo trì khoang',
+    description: 'Đặt lịch bảo trì, khoang tạm ngưng nhận xe trong thời gian đó.',
+  },
 };
+const entityLabels: Record<string, string> = {
+  USER: 'Tài khoản',
+  NOTIFICATION: 'Thông báo',
+  Employee: 'Nhân viên',
+  EmployeeShift: 'Ca làm việc',
+  ServiceBay: 'Khoang sửa chữa',
+  BayReservation: 'Lịch giữ khoang',
+};
+const actionLabel = (action: string) => actionInfo[action]?.label ?? action;
+const entityText = (type: string, id: string | null) =>
+  `${entityLabels[type] ?? type}${id ? ` #${id}` : ''}`;
+const actionLabels = Object.fromEntries(
+  Object.entries(actionInfo).map(([code, info]) => [code, info.label]),
+);
 export function safeAuditDetails(raw: string | null) {
   if (!raw) return 'Không có metadata bổ sung.';
   try {
@@ -81,8 +140,8 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
         header: 'Hành động',
         cell: ({ row }) => (
           <div className="two-lines">
-            <strong>{actionLabels[row.original.action] ?? row.original.action}</strong>
-            <span>{row.original.action}</span>
+            <strong>{actionLabel(row.original.action)}</strong>
+            <span>{actionInfo[row.original.action]?.description ?? row.original.action}</span>
           </div>
         ),
       },
@@ -97,11 +156,7 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
       {
         accessorKey: 'entityType',
         header: 'Đối tượng',
-        cell: ({ row }) => (
-          <span>
-            {row.original.entityType} {row.original.entityId && `#${row.original.entityId}`}
-          </span>
-        ),
+        cell: ({ row }) => <span>{entityText(row.original.entityType, row.original.entityId)}</span>,
       },
       {
         id: 'details',
@@ -214,9 +269,11 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
           {selected && (
             <>
               <dl className="detail-list">
-                <ReadOnlyField label="Hành động">
-                  {actionLabels[selected.action] ?? selected.action}
+                <ReadOnlyField label="Hành động">{actionLabel(selected.action)}</ReadOnlyField>
+                <ReadOnlyField label="Mô tả">
+                  {actionInfo[selected.action]?.description ?? 'Không có mô tả.'}
                 </ReadOnlyField>
+                <ReadOnlyField label="Mã kỹ thuật">{selected.action}</ReadOnlyField>
                 <ReadOnlyField label="Thời gian">
                   {dateTime(selected.createdAt, policy.garageTimeZone)}
                 </ReadOnlyField>
@@ -226,7 +283,7 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
                     : 'Không xác định / hệ thống'}
                 </ReadOnlyField>
                 <ReadOnlyField label="Đối tượng">
-                  {selected.entityType} {selected.entityId && `#${selected.entityId}`}
+                  {entityText(selected.entityType, selected.entityId)}
                 </ReadOnlyField>
               </dl>
               <h3>Metadata</h3>

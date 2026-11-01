@@ -11,17 +11,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class BookingMapper {
 
-    public Booking toEntity(CreateBookingRequest request) {
+    public Booking toEntity(CreateBookingRequest request, Long customerId, Long vehicleId, Long actorUserId) {
         if (request == null) {
             return null;
         }
         Booking booking = new Booking();
-        booking.setCustomerId(request.getCustomerId());
-        booking.setVehicleId(request.getVehicleId());
+        booking.setCustomerId(customerId);
+        booking.setVehicleId(vehicleId);
         booking.setServiceId(request.getServiceId());
         booking.setAppointmentAt(request.getAppointmentAt());
         booking.setRequestDescription(request.getRequestDescription() != null ? request.getRequestDescription().trim() : null);
-        booking.setCreatedBy(request.getCreatedBy());
+        booking.setCreatedBy(actorUserId);
         return booking;
     }
 

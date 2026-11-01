@@ -11,14 +11,8 @@ import {
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
-import {
-  Badge,
-  Button,
-  Field,
-  Loading,
-  Modal,
-  PageHeader,
-} from '../../../shared/components/ui';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { Badge, Button, Field, Loading, Modal, PageHeader } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
@@ -44,6 +38,8 @@ const sortOptions = [
 export function PaymentsPage() {
   const compact = useMediaQuery('(max-width: 640px)');
   const notify = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
 
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query);
@@ -85,7 +81,8 @@ export function PaymentsPage() {
   const paySupplierMutation = usePaySupplierMutation();
 
   const filterCount = (query.trim() ? 1 : 0) + (direction !== '' ? 1 : 0);
-  const isFiltered = query.length > 0 || direction !== '' || sortField !== 'id' || sortDir !== 'desc';
+  const isFiltered =
+    query.length > 0 || direction !== '' || sortField !== 'id' || sortDir !== 'desc';
 
   const handleResetFilters = () => {
     setQuery('');
@@ -162,7 +159,7 @@ export function PaymentsPage() {
                 </strong>
                 <div style={{ marginTop: '2px' }}>
                   <Badge variant={isIncome ? 'success' : 'danger'}>
-                    {isIncome ? 'Thu tiền (IN)' : 'Chi tiền (OUT)'}
+                    {isIncome ? 'Thu tiền khách' : 'Chi trả nhà cung cấp'}
                   </Badge>
                 </div>
               </div>
@@ -206,7 +203,8 @@ export function PaymentsPage() {
                 color: isIncome ? '#059669' : '#b42335',
               }}
             >
-              {isIncome ? '+' : '-'}{Number(row.original.amount).toLocaleString('vi-VN')} đ
+              {isIncome ? '+' : '-'}
+              {Number(row.original.amount).toLocaleString('vi-VN')} đ
             </span>
           );
         },
@@ -260,21 +258,20 @@ export function PaymentsPage() {
         title="Sổ quỹ Thu / Chi"
         description="Nhật ký giao dịch thu tiền khách hàng và thanh toán tiền hàng nhà cung cấp."
         actions={
-          <Button
-            variant="primary"
-            ref={createTrigger}
-            onClick={() => setPayingSupplier(true)}
-          >
-            <Plus size={18} />
-            <span>Lập phiếu chi trả NCC</span>
-          </Button>
+          isAdmin ? (
+            <Button variant="primary" ref={createTrigger} onClick={() => setPayingSupplier(true)}>
+              <Plus size={18} />
+              <span>Lập phiếu chi trả NCC</span>
+            </Button>
+          ) : undefined
         }
       />
 
       <div className="info-strip">
         <DollarSign size={18} />
         <span>
-          Mọi giao dịch thu tiền (IN) và chi trả (OUT) đều phát sinh mã giao dịch duy nhất bất biến và khóa tham chiếu chứng từ tương ứng, chống thanh toán vượt hoặc lặp giao dịch.
+          Mọi giao dịch thu tiền khách hàng và chi trả nhà cung cấp đều được lưu vết đầy đủ để phục
+          vụ đối soát quỹ và công nợ.
         </span>
       </div>
 
@@ -341,13 +338,14 @@ export function PaymentsPage() {
               <div className="status-segments">
                 {[
                   { value: '', label: 'Tất cả' },
-                  { value: 'IN', label: 'Thu tiền (IN)' },
-                  { value: 'OUT', label: 'Chi trả (OUT)' },
+                  { value: 'IN', label: 'Thu tiền khách' },
+                  { value: 'OUT', label: 'Chi trả nhà cung cấp' },
                 ].map((opt) => (
                   <button
                     key={opt.label}
                     type="button"
                     className={direction === opt.value ? 'selected' : ''}
+                    aria-pressed={direction === opt.value}
                     onClick={() => {
                       setDirection(opt.value as PaymentDirection | '');
                       setPage(0);
@@ -403,16 +401,32 @@ export function PaymentsPage() {
                     gap: '8px',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <div>
-                      <strong style={{ fontSize: '15px', fontFamily: 'monospace' }}>{p.transactionCode}</strong>
-                      <div className="muted" style={{ fontSize: '12px' }}>{p.invoiceCode || p.documentCode}</div>
+                      <strong style={{ fontSize: '15px', fontFamily: 'monospace' }}>
+                        {p.transactionCode}
+                      </strong>
+                      <div className="muted" style={{ fontSize: '12px' }}>
+                        {p.invoiceCode || p.documentCode}
+                      </div>
                     </div>
                     <Badge variant={isIncome ? 'success' : 'danger'}>
                       {isIncome ? '+ Thu tiền' : '- Chi tiền'}
                     </Badge>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
                     <span
                       style={{
                         fontSize: '16px',
@@ -424,7 +438,16 @@ export function PaymentsPage() {
                     </span>
                     {renderMethodBadge(p.paymentMethod)}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b', paddingTop: '6px', borderTop: '1px solid #f0f2f5' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: '11px',
+                      color: '#64748b',
+                      paddingTop: '6px',
+                      borderTop: '1px solid #f0f2f5',
+                    }}
+                  >
                     <span>{new Date(p.paidAt).toLocaleString('vi-VN')}</span>
                     <span>{p.recordedByName || ''}</span>
                   </div>
@@ -444,8 +467,14 @@ export function PaymentsPage() {
         {/* Phân trang */}
         <div className="pagination" style={{ borderTop: '1px solid var(--border)' }}>
           <div className="pagination-info">
-            Hiển thị <strong>{paymentsList.length > 0 ? 1 : 0}–{paymentsList.length}</strong> trong <strong>{totalElements}</strong> kết quả
-            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>Trang {page + 1} / {totalPages}</span>
+            Hiển thị{' '}
+            <strong>
+              {paymentsList.length > 0 ? 1 : 0}–{paymentsList.length}
+            </strong>{' '}
+            trong <strong>{totalElements}</strong> kết quả
+            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>
+              Trang {page + 1} / {totalPages}
+            </span>
           </div>
           <div className="pagination-controls">
             <Button
@@ -563,7 +592,11 @@ export function PaymentsPage() {
           </Field>
 
           <div className="modal-form-actions full-width">
-            <Button variant="secondary" onClick={() => setPayingSupplier(false)} disabled={paySupplierMutation.isPending}>
+            <Button
+              variant="secondary"
+              onClick={() => setPayingSupplier(false)}
+              disabled={paySupplierMutation.isPending}
+            >
               Hủy
             </Button>
             <Button variant="primary" type="submit" pending={paySupplierMutation.isPending}>

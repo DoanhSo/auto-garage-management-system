@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="b4Bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b1120" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="b4Cart" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <pattern id="b4Stripes" width="24" height="24" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="12" height="24" fill="#eab308" />
+      <rect x="12" width="12" height="24" fill="#0f172a" />
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="500" fill="url(#b4Bg)" />
+
+  <!-- Floor Perspective -->
+  <polygon points="50,370 750,370 800,500 0,500" fill="#1e293b" opacity="0.9" />
+  <polygon points="70,380 730,380 740,392 60,392" fill="url(#b4Stripes)" />
+  <line x1="70" y1="392" x2="730" y2="392" stroke="#eab308" stroke-width="2" />
+
+  <!-- Vehicle Silhouette on Low Scissor Lift -->
+  <g transform="translate(100, 150)">
+    <!-- Scissor Lift Base Under Vehicle -->
+    <rect x="60" y="165" width="280" height="15" rx="3" fill="#475569" stroke="#334155" stroke-width="2" />
+    <line x1="90" y1="165" x2="150" y2="125" stroke="#f59e0b" stroke-width="6" stroke-linecap="round" />
+    <line x1="150" y1="165" x2="90" y2="125" stroke="#f59e0b" stroke-width="6" stroke-linecap="round" />
+    <line x1="250" y1="165" x2="310" y2="125" stroke="#f59e0b" stroke-width="6" stroke-linecap="round" />
+    <line x1="310" y1="165" x2="250" y2="125" stroke="#f59e0b" stroke-width="6" stroke-linecap="round" />
+    <rect x="70" y="115" width="260" height="12" rx="2" fill="#475569" />
+
+    <!-- Car Hood Open Side Profile -->
+    <path d="M20,115 L320,115 C330,115 340,105 340,95 L330,75 C310,40 240,35 180,45 L80,50 C40,55 20,80 20,115 Z" fill="#1e293b" stroke="#475569" stroke-width="2" />
+    <!-- Open Hood Prop -->
+    <line x1="30" y1="75" x2="10" y2="20" stroke="#f97316" stroke-width="5" stroke-linecap="round" />
+    <line x1="25" y1="70" x2="12" y2="35" stroke="#cbd5e1" stroke-width="2" />
+    <!-- Engine Bay Glimpse -->
+    <rect x="25" y="70" width="55" height="25" rx="2" fill="#0f172a" stroke="#64748b" stroke-width="1" />
+    <!-- Wheels -->
+    <circle cx="90" cy="115" r="28" fill="#0f172a" stroke="#64748b" stroke-width="4" />
+    <circle cx="270" cy="115" r="28" fill="#0f172a" stroke="#64748b" stroke-width="4" />
+  </g>
+
+  <!-- Diagnostic Mobile Station Cart (Center-Right) -->
+  <g transform="translate(460, 160)">
+    <!-- Cart Frame -->
+    <rect x="10" y="60" width="100" height="150" rx="4" fill="url(#b4Cart)" stroke="#0284c7" stroke-width="2" />
+    <rect x="5" y="210" width="110" height="12" rx="3" fill="#1e293b" />
+    <circle cx="15" cy="226" r="6" fill="#0f172a" />
+    <circle cx="105" cy="226" r="6" fill="#0f172a" />
+
+    <!-- Big Diagnostic Tablet with Waveform Screen -->
+    <rect x="-10" y="-30" width="140" height="90" rx="6" fill="#090d16" stroke="#38bdf8" stroke-width="2.5" />
+    <!-- Screen Header -->
+    <rect x="-10" y="-30" width="140" height="18" rx="6" fill="#1e293b" />
+    <text x="60" y="-17" font-family="monospace" font-size="9" font-weight="900" fill="#38bdf8" text-anchor="middle">OBD-II LIVE TELEMETRY</text>
+    <!-- Scope Grid & Waveform Graph -->
+    <g stroke="#1e3a8a" stroke-width="0.8">
+      <line x1="-5" y1="5" x2="125" y2="5" />
+      <line x1="-5" y1="25" x2="125" y2="25" />
+      <line x1="-5" y1="45" x2="125" y2="45" />
+      <line x1="30" y1="-10" x2="30" y2="55" />
+      <line x1="70" y1="-10" x2="70" y2="55" />
+      <line x1="100" y1="-10" x2="100" y2="55" />
+    </g>
+    <!-- Glowing Green Oscilloscope Waveform -->
+    <path d="M-5,25 Q15,5 30,25 T60,25 Q75,-5 85,25 T125,25" fill="none" stroke="#22c55e" stroke-width="2.5" />
+    <text x="0" y="52" font-family="monospace" font-size="8" font-weight="700" fill="#4ade80">CAN-BUS: 500kbps OK</text>
+
+    <!-- Cable Leading to Car OBD port -->
+    <path d="M-10,35 C-70,50 -120,80 -200,100" fill="none" stroke="#f59e0b" stroke-width="3" stroke-dasharray="3,3" />
+  </g>
+
+  <!-- Automated A/C Recovery & Recharging Station (Far Right) -->
+  <g transform="translate(620, 180)">
+    <!-- Machine Enclosure -->
+    <rect x="0" y="40" width="110" height="170" rx="6" fill="#1e293b" stroke="#64748b" stroke-width="2" />
+    <rect x="10" y="55" width="90" height="22" rx="3" fill="#0f172a" />
+    <text x="55" y="70" font-family="system-ui, sans-serif" font-size="10" font-weight="900" fill="#ffffff" text-anchor="middle">TEXA R134a/1234yf</text>
+    <!-- Dual Pressure Gauges: Blue (Low), Red (High) -->
+    <circle cx="35" cy="110" r="18" fill="#0284c7" stroke="#ffffff" stroke-width="2" />
+    <line x1="35" y1="110" x2="42" y2="102" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+    <circle cx="75" cy="110" r="18" fill="#dc2626" stroke="#ffffff" stroke-width="2" />
+    <line x1="75" y1="110" x2="82" y2="104" stroke="#ffffff" stroke-width="2" stroke-linecap="round" />
+    <!-- Hoses to Car -->
+    <path d="M35,128 C35,160 -50,150 -140,120" fill="none" stroke="#0284c7" stroke-width="3" />
+    <path d="M75,128 C75,170 -40,160 -130,125" fill="none" stroke="#dc2626" stroke-width="3" />
+    <!-- Wheels -->
+    <circle cx="15" cy="216" r="6" fill="#0f172a" />
+    <circle cx="95" cy="216" r="6" fill="#0f172a" />
+  </g>
+
+  <!-- Bay Header Badge -->
+  <g transform="translate(40, 30)">
+    <rect x="0" y="0" width="220" height="32" rx="6" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" />
+    <circle cx="18" cy="16" r="6" fill="#38bdf8" />
+    <text x="34" y="21" font-family="system-ui, sans-serif" font-size="13" font-weight="800" fill="#ffffff" letter-spacing="0.5">
+      BAY-04 · CHẨN ĐOÁN & ĐIỆN
+    </text>
+  </g>
+
+  <!-- Bay Floor Marking -->
+  <text x="400" y="475" font-family="system-ui, sans-serif" font-size="28" font-weight="900" fill="#334155" text-anchor="middle" letter-spacing="4">
+    KHOANG 04 · OBD-II & CLIMATE DIAGNOSTICS
+  </text>
+</svg>

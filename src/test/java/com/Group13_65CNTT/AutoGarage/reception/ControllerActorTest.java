@@ -33,17 +33,16 @@ class ControllerActorTest {
     @InjectMocks AttachmentController attachmentController;
 
     @Test
-    void bookingCreationOverwritesCallerSuppliedActor() {
+    void bookingCreationUsesAuthenticatedActor() {
         when(currentUserProvider.userId()).thenReturn(42L);
         CreateBookingRequest request = new CreateBookingRequest();
-        request.setCreatedBy(1L);
         BookingResponse response = new BookingResponse();
         response.setId(9L);
-        when(bookingService.createBooking(request)).thenReturn(response);
+        when(bookingService.createBooking(request, 42L)).thenReturn(response);
 
         bookingController.createBooking(request, new MockHttpServletRequest());
 
-        verify(bookingService).createBooking(org.mockito.ArgumentMatchers.argThat(value -> value.getCreatedBy().equals(42L)));
+        verify(bookingService).createBooking(request, 42L);
     }
 
     @Test

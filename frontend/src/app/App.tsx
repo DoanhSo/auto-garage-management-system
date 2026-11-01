@@ -21,8 +21,16 @@ import {
   FINANCE_ROLES,
   FRONT_DESK_ROLES,
   BOOKING_ROLES,
+  REPAIR_VIEW_ROLES,
+  INVOICE_VIEW_ROLES,
+  homePathForRole,
 } from './access';
 
+const HomePage = lazy(() =>
+  import('../features/home/pages/HomePage').then((module) => ({
+    default: module.HomePage,
+  })),
+);
 const LoginPage = lazy(() =>
   import('../features/auth/pages/LoginPage').then((module) => ({
     default: module.LoginPage,
@@ -155,10 +163,7 @@ export function RequireAdmin() {
 
 function Home() {
   const { user } = useAuth();
-  if (user?.role === 'ADMIN') return <Navigate to="/admin/reports" replace />;
-  if (user?.role === 'WAREHOUSE_STAFF') return <Navigate to="/inventory/parts" replace />;
-  if (user?.role === 'RECEPTIONIST') return <Navigate to="/billing/invoices" replace />;
-  return <Navigate to="/notifications" replace />;
+  return <Navigate to={homePathForRole(user?.role)} replace />;
 }
 
 function StatusPage({ forbidden = false }: { forbidden?: boolean }) {
@@ -211,6 +216,9 @@ const router = createBrowserRouter([
   {
     errorElement: <RouteError />,
     children: [
+      { path: '/', element: <HomePage /> },
+      { path: '/home', element: <Navigate to="/" replace /> },
+      { path: '/landing', element: <Navigate to="/" replace /> },
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegistrationPage /> },
       {
@@ -219,7 +227,7 @@ const router = createBrowserRouter([
           {
             element: <AppShell />,
             children: [
-              { index: true, element: <Home /> },
+              { path: 'workspace', element: <Home /> },
               {
                 element: <RequireRoles allowedRoles={BOOKING_ROLES} />,
                 children: [
@@ -235,18 +243,27 @@ const router = createBrowserRouter([
               { path: 'notifications', element: <NotificationsPage /> },
               { path: 'account/security', element: <AccountPage /> },
               {
+                element: <RequireRoles allowedRoles={REPAIR_VIEW_ROLES} />,
+                children: [{ path: 'repair-orders', element: <RepairOrdersPage /> }],
+              },
+              {
+                element: <RequireRoles allowedRoles={INVOICE_VIEW_ROLES} />,
+                children: [{ path: 'billing/invoices', element: <InvoicesPage /> }],
+              },
+              {
                 element: <RequireRoles allowedRoles={STAFF_ROLES} />,
                 children: [
-                  { path: 'repair-orders', element: <RepairOrdersPage /> },
                   { path: 'repairs', element: <RepairOrdersPage /> },
                   { path: 'estimates', element: <EstimatesPage /> },
                   { path: 'scheduling', element: <SchedulingPage /> },
                   { path: 'warranties', element: <WarrantiesPage /> },
                   { path: 'inventory/parts', element: <PartsPage /> },
                   { path: 'inventory/documents', element: <InventoryDocumentsPage /> },
-                  { path: 'billing/invoices', element: <InvoicesPage /> },
-                  { path: 'billing/payments', element: <PaymentsPage /> },
                 ],
+              },
+              {
+                element: <RequireRoles allowedRoles={FINANCE_ROLES} />,
+                children: [{ path: 'billing/payments', element: <PaymentsPage /> }],
               },
               {
                 element: <RequireRoles allowedRoles={WAREHOUSE_ROLES} />,

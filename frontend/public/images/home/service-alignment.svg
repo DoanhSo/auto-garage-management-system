@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="aBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a192f" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="laserGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ef4444" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#f87171" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#ef4444" stop-opacity="0.9" />
+    </linearGradient>
+    <filter id="laserGlow">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="800" height="500" fill="url(#aBg)" />
+
+  <!-- Badge Hunter -->
+  <rect x="50" y="40" width="180" height="34" rx="6" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5" />
+  <text x="140" y="62" font-family="system-ui, sans-serif" font-size="12" font-weight="800" fill="#fca5a5" text-anchor="middle" letter-spacing="1">
+    HUNTER HAWKEYE ELITE 3D
+  </text>
+
+  <!-- 3D Wheel Alignment Target Matrix -->
+  <g transform="translate(160, 100)">
+    <!-- 3D Optical Target Reflector (Hexagonal Board with Reflective Dots) -->
+    <g transform="translate(40, 40) skewY(10)">
+      <rect x="0" y="0" width="140" height="180" rx="12" fill="#1e293b" stroke="#38bdf8" stroke-width="3" />
+      <!-- Checkerboard Targets -->
+      <circle cx="40" cy="50" r="22" fill="#0284c7" />
+      <circle cx="100" cy="50" r="22" fill="#0f172a" stroke="#38bdf8" stroke-width="3" />
+      <circle cx="40" cy="120" r="22" fill="#0f172a" stroke="#38bdf8" stroke-width="3" />
+      <circle cx="100" cy="120" r="22" fill="#0284c7" />
+      <circle cx="70" cy="85" r="8" fill="#ef4444" />
+    </g>
+
+    <!-- Center Hub Adapter Clamp (Gắn mâm xe) -->
+    <rect x="180" y="110" width="30" height="80" rx="4" fill="#64748b" stroke="#94a3b8" stroke-width="2" />
+    
+    <!-- Big Wheel in Perspective -->
+    <g transform="translate(200, 30)">
+      <ellipse cx="90" cy="150" rx="60" ry="120" fill="#0f172a" stroke="#475569" stroke-width="14" />
+      <ellipse cx="90" cy="150" rx="42" ry="85" fill="#1e293b" stroke="#94a3b8" stroke-width="4" />
+      <!-- Multi-spoke Rim -->
+      <line x1="90" y1="65" x2="90" y2="235" stroke="#cbd5e1" stroke-width="5" />
+      <line x1="48" y1="110" x2="132" y2="190" stroke="#cbd5e1" stroke-width="5" />
+      <line x1="48" y1="190" x2="132" y2="110" stroke="#cbd5e1" stroke-width="5" />
+      <!-- Brembo Big Brake Caliper -->
+      <path d="M75,90 A45,70 0 0,1 115,115" stroke="#ef4444" stroke-width="12" fill="none" stroke-linecap="round" />
+      <ellipse cx="90" cy="150" rx="14" ry="25" fill="#f8fafc" />
+    </g>
+
+    <!-- Laser Projection Beams from High-Def Cameras -->
+    <g filter="url(#laserGlow)">
+      <line x1="480" y1="40" x2="80" y2="140" stroke="url(#laserGrad)" stroke-width="2.5" stroke-dasharray="8,4" />
+      <line x1="480" y1="50" x2="80" y2="200" stroke="url(#laserGrad)" stroke-width="2.5" stroke-dasharray="8,4" />
+      <line x1="480" y1="60" x2="290" y2="180" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6,3" />
+    </g>
+
+    <!-- Hunter Camera Tower on Right -->
+    <g transform="translate(430, 20)">
+      <rect x="50" y="0" width="28" height="240" rx="4" fill="#334155" stroke="#64748b" stroke-width="2" />
+      <!-- Camera Heads -->
+      <rect x="25" y="20" width="78" height="35" rx="6" fill="#0f172a" stroke="#ef4444" stroke-width="2" />
+      <circle cx="45" cy="37" r="10" fill="#ef4444" filter="url(#laserGlow)" />
+      <circle cx="80" cy="37" r="8" fill="#38bdf8" />
+
+      <!-- Digital Angle Readout Panel -->
+      <g transform="translate(-40, 90)">
+        <rect x="0" y="0" width="120" height="60" rx="6" fill="#0f172a" stroke="#22c55e" stroke-width="1.5" />
+        <text x="60" y="22" font-family="monospace" font-size="11" font-weight="700" fill="#22c55e" text-anchor="middle">
+          CAMBER: -0°25'
+        </text>
+        <text x="60" y="38" font-family="monospace" font-size="11" font-weight="700" fill="#22c55e" text-anchor="middle">
+          TOE IN: +0°05'
+        </text>
+        <text x="60" y="52" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#38bdf8" text-anchor="middle">
+          ✓ CHUẨN THÔNG SỐ
+        </text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Bottom Caption -->
+  <text x="400" y="445" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#f8fafc" text-anchor="middle">
+    CÂN CHỈNH GÓC LÁI &amp; ĐỘ CHỤM 3D HUNTER
+  </text>
+  <text x="400" y="470" font-family="system-ui, sans-serif" font-size="13" font-weight="500" fill="#94a3b8" text-anchor="middle">
+    Triệt tiêu nhao lái, ăn mòn lốp không đều · In phiếu kết quả trước và sau cân chỉnh
+  </text>
+</svg>

@@ -67,7 +67,7 @@ public class AuthServiceImpl implements AuthService {
             }
         }
         if (user.getRole() == Role.CUSTOMER && customerRepository != null) {
-            linkExistingCustomerByVerifiedEmail(user);
+            ensureCustomerProfileLinked(user);
         }
         return userMapper.toResponse(user);
     }

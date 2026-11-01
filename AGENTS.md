@@ -39,3 +39,9 @@
 - Desktop chia field thành hai cột bằng nhau, căn thẳng hàng; mobile một cột. Trường nội dung dài, lỗi chung và hàng nút chiếm trọn hàng. Cùng một đối tượng dùng cùng thứ tự/nhóm trường ở form thêm và sửa.
 - Form thông thường phải vừa khung nhìn và thấy được hàng nút, không mặc định cuộn nội bộ/cuộn ngang. Form dài chia thành bước hoặc nhóm hợp lý; không dùng chiều cao cố định, cắt nội dung hay thu nhỏ chữ để ép vừa. Khi zoom/mở bàn phím, cho phép cuộn tối thiểu cần thiết để mọi trường và nút vẫn truy cập được; không cuộn lồng nhiều lớp.
 - Giữ thống nhất label, validation, loading, lỗi API, xác nhận xóa và vị trí nút Hủy/Lưu. Khi sửa layout dùng chung, kiểm tra các màn bị ảnh hưởng trên desktop/mobile, bàn phím và lỗi validation; không coi việc thêm quy chuẩn là đã sửa xong UI hiện tại.
+
+## Quy trình phối hợp Multi-Model: Gemini (Planner/Verifier) & Claude (Coder)
+
+- **`PLAN:` (Planner - ưu tiên Gemini Pro)**: Không sửa code ứng dụng. Khảo sát codebase và guideline, xuất kế hoạch chi tiết vào `docs/CURRENT_PLAN.md` gồm: (1) Mục tiêu, (2) Danh sách đường dẫn file & vị trí cần sửa, (3) Hợp đồng kỹ thuật (`ResponseCode`, DTO, `@PreAuthorize`, UI component), (4) Checklist `[ ] Step 1`, `[ ] Step 2`...
+- **`CODE:` (Coder - ưu tiên Claude Pro)**: Đọc `docs/CURRENT_PLAN.md` trước tiên. Chỉ đọc các file đã chỉ định trong Plan, không grep/quét diện rộng lại toàn bộ dự án để tiết kiệm token. Sửa code theo đúng kiến trúc 7 tầng, đánh dấu `[x]` vào `docs/CURRENT_PLAN.md` và phản hồi ngắn gọn.
+- **`VERIFY:` (Verifier - ưu tiên Gemini Pro)**: Đối chiếu `docs/CURRENT_PLAN.md` với `git diff`, chạy Maven wrapper test/package và bàn giao kết quả thực tế.

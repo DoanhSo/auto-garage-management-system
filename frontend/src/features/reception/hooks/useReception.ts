@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { receptionApi, type BookingQueryParams } from '../api/receptionApi';
+import { customerKeys } from '../../customer/hooks/useCustomers';
+import { vehicleKeys } from '../../vehicle/hooks/useVehicles';
 import type {
   BookingCreate,
   BookingReschedule,
@@ -38,8 +40,10 @@ export function useCreateBookingMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (values: BookingCreate) => receptionApi.createBooking(values),
-    onSuccess: () => {
+    onSuccess: (_booking, values) => {
       queryClient.invalidateQueries({ queryKey: receptionKeys.bookings() });
+      if (values.newCustomer) queryClient.invalidateQueries({ queryKey: customerKeys.all });
+      if (values.newVehicle) queryClient.invalidateQueries({ queryKey: vehicleKeys.all });
     },
   });
 }

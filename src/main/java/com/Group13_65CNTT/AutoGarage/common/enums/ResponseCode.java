@@ -39,6 +39,15 @@ public enum ResponseCode {
             "Configured bootstrap account is not an active administrator",
             HttpStatus.CONFLICT),
     UPLOAD_TOO_LARGE(2013, "Upload exceeds the configured size limit", HttpStatus.PAYLOAD_TOO_LARGE),
+    CUSTOMER_PHONE_DUPLICATE(
+            2014, "Phone number already belongs to another customer", HttpStatus.CONFLICT),
+    VEHICLE_PLATE_DUPLICATE(2015, "License plate already exists", HttpStatus.CONFLICT),
+    BOOKING_CUSTOMER_SOURCE_INVALID(
+            2016, "Provide exactly one of customerId or newCustomer", HttpStatus.BAD_REQUEST),
+    BOOKING_VEHICLE_SOURCE_INVALID(
+            2017, "Provide exactly one of vehicleId or newVehicle", HttpStatus.BAD_REQUEST),
+    BOOKING_VEHICLE_OWNER_MISMATCH(
+            2018, "Vehicle does not belong to the selected customer", HttpStatus.BAD_REQUEST),
     UNAUTHORIZED(3001, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),
     FORBIDDEN(3002, "You do not have permission for this operation", HttpStatus.FORBIDDEN),
     INVALID_TOKEN(3003, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),

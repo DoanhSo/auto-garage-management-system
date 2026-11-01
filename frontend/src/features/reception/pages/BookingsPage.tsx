@@ -158,7 +158,7 @@ export function BookingsPage() {
           <div>
             <span className="plate-badge">{row.original.licensePlate}</span>
             {row.original.vehicleModel && (
-              <div className="muted nowrap" style={{ marginTop: 2 }}>
+              <div className="muted" style={{ marginTop: 2 }}>
                 {row.original.vehicleModel}
               </div>
             )}
@@ -172,7 +172,7 @@ export function BookingsPage() {
           <div>
             <span>{row.original.serviceName || 'Khám tổng quát'}</span>
             {row.original.requestDescription && (
-              <div className="muted nowrap" style={{ marginTop: 2 }}>
+              <div className="muted" style={{ marginTop: 2 }}>
                 {row.original.requestDescription}
               </div>
             )}

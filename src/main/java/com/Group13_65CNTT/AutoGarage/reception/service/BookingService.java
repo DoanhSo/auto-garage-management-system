@@ -11,7 +11,7 @@ import java.util.List;
 
 public interface BookingService {
 
-    BookingResponse createBooking(CreateBookingRequest request);
+    BookingResponse createBooking(CreateBookingRequest request, Long actorUserId);
 
     BookingResponse confirmBooking(Long id, Long actorUserId);
 

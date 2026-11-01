@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { WAREHOUSE_ROLES } from '../../../app/access';
 import {
   Badge,
   Button,
@@ -50,6 +52,9 @@ const sortOptions = [
 export function PartsPage() {
   const compact = useMediaQuery('(max-width: 640px)');
   const notify = useToast();
+  const { user } = useAuth();
+  const canManage = !!user && WAREHOUSE_ROLES.includes(user.role);
+  const isAdmin = user?.role === 'ADMIN';
 
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query);
@@ -208,7 +213,9 @@ export function PartsPage() {
               <Package size={16} />
             </span>
             <div>
-              <strong style={{ display: 'block', color: '#172338' }}>{row.original.partName}</strong>
+              <strong style={{ display: 'block', color: '#172338' }}>
+                {row.original.partName}
+              </strong>
               <span className="muted font-mono" style={{ fontSize: '12px' }}>
                 {row.original.sku}
               </span>
@@ -290,41 +297,43 @@ export function PartsPage() {
         header: 'Trạng thái',
         cell: ({ row }) => <StatusBadge active={row.original.isActive} />,
       },
-      {
-        id: 'actions',
-        header: 'Thao tác',
-        cell: ({ row }) => (
-          <div className="row-actions">
-            <Button
-              variant="ghost"
-              aria-label={`Sửa phụ tùng ${row.original.partName}`}
-              onClick={() => openEdit(row.original)}
-            >
-              <Edit2 size={16} />
-              <span>Sửa</span>
-            </Button>
-            {row.original.isActive && (
-              <Button
-                variant="ghost"
-                className="delete-action"
-                aria-label={`Ngừng kinh doanh ${row.original.partName}`}
-                onClick={() => setDeletingPart(row.original)}
-              >
-                <Trash2 size={16} />
-                <span>Ngừng</span>
-              </Button>
-            )}
-          </div>
-        ),
-      },
+      ...(canManage
+        ? [
+            {
+              id: 'actions',
+              header: 'Thao tác',
+              cell: ({ row }: { row: { original: Part } }) => (
+                <div className="row-actions">
+                  <Button
+                    variant="ghost"
+                    aria-label={`Sửa phụ tùng ${row.original.partName}`}
+                    onClick={() => openEdit(row.original)}
+                  >
+                    <Edit2 size={16} />
+                    <span>Sửa</span>
+                  </Button>
+                  {isAdmin && row.original.isActive && (
+                    <Button
+                      variant="ghost"
+                      className="delete-action"
+                      aria-label={`Ngừng kinh doanh ${row.original.partName}`}
+                      onClick={() => setDeletingPart(row.original)}
+                    >
+                      <Trash2 size={16} />
+                      <span>Ngừng</span>
+                    </Button>
+                  )}
+                </div>
+              ),
+            },
+          ]
+        : []),
     ],
-    [openEdit],
+    [openEdit, canManage, isAdmin],
   );
 
-  const totalElements = onlyLowStock
-    ? (lowStockParts?.length || 0)
-    : (data?.totalElements || 0);
-  const totalPages = onlyLowStock ? 1 : (data?.totalPages || 1);
+  const totalElements = onlyLowStock ? lowStockParts?.length || 0 : data?.totalElements || 0;
+  const totalPages = onlyLowStock ? 1 : data?.totalPages || 1;
 
   return (
     <>
@@ -333,21 +342,20 @@ export function PartsPage() {
         title="Danh mục phụ tùng"
         description="Quản lý mã phụ tùng SKU, đơn vị tính, đơn giá, số lượng tồn kho khả dụng và cảnh báo tái đặt hàng."
         actions={
-          <Button
-            variant="primary"
-            ref={createTrigger}
-            onClick={() => setCreating(true)}
-          >
-            <Plus size={18} />
-            <span>Thêm phụ tùng</span>
-          </Button>
+          canManage ? (
+            <Button variant="primary" ref={createTrigger} onClick={() => setCreating(true)}>
+              <Plus size={18} />
+              <span>Thêm phụ tùng</span>
+            </Button>
+          ) : undefined
         }
       />
 
       <div className="info-strip">
         <Package size={18} />
         <span>
-          Lượng khả dụng = Tồn thực tế - Lượng giữ chỗ cho các phiếu sửa chữa đang thực hiện. Tồn kho tự động cập nhật qua chứng từ nhập/xuất kho.
+          Lượng khả dụng = Tồn thực tế - Lượng giữ chỗ cho các phiếu sửa chữa đang thực hiện. Tồn
+          kho tự động cập nhật qua chứng từ nhập/xuất kho.
         </span>
       </div>
 
@@ -374,7 +382,8 @@ export function PartsPage() {
           <div
             className="user-filter-grid"
             style={{
-              gridTemplateColumns: 'minmax(220px, 1.4fr) minmax(200px, 1fr) minmax(180px, 1fr) minmax(200px, 1fr)',
+              gridTemplateColumns:
+                'minmax(220px, 1.4fr) minmax(200px, 1fr) minmax(180px, 1fr) minmax(200px, 1fr)',
             }}
           >
             {/* Tìm kiếm */}
@@ -415,6 +424,7 @@ export function PartsPage() {
                 <button
                   type="button"
                   className={!onlyLowStock ? 'selected' : ''}
+                  aria-pressed={!onlyLowStock}
                   onClick={() => setOnlyLowStock(false)}
                 >
                   Tất cả tồn
@@ -422,6 +432,7 @@ export function PartsPage() {
                 <button
                   type="button"
                   className={onlyLowStock ? 'selected' : ''}
+                  aria-pressed={onlyLowStock}
                   onClick={() => setOnlyLowStock(true)}
                   style={onlyLowStock ? { background: '#fff1f2', color: '#b42335' } : {}}
                 >
@@ -495,10 +506,18 @@ export function PartsPage() {
                     gap: '8px',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <div>
                       <strong style={{ fontSize: '15px' }}>{p.partName}</strong>
-                      <div className="muted font-mono" style={{ fontSize: '12px' }}>{p.sku}</div>
+                      <div className="muted font-mono" style={{ fontSize: '12px' }}>
+                        {p.sku}
+                      </div>
                     </div>
                     {isLow ? (
                       <Badge variant="warning">Tồn thấp</Badge>
@@ -506,18 +525,43 @@ export function PartsPage() {
                       <StatusBadge active={p.isActive} />
                     )}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span>Giá bán: <strong>{Number(p.sellingPrice).toLocaleString('vi-VN')} đ</strong></span>
-                    <span>Khả dụng: <strong style={{ color: isLow ? '#b42335' : '#245bdb' }}>{p.availableQuantity} {p.unit}</strong></span>
+                  <div
+                    style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}
+                  >
+                    <span>
+                      Giá bán: <strong>{Number(p.sellingPrice).toLocaleString('vi-VN')} đ</strong>
+                    </span>
+                    <span>
+                      Khả dụng:{' '}
+                      <strong style={{ color: isLow ? '#b42335' : '#245bdb' }}>
+                        {p.availableQuantity} {p.unit}
+                      </strong>
+                    </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #f0f2f5' }}>
-                    <span className="muted" style={{ fontSize: '11px' }}>Tồn: {p.stockQuantity} | Giữ: {p.reservedQuantity}</span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingTop: '8px',
+                      borderTop: '1px solid #f0f2f5',
+                    }}
+                  >
+                    <span className="muted" style={{ fontSize: '11px' }}>
+                      Tồn: {p.stockQuantity} | Giữ: {p.reservedQuantity}
+                    </span>
                     <div className="row-actions">
-                      <Button variant="ghost" onClick={() => openEdit(p)}>
-                        <Edit2 size={15} /> Sửa
-                      </Button>
-                      {p.isActive && (
-                        <Button variant="ghost" className="delete-action" onClick={() => setDeletingPart(p)}>
+                      {canManage && (
+                        <Button variant="ghost" onClick={() => openEdit(p)}>
+                          <Edit2 size={15} /> Sửa
+                        </Button>
+                      )}
+                      {isAdmin && p.isActive && (
+                        <Button
+                          variant="ghost"
+                          className="delete-action"
+                          onClick={() => setDeletingPart(p)}
+                        >
                           <Trash2 size={15} /> Ngừng
                         </Button>
                       )}
@@ -539,8 +583,14 @@ export function PartsPage() {
         {/* Phân trang */}
         <div className="pagination" style={{ borderTop: '1px solid var(--border)' }}>
           <div className="pagination-info">
-            Hiển thị <strong>{displayList.length > 0 ? 1 : 0}–{displayList.length}</strong> trong <strong>{totalElements}</strong> kết quả
-            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>Trang {page + 1} / {totalPages}</span>
+            Hiển thị{' '}
+            <strong>
+              {displayList.length > 0 ? 1 : 0}–{displayList.length}
+            </strong>{' '}
+            trong <strong>{totalElements}</strong> kết quả
+            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>
+              Trang {page + 1} / {totalPages}
+            </span>
           </div>
           <div className="pagination-controls">
             <Button
@@ -585,12 +635,7 @@ export function PartsPage() {
           </div>
 
           <Field label="Mã SKU" required>
-            <input
-              name="sku"
-              className="input font-mono"
-              placeholder="VD: PRT-OIL-5W30"
-              required
-            />
+            <input name="sku" className="input font-mono" placeholder="VD: PRT-OIL-5W30" required />
           </Field>
 
           <Field label="Đơn vị tính" required>
@@ -615,11 +660,26 @@ export function PartsPage() {
           <div className="form-section-label">GIÁ BÁN & CHÍNH SÁCH BẢO HÀNH</div>
 
           <Field label="Giá nhập dự kiến (VNĐ)">
-            <input name="purchasePrice" type="number" min="0" step="1000" defaultValue="0" className="input" />
+            <input
+              name="purchasePrice"
+              type="number"
+              min="0"
+              step="1000"
+              defaultValue="0"
+              className="input"
+            />
           </Field>
 
           <Field label="Giá bán niêm yết (VNĐ)" required>
-            <input name="sellingPrice" type="number" min="0" step="1000" defaultValue="0" required className="input" />
+            <input
+              name="sellingPrice"
+              type="number"
+              min="0"
+              step="1000"
+              defaultValue="0"
+              required
+              className="input"
+            />
           </Field>
 
           <Field label="Thời hạn bảo hành (ngày)">
@@ -632,7 +692,11 @@ export function PartsPage() {
 
           <div className="full-width">
             <Field label="Điều khoản bảo hành">
-              <input name="warrantyTerms" className="input" placeholder="VD: Bảo hành 1 đổi 1 nếu lỗi từ nhà sản xuất" />
+              <input
+                name="warrantyTerms"
+                className="input"
+                placeholder="VD: Bảo hành 1 đổi 1 nếu lỗi từ nhà sản xuất"
+              />
             </Field>
           </div>
 
@@ -647,7 +711,11 @@ export function PartsPage() {
           </div>
 
           <div className="modal-form-actions">
-            <Button variant="secondary" onClick={() => setCreating(false)} disabled={createMutation.isPending}>
+            <Button
+              variant="secondary"
+              onClick={() => setCreating(false)}
+              disabled={createMutation.isPending}
+            >
               Hủy
             </Button>
             <Button variant="primary" type="submit" pending={createMutation.isPending}>
@@ -661,7 +729,7 @@ export function PartsPage() {
       <Modal
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
-        title="Cập nhật phụ tùng"
+        title="Sửa phụ tùng"
         description={`Chỉnh sửa thông tin phụ tùng ${editing?.sku}`}
         size="lg"
       >
@@ -765,16 +833,14 @@ export function PartsPage() {
               />
             </Field>
 
-            <div className="full-width">
-              <Field label="Điều khoản bảo hành">
-                <input
-                  name="warrantyTerms"
-                  className="input"
-                  defaultValue={editing.warrantyTerms || ''}
-                  placeholder="VD: Bảo hành 1 đổi 1..."
-                />
-              </Field>
-            </div>
+            <Field label="Điều khoản bảo hành">
+              <input
+                name="warrantyTerms"
+                className="input"
+                defaultValue={editing.warrantyTerms || ''}
+                placeholder="VD: Bảo hành 1 đổi 1..."
+              />
+            </Field>
 
             <Field label="Trạng thái kinh doanh">
               <select name="isActive" className="input" defaultValue={String(editing.isActive)}>
@@ -795,7 +861,11 @@ export function PartsPage() {
             </div>
 
             <div className="modal-form-actions">
-              <Button variant="secondary" onClick={() => setEditing(null)} disabled={updateMutation.isPending}>
+              <Button
+                variant="secondary"
+                onClick={() => setEditing(null)}
+                disabled={updateMutation.isPending}
+              >
                 Hủy
               </Button>
               <Button variant="primary" type="submit" pending={updateMutation.isPending}>

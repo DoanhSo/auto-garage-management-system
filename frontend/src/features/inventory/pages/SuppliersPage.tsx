@@ -75,7 +75,8 @@ export function SuppliersPage() {
   const deactivateMutation = useDeactivateSupplierMutation();
 
   const filterCount = (query.trim() ? 1 : 0) + (active !== undefined ? 1 : 0);
-  const isFiltered = query.length > 0 || active !== undefined || sortField !== 'id' || sortDir !== 'desc';
+  const isFiltered =
+    query.length > 0 || active !== undefined || sortField !== 'id' || sortDir !== 'desc';
 
   const handleResetFilters = () => {
     setQuery('');
@@ -175,12 +176,23 @@ export function SuppliersPage() {
               </div>
             )}
             {row.original.email && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#526278', fontSize: '12px', marginTop: '2px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: '#526278',
+                  fontSize: '12px',
+                  marginTop: '2px',
+                }}
+              >
                 <Mail size={14} className="muted" />
                 <span>{row.original.email}</span>
               </div>
             )}
-            {!row.original.phone && !row.original.email && <span className="muted">Chưa cung cấp</span>}
+            {!row.original.phone && !row.original.email && (
+              <span className="muted">Chưa cung cấp</span>
+            )}
           </div>
         ),
       },
@@ -192,7 +204,16 @@ export function SuppliersPage() {
             {row.original.taxCode && (
               <div style={{ fontWeight: 550, color: '#36485f' }}>MST: {row.original.taxCode}</div>
             )}
-            <div className="muted" style={{ maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div
+              className="muted"
+              style={{
+                maxWidth: '240px',
+                overflow: 'hidden',
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 2,
+              }}
+            >
               {row.original.address || '—'}
             </div>
           </div>
@@ -254,11 +275,7 @@ export function SuppliersPage() {
         title="Nhà cung cấp"
         description="Quản lý danh bạ đối tác cung cấp phụ tùng, chính sách công nợ và thông tin xuất hóa đơn."
         actions={
-          <Button
-            variant="primary"
-            ref={createTrigger}
-            onClick={() => setCreating(true)}
-          >
+          <Button variant="primary" ref={createTrigger} onClick={() => setCreating(true)}>
             <Plus size={18} />
             <span>Thêm nhà cung cấp</span>
           </Button>
@@ -268,7 +285,8 @@ export function SuppliersPage() {
       <div className="info-strip">
         <Building2 size={18} />
         <span>
-          Mã nhà cung cấp duy nhất trên toàn hệ thống. Đối tác đã phát sinh chứng từ nhập kho sẽ chuyển sang ngừng hợp tác thay vì xóa dữ liệu.
+          Mã nhà cung cấp duy nhất trên toàn hệ thống. Đối tác đã phát sinh chứng từ nhập kho sẽ
+          chuyển sang ngừng hợp tác thay vì xóa dữ liệu.
         </span>
       </div>
 
@@ -337,6 +355,7 @@ export function SuppliersPage() {
                     key={opt.label}
                     type="button"
                     className={active === opt.value ? 'selected' : ''}
+                    aria-pressed={active === opt.value}
                     onClick={() => {
                       setActive(opt.value);
                       setPage(0);
@@ -390,31 +409,58 @@ export function SuppliersPage() {
                   gap: '8px',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                  }}
+                >
                   <div>
                     <strong style={{ fontSize: '15px' }}>{s.supplierName}</strong>
-                    <div className="muted font-mono" style={{ fontSize: '12px' }}>{s.supplierCode}</div>
+                    <div className="muted font-mono" style={{ fontSize: '12px' }}>
+                      {s.supplierCode}
+                    </div>
                   </div>
                   <StatusBadge active={s.isActive} />
                 </div>
                 {s.phone && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+                  >
                     <Phone size={13} className="muted" /> <span>{s.phone}</span>
                   </div>
                 )}
                 {s.email && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }} className="muted">
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
+                    className="muted"
+                  >
                     <Mail size={13} /> <span>{s.email}</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #f0f2f5' }}>
-                  <span style={{ fontSize: '12px', color: '#526278' }}>Hạn nợ: <strong>{s.paymentTermDays} ngày</strong></span>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingTop: '8px',
+                    borderTop: '1px solid #f0f2f5',
+                  }}
+                >
+                  <span style={{ fontSize: '12px', color: '#526278' }}>
+                    Hạn nợ: <strong>{s.paymentTermDays} ngày</strong>
+                  </span>
                   <div className="row-actions">
                     <Button variant="ghost" onClick={() => openEdit(s)}>
                       <Edit2 size={15} /> Sửa
                     </Button>
                     {s.isActive && (
-                      <Button variant="ghost" className="delete-action" onClick={() => setDeletingSupplier(s)}>
+                      <Button
+                        variant="ghost"
+                        className="delete-action"
+                        onClick={() => setDeletingSupplier(s)}
+                      >
                         <Trash2 size={15} /> Ngừng
                       </Button>
                     )}
@@ -435,8 +481,14 @@ export function SuppliersPage() {
         {/* Thanh phân trang chuẩn */}
         <div className="pagination" style={{ borderTop: '1px solid var(--border)' }}>
           <div className="pagination-info">
-            Hiển thị <strong>{suppliersList.length > 0 ? 1 : 0}–{suppliersList.length}</strong> trong <strong>{totalElements}</strong> kết quả
-            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>Trang {page + 1} / {totalPages}</span>
+            Hiển thị{' '}
+            <strong>
+              {suppliersList.length > 0 ? 1 : 0}–{suppliersList.length}
+            </strong>{' '}
+            trong <strong>{totalElements}</strong> kết quả
+            <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>
+              Trang {page + 1} / {totalPages}
+            </span>
           </div>
           <div className="pagination-controls">
             <Button
@@ -516,12 +568,20 @@ export function SuppliersPage() {
 
           <div className="full-width">
             <Field label="Địa chỉ trụ sở / kho hàng">
-              <input name="address" className="input" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố" />
+              <input
+                name="address"
+                className="input"
+                placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố"
+              />
             </Field>
           </div>
 
           <div className="modal-form-actions">
-            <Button variant="secondary" onClick={() => setCreating(false)} disabled={createMutation.isPending}>
+            <Button
+              variant="secondary"
+              onClick={() => setCreating(false)}
+              disabled={createMutation.isPending}
+            >
               Hủy
             </Button>
             <Button variant="primary" type="submit" pending={createMutation.isPending}>
@@ -566,15 +626,31 @@ export function SuppliersPage() {
             </Field>
 
             <Field label="Mã số thuế">
-              <input name="taxCode" className="input" defaultValue={editing.taxCode || ''} placeholder="0300123456" />
+              <input
+                name="taxCode"
+                className="input"
+                defaultValue={editing.taxCode || ''}
+                placeholder="0300123456"
+              />
             </Field>
 
             <Field label="Số điện thoại">
-              <input name="phone" className="input" defaultValue={editing.phone || ''} placeholder="028 3838 3838" />
+              <input
+                name="phone"
+                className="input"
+                defaultValue={editing.phone || ''}
+                placeholder="028 3838 3838"
+              />
             </Field>
 
             <Field label="Email liên hệ">
-              <input name="email" type="email" className="input" defaultValue={editing.email || ''} placeholder="sales@ncc.vn" />
+              <input
+                name="email"
+                type="email"
+                className="input"
+                defaultValue={editing.email || ''}
+                placeholder="sales@ncc.vn"
+              />
             </Field>
 
             <div className="form-section-label">ĐIỀU KHOẢN HỢP TÁC & ĐỊA ĐIỂM</div>
@@ -598,11 +674,20 @@ export function SuppliersPage() {
             </Field>
 
             <Field label="Địa chỉ trụ sở / kho">
-              <input name="address" className="input" defaultValue={editing.address || ''} placeholder="Số nhà, đường, tỉnh/thành..." />
+              <input
+                name="address"
+                className="input"
+                defaultValue={editing.address || ''}
+                placeholder="Số nhà, đường, tỉnh/thành..."
+              />
             </Field>
 
             <div className="modal-form-actions">
-              <Button variant="secondary" onClick={() => setEditing(null)} disabled={updateMutation.isPending}>
+              <Button
+                variant="secondary"
+                onClick={() => setEditing(null)}
+                disabled={updateMutation.isPending}
+              >
                 Hủy
               </Button>
               <Button variant="primary" type="submit" pending={updateMutation.isPending}>

@@ -1,19 +1,25 @@
-import { ExternalLink, KeyRound, LogOut, ShieldCheck } from 'lucide-react';
+import { ExternalLink, KeyRound, LogOut, ShieldCheck, UserRound } from 'lucide-react';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { env } from '../../../shared/config/env';
 import {
   Button,
+  Loading,
   PageHeader,
+  QueryError,
   ReadOnlyField,
   RoleBadge,
   StatusBadge,
 } from '../../../shared/components/ui';
-import { initials } from '../../../shared/utils/format';
+import { initials, money } from '../../../shared/utils/format';
+import { customerTypeLabels } from '../../../shared/types/contracts';
+import { useMyCustomerQuery } from '../../customer/hooks/useCustomers';
 import { useLogoutMutation } from '../hooks/useAuthQueries';
 
 export function AccountPage() {
   const { user } = useAuth();
   const logout = useLogoutMutation();
+  const isCustomer = user?.role === 'CUSTOMER';
+  const customer = useMyCustomerQuery(isCustomer);
   if (!user) return null;
   const keycloakAccountUrl = `${env.keycloakPublicOrigin.replace(/\/$/, '')}/account`;
   return (
@@ -21,7 +27,7 @@ export function AccountPage() {
       <PageHeader
         eyebrow="KHÔNG GIAN CÁ NHÂN"
         title="Tài khoản của tôi"
-        description="Thông tin truy cập và bảo mật tài khoản qua Keycloak OIDC."
+        description="Quản lý thông tin hồ sơ cá nhân, bảo mật mật khẩu và các phiên đăng nhập trên hệ thống."
       />
       <div className="account-profile-banner panel">
         <span className="avatar avatar-lg">{initials(user.fullName)}</span>
@@ -54,15 +60,46 @@ export function AccountPage() {
             Liên hệ quản trị viên khi cần cập nhật thông tin hoặc quyền truy cập.
           </p>
         </section>
+        {isCustomer && (
+          <section className="panel">
+            <div className="section-heading">
+              <UserRound size={20} />
+              <h2>Hồ sơ khách hàng &amp; Chính sách công nợ</h2>
+            </div>
+            {customer.isPending ? (
+              <Loading label="Đang tải hồ sơ khách hàng…" />
+            ) : customer.error ? (
+              <QueryError
+                error={customer.error}
+                retry={() => {
+                  void customer.refetch();
+                }}
+              />
+            ) : (
+              <dl className="detail-list">
+                <ReadOnlyField label="Mã khách hàng">{customer.data.customerCode}</ReadOnlyField>
+                <ReadOnlyField label="Số điện thoại">{customer.data.phone}</ReadOnlyField>
+                <ReadOnlyField label="Phân loại">
+                  {customerTypeLabels[customer.data.customerType]}
+                </ReadOnlyField>
+                <ReadOnlyField label="Hạn mức tín dụng">
+                  {money(customer.data.creditLimit)}
+                </ReadOnlyField>
+                <ReadOnlyField label="Kỳ hạn thanh toán">
+                  {customer.data.paymentTermDays} ngày
+                </ReadOnlyField>
+              </dl>
+            )}
+          </section>
+        )}
         <section className="panel">
           <div className="section-heading">
             <KeyRound size={20} />
-            <h2>Bảo mật &amp; Phiên đăng nhập (Keycloak OIDC)</h2>
+            <h2>Bảo mật &amp; Phiên đăng nhập</h2>
           </div>
           <p className="field-hint">
-            Mật khẩu và phương thức xác thực của bạn được quản lý tập trung trên máy chủ định danh
-            Keycloak (<code>autogarage-realm</code>). Bạn cũng có thể thu hồi toàn bộ phiên đăng
-            nhập hiện tại trên hệ thống AutoGarage bất kỳ lúc nào.
+            Mật khẩu, xác thực hai lớp (2FA) và thông tin liên hệ được bảo vệ tập trung. Bạn có thể
+            cập nhật mật khẩu hoặc thu hồi các phiên đang hoạt động bất cứ lúc nào.
           </p>
           <div className="form-actions">
             <a

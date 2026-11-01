@@ -11,12 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
-import {
-  Badge,
-  Button,
-  Loading,
-  PageHeader,
-} from '../../../shared/components/ui';
+import { Badge, Button, Loading, PageHeader } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
@@ -42,9 +37,7 @@ export function StockReconciliationPage() {
       if (filterDiscrepancyOnly && item.matched) return false;
       if (debouncedQuery.trim()) {
         const q = debouncedQuery.toLowerCase().trim();
-        return (
-          item.sku.toLowerCase().includes(q) || item.partName.toLowerCase().includes(q)
-        );
+        return item.sku.toLowerCase().includes(q) || item.partName.toLowerCase().includes(q);
       }
       return true;
     });
@@ -91,18 +84,14 @@ export function StockReconciliationPage() {
         accessorKey: 'stockQuantity',
         header: 'Tồn kho hiện tại',
         cell: ({ row }) => (
-          <span style={{ fontWeight: 650, color: '#172338' }}>
-            {row.original.stockQuantity}
-          </span>
+          <span style={{ fontWeight: 650, color: '#172338' }}>{row.original.stockQuantity}</span>
         ),
       },
       {
         accessorKey: 'ledgerQuantity',
         header: 'Lũy kế sổ kho',
         cell: ({ row }) => (
-          <span style={{ fontWeight: 650, color: '#36485f' }}>
-            {row.original.ledgerQuantity}
-          </span>
+          <span style={{ fontWeight: 650, color: '#36485f' }}>{row.original.ledgerQuantity}</span>
         ),
       },
       {
@@ -163,13 +152,9 @@ export function StockReconciliationPage() {
       <PageHeader
         eyebrow="QUẢN LÝ KHO & VẬT TƯ"
         title="Đối soát kho & Sổ cái"
-        description="Kiểm tra và đối soát tính toàn vẹn giữa số tồn thực tế (parts) và tổng giao dịch trong sổ kho (inventory_transactions)."
+        description="Đối chiếu số lượng phụ tùng thực tế trong kho với lịch sử nhập xuất để phát hiện chênh lệch kịp thời."
         actions={
-          <Button
-            variant="secondary"
-            onClick={() => refetch()}
-            pending={isFetching}
-          >
+          <Button variant="secondary" onClick={() => refetch()} pending={isFetching}>
             <RefreshCw size={16} className={isFetching ? 'spin' : ''} />
             <span>Đối soát lại toàn bộ</span>
           </Button>
@@ -179,120 +164,57 @@ export function StockReconciliationPage() {
       <div className="info-strip">
         <Scale size={18} />
         <span>
-          Cơ chế đối soát tự động so sánh số tồn kho hiện hành với tổng phát sinh chứng từ bất biến. Khi có sai lệch, cần tiến hành kiểm kê thực tế hoặc lập phiếu điều chỉnh (ADJUSTMENT).
+          Hệ thống tự động đối chiếu tồn kho hiện tại với lịch sử chứng từ. Khi phát hiện chênh
+          lệch, vui lòng kiểm kê thực tế tại kệ và lập phiếu điều chỉnh kho.
         </span>
       </div>
 
       {/* KPI Cards thống kê */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '16px',
-        }}
-      >
-        <div
-          style={{
-            background: 'white',
-            border: '1px solid var(--border)',
-            borderRadius: '12px',
-            padding: '18px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-          }}
-        >
-          <div
-            style={{
-              padding: '10px',
-              borderRadius: '8px',
-              background: '#edf3ff',
-              color: '#245bdb',
-            }}
-          >
-            <Scale size={22} />
+      <section className="metric-grid snapshot-metrics" aria-label="Tổng quan đối soát tồn kho">
+        <article className="metric-card metric-tone-primary">
+          <div className="metric-label">
+            <span>Tổng phụ tùng đối soát</span>
+            <span className="metric-icon">
+              <Scale size={18} />
+            </span>
           </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#526278', fontWeight: 550 }}>
-              Tổng phụ tùng đối soát
-            </div>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#172338' }}>
-              {reconciliations.length}
-            </div>
+          <strong className="metric-value">{reconciliations.length}</strong>
+          <p>Danh mục phụ tùng đang quản lý</p>
+        </article>
+        <article className="metric-card metric-tone-success">
+          <div className="metric-label">
+            <span>Khớp số liệu</span>
+            <span className="metric-icon">
+              <CheckCircle2 size={18} />
+            </span>
           </div>
-        </div>
-
-        <div
-          style={{
-            background: 'white',
-            border: '1px solid var(--border)',
-            borderRadius: '12px',
-            padding: '18px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-          }}
-        >
-          <div
-            style={{
-              padding: '10px',
-              borderRadius: '8px',
-              background: '#ecfdf5',
-              color: '#059669',
-            }}
-          >
-            <CheckCircle2 size={22} />
-          </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#526278', fontWeight: 550 }}>
-              Khớp số liệu (100% cân bằng)
-            </div>
-            <div style={{ fontSize: '24px', fontWeight: 700, color: '#059669' }}>
-              {matchedCount}
-            </div>
-          </div>
-        </div>
-
-        <div
+          <strong className="metric-value">{matchedCount}</strong>
+          <p>Tồn kho cân bằng với sổ kho</p>
+        </article>
+        <article
+          className={`metric-card ${discrepancyCount > 0 ? 'metric-tone-danger' : 'metric-tone-primary'}`}
+          role="button"
+          tabIndex={0}
+          aria-pressed={filterDiscrepancyOnly}
           onClick={() => setFilterDiscrepancyOnly(!filterDiscrepancyOnly)}
-          style={{
-            background: 'white',
-            border: filterDiscrepancyOnly ? '2px solid #b42335' : '1px solid var(--border)',
-            borderRadius: '12px',
-            padding: '18px 20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setFilterDiscrepancyOnly(!filterDiscrepancyOnly);
+            }
           }}
+          style={{ cursor: 'pointer' }}
         >
-          <div
-            style={{
-              padding: '10px',
-              borderRadius: '8px',
-              background: discrepancyCount > 0 ? '#fff1f2' : '#f8fafc',
-              color: discrepancyCount > 0 ? '#b42335' : '#64748b',
-            }}
-          >
-            <AlertTriangle size={22} />
+          <div className="metric-label">
+            <span>Có chênh lệch</span>
+            <span className="metric-icon">
+              <AlertTriangle size={18} />
+            </span>
           </div>
-          <div>
-            <div style={{ fontSize: '12px', color: '#526278', fontWeight: 550 }}>
-              Có chênh lệch (Cần kiểm kê)
-            </div>
-            <div
-              style={{
-                fontSize: '24px',
-                fontWeight: 700,
-                color: discrepancyCount > 0 ? '#b42335' : '#172338',
-              }}
-            >
-              {discrepancyCount}
-            </div>
-          </div>
-        </div>
-      </div>
+          <strong className="metric-value">{discrepancyCount}</strong>
+          <p>Cần kiểm kê thực tế tại kệ. Nhấn để lọc.</p>
+        </article>
+      </section>
 
       <section className="panel table-panel">
         {/* Bộ lọc */}
@@ -352,6 +274,7 @@ export function StockReconciliationPage() {
                 <button
                   type="button"
                   className={!filterDiscrepancyOnly ? 'selected' : ''}
+                  aria-pressed={!filterDiscrepancyOnly}
                   onClick={() => setFilterDiscrepancyOnly(false)}
                 >
                   Tất cả phụ tùng
@@ -359,6 +282,7 @@ export function StockReconciliationPage() {
                 <button
                   type="button"
                   className={filterDiscrepancyOnly ? 'selected' : ''}
+                  aria-pressed={filterDiscrepancyOnly}
                   onClick={() => setFilterDiscrepancyOnly(true)}
                   style={filterDiscrepancyOnly ? { background: '#fff1f2', color: '#b42335' } : {}}
                 >
@@ -397,10 +321,18 @@ export function StockReconciliationPage() {
                   gap: '8px',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                  }}
+                >
                   <div>
                     <strong style={{ fontSize: '15px' }}>{item.partName}</strong>
-                    <div className="muted font-mono" style={{ fontSize: '12px' }}>{item.sku}</div>
+                    <div className="muted font-mono" style={{ fontSize: '12px' }}>
+                      {item.sku}
+                    </div>
                   </div>
                   {item.matched ? (
                     <Badge variant="success">Khớp 100%</Badge>
@@ -409,11 +341,23 @@ export function StockReconciliationPage() {
                   )}
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                  <span>Tồn hiện tại: <strong>{item.stockQuantity}</strong></span>
-                  <span>Sổ kho: <strong>{item.ledgerQuantity}</strong></span>
+                  <span>
+                    Tồn hiện tại: <strong>{item.stockQuantity}</strong>
+                  </span>
+                  <span>
+                    Sổ kho: <strong>{item.ledgerQuantity}</strong>
+                  </span>
                 </div>
-                <div style={{ fontSize: '12px', color: '#526278', paddingTop: '4px', borderTop: '1px solid #f0f2f5' }}>
-                  Khả dụng: <strong>{item.availableQuantity}</strong> (Đang giữ: {item.reservedQuantity})
+                <div
+                  style={{
+                    fontSize: '12px',
+                    color: '#526278',
+                    paddingTop: '4px',
+                    borderTop: '1px solid #f0f2f5',
+                  }}
+                >
+                  Khả dụng: <strong>{item.availableQuantity}</strong> (Đang giữ:{' '}
+                  {item.reservedQuantity})
                 </div>
               </div>
             ))}

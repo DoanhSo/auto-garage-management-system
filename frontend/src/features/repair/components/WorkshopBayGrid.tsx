@@ -1,10 +1,23 @@
 import { useMemo } from 'react';
-import { Activity, Car, CheckCircle2, Clock, Gauge, Layers, Wrench, AlertCircle } from 'lucide-react';
+import {
+  Activity,
+  Car,
+  CheckCircle2,
+  Clock,
+  Gauge,
+  Layers,
+  Wrench,
+  AlertCircle,
+} from 'lucide-react';
 import { Button, Loading, QueryError } from '../../../shared/components/ui';
 import { formatDateTime } from '../../../shared/utils/format';
 import type { RepairOrder } from '../types/repairTypes';
 import { RepairOrderStatusBadge } from './RepairOrderCards';
-import { useServiceBaysQuery, useActiveReservationsQuery } from '../../scheduling/hooks/useScheduling';
+import { VehicleLabel } from './VehicleLabel';
+import {
+  useServiceBaysQuery,
+  useActiveReservationsQuery,
+} from '../../scheduling/hooks/useScheduling';
 import type { ServiceBay } from '../../scheduling/types/schedulingTypes';
 
 function Metric({
@@ -39,8 +52,20 @@ export function WorkshopBayGrid({
   orders: RepairOrder[];
   onOpenDetail: (order: RepairOrder) => void;
 }) {
-  const { data: baysData, isLoading: isLoadingBays, isError: isErrorBays, error: errorBays, refetch: refetchBays } = useServiceBaysQuery();
-  const { data: reservations = [], isLoading: isLoadingRes, isError: isErrorRes, error: errorRes, refetch: refetchRes } = useActiveReservationsQuery();
+  const {
+    data: baysData,
+    isLoading: isLoadingBays,
+    isError: isErrorBays,
+    error: errorBays,
+    refetch: refetchBays,
+  } = useServiceBaysQuery();
+  const {
+    data: reservations = [],
+    isLoading: isLoadingRes,
+    isError: isErrorRes,
+    error: errorRes,
+    refetch: refetchRes,
+  } = useActiveReservationsQuery();
 
   const bays = useMemo<ServiceBay[]>(() => baysData?.content ?? [], [baysData?.content]);
 
@@ -51,7 +76,7 @@ export function WorkshopBayGrid({
         (r) => r.bayId === bay.id && (r.status === 'IN_USE' || r.status === 'HELD'),
       );
       const matchedOrder = activeRes?.repairOrderId
-        ? orders.find((o) => String(o.id) === String(activeRes.repairOrderId)) ?? null
+        ? (orders.find((o) => String(o.id) === String(activeRes.repairOrderId)) ?? null)
         : null;
 
       return {
@@ -128,13 +153,17 @@ export function WorkshopBayGrid({
             <li key={bay.id} className={`bay-card${isOccupied ? '' : ' is-free'}`}>
               <div className="bay-card-head">
                 <div>
-                  <strong>{bay.bayName}</strong>
-                  <span>{bay.description || bay.bayCode}</span>
+                  <strong>
+                    <span className="bay-code-tag">{bay.bayCode}</span> {bay.bayName}
+                  </strong>
+                  <span>{bay.description || 'Khoang dịch vụ'}</span>
                 </div>
                 {order ? (
                   <RepairOrderStatusBadge status={order.status} />
                 ) : reservation ? (
-                  <span className={`badge ${reservation.status === 'IN_USE' ? 'badge-primary' : 'badge-warning'}`}>
+                  <span
+                    className={`badge ${reservation.status === 'IN_USE' ? 'badge-primary' : 'badge-warning'}`}
+                  >
                     {reservation.status === 'IN_USE' ? 'Đang hoạt động' : 'Đã giữ chỗ'}
                   </span>
                 ) : (
@@ -154,7 +183,10 @@ export function WorkshopBayGrid({
                     <dt>
                       <Gauge size={14} aria-hidden /> Xe & ODO vào
                     </dt>
-                    <dd>Xe #{order.vehicleId} · {order.odometerIn.toLocaleString('vi-VN')} km</dd>
+                    <dd>
+                      <VehicleLabel vehicleId={order.vehicleId} showBrand={false} /> ·{' '}
+                      {order.odometerIn.toLocaleString('vi-VN')} km
+                    </dd>
                   </div>
                   {order.customerComplaint && (
                     <div>
@@ -195,7 +227,9 @@ export function WorkshopBayGrid({
                   )}
                 </dl>
               ) : (
-                <p className="bay-card-empty">Khoang cầu nâng đang trống, sẵn sàng tiếp nhận xe vào bảo dưỡng hoặc sửa chữa.</p>
+                <p className="bay-card-empty">
+                  Khoang cầu nâng đang trống, sẵn sàng tiếp nhận xe vào bảo dưỡng hoặc sửa chữa.
+                </p>
               )}
 
               <div className="bay-card-foot">

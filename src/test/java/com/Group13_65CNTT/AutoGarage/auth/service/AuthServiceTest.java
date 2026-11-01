@@ -19,6 +19,7 @@ import jakarta.persistence.EntityManager;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -63,6 +64,27 @@ class AuthServiceTest {
         arrangeMe("attacker@example.test");
         service.me();
         verify(customerRepository, never()).findFirstByEmailIgnoreCaseAndUserIdIsNullOrderByIdAsc(anyString());
+        verify(customerRepository, never()).saveAndFlush(argThat(c -> c.getId() != null));
+    }
+
+    @Test
+    void existingCustomerUserWithoutProfileGetsNewLinkedCustomer() {
+        arrangeMe("attacker@example.test");
+        service.me();
+        ArgumentCaptor<Customer> saved = ArgumentCaptor.forClass(Customer.class);
+        verify(customerRepository).saveAndFlush(saved.capture());
+        assertThat(saved.getValue().getUserId()).isEqualTo(1L);
+        assertThat(saved.getValue().getFullName()).isEqualTo("Customer One");
+        assertThat(saved.getValue().getEmail()).isEqualTo("customer@example.test");
+    }
+
+    @Test
+    void existingLinkedCustomerProfileIsNotRecreated() {
+        when(currentUser.userIdOrNull()).thenReturn(1L);
+        when(currentUser.subjectOrNull()).thenReturn("customer-subject");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user()));
+        when(customerRepository.findByUserId(1L)).thenReturn(Optional.of(new Customer()));
+        service.me();
         verify(customerRepository, never()).saveAndFlush(any());
     }
 
@@ -87,7 +109,7 @@ class AuthServiceTest {
     }
 
     private User user() {
-        User user = User.builder().identityId("customer-subject").username("customer.one")
+        User user = User.builder().identityId("customer-subject").username("customer.one").fullName("Customer One")
                 .email("customer@example.test").role(Role.CUSTOMER).active(true).build();
         user.setId(1L);
         return user;

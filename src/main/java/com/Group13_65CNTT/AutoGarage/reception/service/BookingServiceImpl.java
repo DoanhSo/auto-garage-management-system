@@ -1,16 +1,23 @@
 package com.Group13_65CNTT.AutoGarage.reception.service;
 
 import com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
 import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
 import com.Group13_65CNTT.AutoGarage.common.security.ActorIds;
 import com.Group13_65CNTT.AutoGarage.catalog.entity.ServiceEntity;
 import com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository;
+import com.Group13_65CNTT.AutoGarage.customer.dto.CreateCustomerRequest;
+import com.Group13_65CNTT.AutoGarage.customer.dto.CustomerResponse;
 import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
 import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
+import com.Group13_65CNTT.AutoGarage.customer.service.CustomerService;
 import com.Group13_65CNTT.AutoGarage.reception.dto.BookingResponse;
 import com.Group13_65CNTT.AutoGarage.reception.dto.CancelBookingRequest;
 import com.Group13_65CNTT.AutoGarage.reception.dto.CreateBookingRequest;
+import com.Group13_65CNTT.AutoGarage.reception.dto.NewBookingCustomerRequest;
+import com.Group13_65CNTT.AutoGarage.reception.dto.NewBookingVehicleRequest;
 import com.Group13_65CNTT.AutoGarage.reception.dto.RescheduleBookingRequest;
 import com.Group13_65CNTT.AutoGarage.reception.entity.Booking;
 import com.Group13_65CNTT.AutoGarage.reception.entity.BookingStatus;
@@ -20,8 +27,11 @@ import com.Group13_65CNTT.AutoGarage.shared.contracts.BayScheduling;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
+import com.Group13_65CNTT.AutoGarage.vehicle.dto.CreateVehicleRequest;
+import com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleResponse;
 import com.Group13_65CNTT.AutoGarage.vehicle.entity.Vehicle;
 import com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleRepository;
+import com.Group13_65CNTT.AutoGarage.vehicle.service.VehicleService;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -45,6 +55,8 @@ public class BookingServiceImpl implements BookingService {
     private final VehicleRepository vehicleRepository;
     private final ServiceRepository serviceRepository;
     private final BookingMapper bookingMapper;
+    private final CustomerService customerService;
+    private final VehicleService vehicleService;
     private final Random random = new Random();
     private BayScheduling bayScheduling;
 
@@ -54,7 +66,13 @@ public class BookingServiceImpl implements BookingService {
             VehicleRepository vehicleRepository,
             ServiceRepository serviceRepository,
             BookingMapper bookingMapper,
-            ObjectProvider<BayScheduling> baySchedulingProvider, CustomerScope customerScope, WorkshopProperties workshop) {
+            ObjectProvider<BayScheduling> baySchedulingProvider,
+            CustomerScope customerScope,
+            WorkshopProperties workshop,
+            CustomerService customerService,
+            VehicleService vehicleService) {
+        this.customerService = customerService;
+        this.vehicleService = vehicleService;
         this.workshop = workshop;
         this.customerScope = customerScope;
         this.bookingRepository = bookingRepository;
@@ -71,53 +89,21 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    public BookingResponse createBooking(CreateBookingRequest request) {
-        customerScope.requireResource(AccessResource.CUSTOMER, request.getCustomerId());
-        customerScope.requireResource(AccessResource.VEHICLE, request.getVehicleId());
-        Customer customer =
-                customerRepository
-                        .findById(request.getCustomerId())
-                        .orElseThrow(
-                                () ->
-                                        new ResourceNotFoundException(
-                                                "Không tìm thấy khách hàng với ID: "
-                                                        + request.getCustomerId()));
-        if (!Boolean.TRUE.equals(customer.getIsActive())) {
-            throw new BusinessRuleException("Khách hàng đang ở trạng thái ngừng hoạt động");
+    public BookingResponse createBooking(CreateBookingRequest request, Long actorUserId) {
+        validateBookingSources(request);
+        if (request.getNewCustomer() != null || request.getNewVehicle() != null) {
+            customerScope.requireFrontDesk();
         }
 
-        Vehicle vehicle =
-                vehicleRepository
-                        .findById(request.getVehicleId())
-                        .orElseThrow(
-                                () ->
-                                        new ResourceNotFoundException(
-                                                "Không tìm thấy phương tiện với ID: "
-                                                        + request.getVehicleId()));
-        if (!Boolean.TRUE.equals(vehicle.getIsActive())) {
-            throw new BusinessRuleException("Phương tiện đang ở trạng thái ngừng hoạt động");
-        }
-
-        ServiceEntity service =
-                serviceRepository
-                        .findById(request.getServiceId())
-                        .orElseThrow(
-                                () ->
-                                        new ResourceNotFoundException(
-                                                "Không tìm thấy dịch vụ danh mục với ID: "
-                                                        + request.getServiceId()));
-        if (!Boolean.TRUE.equals(service.getIsActive())) {
-            throw new BusinessRuleException("Dịch vụ đang ở trạng thái ngừng cung cấp");
-        }
+        Customer customer = resolveCustomer(request);
+        Vehicle vehicle = resolveVehicle(request, customer);
+        ServiceEntity service = resolveActiveService(request.getServiceId());
 
         if (request.getAppointmentAt().isBefore(Instant.now())) {
             throw new BusinessRuleException("Thời gian hẹn không được ở trong quá khứ");
         }
 
-        int durationMinutes =
-                service.getStandardMinutes() != null && service.getStandardMinutes() > 0
-                        ? service.getStandardMinutes()
-                        : workshop.getDefaultServiceMinutes();
+        int durationMinutes = resolveDurationMinutes(service);
         Instant expectedEndAt =
                 request.getAppointmentAt().plus(Duration.ofMinutes(durationMinutes));
 
@@ -129,7 +115,8 @@ public class BookingServiceImpl implements BookingService {
                             + " đã có lịch hẹn khác trong khung giờ này");
         }
 
-        Booking booking = bookingMapper.toEntity(request);
+        Booking booking =
+                bookingMapper.toEntity(request, customer.getId(), vehicle.getId(), actorUserId);
         booking.setBookingCode(generateBookingCode());
         booking.setExpectedEndAt(expectedEndAt);
         booking.setStatus(BookingStatus.PENDING);
@@ -138,7 +125,7 @@ public class BookingServiceImpl implements BookingService {
 
         Long reservedBayId = null;
         if (request.getBayId() != null && bayScheduling != null) {
-            long actorId = ActorIds.require(request.getCreatedBy());
+            long actorId = ActorIds.require(actorUserId);
             bayScheduling.reserveBooking(
                     actorId,
                     saved.getId(),
@@ -149,6 +136,124 @@ public class BookingServiceImpl implements BookingService {
         }
 
         return bookingMapper.toResponse(saved, customer, vehicle, service, reservedBayId);
+    }
+
+    private void validateBookingSources(CreateBookingRequest request) {
+        if ((request.getCustomerId() == null) == (request.getNewCustomer() == null)) {
+            throw new BusinessException(
+                    ResponseCode.BOOKING_CUSTOMER_SOURCE_INVALID,
+                    "Phải chọn khách hàng có sẵn hoặc nhập thông tin khách hàng mới");
+        }
+        if ((request.getVehicleId() == null) == (request.getNewVehicle() == null)) {
+            throw new BusinessException(
+                    ResponseCode.BOOKING_VEHICLE_SOURCE_INVALID,
+                    "Phải chọn phương tiện có sẵn hoặc nhập thông tin phương tiện mới");
+        }
+        if (request.getNewCustomer() != null && request.getVehicleId() != null) {
+            throw new BusinessException(
+                    ResponseCode.BOOKING_VEHICLE_SOURCE_INVALID,
+                    "Khách hàng mới chưa có phương tiện đã đăng ký trên hệ thống");
+        }
+    }
+
+    private Customer resolveCustomer(CreateBookingRequest request) {
+        Long customerId = request.getCustomerId();
+        if (customerId != null) {
+            customerScope.requireResource(AccessResource.CUSTOMER, customerId);
+            Customer customer = findCustomer(customerId);
+            if (!Boolean.TRUE.equals(customer.getIsActive())) {
+                throw new BusinessRuleException("Khách hàng đang ở trạng thái ngừng hoạt động");
+            }
+            return customer;
+        }
+
+        NewBookingCustomerRequest newCustomer = request.getNewCustomer();
+        CreateCustomerRequest createCustomerRequest = new CreateCustomerRequest();
+        createCustomerRequest.setFullName(trimToNull(newCustomer.getFullName()));
+        createCustomerRequest.setPhone(trimToNull(newCustomer.getPhone()));
+        createCustomerRequest.setEmail(trimToNull(newCustomer.getEmail()));
+        CustomerResponse createdCustomer = customerService.createCustomer(createCustomerRequest);
+        return findCustomer(createdCustomer.getId());
+    }
+
+    private Vehicle resolveVehicle(CreateBookingRequest request, Customer customer) {
+        Long vehicleId = request.getVehicleId();
+        if (vehicleId != null) {
+            customerScope.requireResource(AccessResource.VEHICLE, vehicleId);
+            Vehicle vehicle = findVehicle(vehicleId);
+            if (!Boolean.TRUE.equals(vehicle.getIsActive())) {
+                throw new BusinessRuleException("Phương tiện đang ở trạng thái ngừng hoạt động");
+            }
+            if (!customer.getId().equals(vehicle.getCustomerId())) {
+                throw new BusinessException(
+                        ResponseCode.BOOKING_VEHICLE_OWNER_MISMATCH,
+                        "Phương tiện không thuộc sở hữu của khách hàng đã chọn");
+            }
+            return vehicle;
+        }
+
+        NewBookingVehicleRequest newVehicle = request.getNewVehicle();
+        CreateVehicleRequest createVehicleRequest = new CreateVehicleRequest();
+        createVehicleRequest.setCustomerId(customer.getId());
+        createVehicleRequest.setLicensePlate(trimToNull(newVehicle.getLicensePlate()));
+        createVehicleRequest.setBrand(trimToNull(newVehicle.getBrand()));
+        createVehicleRequest.setModel(trimToNull(newVehicle.getModel()));
+        createVehicleRequest.setManufactureYear(newVehicle.getManufactureYear());
+        createVehicleRequest.setColor(trimToNull(newVehicle.getColor()));
+        VehicleResponse createdVehicle = vehicleService.createVehicle(createVehicleRequest);
+        return findVehicle(createdVehicle.getId());
+    }
+
+    private ServiceEntity resolveActiveService(Long serviceId) {
+        if (serviceId == null) {
+            return null;
+        }
+        ServiceEntity service =
+                serviceRepository
+                        .findById(serviceId)
+                        .orElseThrow(
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Không tìm thấy dịch vụ danh mục với ID: "
+                                                        + serviceId));
+        if (!Boolean.TRUE.equals(service.getIsActive())) {
+            throw new BusinessRuleException("Dịch vụ đang ở trạng thái ngừng cung cấp");
+        }
+        return service;
+    }
+
+    private int resolveDurationMinutes(ServiceEntity service) {
+        return service != null
+                        && service.getStandardMinutes() != null
+                        && service.getStandardMinutes() > 0
+                ? service.getStandardMinutes()
+                : workshop.getDefaultServiceMinutes();
+    }
+
+    private Customer findCustomer(Long customerId) {
+        return customerRepository
+                .findById(customerId)
+                .orElseThrow(
+                        () ->
+                                new ResourceNotFoundException(
+                                        "Không tìm thấy khách hàng với ID: " + customerId));
+    }
+
+    private Vehicle findVehicle(Long vehicleId) {
+        return vehicleRepository
+                .findById(vehicleId)
+                .orElseThrow(
+                        () ->
+                                new ResourceNotFoundException(
+                                        "Không tìm thấy phương tiện với ID: " + vehicleId));
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @Override
@@ -195,18 +300,18 @@ public class BookingServiceImpl implements BookingService {
             throw new BusinessRuleException("Thời gian hẹn mới không được ở trong quá khứ");
         }
 
-        ServiceEntity service =
-                serviceRepository
-                        .findById(booking.getServiceId())
-                        .orElseThrow(
-                                () ->
-                                        new ResourceNotFoundException(
-                                                "Không tìm thấy dịch vụ của lịch hẹn"));
+        ServiceEntity service = null;
+        if (booking.getServiceId() != null) {
+            service =
+                    serviceRepository
+                            .findById(booking.getServiceId())
+                            .orElseThrow(
+                                    () ->
+                                            new ResourceNotFoundException(
+                                                    "Không tìm thấy dịch vụ của lịch hẹn"));
+        }
 
-        int durationMinutes =
-                service.getStandardMinutes() != null && service.getStandardMinutes() > 0
-                        ? service.getStandardMinutes()
-                        : workshop.getDefaultServiceMinutes();
+        int durationMinutes = resolveDurationMinutes(service);
         Instant newExpectedEndAt =
                 request.getNewAppointmentAt().plus(Duration.ofMinutes(durationMinutes));
 
@@ -343,7 +448,10 @@ public class BookingServiceImpl implements BookingService {
     private BookingResponse loadResponse(Booking booking) {
         Customer customer = customerRepository.findById(booking.getCustomerId()).orElse(null);
         Vehicle vehicle = vehicleRepository.findById(booking.getVehicleId()).orElse(null);
-        ServiceEntity service = serviceRepository.findById(booking.getServiceId()).orElse(null);
+        ServiceEntity service =
+                booking.getServiceId() != null
+                        ? serviceRepository.findById(booking.getServiceId()).orElse(null)
+                        : null;
         return bookingMapper.toResponse(booking, customer, vehicle, service, null);
     }
 
