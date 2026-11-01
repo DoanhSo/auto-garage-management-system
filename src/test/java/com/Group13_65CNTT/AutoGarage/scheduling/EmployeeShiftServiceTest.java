@@ -28,6 +28,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -97,7 +98,7 @@ class EmployeeShiftServiceTest {
     @DisplayName("Tạo ca làm việc thành công")
     void createShift_success() {
         when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
-        when(employeeShiftRepository.findOverlappingShifts(1L, ShiftStatus.ACTIVE, createRequest.getStartsAt(), createRequest.getEndsAt()))
+        when(employeeShiftRepository.findOverlappingShifts(eq(1L), eq(ShiftStatus.ACTIVE), any(), any()))
                 .thenReturn(Collections.emptyList());
         when(employeeShiftMapper.toEntity(createRequest)).thenReturn(shift);
         when(employeeShiftRepository.save(any(EmployeeShift.class))).thenReturn(shift);
@@ -155,7 +156,7 @@ class EmployeeShiftServiceTest {
     @DisplayName("Tạo ca làm thất bại khi bị trùng ca làm đang active của nhân viên (UC37)")
     void createShift_overlappingShift_throwsDuplicate() {
         when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
-        when(employeeShiftRepository.findOverlappingShifts(1L, ShiftStatus.ACTIVE, createRequest.getStartsAt(), createRequest.getEndsAt()))
+        when(employeeShiftRepository.findOverlappingShifts(eq(1L), eq(ShiftStatus.ACTIVE), any(), any()))
                 .thenReturn(List.of(shift));
 
         assertThatThrownBy(() -> schedulingService.createShift(100L, createRequest))
@@ -189,5 +190,50 @@ class EmployeeShiftServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getContent()).hasSize(1);
         verify(employeeShiftRepository).findAll(pageable);
+    }
+
+    @Test
+    @DisplayName("Kỹ thuật viên đăng ký ca: ca lưu ở trạng thái chờ duyệt, chưa tính là ca làm việc")
+    void registerShift_savesPendingShift() {
+        Instant start = now.plus(Duration.ofHours(24));
+        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.of(employee));
+        when(employeeShiftRepository.save(any(EmployeeShift.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        schedulingService.registerShift(10L, com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ShiftRegisterRequest.builder()
+                .startsAt(start).endsAt(start.plus(Duration.ofHours(4))).build());
+
+        org.mockito.ArgumentCaptor<EmployeeShift> saved = org.mockito.ArgumentCaptor.forClass(EmployeeShift.class);
+        verify(employeeShiftRepository).save(saved.capture());
+        assertThat(saved.getValue().getStatus()).isEqualTo(ShiftStatus.PENDING);
+        assertThat(saved.getValue().getEmployeeId()).isEqualTo(1L);
+        assertThat(saved.getValue().getRegisteredAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Quản đốc duyệt đăng ký: ca chuyển sang ACTIVE và ghi người duyệt")
+    void approveRegistration_activatesShift() {
+        shift.setStatus(ShiftStatus.PENDING);
+        when(employeeShiftRepository.findById(1L)).thenReturn(Optional.of(shift));
+        when(employeeShiftRepository.save(any(EmployeeShift.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        schedulingService.approveShiftRegistration(100L, 1L);
+
+        assertThat(shift.getStatus()).isEqualTo(ShiftStatus.ACTIVE);
+        assertThat(shift.getApprovedBy()).isEqualTo(100L);
+    }
+
+    @Test
+    @DisplayName("Từ chối đăng ký ca lưu lý do; ca đã xử lý thì không duyệt lại được")
+    void rejectRegistration_storesReasonAndBlocksReprocessing() {
+        shift.setStatus(ShiftStatus.PENDING);
+        when(employeeShiftRepository.findById(1L)).thenReturn(Optional.of(shift));
+        when(employeeShiftRepository.save(any(EmployeeShift.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        schedulingService.rejectShiftRegistration(100L, 1L, " Thiếu quân số khoang ");
+
+        assertThat(shift.getStatus()).isEqualTo(ShiftStatus.REJECTED);
+        assertThat(shift.getRejectionReason()).isEqualTo("Thiếu quân số khoang");
+        assertThatThrownBy(() -> schedulingService.approveShiftRegistration(100L, 1L))
+                .hasMessageContaining("đã được xử lý");
     }
 }

@@ -3,8 +3,23 @@ import type { VehicleWorkHistoryEntry } from '../../vehicle/types/workHistory';
 export type PayrollStatus = 'DRAFT' | 'CALCULATED' | 'APPROVED' | 'PAID';
 export type PayrollItemStatus = 'CALCULATED' | 'CONFIRMED' | 'PAID';
 export type CommissionType =
-  'ORDER_COMPLETION' | 'LABOR_SHARE' | 'FAST_TURNAROUND' | 'QC_EXCELLENCE';
+  | 'ORDER_COMPLETION'
+  | 'LABOR_SHARE'
+  | 'FAST_TURNAROUND'
+  | 'QC_EXCELLENCE'
+  | 'TIME_SAVED_EFFICIENCY'
+  | 'WARRANTY_DEDUCTION';
 export type CommissionStatus = 'PENDING' | 'APPROVED' | 'PAID_OUT' | 'CANCELLED';
+
+export const periodStatusVariant: Record<
+  PayrollStatus,
+  'secondary' | 'warning' | 'primary' | 'success'
+> = {
+  DRAFT: 'secondary',
+  CALCULATED: 'warning',
+  APPROVED: 'primary',
+  PAID: 'success',
+};
 
 export const payrollStatusLabels: Record<PayrollStatus, string> = {
   DRAFT: 'Nháp',
@@ -24,6 +39,8 @@ export const commissionTypeLabels: Record<CommissionType, string> = {
   LABOR_SHARE: 'Hoa hồng tiền công',
   FAST_TURNAROUND: 'Thưởng vượt tiến độ',
   QC_EXCELLENCE: 'Thưởng kiểm định QC',
+  TIME_SAVED_EFFICIENCY: 'Thưởng tiết kiệm giờ',
+  WARRANTY_DEDUCTION: 'Khấu trừ lỗi bảo hành',
 };
 
 export const commissionStatusLabels: Record<CommissionStatus, string> = {
@@ -71,6 +88,7 @@ export interface PayrollItem {
   completedOrderCount: number;
   hourlyPayAmount: string | number;
   commissionAmount: string | number;
+  orderBonusAmount: string | number;
   allowanceAmount: string | number;
   deductionAmount: string | number;
   grossPay: string | number;
@@ -90,6 +108,11 @@ export interface OrderCommission {
   repairOrderId: string;
   taskId?: string | null;
   employeeId: string;
+  shiftId?: string | null;
+  shiftType?: string | null;
+  serviceBayId?: string | null;
+  bayCode?: string | null;
+  licensePlate?: string | null;
   commissionType: CommissionType;
   baseAmount: string | number;
   ratePercent: string | number;

@@ -43,8 +43,7 @@ export function RepairOrderFilters({
 }) {
   const id = useId();
   const count = (keyword.trim() ? 1 : 0) + (status ? 1 : 0);
-  const changed =
-    keyword.length > 0 || !!status || sortBy !== 'createdAt' || sortDir !== 'desc';
+  const changed = keyword.length > 0 || !!status || sortBy !== 'createdAt' || sortDir !== 'desc';
   return (
     <section className="user-filters" aria-label="Bộ lọc lệnh sửa chữa">
       <div className="user-filters-heading">

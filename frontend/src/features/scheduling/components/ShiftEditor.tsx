@@ -1,9 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '../../../app/providers/ToastProvider';
-import { Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/components/ui';
+import {
+  Button,
+  Combobox,
+  ConfirmDialog,
+  Field,
+  FormError,
+  Sheet,
+} from '../../../shared/components/ui';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { ApiError, errorMessage } from '../../../shared/api/errors';
-import { useUsersQuery } from '../../identity/hooks/useUsers';
 import {
   useCreateShiftMutation,
   useSchedulingEmployeesQuery,
@@ -11,13 +17,12 @@ import {
 } from '../hooks/useScheduling';
 import {
   SKILL_LABELS,
+  bayTypeLabels,
   parseSkills,
   shiftTypeLabels,
   shiftTypeWindows,
   type ShiftType,
 } from '../types/scheduling';
-
-const SHIFT_PRESETS: ShiftType[] = ['MORNING', 'AFTERNOON', 'FULL_DAY', 'OVERTIME'];
 
 function expectedHours(startsAt: string, endsAt: string): string {
   const diff = (new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 3_600_000;
@@ -50,10 +55,11 @@ export function ShiftEditor({
 
   const bays = useServiceBaysQuery({ isActive: true, page: 0, size: 100 });
   const { data: employees = [] } = useSchedulingEmployeesQuery({ active: true });
-  const users = useUsersQuery({ page: 0, size: 100, sortBy: 'fullName', sortDir: 'asc' });
-  const userNames = new Map(
-    (users.data?.content ?? []).map((u) => [String(u.id), u.fullName] as const),
-  );
+
+  const selectedEmployee = employees.find((emp) => String(emp.id) === employeeId);
+  const selectedBay = (bays.data?.content ?? []).find((bay) => String(bay.id) === serviceBayId);
+  const employeeLabel = (emp: { fullName?: string | null; employeeCode: string }) =>
+    `${emp.fullName ?? emp.employeeCode} · ${emp.employeeCode}`;
 
   const applyPreset = (type: ShiftType) => {
     const day = startsAt.slice(0, 10);
@@ -110,7 +116,7 @@ export function ShiftEditor({
       onSaved();
       onClose();
     } catch (err: unknown) {
-      if (err instanceof ApiError && (err.code === 2003 || err.status === 409)) {
+      if (err instanceof ApiError && !err.detail && (err.code === 2003 || err.status === 409)) {
         notify(
           'Kỹ thuật viên đã có ca làm việc khác trong khoảng thời gian đã chọn (trùng ca làm)',
         );
@@ -140,41 +146,63 @@ export function ShiftEditor({
 
           <div className="full-width-field">
             <Field label="Kỹ thuật viên" required>
-              <select
-                className="select"
+              <Combobox
                 value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
+                onChange={setEmployeeId}
                 disabled={busy}
-                required
-              >
-                <option value="">-- Chọn kỹ thuật viên --</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {userNames.get(String(emp.userId)) ?? emp.employeeCode} · {emp.employeeCode}
-                    {parseSkills(emp.skillsJson).length > 0 &&
-                      ` · ${parseSkills(emp.skillsJson)
+                placeholder="Gõ tên hoặc mã để tìm kỹ thuật viên…"
+                options={employees.map((emp) => ({
+                  value: String(emp.id),
+                  label: employeeLabel(emp),
+                  description:
+                    [
+                      parseSkills(emp.skillsJson)
                         .map((s) => SKILL_LABELS[s] ?? s)
-                        .join(', ')}`}
-                    {emp.canQc ? ' · QC' : ''}
-                  </option>
-                ))}
-              </select>
+                        .join(', '),
+                      emp.canQc ? 'QC' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ') || undefined,
+                }))}
+              />
             </Field>
           </div>
 
-          <div className="full-width-field row-actions" aria-label="Chọn nhanh ca chuẩn">
-            {SHIFT_PRESETS.map((type) => (
-              <Button
-                key={type}
-                type="button"
-                variant={shiftType === type ? 'primary' : 'secondary'}
-                disabled={busy}
-                onClick={() => applyPreset(type)}
-              >
-                {shiftTypeLabels[type]} {shiftTypeWindows[type].start}–{shiftTypeWindows[type].end}
-              </Button>
-            ))}
-          </div>
+          <Field
+            label="Khoang trực"
+            hint={
+              selectedBay
+                ? `${bayTypeLabels[selectedBay.bayType] ?? selectedBay.bayType} · tối đa 2 thợ (1 chính, 1 phụ) cùng trực`
+                : 'Nếu không chọn khoang, thợ sẽ vào danh sách thợ cơ động để điều động linh hoạt khi tiếp nhận xe.'
+            }
+          >
+            <Combobox
+              value={serviceBayId}
+              onChange={setServiceBayId}
+              disabled={busy}
+              placeholder="Không gán khoang (Thợ cơ động / Hỗ trợ toàn xưởng / QC)"
+              options={(bays.data?.content ?? []).map((bay) => ({
+                value: String(bay.id),
+                label: `${bay.bayCode} · ${bayTypeLabels[bay.bayType] ?? bay.bayName}`,
+              }))}
+            />
+          </Field>
+
+          <Field label="Loại ca">
+            <select
+              className="select"
+              value={shiftType}
+              onChange={(e) => applyPreset(e.target.value as ShiftType)}
+              disabled={busy}
+            >
+              {Object.entries(shiftTypeLabels).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label} {shiftTypeWindows[key as ShiftType].start}–
+                  {shiftTypeWindows[key as ShiftType].end}
+                </option>
+              ))}
+            </select>
+          </Field>
 
           <Field label="Thời gian bắt đầu ca" required>
             <input
@@ -198,40 +226,21 @@ export function ShiftEditor({
             />
           </Field>
 
-          <Field label="Loại ca">
-            <select
-              className="select"
-              value={shiftType}
-              onChange={(e) => setShiftType(e.target.value as ShiftType)}
-              disabled={busy}
-            >
-              {Object.entries(shiftTypeLabels).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <Field label="Khoang trực cố định">
-            <select
-              className="select"
-              value={serviceBayId}
-              onChange={(e) => setServiceBayId(e.target.value)}
-              disabled={busy}
-            >
-              <option value="">-- Không gán khoang --</option>
-              {(bays.data?.content ?? []).map((bay) => (
-                <option key={bay.id} value={bay.id}>
-                  {bay.bayCode} · {bay.bayName}
-                </option>
-              ))}
-            </select>
-          </Field>
-
+          <div className="full-width-field info-strip" aria-live="polite">
+            <span>
+              <strong>
+                {selectedEmployee ? employeeLabel(selectedEmployee) : 'Chưa chọn thợ'}
+              </strong>
+              {' → '}
+              <strong>{selectedBay ? selectedBay.bayCode : 'thợ cơ động'}</strong>
+              {' · '}
+              {shiftTypeLabels[shiftType]} · {expectedHours(startsAt, endsAt)}
+            </span>
+          </div>
           <div className="full-width-field">
             <p className="description">
-              Tổng giờ dự kiến của ca: {expectedHours(startsAt, endsAt)}
+              Giới hạn: tối đa 12 giờ/ngày, 60 giờ/tuần và nghỉ ít nhất 8 giờ giữa hai ca ở hai ngày
+              liên tiếp. Hệ thống sẽ báo ngay nếu ca vi phạm.
             </p>
           </div>
 

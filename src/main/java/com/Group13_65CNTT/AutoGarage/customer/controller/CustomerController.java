@@ -54,7 +54,7 @@ public class CustomerController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize(SecurityConstants.HAS_BOOKING_ACCESS)
+    @PreAuthorize(SecurityConstants.HAS_CUSTOMER_PROFILE_ACCESS)
     @Operation(summary = "Fetch customer by ID")
     public ResponseEntity<ApiResponse<CustomerResponse>> getCustomerById(
             @PathVariable Long id,

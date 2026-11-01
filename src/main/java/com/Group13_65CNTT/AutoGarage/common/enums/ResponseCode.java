@@ -48,6 +48,8 @@ public enum ResponseCode {
             2017, "Provide exactly one of vehicleId or newVehicle", HttpStatus.BAD_REQUEST),
     BOOKING_VEHICLE_OWNER_MISMATCH(
             2018, "Vehicle does not belong to the selected customer", HttpStatus.BAD_REQUEST),
+    BAY_UNAVAILABLE(
+            2019, "Service bay is already reserved for the requested period", HttpStatus.CONFLICT),
     UNAUTHORIZED(3001, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),
     FORBIDDEN(3002, "You do not have permission for this operation", HttpStatus.FORBIDDEN),
     INVALID_TOKEN(3003, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),

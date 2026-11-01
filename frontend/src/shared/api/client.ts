@@ -95,7 +95,9 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
             ),
           )
         : {};
-      const error = new ApiError(response.status, payload.code, fields);
+      const detail =
+        typeof payload.detail === 'string' && payload.detail.length <= 300 ? payload.detail : undefined;
+      const error = new ApiError(response.status, payload.code, fields, false, detail);
       if (
         token &&
         response.status === 401 &&

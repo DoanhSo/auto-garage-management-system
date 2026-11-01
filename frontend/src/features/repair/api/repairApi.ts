@@ -93,7 +93,12 @@ export const repairApi = {
 
   async assignTask(
     taskId: string | number,
-    data: { employeeId: string | number; role: AssignmentRole },
+    data: {
+      employeeId: string | number;
+      assignmentRole: AssignmentRole;
+      startsAt: string;
+      endsAt: string;
+    },
   ): Promise<TaskAssignment> {
     return request<TaskAssignment>(`/repair-tasks/${taskId}/assignments`, {
       method: 'POST',
@@ -112,26 +117,22 @@ export const repairApi = {
   },
 
   async startTimer(assignmentId: string | number): Promise<LaborSession> {
-    return request<LaborSession>(
-      `/repair-tasks/assignments/${assignmentId}/timer/start`,
-      { method: 'POST' },
-    );
+    return request<LaborSession>(`/repair-tasks/assignments/${assignmentId}/timer/start`, {
+      method: 'POST',
+    });
   },
 
   async stopTimer(assignmentId: string | number, stopReason: StopReason): Promise<LaborSession> {
-    return request<LaborSession>(
-      `/repair-tasks/assignments/${assignmentId}/timer/stop`,
-      {
-        method: 'POST',
-        body: { stopReason },
-      },
-    );
+    return request<LaborSession>(`/repair-tasks/assignments/${assignmentId}/timer/stop`, {
+      method: 'POST',
+      body: { stopReason },
+    });
   },
 
   async completeTask(taskId: string | number, note?: string): Promise<TaskWorkSummary> {
     return request<TaskWorkSummary>(`/repair-tasks/${taskId}/complete`, {
       method: 'POST',
-      body: { note },
+      body: { completionNote: note },
     });
   },
 

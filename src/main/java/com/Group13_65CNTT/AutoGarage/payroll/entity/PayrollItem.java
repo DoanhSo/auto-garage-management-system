@@ -72,6 +72,10 @@ public class PayrollItem {
     private BigDecimal commissionAmount = BigDecimal.ZERO;
 
     @Builder.Default
+    @Column(name = "order_bonus_amount", nullable = false, precision = 18, scale = 2)
+    private BigDecimal orderBonusAmount = BigDecimal.ZERO;
+
+    @Builder.Default
     @Column(name = "allowance_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal allowanceAmount = BigDecimal.ZERO;
 

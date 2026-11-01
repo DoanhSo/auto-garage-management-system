@@ -128,6 +128,16 @@ public class PayrollController {
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
 
+    @GetMapping(ApiPaths.PAYROLL_PERIODS + "/by-month")
+    @PreAuthorize(SecurityConstants.HAS_ROLE_PAYROLL_MANAGER)
+    @Operation(summary = "Kỳ tính lương của một tháng (null nếu chưa khởi tạo)")
+    public ResponseEntity<ApiResponse<PayrollPeriodDetailResponse>> getPeriodByMonth(
+            @RequestParam @jakarta.validation.constraints.Pattern(regexp = "\\d{4}-(0[1-9]|1[0-2])") String month,
+            HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(ApiResponse.success(
+                ResponseCode.SUCCESS, payrollService.getPeriodByMonth(month), httpRequest.getRequestURI()));
+    }
+
     @GetMapping(ApiPaths.PAYROLL_PERIODS + "/{id}")
     @PreAuthorize(SecurityConstants.HAS_ROLE_PAYROLL_MANAGER)
     @Operation(summary = "Chi tiết kỳ tính lương kèm phiếu lương từng nhân viên")
@@ -167,7 +177,7 @@ public class PayrollController {
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
     }
 
-    @PostMapping(ApiPaths.PAYROLL_PERIODS + "/{id}/disburse")
+    @PostMapping({ApiPaths.PAYROLL_PERIODS + "/{id}/disburse", ApiPaths.PAYROLL_PERIODS + "/{id}/payout"})
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
     @Operation(summary = "Chi trả lương và hạch toán phiếu chi vào sổ quỹ (Chỉ Quản trị viên)")
     public ResponseEntity<ApiResponse<PayrollPeriodResponse>> disbursePeriod(

@@ -23,7 +23,9 @@ export function HandoverModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (odometerOut < order.odometerIn) {
-      notify(`Số km khi bàn giao không được nhỏ hơn số km lúc vào (${order.odometerIn.toLocaleString('vi-VN')} km)`);
+      notify(
+        `Số km khi bàn giao không được nhỏ hơn số km lúc vào (${order.odometerIn.toLocaleString('vi-VN')} km)`,
+      );
       return;
     }
 
@@ -53,11 +55,7 @@ export function HandoverModal({
         <FormError message={handover.error ? errorMessage(handover.error) : undefined} />
 
         <Field label="Số ODO khi vào (km)">
-          <input
-            className="input"
-            disabled
-            value={order.odometerIn.toLocaleString('vi-VN')}
-          />
+          <input className="input" disabled value={order.odometerIn.toLocaleString('vi-VN')} />
         </Field>
 
         <Field label="Số ODO khi bàn giao (km)" required>

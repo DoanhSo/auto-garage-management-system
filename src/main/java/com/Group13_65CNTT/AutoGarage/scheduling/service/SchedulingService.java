@@ -6,6 +6,7 @@ import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.MaintenanceReservati
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ServiceBayCreateRequest;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ServiceBayUpdateRequest;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ShiftCreateRequest;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ShiftRegisterRequest;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.BayReservationResponse;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.EmployeeResponse;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.ServiceBayResponse;
@@ -31,6 +32,16 @@ public interface SchedulingService {
     ShiftResponse createShift(Long actorUserId, ShiftCreateRequest request);
 
     void cancelShift(Long actorUserId, Long shiftId);
+
+    ShiftResponse registerShift(Long actorUserId, ShiftRegisterRequest request);
+
+    ShiftResponse approveShiftRegistration(Long actorUserId, Long shiftId);
+
+    ShiftResponse rejectShiftRegistration(Long actorUserId, Long shiftId, String reason);
+
+    Page<ShiftResponse> getPendingRegistrations(Pageable pageable);
+
+    Page<ShiftResponse> getMyShifts(Long actorUserId, Pageable pageable);
 
     Page<ShiftResponse> getEmployeeShifts(Long employeeId, Pageable pageable);
 

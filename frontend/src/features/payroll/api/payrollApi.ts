@@ -25,6 +25,9 @@ export const payrollApi = {
         }),
     ),
 
+  getPeriodByMonth: (month: string) =>
+    request<PayrollPeriodDetail | null>('/payroll/periods/by-month' + queryString({ month })),
+
   getPeriod: (id: string | number) => request<PayrollPeriodDetail>(`/payroll/periods/${id}`),
 
   createPeriod: (data: PayrollPeriodCreateInput) =>

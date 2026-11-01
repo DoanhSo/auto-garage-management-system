@@ -79,6 +79,9 @@ class PayrollServiceTest {
     @Mock private TaskAssignmentRepository assignmentRepository;
     @Mock private VehicleCheckRepository vehicleCheckRepository;
     @Mock private BillingOperations billingOperations;
+    @Mock private com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository serviceRepository;
+    @Mock private com.Group13_65CNTT.AutoGarage.scheduling.repository.ServiceBayRepository serviceBayRepository;
+    @Mock private com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleRepository vehicleRepository;
 
     @InjectMocks private PayrollServiceImpl service;
 
@@ -150,10 +153,12 @@ class PayrollServiceTest {
         ArgumentCaptor<List<OrderCommission>> captor = ArgumentCaptor.forClass(List.class);
         verify(commissionRepository).saveAll(captor.capture());
         List<OrderCommission> saved = captor.getValue();
-        assertThat(created).isEqualTo(4);
+        assertThat(created).isEqualTo(5);
         assertThat(amountOf(saved, 1L, CommissionType.LABOR_SHARE)).isEqualByComparingTo("70000");
         assertThat(amountOf(saved, 2L, CommissionType.LABOR_SHARE)).isEqualByComparingTo("30000");
-        assertThat(amountOf(saved, 1L, CommissionType.ORDER_COMPLETION)).isEqualByComparingTo("100000");
+        // Đơn đầu tiên trong ca: thưởng 50.000, thợ chính 70% và thợ phụ 30%.
+        assertThat(amountOf(saved, 1L, CommissionType.ORDER_COMPLETION)).isEqualByComparingTo("35000");
+        assertThat(amountOf(saved, 2L, CommissionType.ORDER_COMPLETION)).isEqualByComparingTo("15000");
         assertThat(amountOf(saved, 3L, CommissionType.QC_EXCELLENCE)).isEqualByComparingTo("30000");
         assertThat(saved).allMatch(commission -> commission.getStatus() == CommissionStatus.APPROVED);
     }
@@ -184,6 +189,84 @@ class PayrollServiceTest {
         assertThat(captor.getValue()).extracting(OrderCommission::getCommissionType)
                 .containsExactly(CommissionType.LABOR_SHARE);
         assertThat(captor.getValue().get(0).getCommissionAmount()).isEqualByComparingTo("100000");
+    }
+
+    @Test
+    @DisplayName("Thưởng đơn theo bậc trong ca: đơn thứ 3 trong cùng ca được 80.000, thợ làm một mình hưởng 100%")
+    void orderBonusUsesTheTierOfThePositionInTheShift() {
+        RepairOrder order = closedOrder(1L);
+        when(repairOrderRepository.findById(7L)).thenReturn(Optional.of(order));
+        when(commissionRepository.existsByRepairOrderId(7L)).thenReturn(false);
+        when(repairTaskRepository.findByRepairOrderId(7L)).thenReturn(List.of(RepairTask.builder()
+                .id(70L).taskType(TaskType.REPAIR).status(TaskStatus.COMPLETED)
+                .quantity(BigDecimal.ONE).unitPrice(new BigDecimal("1000000")).build()));
+        when(assignmentRepository.findByTaskId(70L)).thenReturn(List.of(assignment(1L, AssignmentRole.MAIN)));
+        when(employeeRepository.findAllById(anyCollection())).thenReturn(List.of(employee(1L, "50000", "0")));
+        when(vehicleCheckRepository.findAllByRepairOrderIdAndCheckTypeOrderByAttemptNoAsc(7L, CheckType.QC))
+                .thenReturn(List.of(qcCheck(CheckResult.PASSED)));
+        com.Group13_65CNTT.AutoGarage.scheduling.entity.EmployeeShift shift =
+                com.Group13_65CNTT.AutoGarage.scheduling.entity.EmployeeShift.builder()
+                        .id(40L).employeeId(1L)
+                        .shiftType(com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftType.MORNING)
+                        .serviceBayId(2L).build();
+        when(shiftRepository.findActiveAt(org.mockito.ArgumentMatchers.eq(1L), any())).thenReturn(List.of(shift));
+        when(commissionRepository.countByEmployeeIdAndShiftIdAndCommissionTypeAndStatusNot(
+                1L, 40L, CommissionType.ORDER_COMPLETION, CommissionStatus.CANCELLED)).thenReturn(2L);
+        com.Group13_65CNTT.AutoGarage.scheduling.entity.ServiceBay bay =
+                com.Group13_65CNTT.AutoGarage.scheduling.entity.ServiceBay.builder().id(2L).bayCode("BAY-02").build();
+        when(serviceBayRepository.findById(2L)).thenReturn(Optional.of(bay));
+        com.Group13_65CNTT.AutoGarage.vehicle.entity.Vehicle vehicle = new com.Group13_65CNTT.AutoGarage.vehicle.entity.Vehicle();
+        vehicle.setLicensePlate("30A-123.45");
+        order.setVehicleId(9L);
+        when(vehicleRepository.findById(9L)).thenReturn(Optional.of(vehicle));
+
+        service.recordOrderCommissions(1L, 7L);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<OrderCommission>> captor = ArgumentCaptor.forClass(List.class);
+        verify(commissionRepository).saveAll(captor.capture());
+        OrderCommission bonus = captor.getValue().stream()
+                .filter(row -> row.getCommissionType() == CommissionType.ORDER_COMPLETION).findFirst().orElseThrow();
+        assertThat(bonus.getCommissionAmount()).isEqualByComparingTo("80000");
+        assertThat(bonus.getShiftId()).isEqualTo(40L);
+        assertThat(bonus.getBayCode()).isEqualTo("BAY-02");
+        assertThat(bonus.getLicensePlate()).isEqualTo("30A-123.45");
+        assertThat(bonus.getNotes()).isEqualTo("Thưởng đơn xe 30A-123.45 ca Sáng tại khoang BAY-02");
+    }
+
+    @Test
+    @DisplayName("Thưởng tiết kiệm giờ: 50% giá trị giờ dôi so với định mức khi QC đạt lần 1")
+    void timeSavedBonusPaysHalfTheSavedBookHours() {
+        RepairOrder order = closedOrder(1L);
+        when(repairOrderRepository.findById(7L)).thenReturn(Optional.of(order));
+        when(commissionRepository.existsByRepairOrderId(7L)).thenReturn(false);
+        when(repairTaskRepository.findByRepairOrderId(7L)).thenReturn(List.of(RepairTask.builder()
+                .id(70L).serviceId(5L).taskType(TaskType.REPAIR).status(TaskStatus.COMPLETED)
+                .quantity(BigDecimal.ONE).unitPrice(new BigDecimal("1000000")).build()));
+        when(assignmentRepository.findByTaskId(70L)).thenReturn(List.of(
+                TaskAssignment.builder().id(9L).taskId(70L).employeeId(1L).assignmentRole(AssignmentRole.MAIN).build()));
+        when(employeeRepository.findAllById(anyCollection())).thenReturn(List.of(employee(1L, "50000", "0")));
+        when(vehicleCheckRepository.findAllByRepairOrderIdAndCheckTypeOrderByAttemptNoAsc(7L, CheckType.QC))
+                .thenReturn(List.of(qcCheck(CheckResult.PASSED)));
+        com.Group13_65CNTT.AutoGarage.catalog.entity.ServiceEntity service =
+                new com.Group13_65CNTT.AutoGarage.catalog.entity.ServiceEntity();
+        service.setStandardMinutes(120);
+        when(serviceRepository.findById(5L)).thenReturn(Optional.of(service));
+        when(laborSessionRepository.findByAssignmentIdIn(anyCollection())).thenReturn(List.of(LaborSession.builder()
+                .assignmentId(9L).employeeId(1L)
+                .startsAt(Instant.parse("2026-10-05T02:00:00Z")).endsAt(Instant.parse("2026-10-05T03:00:00Z")).build()));
+
+        service(7L);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<OrderCommission>> captor = ArgumentCaptor.forClass(List.class);
+        verify(commissionRepository).saveAll(captor.capture());
+        // 2h book - 1h actual = 1h saved x 50.000 x 50% = 25.000
+        assertThat(amountOf(captor.getValue(), 1L, CommissionType.TIME_SAVED_EFFICIENCY)).isEqualByComparingTo("25000");
+    }
+
+    private void service(Long orderId) {
+        this.service.recordOrderCommissions(1L, orderId);
     }
 
     @Test

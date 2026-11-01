@@ -28,6 +28,7 @@ public class ShiftCreateRequest {
 
     private ShiftType shiftType;
 
+    /** Optional: null means a floating technician who can be dispatched to any bay. */
     private Long serviceBayId;
 
     private String notes;

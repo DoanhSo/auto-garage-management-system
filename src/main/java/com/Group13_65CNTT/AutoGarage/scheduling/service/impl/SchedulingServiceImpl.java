@@ -1,7 +1,10 @@
 package com.Group13_65CNTT.AutoGarage.scheduling.service.impl;
 
 import com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties;
+import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.security.ActorIds;
+import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
+import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
@@ -12,6 +15,7 @@ import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.MaintenanceReservati
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ServiceBayCreateRequest;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ServiceBayUpdateRequest;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ShiftCreateRequest;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ShiftRegisterRequest;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.BayReservationResponse;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.EmployeeResponse;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.ServiceBayResponse;
@@ -24,6 +28,12 @@ import com.Group13_65CNTT.AutoGarage.scheduling.entity.ReservationType;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.ServiceBay;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftStatus;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftType;
+import com.Group13_65CNTT.AutoGarage.scheduling.constant.ShiftPolicy;
+import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
+import java.time.DayOfWeek;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import com.Group13_65CNTT.AutoGarage.scheduling.mapper.BayReservationMapper;
 import com.Group13_65CNTT.AutoGarage.scheduling.mapper.EmployeeMapper;
 import com.Group13_65CNTT.AutoGarage.scheduling.mapper.EmployeeShiftMapper;
@@ -44,6 +54,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.Set;
 
 @Service
@@ -57,6 +70,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
     private final ServiceBayRepository serviceBayRepository;
     private final BayReservationRepository bayReservationRepository;
     private final UserRepository userRepository;
+    private final CurrentUserProvider currentUser;
 
     private final EmployeeMapper employeeMapper;
     private final EmployeeShiftMapper employeeShiftMapper;
@@ -80,7 +94,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
         Employee employee = employeeMapper.toEntity(request);
         employee.setEmployeeCode(request.getEmployeeCode().trim());
         Employee saved = employeeRepository.save(employee);
-        return employeeMapper.toResponse(saved);
+        return toEmployeeResponse(saved, loadAccounts(List.of(saved)));
     }
 
     @Override
@@ -88,7 +102,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
     public EmployeeResponse getEmployeeById(Long id) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
-        return employeeMapper.toResponse(employee);
+        return toEmployeeResponse(employee, loadAccounts(List.of(employee)));
     }
 
     @Override
@@ -96,7 +110,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
     public EmployeeResponse getEmployeeByUserId(Long userId) {
         Employee employee = employeeRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
-        return employeeMapper.toResponse(employee);
+        return toEmployeeResponse(employee, loadAccounts(List.of(employee)));
     }
 
     @Override
@@ -105,7 +119,36 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
         Page<Employee> page = (isActive == null)
                 ? employeeRepository.findAll(pageable)
                 : employeeRepository.findByIsActive(isActive, pageable);
-        return page.map(employeeMapper::toResponse);
+        Map<Long, User> accounts = loadAccounts(page.getContent());
+        return page.map(employee -> toEmployeeResponse(employee, accounts));
+    }
+
+    private Map<Long, User> loadAccounts(List<Employee> employees) {
+        return userRepository.findAllById(employees.stream().map(Employee::getUserId).toList()).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+    }
+
+    /** Adds the account's display name; pay and bank details stay with the front desk only. */
+    private EmployeeResponse toEmployeeResponse(Employee employee, Map<Long, User> accounts) {
+        EmployeeResponse response = employeeMapper.toResponse(employee);
+        User account = accounts.get(employee.getUserId());
+        if (account != null) {
+            response.setFullName(account.getFullName());
+            response.setUsername(account.getUsername());
+            response.setEmail(account.getEmail());
+        }
+        Role role = currentUser.role();
+        if (role != Role.ADMIN && role != Role.RECEPTIONIST) {
+            response.setBankName(null);
+            response.setBankAccountNumber(null);
+            response.setBankAccountHolder(null);
+            response.setBaseSalary(null);
+            response.setSalaryCoefficient(null);
+            response.setHourlyCost(null);
+            response.setOvertimeMultiplier(null);
+            response.setDefaultCommissionRate(null);
+        }
+        return response;
     }
 
     @Override
@@ -117,7 +160,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
         employeeMapper.updateEntityFromRequest(request, employee);
         Employee updated = employeeRepository.save(employee);
-        return employeeMapper.toResponse(updated);
+        return toEmployeeResponse(updated, loadAccounts(List.of(updated)));
     }
 
     @Override
@@ -155,6 +198,9 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
             throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
         }
 
+        validateWorkingLimits(request.getEmployeeId(), request.getStartsAt(), request.getEndsAt());
+        validateBayCapacity(request);
+
         EmployeeShift shift = employeeShiftMapper.toEntity(request);
         if (shift.getShiftType() == null) {
             shift.setShiftType(ShiftType.FULL_DAY);
@@ -163,6 +209,179 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
         shift.setCreatedBy(ActorIds.require(actorUserId));
         EmployeeShift saved = employeeShiftRepository.save(shift);
         return employeeShiftMapper.toResponse(saved);
+    }
+
+    /** A bay hosts at most one main and one assistant technician in the same period. */
+    private void validateBayCapacity(ShiftCreateRequest request) {
+        if (request.getServiceBayId() == null) {
+            return;
+        }
+        List<EmployeeShift> sameBay = employeeShiftRepository.findOverlappingByBay(
+                request.getServiceBayId(), request.getStartsAt(), request.getEndsAt());
+        long distinctTechnicians = sameBay.stream().map(EmployeeShift::getEmployeeId).distinct().count();
+        if (distinctTechnicians >= ShiftPolicy.MAX_TECHNICIANS_PER_BAY) {
+            throw new BusinessRuleException("Khoang đã đủ " + ShiftPolicy.MAX_TECHNICIANS_PER_BAY
+                    + " thợ trực trong khung giờ này (1 thợ chính và 1 thợ phụ). Hãy chọn khoang khác hoặc đổi giờ.");
+        }
+    }
+
+    /** Daily (12h), weekly (60h) and overnight rest (8h) limits for one technician. */
+    private void validateWorkingLimits(Long employeeId, Instant startsAt, Instant endsAt) {
+        ZoneId zone = ShiftPolicy.ZONE;
+        LocalDate startDay = startsAt.atZone(zone).toLocalDate();
+        LocalDate endDay = endsAt.atZone(zone).toLocalDate();
+
+        for (LocalDate day = startDay; !day.isAfter(endDay); day = day.plusDays(1)) {
+            Instant from = day.atStartOfDay(zone).toInstant();
+            Instant to = day.plusDays(1).atStartOfDay(zone).toInstant();
+            if (workedSeconds(employeeId, from, to, startsAt, endsAt) > ShiftPolicy.MAX_DAILY_HOURS * 3600) {
+                throw new BusinessRuleException("Vượt giới hạn " + ShiftPolicy.MAX_DAILY_HOURS
+                        + " giờ làm việc trong ngày " + day.getDayOfMonth() + "/" + day.getMonthValue());
+            }
+        }
+
+        for (LocalDate weekStart = startDay.with(DayOfWeek.MONDAY);
+                !weekStart.isAfter(endDay);
+                weekStart = weekStart.plusWeeks(1)) {
+            Instant from = weekStart.atStartOfDay(zone).toInstant();
+            Instant to = weekStart.plusWeeks(1).atStartOfDay(zone).toInstant();
+            if (workedSeconds(employeeId, from, to, startsAt, endsAt) > ShiftPolicy.MAX_WEEKLY_HOURS * 3600) {
+                throw new BusinessRuleException("Vượt giới hạn " + ShiftPolicy.MAX_WEEKLY_HOURS
+                        + " giờ làm việc trong tuần bắt đầu ngày " + weekStart.getDayOfMonth() + "/" + weekStart.getMonthValue());
+            }
+        }
+
+        Duration rest = Duration.ofHours(ShiftPolicy.MIN_REST_HOURS);
+        for (EmployeeShift other : employeeShiftRepository.findOverlappingShifts(
+                employeeId, ShiftStatus.ACTIVE, startsAt.minus(rest), endsAt.plus(rest))) {
+            boolean before = !other.getEndsAt().isAfter(startsAt);
+            boolean after = !other.getStartsAt().isBefore(endsAt);
+            if (before && other.getEndsAt().plus(rest).isAfter(startsAt)
+                    && !other.getEndsAt().atZone(zone).toLocalDate().equals(startDay)) {
+                throw new BusinessRuleException("Cần nghỉ tối thiểu " + ShiftPolicy.MIN_REST_HOURS
+                        + " giờ giữa hai ca ở hai ngày liên tiếp");
+            }
+            if (after && endsAt.plus(rest).isAfter(other.getStartsAt())
+                    && !other.getStartsAt().atZone(zone).toLocalDate().equals(endDay)) {
+                throw new BusinessRuleException("Cần nghỉ tối thiểu " + ShiftPolicy.MIN_REST_HOURS
+                        + " giờ giữa hai ca ở hai ngày liên tiếp");
+            }
+        }
+    }
+
+    private long workedSeconds(Long employeeId, Instant from, Instant to, Instant newStart, Instant newEnd) {
+        long total = overlapSeconds(newStart, newEnd, from, to);
+        for (EmployeeShift existing : employeeShiftRepository.findOverlappingShifts(
+                employeeId, ShiftStatus.ACTIVE, from, to)) {
+            total += overlapSeconds(existing.getStartsAt(), existing.getEndsAt(), from, to);
+        }
+        return total;
+    }
+
+    private long overlapSeconds(Instant aStart, Instant aEnd, Instant bStart, Instant bEnd) {
+        Instant start = aStart.isAfter(bStart) ? aStart : bStart;
+        Instant end = aEnd.isBefore(bEnd) ? aEnd : bEnd;
+        return end.isAfter(start) ? Duration.between(start, end).getSeconds() : 0;
+    }
+
+    @Override
+    @Transactional
+    @Audited(action = "REGISTER_SHIFT", entity = "EmployeeShift")
+    public ShiftResponse registerShift(Long actorUserId, ShiftRegisterRequest request) {
+        Long actorId = ActorIds.require(actorUserId);
+        if (!request.getEndsAt().isAfter(request.getStartsAt())) {
+            throw new BusinessRuleException("Giờ kết thúc ca phải sau giờ bắt đầu");
+        }
+        if (!request.getEndsAt().isAfter(Instant.now())) {
+            throw new BusinessRuleException("Không thể đăng ký ca đã kết thúc");
+        }
+        Employee employee = employeeRepository.findByUserId(actorId)
+                .filter(emp -> Boolean.TRUE.equals(emp.getIsActive()))
+                .orElseThrow(() -> new BusinessRuleException("Tài khoản chưa có hồ sơ kỹ thuật viên đang hoạt động"));
+        if (request.getServiceBayId() != null && !serviceBayRepository.existsById(request.getServiceBayId())) {
+            throw new BusinessException(ResponseCode.RESOURCE_NOT_FOUND);
+        }
+        requireNoOwnOverlap(employee.getId(), request.getStartsAt(), request.getEndsAt());
+        validateWorkingLimits(employee.getId(), request.getStartsAt(), request.getEndsAt());
+
+        EmployeeShift shift = EmployeeShift.builder()
+                .employeeId(employee.getId())
+                .startsAt(request.getStartsAt())
+                .endsAt(request.getEndsAt())
+                .shiftType(request.getShiftType() != null ? request.getShiftType() : ShiftType.FULL_DAY)
+                .serviceBayId(request.getServiceBayId())
+                .status(ShiftStatus.PENDING)
+                .notes(request.getNotes())
+                .registeredAt(Instant.now())
+                .createdBy(actorId)
+                .build();
+        return employeeShiftMapper.toResponse(employeeShiftRepository.save(shift));
+    }
+
+    @Override
+    @Transactional
+    @Audited(action = "APPROVE_SHIFT_REGISTRATION", entity = "EmployeeShift")
+    public ShiftResponse approveShiftRegistration(Long actorUserId, Long shiftId) {
+        EmployeeShift shift = loadPendingShift(shiftId);
+        requireNoOwnOverlap(shift.getEmployeeId(), shift.getStartsAt(), shift.getEndsAt());
+        validateWorkingLimits(shift.getEmployeeId(), shift.getStartsAt(), shift.getEndsAt());
+        validateBayCapacity(ShiftCreateRequest.builder()
+                .employeeId(shift.getEmployeeId())
+                .startsAt(shift.getStartsAt())
+                .endsAt(shift.getEndsAt())
+                .serviceBayId(shift.getServiceBayId())
+                .build());
+        shift.setStatus(ShiftStatus.ACTIVE);
+        shift.setApprovedBy(ActorIds.require(actorUserId));
+        shift.setRejectionReason(null);
+        return employeeShiftMapper.toResponse(employeeShiftRepository.save(shift));
+    }
+
+    @Override
+    @Transactional
+    @Audited(action = "REJECT_SHIFT_REGISTRATION", entity = "EmployeeShift")
+    public ShiftResponse rejectShiftRegistration(Long actorUserId, Long shiftId, String reason) {
+        EmployeeShift shift = loadPendingShift(shiftId);
+        shift.setStatus(ShiftStatus.REJECTED);
+        shift.setApprovedBy(ActorIds.require(actorUserId));
+        shift.setRejectionReason(reason.trim());
+        return employeeShiftMapper.toResponse(employeeShiftRepository.save(shift));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ShiftResponse> getPendingRegistrations(Pageable pageable) {
+        return employeeShiftRepository.findByStatus(ShiftStatus.PENDING, pageable)
+                .map(employeeShiftMapper::toResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ShiftResponse> getMyShifts(Long actorUserId, Pageable pageable) {
+        return employeeRepository.findByUserId(ActorIds.require(actorUserId))
+                .map(emp -> employeeShiftRepository.findByEmployeeId(emp.getId(), pageable)
+                        .map(employeeShiftMapper::toResponse))
+                .orElseGet(() -> Page.empty(pageable));
+    }
+
+    private EmployeeShift loadPendingShift(Long shiftId) {
+        EmployeeShift shift = employeeShiftRepository.findById(shiftId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        if (shift.getStatus() != ShiftStatus.PENDING) {
+            throw new BusinessRuleException("Yêu cầu đăng ký ca này đã được xử lý");
+        }
+        return shift;
+    }
+
+    /** Neither a working nor a still-pending shift of the same technician may overlap the new one. */
+    private void requireNoOwnOverlap(Long employeeId, Instant startsAt, Instant endsAt) {
+        for (ShiftStatus status : List.of(ShiftStatus.ACTIVE, ShiftStatus.PENDING)) {
+            if (!employeeShiftRepository.findOverlappingShifts(employeeId, status, startsAt, endsAt).isEmpty()) {
+                throw new BusinessRuleException(status == ShiftStatus.ACTIVE
+                        ? "Kỹ thuật viên đã có ca làm việc khác trong khoảng thời gian này"
+                        : "Đã có một yêu cầu đăng ký ca chờ duyệt trùng khoảng thời gian này");
+            }
+        }
     }
 
     @Override
@@ -266,7 +485,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
         List<BayReservation> overlaps = checkBayAvailability(bay.getId(), request.getStartsAt(), request.getEndsAt());
         if (!overlaps.isEmpty()) {
-            throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
+            throw new BusinessException(ResponseCode.BAY_UNAVAILABLE);
         }
 
         BayReservation reservation = BayReservation.builder()
@@ -308,7 +527,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
         List<BayReservation> activeOverlaps = checkBayAvailability(bayId, startsAt, endsAt);
         if (!activeOverlaps.isEmpty()) {
-            throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
+            throw new BusinessException(ResponseCode.BAY_UNAVAILABLE);
         }
 
         BayReservation reservation = BayReservation.builder()
@@ -343,7 +562,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
         List<BayReservation> activeOverlaps = checkBayAvailability(bayId, startsAt, endsAt);
         if (!activeOverlaps.isEmpty()) {
-            throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
+            throw new BusinessException(ResponseCode.BAY_UNAVAILABLE);
         }
 
         BayReservation reservation = BayReservation.builder()

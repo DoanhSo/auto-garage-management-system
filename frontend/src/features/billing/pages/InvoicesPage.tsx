@@ -92,9 +92,12 @@ export function InvoicesPage() {
     sortDir,
   });
 
-  const completedOrders = useRepairOrdersQuery(
-    { status: 'COMPLETED', size: 100, sortBy: 'id', sortDir: 'desc' },
-  );
+  const completedOrders = useRepairOrdersQuery({
+    status: 'COMPLETED',
+    size: 100,
+    sortBy: 'id',
+    sortDir: 'desc',
+  });
   const issueMutation = useIssueInvoiceMutation();
   const voidMutation = useVoidInvoiceMutation();
   const receivePaymentMutation = useReceivePaymentMutation();
@@ -575,6 +578,8 @@ export function InvoicesPage() {
             columns={columns}
             data={invoicesList}
             busy={isFetching}
+            emptyTitle="Chưa có hóa đơn nào"
+            emptyDescription="Hóa đơn sẽ xuất hiện tại đây sau khi lệnh sửa chữa được nghiệm thu."
           />
         )}
 
@@ -636,7 +641,8 @@ export function InvoicesPage() {
               </option>
               {(completedOrders.data?.content ?? []).map((order) => (
                 <option key={order.id} value={order.id}>
-                  #{order.orderCode} · nhận xe {new Date(order.receivedAt).toLocaleDateString('vi-VN')}
+                  #{order.orderCode} · nhận xe{' '}
+                  {new Date(order.receivedAt).toLocaleDateString('vi-VN')}
                 </option>
               ))}
             </select>

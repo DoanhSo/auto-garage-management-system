@@ -1,21 +1,27 @@
 import { useState, useEffect } from 'react';
-import { Check, X } from 'lucide-react';
+import { Car, Check, User, X } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { errorMessage } from '../../../shared/api/errors';
-import { money, formatDate, formatDateTime } from '../../../shared/utils/format';
-import { Badge, Button, Field, ReadOnlyField, Sheet } from '../../../shared/components/ui';
+import { money, formatDateTime } from '../../../shared/utils/format';
+import { Badge, Button, Field, Sheet } from '../../../shared/components/ui';
 import { useDecideEstimateMutation, useSendEstimateMutation } from '../hooks/useEstimate';
 import type { Estimate, LineDecisionInput } from '../types/estimate';
 import { estimateStatusLabels } from '../types/estimate';
+import type { Vehicle } from '../../../shared/types/contracts';
+import type { RepairOrder } from '../../repair/types/repairTypes';
 
 type Decision = LineDecisionInput['decision'];
 
 export function EstimateDecisionModal({
   estimate,
+  repairOrder,
+  vehicle,
   open,
   onClose,
 }: {
   estimate: Estimate | null;
+  repairOrder?: RepairOrder | null;
+  vehicle?: Vehicle | null;
   open: boolean;
   onClose: () => void;
 }) {
@@ -89,18 +95,45 @@ export function EstimateDecisionModal({
       onClose={onClose}
     >
       <div className="editor-form">
-        <dl className="detail-list">
-          <ReadOnlyField label="Loại báo giá">
-            {estimate.estimateKind === 'INITIAL' ? 'Ban đầu' : 'Phát sinh'}
-          </ReadOnlyField>
-          <ReadOnlyField label="Gửi khách lúc">
-            {estimate.sentAt ? formatDateTime(estimate.sentAt) : 'Chưa gửi'}
-          </ReadOnlyField>
-          <ReadOnlyField label="Hiệu lực đến">
-            {estimate.validUntil ? formatDate(estimate.validUntil) : 'Không giới hạn'}
-          </ReadOnlyField>
-          <ReadOnlyField label="Ghi chú">{estimate.notes || '—'}</ReadOnlyField>
-        </dl>
+        {(vehicle || repairOrder) && (
+          <div className="info-strip">
+            <User size={18} aria-hidden />
+            <span>
+              <strong>{vehicle?.customerName ?? 'Chưa rõ khách hàng'}</strong>
+              {vehicle?.customerPhone && ` (${vehicle.customerPhone})`}
+            </span>
+            <Car size={18} aria-hidden />
+            <span>
+              <strong>{vehicle?.licensePlate ?? 'Chưa rõ biển số'}</strong>
+              {vehicle && ` · ${vehicle.brand} ${vehicle.model}`}
+              {repairOrder && ` · ODO vào xưởng ${repairOrder.odometerIn.toLocaleString('vi-VN')} km`}
+              {repairOrder?.orderCode && ` · Lệnh #${repairOrder.orderCode}`}
+            </span>
+          </div>
+        )}
+
+        <div className="horizontal-summary-bar" aria-label="Thông số báo giá">
+          <div>
+            <span>Loại báo giá</span>
+            <strong>{estimate.estimateKind === 'INITIAL' ? 'Ban đầu' : 'Phát sinh'}</strong>
+          </div>
+          <div>
+            <span>Gửi khách lúc</span>
+            <strong>{estimate.sentAt ? formatDateTime(estimate.sentAt) : 'Chưa gửi'}</strong>
+          </div>
+          <div>
+            <span>Hiệu lực đến</span>
+            <strong>
+              {estimate.validUntil ? formatDateTime(estimate.validUntil) : 'Không giới hạn'}
+            </strong>
+          </div>
+        </div>
+
+        {estimate.notes && (
+          <p className="description">
+            <strong>Ghi chú:</strong> {estimate.notes}
+          </p>
+        )}
 
         {estimate.status === 'DRAFT' && (
           <div className="info-strip">
@@ -136,17 +169,17 @@ export function EstimateDecisionModal({
                 }`}
               >
                 <div className="estimate-decision-meta">
-                  <strong>
+                  <div className="estimate-decision-line">
                     <Badge variant={it.itemType === 'SERVICE' ? 'primary' : 'warning'}>
                       {it.itemType === 'SERVICE' ? 'Dịch vụ' : 'Phụ tùng'}
-                    </Badge>{' '}
-                    {it.itemName}
-                  </strong>
-                  <span>
-                    {it.quantity} {it.unit} × {money(it.unitPrice)} ={' '}
+                    </Badge>
+                    <strong>{it.itemName}</strong>
+                    <span className="muted">
+                      • {it.quantity} {it.unit} × {money(it.unitPrice)} ={' '}
+                    </span>
                     <strong>{money(it.lineTotal || it.quantity * it.unitPrice)}</strong>
-                  </span>
-                  {(it.warrantyDays || it.warrantyKm || it.reservedQuantity) && (
+                  </div>
+                  {Boolean(it.warrantyDays || it.warrantyKm || it.reservedQuantity) && (
                     <span className="muted">
                       {it.warrantyDays ? `Bảo hành ${it.warrantyDays} ngày` : ''}
                       {it.warrantyKm ? ` / ${it.warrantyKm.toLocaleString('vi-VN')} km` : ''}

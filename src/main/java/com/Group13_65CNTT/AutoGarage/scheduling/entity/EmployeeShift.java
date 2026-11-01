@@ -40,6 +40,17 @@ public class EmployeeShift {
     @Column(name = "ends_at", nullable = false)
     private Instant endsAt;
 
+    @Column(name = "actual_starts_at")
+    private Instant actualStartsAt;
+
+    @Column(name = "actual_ends_at")
+    private Instant actualEndsAt;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "attendance_status", nullable = false, length = 20)
+    private AttendanceStatus attendanceStatus = AttendanceStatus.SCHEDULED;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "shift_type", nullable = false, length = 20)
@@ -56,6 +67,15 @@ public class EmployeeShift {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "registered_at")
+    private Instant registeredAt;
+
+    @Column(name = "approved_by")
+    private Long approvedBy;
+
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
 
@@ -70,6 +90,9 @@ public class EmployeeShift {
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = Instant.now();
+        }
+        if (attendanceStatus == null) {
+            attendanceStatus = AttendanceStatus.SCHEDULED;
         }
         if (shiftType == null) {
             shiftType = ShiftType.FULL_DAY;

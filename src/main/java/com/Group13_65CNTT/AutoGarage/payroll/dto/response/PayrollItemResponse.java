@@ -19,6 +19,7 @@ public record PayrollItemResponse(
         Integer completedOrderCount,
         BigDecimal hourlyPayAmount,
         BigDecimal commissionAmount,
+        BigDecimal orderBonusAmount,
         BigDecimal allowanceAmount,
         BigDecimal deductionAmount,
         BigDecimal grossPay,

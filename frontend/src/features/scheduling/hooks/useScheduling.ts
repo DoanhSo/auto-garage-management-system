@@ -3,6 +3,7 @@ import { schedulingApi } from '../api/schedulingApi';
 import type {
   ServiceBayCreateInput,
   ShiftCreateInput,
+  ShiftRegisterInput,
   ShiftStatus,
   MaintenanceInput,
   EmployeeCreateInput,
@@ -69,6 +70,36 @@ export function useDeleteServiceBayMutation() {
   });
 }
 
+export function useBayDayRosterQuery(bayId: string | null, date: string) {
+  return useQuery({
+    enabled: !!bayId,
+    queryKey: ['bay-day-roster', bayId, date],
+    queryFn: () => schedulingApi.getBayDayRoster(bayId as string, date),
+  });
+}
+
+export function useShiftAttendanceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: string | number; action: 'check-in' | 'check-out' }) =>
+      action === 'check-in' ? schedulingApi.checkInShift(id) : schedulingApi.checkOutShift(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['on-shift-technicians'] });
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['shift-reconciliation'] });
+    },
+  });
+}
+
+export function useShiftReconciliationQuery(date: string, enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: ['shift-reconciliation', date],
+    queryFn: () => schedulingApi.getShiftReconciliation(date),
+    refetchInterval: 60_000,
+  });
+}
+
 export function useOnShiftTechniciansQuery(enabled = true) {
   return useQuery({
     enabled,
@@ -98,6 +129,44 @@ export function useShiftsQuery(params?: {
   return useQuery({
     queryKey: ['employee-shifts', params],
     queryFn: () => schedulingApi.listShifts(params),
+  });
+}
+
+export function usePendingRegistrationsQuery(enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryKey: ['employee-shifts', 'pending'],
+    queryFn: () => schedulingApi.getPendingRegistrations(),
+  });
+}
+
+export function useMyShiftsQuery(enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryKey: ['employee-shifts', 'my'],
+    queryFn: () => schedulingApi.getMyShifts(),
+  });
+}
+
+export function useRegisterShiftMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ShiftRegisterInput) => schedulingApi.registerShift(data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['employee-shifts'] }),
+  });
+}
+
+export function useReviewRegistrationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string | number; reason?: string }) =>
+      reason === undefined
+        ? schedulingApi.approveRegistration(id)
+        : schedulingApi.rejectRegistration(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee-shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['on-shift-technicians'] });
+    },
   });
 }
 

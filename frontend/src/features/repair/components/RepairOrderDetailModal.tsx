@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import {
   Wrench,
   CheckCircle,
@@ -24,11 +24,10 @@ import {
   useOnShiftTechniciansQuery,
   useSchedulingEmployeesQuery,
 } from '../../scheduling/hooks/useScheduling';
-import { useUsersQuery } from '../../identity/hooks/useUsers';
 import { errorMessage } from '../../../shared/api/errors';
 import { Button, Empty, Loading, QueryError, Sheet } from '../../../shared/components/ui';
 import { formatDateTime, money } from '../../../shared/utils/format';
-import type { RepairOrderStatus } from '../types/repairTypes';
+import type { RepairOrderStatus, RepairTask } from '../types/repairTypes';
 import {
   useRepairOrderQuery,
   useRepairTasksQuery,
@@ -46,6 +45,8 @@ import { useQualityChecksQuery } from '../../quality/hooks/useQuality';
 import { RepairOrderStatusBadge } from './RepairOrderCards';
 import { REPAIR_STATUS_LABELS } from './RepairOrderFilters';
 import { CreateTaskModal } from './CreateTaskModal';
+import { AssignTaskModal } from './AssignTaskModal';
+import { TaskWorkPanel } from './TaskWorkPanel';
 import { CreateEstimateModal } from './CreateEstimateModal';
 import { PerformQCModal } from './PerformQCModal';
 import { HandoverModal } from './HandoverModal';
@@ -73,12 +74,12 @@ export function RepairOrderDetailModal({
   const canDecideEstimate = isCustomer || canFrontDesk;
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const updateOrder = useUpdateRepairOrderMutation();
+  const [assigningTask, setAssigningTask] = useState<RepairTask | null>(null);
   const { data: staff = [] } = useSchedulingEmployeesQuery({ active: true }, canTechnical);
   const onShift = useOnShiftTechniciansQuery(open && canTechnical);
-  const users = useUsersQuery({ page: 0, size: 100, sortBy: 'fullName', sortDir: 'asc' });
-  const staffName = (employee: { userId: string | number; employeeCode: string }) =>
-    (users.data?.content ?? []).find((u) => String(u.id) === String(employee.userId))?.fullName ??
-    employee.employeeCode;
+  const ownEmployeeId = staff.find((e) => String(e.userId) === String(user?.id))?.id;
+  const staffName = (employee: { fullName?: string | null; employeeCode: string }) =>
+    employee.fullName ?? employee.employeeCode;
 
   // Sub-modals
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
@@ -784,54 +785,69 @@ export function RepairOrderDetailModal({
                         </thead>
                         <tbody>
                           {tasks.map((task) => (
-                            <tr key={task.id}>
-                              <td>
-                                <div>
-                                  <strong>{task.taskName}</strong>
-                                  {task.description && (
-                                    <p className="text-xs muted mt-0.5">{task.description}</p>
-                                  )}
-                                </div>
-                              </td>
-                              <td>
-                                <span className="badge badge-neutral text-xs">
-                                  {task.taskType === 'REPAIR'
-                                    ? 'Sửa chữa'
-                                    : task.taskType === 'DIAGNOSIS'
-                                      ? 'Chẩn đoán'
-                                      : 'Bảo dưỡng'}
-                                </span>
-                              </td>
-                              <td className="text-right font-medium">{task.quantity || 1}</td>
-                              <td className="text-center">
-                                <span
-                                  className={`badge text-xs ${
-                                    task.status === 'COMPLETED'
-                                      ? 'badge-success'
-                                      : task.status === 'IN_PROGRESS'
-                                        ? 'badge-primary'
-                                        : 'badge-warning'
-                                  }`}
-                                >
-                                  {task.status === 'COMPLETED'
-                                    ? '✓ Đã hoàn thành'
-                                    : task.status === 'IN_PROGRESS'
-                                      ? 'Đang thực hiện'
-                                      : 'Chờ thực hiện'}
-                                </span>
-                              </td>
-                              <td className="text-right">
-                                {canTechnical && task.status !== 'COMPLETED' && (
-                                  <Button
-                                    variant="secondary"
-                                    onClick={() => handleCompleteTask(task.id)}
-                                    pending={completeTask.isPending}
+                            <Fragment key={task.id}>
+                              <tr>
+                                <td>
+                                  <div>
+                                    <strong>{task.taskName}</strong>
+                                    {task.description && (
+                                      <p className="text-xs muted mt-0.5">{task.description}</p>
+                                    )}
+                                  </div>
+                                </td>
+                                <td>
+                                  <span className="badge badge-neutral text-xs">
+                                    {task.taskType === 'REPAIR'
+                                      ? 'Sửa chữa'
+                                      : task.taskType === 'DIAGNOSIS'
+                                        ? 'Chẩn đoán'
+                                        : 'Bảo dưỡng'}
+                                  </span>
+                                </td>
+                                <td className="text-right font-medium">{task.quantity || 1}</td>
+                                <td className="text-center">
+                                  <span
+                                    className={`badge text-xs ${
+                                      task.status === 'COMPLETED'
+                                        ? 'badge-success'
+                                        : task.status === 'IN_PROGRESS'
+                                          ? 'badge-primary'
+                                          : 'badge-warning'
+                                    }`}
                                   >
-                                    <CheckCircle size={14} /> Hoàn thành
-                                  </Button>
-                                )}
-                              </td>
-                            </tr>
+                                    {task.status === 'COMPLETED'
+                                      ? '✓ Đã hoàn thành'
+                                      : task.status === 'IN_PROGRESS'
+                                        ? 'Đang thực hiện'
+                                        : 'Chờ thực hiện'}
+                                  </span>
+                                </td>
+                                <td className="text-right">
+                                  {canTechnical && task.status !== 'COMPLETED' && (
+                                    <Button
+                                      variant="secondary"
+                                      onClick={() => handleCompleteTask(task.id)}
+                                      pending={completeTask.isPending}
+                                    >
+                                      <CheckCircle size={14} /> Hoàn thành
+                                    </Button>
+                                  )}
+                                </td>
+                              </tr>
+                              {canTechnical && (
+                                <tr>
+                                  <td colSpan={5}>
+                                    <TaskWorkPanel
+                                      task={task}
+                                      canAssign={canFrontDesk}
+                                      canOperate={canTechnical}
+                                      ownEmployeeId={ownEmployeeId}
+                                      onAssign={setAssigningTask}
+                                    />
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
                           ))}
                         </tbody>
                       </table>
@@ -1003,6 +1019,7 @@ export function RepairOrderDetailModal({
       </div>
 
       {/* Sub-modals */}
+      <AssignTaskModal task={assigningTask} onClose={() => setAssigningTask(null)} />
       <CreateTaskModal
         orderId={order?.id || ''}
         open={createTaskOpen}

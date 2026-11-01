@@ -122,36 +122,60 @@ export function useCreateTaskMutation() {
   });
 }
 
-export function useAssignTaskMutation() {
+function useRefreshTaskWork() {
   const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: ['repair-tasks'] });
+    void qc.invalidateQueries({ queryKey: ['task-summary'] });
+    void qc.invalidateQueries({ queryKey: ['on-shift-technicians'] });
+    void qc.invalidateQueries({ queryKey: ['repair-orders'] });
+  };
+}
+
+export function useTaskSummaryQuery(taskId: string | number | null | undefined) {
+  return useQuery({
+    queryKey: ['task-summary', taskId],
+    queryFn: () => repairApi.getTaskWorkSummary(taskId as string | number),
+    enabled: !!taskId,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useAssignTaskMutation() {
+  const refresh = useRefreshTaskWork();
   return useMutation({
     mutationFn: ({
       taskId,
-      employeeId,
-      role,
+      ...data
     }: {
       taskId: string | number;
       employeeId: string | number;
-      role: AssignmentRole;
-    }) => repairApi.assignTask(taskId, { employeeId, role }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['repair-tasks'] });
-    },
+      assignmentRole: AssignmentRole;
+      startsAt: string;
+      endsAt: string;
+    }) => repairApi.assignTask(taskId, data),
+    onSuccess: refresh,
+  });
+}
+
+export function useReleaseAssignmentMutation() {
+  const refresh = useRefreshTaskWork();
+  return useMutation({
+    mutationFn: (assignmentId: string | number) => repairApi.releaseAssignment(assignmentId),
+    onSuccess: refresh,
   });
 }
 
 export function useStartTimerMutation() {
-  const qc = useQueryClient();
+  const refresh = useRefreshTaskWork();
   return useMutation({
     mutationFn: (assignmentId: string | number) => repairApi.startTimer(assignmentId),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['repair-tasks'] });
-    },
+    onSuccess: refresh,
   });
 }
 
 export function useStopTimerMutation() {
-  const qc = useQueryClient();
+  const refresh = useRefreshTaskWork();
   return useMutation({
     mutationFn: ({
       assignmentId,
@@ -160,20 +184,15 @@ export function useStopTimerMutation() {
       assignmentId: string | number;
       stopReason: StopReason;
     }) => repairApi.stopTimer(assignmentId, stopReason),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['repair-tasks'] });
-    },
+    onSuccess: refresh,
   });
 }
 
 export function useCompleteTaskMutation() {
-  const qc = useQueryClient();
+  const refresh = useRefreshTaskWork();
   return useMutation({
     mutationFn: ({ taskId, note }: { taskId: string | number; note?: string }) =>
       repairApi.completeTask(taskId, note),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['repair-tasks'] });
-      void qc.invalidateQueries({ queryKey: ['repair-orders'] });
-    },
+    onSuccess: refresh,
   });
 }

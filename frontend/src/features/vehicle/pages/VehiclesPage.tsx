@@ -299,7 +299,24 @@ export function VehiclesPage() {
             onDeactivate={setDeactivatingVehicle}
           />
         ) : (
-          <DataTable<Vehicle> columns={columns} data={vehicles} caption="Danh sách phương tiện" />
+          <DataTable<Vehicle>
+            columns={columns}
+            data={vehicles}
+            caption="Danh sách phương tiện"
+            emptyTitle="Chưa có phương tiện nào"
+            emptyDescription={
+              canManage
+                ? 'Thêm xe đầu tiên để bắt đầu tiếp nhận và theo dõi lịch sử sửa chữa.'
+                : 'Tài khoản của bạn chưa có xe nào. Hãy liên hệ xưởng để đăng ký xe của bạn.'
+            }
+            emptyAction={
+              canManage ? (
+                <Button variant="primary" onClick={handleOpenCreate}>
+                  Thêm xe
+                </Button>
+              ) : undefined
+            }
+          />
         )}
       </section>
 

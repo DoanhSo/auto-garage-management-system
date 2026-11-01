@@ -35,6 +35,12 @@ public interface LaborSessionRepository extends JpaRepository<LaborSession, Long
            "WHERE rt.repairOrderId = :repairOrderId AND ls.endsAt IS NULL")
     long countOpenSessionsByRepairOrderId(@Param("repairOrderId") Long repairOrderId);
 
+    @Query("SELECT ls FROM LaborSession ls WHERE ls.employeeId = :employeeId AND ls.startsAt < :to " +
+           "AND (ls.endsAt IS NULL OR ls.endsAt > :from)")
+    List<LaborSession> findOverlapping(@Param("employeeId") Long employeeId,
+                                       @Param("from") java.time.Instant from,
+                                       @Param("to") java.time.Instant to);
+
     @Query("SELECT ls FROM LaborSession ls WHERE ls.endsAt IS NOT NULL " +
            "AND ls.startsAt >= :from AND ls.startsAt < :to")
     List<LaborSession> findClosedBetween(@Param("from") java.time.Instant from, @Param("to") java.time.Instant to);

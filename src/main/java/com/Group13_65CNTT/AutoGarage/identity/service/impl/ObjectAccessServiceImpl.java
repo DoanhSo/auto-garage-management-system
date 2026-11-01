@@ -74,6 +74,8 @@ public class ObjectAccessServiceImpl implements ObjectAccessService {
                 return;
             if (resource == AccessResource.VEHICLE
                     && accessRepository.assignedToVehicle(actorId, id) > 0) return;
+            if (resource == AccessResource.CUSTOMER
+                    && accessRepository.assignedToCustomer(actorId, id) > 0) return;
         }
         forbidden();
     }

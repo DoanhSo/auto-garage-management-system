@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
 import type { Page, UiPolicy } from '../types/contracts';
 import { Button, Empty } from './ui';
@@ -10,12 +11,18 @@ export function DataTable<T extends { id: string | number }>({
   busy = false,
   caption,
   hideOnMobile = [],
+  emptyTitle = 'Không có kết quả',
+  emptyDescription = 'Thử thay đổi bộ lọc hoặc quay lại khi có dữ liệu mới.',
+  emptyAction,
 }: {
   columns: ColumnDef<T>[];
   data: T[];
   busy?: boolean;
   caption: string;
   hideOnMobile?: string[];
+  emptyTitle?: string;
+  emptyDescription?: string;
+  emptyAction?: ReactNode;
 }) {
   const table = useReactTable({
     columns,
@@ -26,12 +33,7 @@ export function DataTable<T extends { id: string | number }>({
     manualSorting: true,
   });
   if (!data.length)
-    return (
-      <Empty
-        title="Không có kết quả"
-        description="Thử thay đổi bộ lọc hoặc quay lại khi có dữ liệu mới."
-      />
-    );
+    return <Empty title={emptyTitle} description={emptyDescription} action={emptyAction} />;
   return (
     <div className="table-scroll" aria-busy={busy}>
       <table className="data-table">
