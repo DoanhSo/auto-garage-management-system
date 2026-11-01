@@ -18,6 +18,8 @@ public class CheckInVehicleResponse {
     private String customerComplaint;
     private Long receivedBy;
     private Instant receivedAt;
+    private Long diagnosticTechnicianId;
+    private Long serviceBayId;
 
     public Long getRepairOrderId() {
         return repairOrderId;
@@ -113,6 +115,22 @@ public class CheckInVehicleResponse {
 
     public void setReceivedBy(Long receivedBy) {
         this.receivedBy = receivedBy;
+    }
+
+    public Long getDiagnosticTechnicianId() {
+        return diagnosticTechnicianId;
+    }
+
+    public void setDiagnosticTechnicianId(Long diagnosticTechnicianId) {
+        this.diagnosticTechnicianId = diagnosticTechnicianId;
+    }
+
+    public Long getServiceBayId() {
+        return serviceBayId;
+    }
+
+    public void setServiceBayId(Long serviceBayId) {
+        this.serviceBayId = serviceBayId;
     }
 
     public Instant getReceivedAt() {

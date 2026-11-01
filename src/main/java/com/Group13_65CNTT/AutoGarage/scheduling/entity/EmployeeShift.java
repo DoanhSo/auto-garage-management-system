@@ -42,6 +42,14 @@ public class EmployeeShift {
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
+    @Column(name = "shift_type", nullable = false, length = 20)
+    private ShiftType shiftType = ShiftType.FULL_DAY;
+
+    @Column(name = "service_bay_id")
+    private Long serviceBayId;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private ShiftStatus status = ShiftStatus.ACTIVE;
 
@@ -62,6 +70,9 @@ public class EmployeeShift {
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = Instant.now();
+        }
+        if (shiftType == null) {
+            shiftType = ShiftType.FULL_DAY;
         }
         if (status == null) {
             status = ShiftStatus.ACTIVE;

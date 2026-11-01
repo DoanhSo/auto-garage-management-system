@@ -59,6 +59,18 @@ public class RepairOrder {
     @Column(name = "received_by", nullable = false)
     private Long receivedBy;
 
+    @Column(name = "lead_technician_id")
+    private Long leadTechnicianId;
+
+    @Column(name = "diagnostic_technician_id")
+    private Long diagnosticTechnicianId;
+
+    @Column(name = "service_bay_id")
+    private Long serviceBayId;
+
+    @Column(name = "qc_technician_id")
+    private Long qcTechnicianId;
+
     @Column(name = "received_at", nullable = false)
     private Instant receivedAt;
 

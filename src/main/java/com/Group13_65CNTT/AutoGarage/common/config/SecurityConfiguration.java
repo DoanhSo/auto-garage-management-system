@@ -147,23 +147,44 @@ public class SecurityConfiguration {
                                             ApiPaths.EMPLOYEES_WILDCARD,
                                             ApiPaths.SHIFTS_BASE,
                                             ApiPaths.SHIFTS_WILDCARD,
+                                            ApiPaths.SCHEDULING_BASE,
+                                            ApiPaths.SCHEDULING_WILDCARD,
                                             ApiPaths.SERVICE_BAYS_BASE,
                                             ApiPaths.SERVICE_BAYS_WILDCARD,
                                             ApiPaths.BAY_RESERVATIONS_BASE,
                                             ApiPaths.BAY_RESERVATIONS_WILDCARD,
-                                            ApiPaths.REPAIR_ORDERS_BASE,
-                                            ApiPaths.REPAIR_ORDERS_WILDCARD,
                                             ApiPaths.REPAIR_TASKS_BASE,
                                             ApiPaths.REPAIR_TASKS_WILDCARD,
                                             ApiPaths.QUALITY_CHECKS_BASE,
-                                            ApiPaths.QUALITY_CHECKS_WILDCARD,
+                                            ApiPaths.QUALITY_CHECKS_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.TECHNICIAN.name(),
+                                            Role.WAREHOUSE_STAFF.name())
+                                    .requestMatchers(
+                                            ApiPaths.REPAIR_ORDERS_BASE,
+                                            ApiPaths.REPAIR_ORDERS_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.TECHNICIAN.name(),
+                                            Role.WAREHOUSE_STAFF.name(),
+                                            Role.CUSTOMER.name())
+                                    .requestMatchers(
                                             ApiPaths.WARRANTIES_BASE,
                                             ApiPaths.WARRANTIES_WILDCARD)
                                     .hasAnyRole(
                                             Role.ADMIN.name(),
                                             Role.RECEPTIONIST.name(),
                                             Role.TECHNICIAN.name(),
-                                            Role.WAREHOUSE_STAFF.name())
+                                            Role.CUSTOMER.name())
+                                    .requestMatchers(
+                                            ApiPaths.PAYROLL_BASE, ApiPaths.PAYROLL_WILDCARD)
+                                    .hasAnyRole(
+                                            Role.ADMIN.name(),
+                                            Role.RECEPTIONIST.name(),
+                                            Role.TECHNICIAN.name())
                                     .requestMatchers(
                                             ApiPaths.ESTIMATES_BASE,
                                             ApiPaths.ESTIMATES_WILDCARD,

@@ -115,7 +115,8 @@ export const billingApi = {
     sortDir?: string;
   }): Promise<Page<CustomerDebtBalance>> => {
     const [customers, invoices] = await Promise.all([
-      customerApi.list({ isActive: true }),
+      // Thủ kho không có quyền xem danh mục khách hàng: bỏ qua thay vì làm sập cả sổ nợ.
+      customerApi.list({ isActive: true }).catch(() => []),
       request<Page<InvoiceBalanceRow>>(
         '/billing/debts/invoices' +
           queryString({

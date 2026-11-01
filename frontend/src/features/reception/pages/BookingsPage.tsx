@@ -134,9 +134,7 @@ export function BookingsPage() {
       {
         id: 'bookingCode',
         header: 'Mã hẹn',
-        cell: ({ row }) => (
-          <span className="code-tag">#{row.original.bookingCode}</span>
-        ),
+        cell: ({ row }) => <span className="code-tag">#{row.original.bookingCode}</span>,
       },
       {
         id: 'appointmentAt',
@@ -308,7 +306,8 @@ export function BookingsPage() {
       <div className="info-strip">
         <CalendarCheck size={18} />
         <span>
-          Quy trình tiếp nhận xe: Đặt lịch hẹn → Xác nhận → Tiếp nhận vào xưởng → Lập biên bản kiểm tra & đính kèm ảnh hiện trạng.
+          Quy trình tiếp nhận xe: Đặt lịch hẹn → Xác nhận → Tiếp nhận vào xưởng → Lập biên bản kiểm
+          tra & đính kèm ảnh hiện trạng.
         </span>
       </div>
 

@@ -19,6 +19,8 @@ public interface EmployeeShiftMapper {
     @Mapping(target = "employeeId", source = "employeeId")
     @Mapping(target = "startsAt", source = "startsAt")
     @Mapping(target = "endsAt", source = "endsAt")
+    @Mapping(target = "shiftType", source = "shiftType")
+    @Mapping(target = "serviceBayId", source = "serviceBayId")
     @Mapping(target = "notes", source = "notes")
     EmployeeShift toEntity(ShiftCreateRequest request);
 
@@ -27,6 +29,8 @@ public interface EmployeeShiftMapper {
     @Mapping(target = "employeeId", source = "employeeId")
     @Mapping(target = "startsAt", source = "startsAt")
     @Mapping(target = "endsAt", source = "endsAt")
+    @Mapping(target = "shiftType", source = "shiftType")
+    @Mapping(target = "serviceBayId", source = "serviceBayId")
     @Mapping(target = "status", source = "status")
     @Mapping(target = "notes", source = "notes")
     @Mapping(target = "createdBy", source = "createdBy")

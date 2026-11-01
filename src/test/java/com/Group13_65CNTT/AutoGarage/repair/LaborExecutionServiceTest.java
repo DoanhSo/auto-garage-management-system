@@ -83,6 +83,8 @@ class LaborExecutionServiceTest {
     @Mock
     private LaborSessionMapper laborSessionMapper;
 
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.repair.service.WorkLogRecorder workLogRecorder;
     @InjectMocks
     private LaborExecutionServiceImpl laborExecutionService;
     @Mock

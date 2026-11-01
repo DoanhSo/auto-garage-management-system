@@ -44,6 +44,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     private final com.Group13_65CNTT.AutoGarage.scheduling.repository.EmployeeShiftRepository shiftRepository;
     private final com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository serviceRepository;
     private final com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
+    private final com.Group13_65CNTT.AutoGarage.repair.service.WorkLogRecorder workLogRecorder;
 
     private final TaskAssignmentMapper taskAssignmentMapper;
     private final LaborSessionMapper laborSessionMapper;
@@ -120,6 +121,18 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         assignment.setAssignedAt(Instant.now());
 
         TaskAssignment saved = taskAssignmentRepository.save(assignment);
+
+        if (request.getAssignmentRole() != AssignmentRole.QC) {
+            workLogRecorder.start(
+                    order,
+                    employee.getId(),
+                    request.getAssignmentRole() == AssignmentRole.MAIN
+                            ? AssignmentStage.REPAIR_MAIN
+                            : AssignmentStage.REPAIR_ASSISTANT,
+                    taskId,
+                    request.getStartsAt(),
+                    null);
+        }
 
         // Cập nhật trạng thái task nếu đang PENDING
         if (task.getStatus() == TaskStatus.PENDING) {
@@ -306,6 +319,8 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
             }
         }
         taskAssignmentRepository.saveAll(activeAssignments);
+        workLogRecorder.completeTask(taskId, activeAssignments, now,
+                request != null ? request.getCompletionNote() : null);
 
         // 3. Cập nhật task sang COMPLETED
         task.setStatus(TaskStatus.COMPLETED);

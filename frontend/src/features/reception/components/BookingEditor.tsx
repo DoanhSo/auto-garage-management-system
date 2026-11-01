@@ -202,7 +202,11 @@ function BookingForm({
       notify('Đặt lịch hẹn thành công');
       onSaved();
     } catch (err: unknown) {
-      if (err instanceof ApiError && err.code === PHONE_DUPLICATE_CODE && values.customerMode === 'new') {
+      if (
+        err instanceof ApiError &&
+        err.code === PHONE_DUPLICATE_CODE &&
+        values.customerMode === 'new'
+      ) {
         showStepOneError('newCustomer.phone', err.message);
         return;
       }
@@ -254,7 +258,9 @@ function BookingForm({
           {STEPS.map((item) => (
             <li
               key={item.step}
-              className={item.step === step ? 'is-active' : item.step < step ? 'is-done' : undefined}
+              className={
+                item.step === step ? 'is-active' : item.step < step ? 'is-done' : undefined
+              }
               aria-current={item.step === step ? 'step' : undefined}
             >
               <span aria-hidden>{item.step}</span>
@@ -294,7 +300,11 @@ function BookingForm({
 
             {isNewCustomer ? (
               <>
-                <Field label="Họ tên khách hàng" required error={errors.newCustomer?.fullName?.message}>
+                <Field
+                  label="Họ tên khách hàng"
+                  required
+                  error={errors.newCustomer?.fullName?.message}
+                >
                   <input
                     className="input"
                     autoComplete="name"
@@ -323,7 +333,10 @@ function BookingForm({
                       Số này đã có hồ sơ: <strong>{phoneOwner.fullName}</strong>
                       {phoneOwner.customerCode ? ` (${phoneOwner.customerCode})` : ''}.
                     </span>
-                    <Button variant="secondary" onClick={() => selectExistingCustomer(phoneOwner.id)}>
+                    <Button
+                      variant="secondary"
+                      onClick={() => selectExistingCustomer(phoneOwner.id)}
+                    >
                       Dùng hồ sơ này
                     </Button>
                   </div>
@@ -408,10 +421,13 @@ function BookingForm({
                 {plateMatch && plateBelongsToCustomer && (
                   <div className="alert full-width booking-match" role="status">
                     <span>
-                      <strong>{plateMatch.licensePlate}</strong> ({plateMatch.brand} {plateMatch.model}) đã
-                      thuộc khách này.
+                      <strong>{plateMatch.licensePlate}</strong> ({plateMatch.brand}{' '}
+                      {plateMatch.model}) đã thuộc khách này.
                     </span>
-                    <Button variant="secondary" onClick={() => selectExistingVehicle(plateMatch.id)}>
+                    <Button
+                      variant="secondary"
+                      onClick={() => selectExistingVehicle(plateMatch.id)}
+                    >
                       Chọn xe này
                     </Button>
                   </div>
@@ -461,7 +477,9 @@ function BookingForm({
                       {v.licensePlate} ({v.brand} {v.model})
                     </option>
                   ))}
-                  {!isCustomer && <option value={NEW_VEHICLE_OPTION}>+ Thêm xe mới cho khách này</option>}
+                  {!isCustomer && (
+                    <option value={NEW_VEHICLE_OPTION}>+ Thêm xe mới cho khách này</option>
+                  )}
                 </select>
               </Field>
             )}
@@ -495,7 +513,12 @@ function BookingForm({
               error={errors.appointmentAt?.message}
               hint="Chọn ngày giờ tiếp nhận xe vào gara"
             >
-              <input type="datetime-local" className="input" disabled={busy} {...register('appointmentAt')} />
+              <input
+                type="datetime-local"
+                className="input"
+                disabled={busy}
+                {...register('appointmentAt')}
+              />
             </Field>
             <BookingTimeSlotPicker
               value={watch('appointmentAt')}
@@ -510,7 +533,11 @@ function BookingForm({
               error={errors.serviceId?.message}
               hint="Để trống nếu cần khám & chẩn đoán trước"
             >
-              <select className="select" disabled={isLoadingServices || busy} {...register('serviceId')}>
+              <select
+                className="select"
+                disabled={isLoadingServices || busy}
+                {...register('serviceId')}
+              >
                 <option value="">Khám & Chẩn đoán tổng quát</option>
                 {services.map((s) => (
                   <option key={s.id} value={s.id}>

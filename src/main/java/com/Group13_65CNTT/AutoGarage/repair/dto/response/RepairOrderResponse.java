@@ -27,6 +27,10 @@ public class RepairOrderResponse {
     private String customerComplaint;
     private String diagnosis;
     private Long receivedBy;
+    private Long leadTechnicianId;
+    private Long diagnosticTechnicianId;
+    private Long serviceBayId;
+    private Long qcTechnicianId;
     private Instant receivedAt;
     private Long latestQcCheckId;
     private Long handedOverBy;

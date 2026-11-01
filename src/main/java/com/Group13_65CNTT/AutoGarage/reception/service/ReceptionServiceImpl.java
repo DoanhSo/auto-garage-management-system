@@ -133,6 +133,8 @@ public class ReceptionServiceImpl implements ReceptionService {
                             vehicle.getId(),
                             request.getOdometerIn());
             repairWorkflow.recordReceptionDetails(repairOrderId, request.getFuelLevelPercent(), request.getCustomerComplaint());
+            repairWorkflow.recordReceptionDispatch(
+                    actor, repairOrderId, request.getDiagnosticTechnicianId(), request.getServiceBayId());
         } else {
             throw new com.Group13_65CNTT.AutoGarage.common.exception.BusinessException(
                     com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.SERVICE_UNAVAILABLE);
@@ -158,6 +160,8 @@ public class ReceptionServiceImpl implements ReceptionService {
         response.setOdometerIn(request.getOdometerIn());
         response.setFuelLevelPercent(request.getFuelLevelPercent());
         response.setCustomerComplaint(request.getCustomerComplaint());
+        response.setDiagnosticTechnicianId(request.getDiagnosticTechnicianId());
+        response.setServiceBayId(request.getServiceBayId());
         response.setReceivedBy(actor);
         response.setReceivedAt(Instant.now());
 

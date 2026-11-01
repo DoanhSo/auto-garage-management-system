@@ -496,6 +496,25 @@ public class BillingServiceImpl implements BillingService {
 
     @Override
     @Transactional
+    public long recordPayrollDisbursement(long actorUserId, long payrollPeriodId, BigDecimal amount, String notes) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException(ResponseCode.BAD_REQUEST);
+        }
+        Payment payment = Payment.builder()
+                .transactionCode("TX-PAY-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase())
+                .direction(PaymentDirection.OUT)
+                .payrollPeriodId(payrollPeriodId)
+                .amount(amount)
+                .paymentMethod(PaymentMethod.BANK_TRANSFER)
+                .paidAt(Instant.now())
+                .recordedBy(actorUserId)
+                .notes(notes)
+                .build();
+        return paymentRepository.save(payment).getId();
+    }
+
+    @Override
+    @Transactional
     public PaymentResponse paySupplier(long actorUserId, SupplierPaymentRequest request) {
         // Enforce BR01: only ADMIN can make outgoing payments
         User actor = userRepository.findById(actorUserId)

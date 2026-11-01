@@ -69,8 +69,18 @@ export function useDeleteServiceBayMutation() {
   });
 }
 
-export function useSchedulingEmployeesQuery(params?: { active?: boolean }) {
+export function useOnShiftTechniciansQuery(enabled = true) {
   return useQuery({
+    enabled,
+    queryKey: ['on-shift-technicians'],
+    queryFn: () => schedulingApi.getOnShiftTechnicians(),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useSchedulingEmployeesQuery(params?: { active?: boolean }, enabled = true) {
+  return useQuery({
+    enabled,
     queryKey: ['scheduling-employees', params],
     queryFn: async () => {
       const page = await schedulingApi.listEmployees(params);

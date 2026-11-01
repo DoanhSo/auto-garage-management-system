@@ -91,7 +91,7 @@ class MigrationSchemaTests extends IntegrationTestSupport {
     @Test
     void allMigrationsAndTablesExist() {
         assertEquals(
-                30,
+                34,
                 jdbc.queryForObject(
                         "SELECT COUNT(*) FROM information_schema.tables WHERE"
                             + " table_schema=DATABASE() AND table_type='BASE TABLE' AND table_name"
@@ -103,9 +103,40 @@ class MigrationSchemaTests extends IntegrationTestSupport {
                         "SELECT COUNT(*) FROM information_schema.views WHERE"
                                 + " table_schema=DATABASE()",
                         Integer.class));
-        assertEquals(11, flyway.info().applied().length);
+        assertEquals(13, flyway.info().applied().length);
         assertEquals(0, flyway.info().pending().length);
         flyway.validate();
+    }
+
+    @Test
+    void payrollDisbursementsAreCashOutPaymentsLinkedOnlyToAPayrollPeriod() {
+        jdbc.update(
+                "INSERT INTO payroll_periods(id,period_code,period_month,from_date,to_date)"
+                        + " VALUES(910001,'PR-SCHEMA','2099-01','2099-01-01','2099-01-31')");
+        jdbc.update(
+                "INSERT INTO payments(transaction_code,direction,payroll_period_id,amount,payment_method,recorded_by)"
+                        + " VALUES('TX-SCHEMA-PAY','OUT',910001,100,'BANK_TRANSFER',910001)");
+        rejected(
+                "INSERT INTO payments(transaction_code,direction,payroll_period_id,amount,payment_method,recorded_by)"
+                        + " VALUES('TX-SCHEMA-PAY-IN','IN',910001,100,'BANK_TRANSFER',910001)");
+        rejected(
+                "INSERT INTO payments(transaction_code,direction,invoice_id,payroll_period_id,amount,payment_method,recorded_by)"
+                        + " VALUES('TX-SCHEMA-PAY-MIX','OUT',910001,910001,100,'BANK_TRANSFER',910001)");
+        rejected(
+                "INSERT INTO payroll_periods(period_code,period_month,from_date,to_date)"
+                        + " VALUES('PR-SCHEMA-DUP','2099-01','2099-01-01','2099-01-31')");
+    }
+
+    @Test
+    void workLogRowsRequireKnownStageResultAndNonNegativeSeconds() {
+        jdbc.update(
+                "INSERT INTO employees(id,user_id,employee_code) VALUES(910501,910001,'SCHEMA_KTV')");
+        String base = "INSERT INTO repair_order_assignments(repair_order_id,vehicle_id,employee_id,"
+                + "assignment_stage,started_at,actual_seconds,result_status) VALUES(910001,910001,910501,";
+        jdbc.update(base + "'DIAGNOSIS',CURRENT_TIMESTAMP(6),60,'IN_PROGRESS')");
+        rejected(base + "'PAINTING',CURRENT_TIMESTAMP(6),60,'IN_PROGRESS')");
+        rejected(base + "'REPAIR_MAIN',CURRENT_TIMESTAMP(6),60,'DONE')");
+        rejected(base + "'REPAIR_MAIN',CURRENT_TIMESTAMP(6),-1,'IN_PROGRESS')");
     }
 
     @Test

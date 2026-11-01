@@ -11,7 +11,11 @@ import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentContent;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,8 +46,12 @@ class AttachmentServiceTest {
 
     private MockMultipartFile validImageFile;
 
+    @TempDir
+    Path storageDir;
+
     @BeforeEach
     void setUp() {
+        workshop.setAttachmentStorageDir(storageDir.toString());
         validImageFile = new MockMultipartFile(
                 "file",
                 "car_scratch.jpg",
@@ -116,6 +124,55 @@ class AttachmentServiceTest {
         assertTrue(response.getStorageKey().startsWith("attachments/check_in/"));
         assertFalse(response.getStorageKey().contains("car_scratch.jpg")); // Không dùng filename tùy ý
         verify(attachmentRepository, times(1)).save(any(Attachment.class));
+        assertTrue(Files.isRegularFile(storageDir.resolve(response.getStorageKey())));
+    }
+
+    @Test
+    void storedContentIsServedBackWithOriginalType() throws IOException {
+        Attachment saved = new Attachment();
+        saved.setId(10L);
+        saved.setStorageKey("attachments/check_in/2026/11/01/a.jpg");
+        saved.setContentType("image/jpeg");
+        saved.setOriginalFilename("car_scratch.jpg");
+        Path file = storageDir.resolve(saved.getStorageKey());
+        Files.createDirectories(file.getParent());
+        Files.write(file, validImageFile.getBytes());
+        when(attachmentRepository.findById(10L)).thenReturn(java.util.Optional.of(saved));
+
+        AttachmentContent content = attachmentService.loadAttachmentContent(10L);
+
+        assertArrayEquals(validImageFile.getBytes(), content.bytes());
+        assertEquals("image/jpeg", content.contentType());
+    }
+
+    @Test
+    void missingSeedFileFallsBackToEscapedSvgPlaceholder() {
+        Attachment seeded = new Attachment();
+        seeded.setId(11L);
+        seeded.setStorageKey("attachments/diagnosis/seed.jpg");
+        seeded.setContentType("image/jpeg");
+        seeded.setOriginalFilename("<script>x</script>.jpg");
+        seeded.setCategory(AttachmentCategory.DIAGNOSIS);
+        when(attachmentRepository.findById(11L)).thenReturn(java.util.Optional.of(seeded));
+
+        AttachmentContent content = attachmentService.loadAttachmentContent(11L);
+        String svg = new String(content.bytes(), java.nio.charset.StandardCharsets.UTF_8);
+
+        assertEquals("image/svg+xml", content.contentType());
+        assertTrue(svg.contains("DIAGNOSIS"));
+        assertFalse(svg.contains("<script>"));
+    }
+
+    @Test
+    void storageKeyEscapingTheRootIsRejected() {
+        Attachment hostile = new Attachment();
+        hostile.setId(12L);
+        hostile.setStorageKey("../../etc/passwd");
+        when(attachmentRepository.findById(12L)).thenReturn(java.util.Optional.of(hostile));
+
+        BusinessException failure = assertThrows(BusinessException.class,
+                () -> attachmentService.loadAttachmentContent(12L));
+        assertEquals(ResponseCode.BAD_REQUEST, failure.getResponseCode());
     }
 
     @Test

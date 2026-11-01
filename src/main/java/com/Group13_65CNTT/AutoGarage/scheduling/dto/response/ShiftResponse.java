@@ -1,6 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.scheduling.dto.response;
 
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftStatus;
+import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -19,6 +20,8 @@ public class ShiftResponse {
     private Long employeeId;
     private Instant startsAt;
     private Instant endsAt;
+    private ShiftType shiftType;
+    private Long serviceBayId;
     private ShiftStatus status;
     private String notes;
     private Long createdBy;

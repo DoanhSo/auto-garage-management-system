@@ -2,6 +2,25 @@ export * from './schedulingTypes';
 
 export type ShiftStatus = 'ACTIVE' | 'CANCELLED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED';
 
+export type ShiftType = 'MORNING' | 'AFTERNOON' | 'OVERTIME' | 'FULL_DAY' | 'NIGHT';
+
+export const shiftTypeLabels: Record<ShiftType, string> = {
+  MORNING: 'Ca sáng',
+  AFTERNOON: 'Ca chiều',
+  OVERTIME: 'Tăng ca',
+  FULL_DAY: 'Cả ngày',
+  NIGHT: 'Ca đêm',
+};
+
+/** Khung giờ gợi ý theo loại ca (giờ địa phương, HH:mm). */
+export const shiftTypeWindows: Record<ShiftType, { start: string; end: string }> = {
+  MORNING: { start: '07:30', end: '11:30' },
+  AFTERNOON: { start: '13:00', end: '17:00' },
+  OVERTIME: { start: '17:30', end: '20:30' },
+  FULL_DAY: { start: '08:00', end: '17:00' },
+  NIGHT: { start: '20:00', end: '23:59' },
+};
+
 export const shiftStatusLabels: Record<ShiftStatus, string> = {
   ACTIVE: 'Đang hoạt động',
   CANCELLED: 'Đã hủy',
@@ -39,6 +58,9 @@ export interface Employee {
   skillsJson?: string | null;
   canQc: boolean;
   hourlyCost: number;
+  baseSalary?: number | string;
+  overtimeMultiplier?: number | string;
+  defaultCommissionRate?: number | string;
   isActive: boolean;
   createdAt: string;
   version?: string | number;
@@ -49,6 +71,8 @@ export interface Shift {
   employeeId: string | number;
   startsAt: string;
   endsAt: string;
+  shiftType?: ShiftType;
+  serviceBayId?: string | number | null;
   status: ShiftStatus;
   notes?: string | null;
   createdBy: string | number;
@@ -60,7 +84,36 @@ export interface ShiftCreateInput {
   employeeId: number;
   startsAt: string;
   endsAt: string;
+  shiftType?: ShiftType;
+  serviceBayId?: number;
   notes?: string | null;
+}
+
+export type TechnicianAvailability = 'AVAILABLE' | 'BUSY' | 'OVERLOADED';
+
+export const availabilityLabels: Record<TechnicianAvailability, string> = {
+  AVAILABLE: 'Đang rảnh',
+  BUSY: 'Đang thi công',
+  OVERLOADED: 'Quá tải',
+};
+
+export interface OnShiftTechnician {
+  employeeId: string;
+  employeeCode: string;
+  fullName: string;
+  shiftId: string;
+  shiftType?: ShiftType | null;
+  shiftStartsAt: string;
+  shiftEndsAt: string;
+  serviceBayId?: string | null;
+  bayCode?: string | null;
+  bayName?: string | null;
+  skills: string[];
+  canQc: boolean;
+  activeOrdersCount: number;
+  hasActiveTimer: boolean;
+  activeTaskId?: string | null;
+  availabilityStatus: TechnicianAvailability;
 }
 
 export interface MaintenanceInput {
@@ -75,12 +128,18 @@ export interface EmployeeCreateInput {
   skillsJson?: string | null;
   canQc: boolean;
   hourlyCost: number;
+  baseSalary?: number;
+  overtimeMultiplier?: number;
+  defaultCommissionRate?: number;
 }
 
 export interface EmployeeUpdateInput {
   skillsJson?: string | null;
   canQc?: boolean;
   hourlyCost?: number;
+  baseSalary?: number;
+  overtimeMultiplier?: number;
+  defaultCommissionRate?: number;
   isActive?: boolean;
 }
 

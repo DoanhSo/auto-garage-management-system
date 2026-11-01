@@ -14,7 +14,11 @@ import com.Group13_65CNTT.AutoGarage.reception.entity.CheckResult;
 import com.Group13_65CNTT.AutoGarage.reception.entity.CheckType;
 import com.Group13_65CNTT.AutoGarage.reception.entity.VehicleCheck;
 import com.Group13_65CNTT.AutoGarage.reception.repository.VehicleCheckRepository;
+import com.Group13_65CNTT.AutoGarage.repair.entity.AssignmentStage;
 import com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrder;
+import com.Group13_65CNTT.AutoGarage.repair.entity.WorkResultStatus;
+import com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderAssignmentRepository;
+import com.Group13_65CNTT.AutoGarage.repair.service.WorkLogRecorder;
 import com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrderStatus;
 import com.Group13_65CNTT.AutoGarage.repair.entity.RepairTask;
 import com.Group13_65CNTT.AutoGarage.repair.entity.TaskStatus;
@@ -47,6 +51,8 @@ public class QualityServiceImpl implements QualityService {
     private final ObjectAccessService objectAccess;
     private final CustomerScope customerScope;
     private final com.Group13_65CNTT.AutoGarage.repair.repository.TaskAssignmentRepository assignmentRepository;
+    private final WorkLogRecorder workLogRecorder;
+    private final RepairOrderAssignmentRepository workLogRepository;
 
     @Override
     @Transactional
@@ -77,10 +83,22 @@ public class QualityServiceImpl implements QualityService {
         }
 
         // Only an active, QC-capable employee assigned to inspect this order may record QC.
-        employeeRepository.findByUserId(actorId)
+        Employee inspector = employeeRepository.findByUserId(actorId)
                 .filter(employee -> Boolean.TRUE.equals(employee.getIsActive())
                         && Boolean.TRUE.equals(employee.getCanQc()))
                 .orElseThrow(() -> new BusinessException(ResponseCode.FORBIDDEN));
+
+        // Four-eyes principle: inspector must be on shift and must not be a main repairer of this order.
+        Instant inspectionTime = Instant.now();
+        if (workLogRecorder.activeShift(inspector.getId(), inspectionTime).isEmpty()) {
+            throw new BusinessRuleException("Kỹ thuật viên QC phải đang trong ca trực");
+        }
+        boolean repairedByInspector = workLogRepository
+                .findByRepairOrderIdAndAssignmentStage(order.getId(), AssignmentStage.REPAIR_MAIN).stream()
+                .anyMatch(row -> row.getEmployeeId().equals(inspector.getId()));
+        if (repairedByInspector) {
+            throw new BusinessRuleException("Thợ chính đã sửa chữa không được tự kiểm định QC cho chính phiếu này");
+        }
 
         int nextAttemptNo = vehicleCheckRepository.findMaxAttemptNo(order.getId(), CheckType.QC) + 1;
 
@@ -108,6 +126,15 @@ public class QualityServiceImpl implements QualityService {
 
         // Cập nhật latest_qc_check_id cho phiếu sửa chữa
         order.setLatestQcCheckId(savedCheck.getId());
+        order.setQcTechnicianId(inspector.getId());
+
+        Instant inspectionStart = order.getUpdatedAt() != null && order.getUpdatedAt().isBefore(inspectionTime)
+                ? order.getUpdatedAt() : inspectionTime;
+        workLogRecorder.start(order, inspector.getId(), AssignmentStage.QC_INSPECTION, null,
+                inspectionStart, request.getNotes());
+        workLogRecorder.finish(order.getId(), inspector.getId(), AssignmentStage.QC_INSPECTION, inspectionTime,
+                request.getResult() == CheckResult.PASSED ? WorkResultStatus.PASSED : WorkResultStatus.REWORK_FAILED,
+                request.getNotes());
 
         if (request.getResult() == CheckResult.PASSED) {
             var qcAssignments = assignmentRepository.findActiveQcForOrder(order.getId());
@@ -134,6 +161,12 @@ public class QualityServiceImpl implements QualityService {
                     }
                 }
                 repairTaskRepository.saveAll(reworkTasks);
+                var reworkIds = reworkTasks.stream().map(RepairTask::getId).collect(java.util.stream.Collectors.toSet());
+                var failedRows = workLogRepository.findByRepairOrderIdOrderByStartedAtAsc(order.getId()).stream()
+                        .filter(row -> row.getTaskId() != null && reworkIds.contains(row.getTaskId()))
+                        .toList();
+                failedRows.forEach(row -> row.setResultStatus(WorkResultStatus.REWORK_FAILED));
+                workLogRepository.saveAll(failedRows);
                 log.info("Đã chuyển {} công việc sang trạng thái REWORK để xử lý lại", reworkTasks.size());
             }
         }

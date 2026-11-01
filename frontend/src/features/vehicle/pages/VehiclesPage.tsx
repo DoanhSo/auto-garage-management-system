@@ -174,7 +174,11 @@ export function VehiclesPage() {
               <Calendar size={13} className="muted" />
               <span
                 className={
-                  isExpired ? 'badge badge-danger' : isExpiringSoon ? 'badge badge-warning' : 'muted nowrap'
+                  isExpired
+                    ? 'badge badge-danger'
+                    : isExpiringSoon
+                      ? 'badge badge-warning'
+                      : 'muted nowrap'
                 }
               >
                 {formatDate(date)}
@@ -264,7 +268,8 @@ export function VehiclesPage() {
       <div className="info-strip">
         <Car size={18} />
         <span>
-          Đăng ký thông tin phương tiện, theo dõi số ODO, chuyển nhượng chủ sở hữu và tra cứu lịch sử sửa chữa.
+          Đăng ký thông tin phương tiện, theo dõi số ODO, chuyển nhượng chủ sở hữu và tra cứu lịch
+          sử sửa chữa.
         </span>
       </div>
 
@@ -294,11 +299,7 @@ export function VehiclesPage() {
             onDeactivate={setDeactivatingVehicle}
           />
         ) : (
-          <DataTable<Vehicle>
-            columns={columns}
-            data={vehicles}
-            caption="Danh sách phương tiện"
-          />
+          <DataTable<Vehicle> columns={columns} data={vehicles} caption="Danh sách phương tiện" />
         )}
       </section>
 

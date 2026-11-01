@@ -93,11 +93,7 @@ export function CancelBookingDialog({
           <Button disabled={cancel.isPending} onClick={onClose}>
             Đóng
           </Button>
-          <Button
-            type="submit"
-            variant="danger"
-            pending={cancel.isPending}
-          >
+          <Button type="submit" variant="danger" pending={cancel.isPending}>
             <CalendarX size={16} />
             {cancel.isPending ? 'Đang hủy…' : 'Xác nhận hủy hẹn'}
           </Button>

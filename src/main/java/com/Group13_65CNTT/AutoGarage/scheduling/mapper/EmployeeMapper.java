@@ -23,6 +23,9 @@ public interface EmployeeMapper {
     @Mapping(target = "skillsJson", source = "skillsJson")
     @Mapping(target = "canQc", source = "canQc")
     @Mapping(target = "hourlyCost", source = "hourlyCost")
+    @Mapping(target = "baseSalary", source = "baseSalary")
+    @Mapping(target = "overtimeMultiplier", source = "overtimeMultiplier")
+    @Mapping(target = "defaultCommissionRate", source = "defaultCommissionRate")
     Employee toEntity(EmployeeCreateRequest request);
 
     @BeanMapping(ignoreByDefault = true)
@@ -32,6 +35,9 @@ public interface EmployeeMapper {
     @Mapping(target = "skillsJson", source = "skillsJson")
     @Mapping(target = "canQc", source = "canQc")
     @Mapping(target = "hourlyCost", source = "hourlyCost")
+    @Mapping(target = "baseSalary", source = "baseSalary")
+    @Mapping(target = "overtimeMultiplier", source = "overtimeMultiplier")
+    @Mapping(target = "defaultCommissionRate", source = "defaultCommissionRate")
     @Mapping(target = "isActive", source = "isActive")
     @Mapping(target = "createdAt", source = "createdAt")
     @Mapping(target = "updatedAt", source = "updatedAt")
@@ -42,6 +48,9 @@ public interface EmployeeMapper {
     @Mapping(target = "skillsJson", source = "skillsJson")
     @Mapping(target = "canQc", source = "canQc")
     @Mapping(target = "hourlyCost", source = "hourlyCost")
+    @Mapping(target = "baseSalary", source = "baseSalary")
+    @Mapping(target = "overtimeMultiplier", source = "overtimeMultiplier")
+    @Mapping(target = "defaultCommissionRate", source = "defaultCommissionRate")
     @Mapping(target = "isActive", source = "isActive")
     void updateEntityFromRequest(EmployeeUpdateRequest request, @MappingTarget Employee entity);
 }

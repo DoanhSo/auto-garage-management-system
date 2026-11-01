@@ -5,6 +5,7 @@ import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.dto.ApiResponse;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
+import com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentContent;
 import com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentResponse;
 import com.Group13_65CNTT.AutoGarage.reception.entity.AttachmentCategory;
 import com.Group13_65CNTT.AutoGarage.reception.service.AttachmentService;
@@ -14,6 +15,9 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +25,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -60,6 +66,22 @@ public class AttachmentController {
             HttpServletRequest httpRequest) {
         AttachmentResponse response = attachmentService.getAttachmentById(id);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
+    }
+
+    @GetMapping("/{id}/content")
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
+    @Operation(summary = "Stream attachment content for inline preview")
+    public ResponseEntity<byte[]> getAttachmentContent(@PathVariable Long id) {
+        AttachmentContent content = attachmentService.loadAttachmentContent(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(content.contentType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(content.originalFilename(), StandardCharsets.UTF_8).build().toString())
+                .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                // Chặn đoán MIME và thực thi script nếu tệp (vd. SVG) bị mở trực tiếp.
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")
+                .body(content.bytes());
     }
 
     @GetMapping("/order/{repairOrderId}")

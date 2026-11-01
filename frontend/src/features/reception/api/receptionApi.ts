@@ -16,6 +16,7 @@ import type {
   VehicleCheck,
   VehicleCheckCreate,
   Attachment,
+  AttachmentCategory,
 } from '../../../shared/types/contracts';
 import { z } from 'zod';
 
@@ -132,11 +133,35 @@ export const receptionApi = {
     return attachmentSchema.parse(raw);
   },
 
+  /** Đóng gói đúng tham số multipart mà AttachmentController.uploadAttachment yêu cầu. */
+  uploadOrderAttachment: async (values: {
+    repairOrderId: string;
+    vehicleCheckId?: string | null;
+    category: AttachmentCategory;
+    file: File;
+  }): Promise<Attachment> => {
+    const formData = new FormData();
+    formData.append('repairOrderId', values.repairOrderId);
+    if (values.vehicleCheckId) formData.append('vehicleCheckId', values.vehicleCheckId);
+    formData.append('category', values.category);
+    formData.append('file', values.file);
+    return receptionApi.uploadAttachment(formData);
+  },
+
   getAttachmentsByOrder: async (
     repairOrderId: string,
     signal?: AbortSignal,
   ): Promise<Attachment[]> => {
     const raw = await request<unknown>(`/attachments/order/${repairOrderId}`, { signal });
     return z.array(attachmentSchema).parse(raw);
+  },
+
+  /** Tải nội dung ảnh kèm Bearer token và trả object URL cho <img>; người gọi phải revoke. */
+  fetchAttachmentBlobUrl: async (attachmentId: string, signal?: AbortSignal): Promise<string> => {
+    const blob = await request<Blob>(`/attachments/${attachmentId}/content`, {
+      signal,
+      binary: true,
+    });
+    return URL.createObjectURL(blob);
   },
 };

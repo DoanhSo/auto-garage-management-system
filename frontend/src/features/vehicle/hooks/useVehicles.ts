@@ -41,6 +41,14 @@ export function useVehicleTimelineQuery(id: string | null, params?: VehicleTimel
   });
 }
 
+export function useVehicleWorkHistoryQuery(id: string | null) {
+  return useQuery({
+    queryKey: ['vehicles', 'work-history', id],
+    queryFn: ({ signal }) => vehicleApi.workHistory(id as string, signal),
+    enabled: Boolean(id),
+  });
+}
+
 export function useCreateVehicleMutation() {
   const queryClient = useQueryClient();
   return useMutation({

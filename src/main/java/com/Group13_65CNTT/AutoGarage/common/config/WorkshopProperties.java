@@ -2,6 +2,7 @@ package com.Group13_65CNTT.AutoGarage.common.config;
 
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
@@ -22,6 +23,10 @@ public class WorkshopProperties {
 
     @Min(1)
     private long maxUploadRequestBytes = 16L * 1024 * 1024;
+
+    /** Thư mục lưu nội dung tệp đính kèm; storageKey được nối tương đối vào thư mục này. */
+    @NotBlank
+    private String attachmentStorageDir = "./data/attachments";
 
     @NotNull
     private Duration reservationHold = Duration.ofMinutes(30);

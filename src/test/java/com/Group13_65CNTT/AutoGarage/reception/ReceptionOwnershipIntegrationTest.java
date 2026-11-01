@@ -54,6 +54,7 @@ class ReceptionOwnershipIntegrationTest extends IntegrationTestSupport {
     private final RepairTaskRepository tasks;
     private final TaskAssignmentRepository assignments;
     private final EmployeeRepository employees;
+    private final com.Group13_65CNTT.AutoGarage.scheduling.repository.EmployeeShiftRepository shifts;
     private final VehicleCheckRepository checks;
     private final AttachmentRepository attachments;
 
@@ -151,6 +152,12 @@ class ReceptionOwnershipIntegrationTest extends IntegrationTestSupport {
 
         employee.setCanQc(true);
         employees.saveAndFlush(employee);
+        mvc.perform(post("/api/v1/quality-checks").header("Authorization", authorization)
+                        .contentType("application/json").content(body)).andExpect(status().isBadRequest());
+
+        shifts.saveAndFlush(com.Group13_65CNTT.AutoGarage.scheduling.entity.EmployeeShift.builder()
+                .employeeId(employee.getId()).startsAt(Instant.now().minusSeconds(3600))
+                .endsAt(Instant.now().plusSeconds(3600)).createdBy(technician.getId()).build());
         mvc.perform(post("/api/v1/quality-checks").header("Authorization", authorization)
                         .contentType("application/json").content(body)).andExpect(status().isCreated());
         org.assertj.core.api.Assertions.assertThat(checks.findAllByRepairOrderIdOrderByCheckedAtDesc(order.getId()))

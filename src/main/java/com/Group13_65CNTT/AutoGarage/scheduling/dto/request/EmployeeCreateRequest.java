@@ -1,5 +1,6 @@
 package com.Group13_65CNTT.AutoGarage.scheduling.dto.request;
 
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -34,4 +35,14 @@ public class EmployeeCreateRequest {
     @NotNull(message = "Hourly cost is required")
     @DecimalMin(value = "0.0", message = "Hourly cost must not be negative")
     private BigDecimal hourlyCost;
+
+    @DecimalMin(value = "0.0", message = "Base salary must not be negative")
+    private BigDecimal baseSalary;
+
+    @DecimalMin(value = "1.0", message = "Overtime multiplier must be at least 1")
+    private BigDecimal overtimeMultiplier;
+
+    @DecimalMin(value = "0.0", message = "Commission rate must not be negative")
+    @DecimalMax(value = "100.0", message = "Commission rate must not exceed 100")
+    private BigDecimal defaultCommissionRate;
 }

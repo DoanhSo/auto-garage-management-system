@@ -1,6 +1,7 @@
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-RUN addgroup -S garage && adduser -S garage -G garage
+RUN addgroup -S garage && adduser -S garage -G garage \
+    && mkdir -p /app/data/attachments && chown -R garage:garage /app/data
 COPY target/AutoGarage-0.0.1-SNAPSHOT.jar app.jar
 COPY docker/backend-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh

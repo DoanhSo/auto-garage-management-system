@@ -5,6 +5,7 @@ import type {
   ServiceBay,
   ServiceBayCreateInput,
   Employee,
+  OnShiftTechnician,
   Shift,
   ShiftCreateInput,
   ShiftStatus,
@@ -32,12 +33,7 @@ export const schedulingApi = {
     return request<Page<ServiceBay>>(`/service-bays${query}`);
   },
 
-  listBays: (params?: {
-    keyword?: string;
-    active?: boolean;
-    page?: number;
-    size?: number;
-  }) =>
+  listBays: (params?: { keyword?: string; active?: boolean; page?: number; size?: number }) =>
     request<Page<ServiceBay>>(
       '/service-bays' +
         queryString({
@@ -96,6 +92,7 @@ export const schedulingApi = {
         }),
     ),
 
+  getOnShiftTechnicians: () => request<OnShiftTechnician[]>('/scheduling/on-shift-technicians'),
 
   scheduleMaintenance: (bayId: string | number, data: MaintenanceInput) =>
     request<BayReservation>(`/service-bays/${bayId}/maintenance`, {

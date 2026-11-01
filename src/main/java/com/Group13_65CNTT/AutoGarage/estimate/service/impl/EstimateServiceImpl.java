@@ -257,7 +257,7 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
     @Transactional(readOnly = true)
     public Page<EstimateResponse> searchEstimates(Long repairOrderId, EstimateStatus status,
                                                   int page, int size, String sortBy, String sortDir) {
-        if (repairOrderId == null) customerScope.requireFrontDesk();
+        if (repairOrderId == null) customerScope.requireTechnical();
         else customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.REPAIR_ORDER, repairOrderId);
         Pageable pageable = pagination.page(page, size, sortBy, sortDir,
                 Set.of("id", "estimateCode", "versionNo", "status", "createdAt", "totalAmount"));

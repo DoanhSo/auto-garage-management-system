@@ -2,7 +2,9 @@ package com.Group13_65CNTT.AutoGarage.warranty.service.impl;
 
 import com.Group13_65CNTT.AutoGarage.common.util.RequestFingerprint;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 
 import com.Group13_65CNTT.AutoGarage.billing.entity.Invoice;
 import com.Group13_65CNTT.AutoGarage.billing.entity.InvoiceItem;
@@ -43,6 +45,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
@@ -51,6 +54,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations {
     private final com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
     private final com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
+    private final CurrentUserProvider currentUser;
 
     private final WarrantyRepository warrantyRepository;
     private final WarrantyClaimRepository warrantyClaimRepository;
@@ -258,18 +262,46 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
 
     @Override
     @Transactional(readOnly = true)
+    public Page<WarrantyResponse> searchWarranties(
+            Long vehicleId,
+            Long customerId,
+            WarrantyStatus status,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir) {
+        Long scopedCustomerId = scopedCustomerId(customerId);
+        Pageable pageable = pagination.page(page, size, sortBy, sortDir,
+                Set.of("id", "warrantyCode", "startsAt", "expiresAt", "status", "createdAt"));
+        return warrantyRepository.searchWarranties(vehicleId, scopedCustomerId, status, pageable)
+                .map(warrantyMapper::toResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Page<WarrantyResponse> getWarrantiesByVehicleId(Long vehicleId, int page, int size) {
-        customerScope.requireFrontDesk();
+        Long scopedCustomerId = scopedCustomerId(null);
         Pageable pageable = PageRequest.of(page, size);
-        return warrantyRepository.findByVehicleId(vehicleId, pageable).map(warrantyMapper::toResponse);
+        return warrantyRepository.searchWarranties(vehicleId, scopedCustomerId, null, pageable)
+                .map(warrantyMapper::toResponse);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<WarrantyResponse> getWarrantiesByCustomerId(Long customerId, int page, int size) {
-        customerScope.requireFrontDesk();
+        Long scopedCustomerId = scopedCustomerId(customerId);
         Pageable pageable = PageRequest.of(page, size);
-        return warrantyRepository.findByCustomerId(customerId, pageable).map(warrantyMapper::toResponse);
+        return warrantyRepository.findByCustomerId(scopedCustomerId, pageable)
+                .map(warrantyMapper::toResponse);
+    }
+
+    /** Khách hàng chỉ thấy bảo hành của mình; nhân viên kỹ thuật/lễ tân/admin tra cứu tự do. */
+    private Long scopedCustomerId(Long requestedCustomerId) {
+        if (currentUser.role() == Role.CUSTOMER) {
+            return customerScope.customerIdForQuery(requestedCustomerId);
+        }
+        customerScope.requireTechnical();
+        return requestedCustomerId;
     }
 
     @Override

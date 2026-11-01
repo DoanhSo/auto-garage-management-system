@@ -32,7 +32,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const generation = session.generation;
   const token = options.authenticated === false ? null : session.token;
   const headers: Record<string, string> = {
-    Accept: options.binary ? 'text/csv, application/json' : 'application/json',
+    Accept: options.binary ? '*/*' : 'application/json',
   };
   if (token) headers.Authorization = `Bearer ${token}`;
   const multipart = options.body instanceof FormData;
@@ -63,10 +63,11 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
           : encodeJson(options.body),
     });
     assertSession();
+    // Nội dung nhị phân (CSV, ảnh, PDF): mọi phản hồi thành công không phải JSON envelope.
     if (
       options.binary &&
       response.ok &&
-      response.headers.get('content-type')?.includes('text/csv')
+      !response.headers.get('content-type')?.includes('application/json')
     ) {
       const blob = await response.blob();
       assertSession();

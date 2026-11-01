@@ -4,23 +4,36 @@ import { Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { ApiError, errorMessage } from '../../../shared/api/errors';
 import { useUsersQuery } from '../../identity/hooks/useUsers';
-import { useCreateShiftMutation, useSchedulingEmployeesQuery } from '../hooks/useScheduling';
-import { SKILL_LABELS, parseSkills } from '../types/scheduling';
+import {
+  useCreateShiftMutation,
+  useSchedulingEmployeesQuery,
+  useServiceBaysQuery,
+} from '../hooks/useScheduling';
+import {
+  SKILL_LABELS,
+  parseSkills,
+  shiftTypeLabels,
+  shiftTypeWindows,
+  type ShiftType,
+} from '../types/scheduling';
 
-const SHIFT_PRESETS = [
-  { label: 'Ca sáng 08:00–12:00', start: '08:00', end: '12:00' },
-  { label: 'Ca chiều 13:00–17:30', start: '13:00', end: '17:30' },
-  { label: 'Cả ngày 08:00–17:30', start: '08:00', end: '17:30' },
-];
+const SHIFT_PRESETS: ShiftType[] = ['MORNING', 'AFTERNOON', 'FULL_DAY', 'OVERTIME'];
+
+function expectedHours(startsAt: string, endsAt: string): string {
+  const diff = (new Date(endsAt).getTime() - new Date(startsAt).getTime()) / 3_600_000;
+  return Number.isFinite(diff) && diff > 0 ? `${diff.toFixed(1).replace('.', ',')} giờ` : '—';
+}
 
 export function ShiftEditor({
   open,
   initialEmployeeId,
+  initialServiceBayId,
   onClose,
   onSaved,
 }: {
   open: boolean;
   initialEmployeeId?: string | number | null;
+  initialServiceBayId?: string | number | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -32,15 +45,21 @@ export function ShiftEditor({
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
   const [notes, setNotes] = useState('');
+  const [shiftType, setShiftType] = useState<ShiftType>('FULL_DAY');
+  const [serviceBayId, setServiceBayId] = useState('');
 
+  const bays = useServiceBaysQuery({ isActive: true, page: 0, size: 100 });
   const { data: employees = [] } = useSchedulingEmployeesQuery({ active: true });
   const users = useUsersQuery({ page: 0, size: 100, sortBy: 'fullName', sortDir: 'asc' });
-  const userNames = new Map((users.data?.content ?? []).map((u) => [String(u.id), u.fullName] as const));
+  const userNames = new Map(
+    (users.data?.content ?? []).map((u) => [String(u.id), u.fullName] as const),
+  );
 
-  const applyPreset = (start: string, end: string) => {
+  const applyPreset = (type: ShiftType) => {
     const day = startsAt.slice(0, 10);
-    setStartsAt(`${day}T${start}`);
-    setEndsAt(`${day}T${end}`);
+    setShiftType(type);
+    setStartsAt(`${day}T${shiftTypeWindows[type].start}`);
+    setEndsAt(`${day}T${shiftTypeWindows[type].end}`);
   };
 
   useEffect(() => {
@@ -53,9 +72,11 @@ export function ShiftEditor({
       setStartsAt(`${localToday}T08:00`);
       setEndsAt(`${localToday}T17:00`);
       setNotes('');
+      setShiftType('FULL_DAY');
+      setServiceBayId(initialServiceBayId ? String(initialServiceBayId) : '');
       setDiscard(false);
     }
-  }, [open, initialEmployeeId]);
+  }, [open, initialEmployeeId, initialServiceBayId]);
 
   const isDirty = !!employeeId;
   const busy = createMutation.isPending;
@@ -81,6 +102,8 @@ export function ShiftEditor({
         employeeId: Number(employeeId),
         startsAt: startDate.toISOString(),
         endsAt: endDate.toISOString(),
+        shiftType,
+        serviceBayId: serviceBayId ? Number(serviceBayId) : undefined,
         notes: notes.trim() || undefined,
       });
       notify('Phân công ca làm việc thành công');
@@ -88,7 +111,9 @@ export function ShiftEditor({
       onClose();
     } catch (err: unknown) {
       if (err instanceof ApiError && (err.code === 2003 || err.status === 409)) {
-        notify('Kỹ thuật viên đã có ca làm việc khác trong khoảng thời gian đã chọn (trùng ca làm)');
+        notify(
+          'Kỹ thuật viên đã có ca làm việc khác trong khoảng thời gian đã chọn (trùng ca làm)',
+        );
       } else {
         notify(errorMessage(err));
       }
@@ -138,15 +163,15 @@ export function ShiftEditor({
           </div>
 
           <div className="full-width-field row-actions" aria-label="Chọn nhanh ca chuẩn">
-            {SHIFT_PRESETS.map((p) => (
+            {SHIFT_PRESETS.map((type) => (
               <Button
-                key={p.label}
+                key={type}
                 type="button"
-                variant="secondary"
+                variant={shiftType === type ? 'primary' : 'secondary'}
                 disabled={busy}
-                onClick={() => applyPreset(p.start, p.end)}
+                onClick={() => applyPreset(type)}
               >
-                {p.label}
+                {shiftTypeLabels[type]} {shiftTypeWindows[type].start}–{shiftTypeWindows[type].end}
               </Button>
             ))}
           </div>
@@ -172,6 +197,43 @@ export function ShiftEditor({
               required
             />
           </Field>
+
+          <Field label="Loại ca">
+            <select
+              className="select"
+              value={shiftType}
+              onChange={(e) => setShiftType(e.target.value as ShiftType)}
+              disabled={busy}
+            >
+              {Object.entries(shiftTypeLabels).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Khoang trực cố định">
+            <select
+              className="select"
+              value={serviceBayId}
+              onChange={(e) => setServiceBayId(e.target.value)}
+              disabled={busy}
+            >
+              <option value="">-- Không gán khoang --</option>
+              {(bays.data?.content ?? []).map((bay) => (
+                <option key={bay.id} value={bay.id}>
+                  {bay.bayCode} · {bay.bayName}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <div className="full-width-field">
+            <p className="description">
+              Tổng giờ dự kiến của ca: {expectedHours(startsAt, endsAt)}
+            </p>
+          </div>
 
           <div className="full-width-field">
             <Field label="Ghi chú ca làm">

@@ -54,6 +54,9 @@ public class Payment {
     @Column(name = "inventory_document_id")
     private Long inventoryDocumentId;
 
+    @Column(name = "payroll_period_id")
+    private Long payrollPeriodId;
+
     @Column(name = "amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal amount;
 

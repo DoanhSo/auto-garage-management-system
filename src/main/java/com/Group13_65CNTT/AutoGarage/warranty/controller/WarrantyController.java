@@ -9,6 +9,7 @@ import com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyClaimDecideReq
 import com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyClaimOpenRequest;
 import com.Group13_65CNTT.AutoGarage.warranty.dto.response.WarrantyClaimResponse;
 import com.Group13_65CNTT.AutoGarage.warranty.dto.response.WarrantyResponse;
+import com.Group13_65CNTT.AutoGarage.warranty.entity.WarrantyStatus;
 import com.Group13_65CNTT.AutoGarage.warranty.service.WarrantyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -32,8 +33,25 @@ public class WarrantyController {
     private final WarrantyService warrantyService;
     private final CurrentUserProvider currentUserProvider;
 
+    @GetMapping
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
+    @Operation(summary = "Tìm kiếm sổ bảo hành (phân trang)")
+    public ResponseEntity<ApiResponse<Page<WarrantyResponse>>> searchWarranties(
+            @RequestParam(required = false) Long vehicleId,
+            @RequestParam(required = false) Long customerId,
+            @RequestParam(required = false) WarrantyStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "startsAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            HttpServletRequest httpRequest) {
+        Page<WarrantyResponse> response = warrantyService.searchWarranties(
+                vehicleId, customerId, status, page, size, sortBy, sortDir);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
+    }
+
     @GetMapping("/{id}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Lấy thông tin bảo hành theo ID")
     public ResponseEntity<ApiResponse<WarrantyResponse>> getWarrantyById(
             @PathVariable Long id,
@@ -53,7 +71,7 @@ public class WarrantyController {
     }
 
     @GetMapping("/vehicle/{vehicleId}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Lấy danh sách chính sách bảo hành của xe")
     public ResponseEntity<ApiResponse<Page<WarrantyResponse>>> getWarrantiesByVehicleId(
             @PathVariable Long vehicleId,
@@ -65,7 +83,7 @@ public class WarrantyController {
     }
 
     @GetMapping("/customer/{customerId}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Lấy danh sách chính sách bảo hành của khách hàng")
     public ResponseEntity<ApiResponse<Page<WarrantyResponse>>> getWarrantiesByCustomerId(
             @PathVariable Long customerId,
@@ -101,7 +119,7 @@ public class WarrantyController {
     }
 
     @GetMapping("/claims/{claimId}")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Lấy chi tiết yêu cầu bảo hành theo ID")
     public ResponseEntity<ApiResponse<WarrantyClaimResponse>> getClaimById(
             @PathVariable Long claimId,
@@ -111,7 +129,7 @@ public class WarrantyController {
     }
 
     @GetMapping("/{warrantyId}/claims")
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Lấy danh sách các lần claim của một chính sách bảo hành")
     public ResponseEntity<ApiResponse<Page<WarrantyClaimResponse>>> getClaimsByWarrantyId(
             @PathVariable Long warrantyId,

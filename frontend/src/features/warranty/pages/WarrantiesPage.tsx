@@ -6,6 +6,7 @@ import { Badge, Button, PageHeader, Loading, QueryError } from '../../../shared/
 import { DataTable } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { formatDate, formatDateTime } from '../../../shared/utils/format';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
 import { useCustomersQuery } from '../../customer/hooks/useCustomers';
 import { warrantyApi } from '../api/warrantyApi';
@@ -29,6 +30,11 @@ const daysLeft = (expiresAt: string) =>
   Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000);
 
 export function WarrantiesPage() {
+  const { user } = useAuth();
+  // Chỉ lễ tân/admin xem được danh mục khách hàng và mở khiếu nại; thẩm định dành riêng admin.
+  const canLookupCustomers = user?.role === 'ADMIN' || user?.role === 'RECEPTIONIST';
+  const canOpenClaim = canLookupCustomers;
+  const canDecideClaim = user?.role === 'ADMIN';
   const [mode, setMode] = useState<LookupMode>('vehicle');
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
@@ -40,7 +46,7 @@ export function WarrantiesPage() {
   const [decidingClaim, setDecidingClaim] = useState<WarrantyClaim | null>(null);
 
   const { data: vehicles = [] } = useVehiclesQuery({ isActive: true });
-  const { data: customers = [] } = useCustomersQuery({ isActive: true });
+  const { data: customers = [] } = useCustomersQuery({ isActive: true }, canLookupCustomers);
 
   const activeVehicleId = selectedVehicleId || (vehicles[0]?.id ? String(vehicles[0].id) : '');
   const activeCustomerId = selectedCustomerId || (customers[0]?.id ? String(customers[0].id) : '');
@@ -207,7 +213,7 @@ export function WarrantiesPage() {
             >
               <FileText size={14} /> Xem khiếu nại
             </Button>
-            {row.original.status === 'ACTIVE' && (
+            {canOpenClaim && row.original.status === 'ACTIVE' && (
               <Button variant="ghost" onClick={() => setOpenClaimWarranty(row.original)}>
                 <AlertCircle size={14} /> Mở khiếu nại
               </Button>
@@ -216,7 +222,7 @@ export function WarrantiesPage() {
         ),
       },
     ],
-    [vehicleMap, customerMap],
+    [vehicleMap, customerMap, canOpenClaim],
   );
 
   const claimColumns = useMemo<ColumnDef<WarrantyClaim>[]>(
@@ -296,6 +302,7 @@ export function WarrantiesPage() {
         id: 'actions',
         header: 'Thao tác',
         cell: ({ row }) =>
+          canDecideClaim &&
           row.original.status === 'OPEN' && (
             <div className="row-actions">
               <Button variant="primary" onClick={() => setDecidingClaim(row.original)}>
@@ -305,7 +312,7 @@ export function WarrantiesPage() {
           ),
       },
     ],
-    [warrantyById],
+    [warrantyById, canDecideClaim],
   );
 
   const refreshAll = () => {
@@ -348,21 +355,23 @@ export function WarrantiesPage() {
       <section className="panel table-panel">
         <div className="user-filters" role="search" aria-label="Tra cứu bảo hành">
           <div className="user-filter-grid">
-            <div className="user-filter-field">
-              <label htmlFor="warranty-mode">Tra cứu theo</label>
-              <select
-                id="warranty-mode"
-                className="select"
-                value={mode}
-                onChange={(e) => {
-                  setMode(e.target.value as LookupMode);
-                  setSelectedWarrantyId(ALL_BOOKS);
-                }}
-              >
-                <option value="vehicle">Phương tiện</option>
-                <option value="customer">Khách hàng</option>
-              </select>
-            </div>
+            {canLookupCustomers && (
+              <div className="user-filter-field">
+                <label htmlFor="warranty-mode">Tra cứu theo</label>
+                <select
+                  id="warranty-mode"
+                  className="select"
+                  value={mode}
+                  onChange={(e) => {
+                    setMode(e.target.value as LookupMode);
+                    setSelectedWarrantyId(ALL_BOOKS);
+                  }}
+                >
+                  <option value="vehicle">Phương tiện</option>
+                  <option value="customer">Khách hàng</option>
+                </select>
+              </div>
+            )}
             {mode === 'vehicle' ? (
               <div className="user-filter-field">
                 <label htmlFor="warranty-vehicle">Phương tiện</label>

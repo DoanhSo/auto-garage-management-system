@@ -12,7 +12,8 @@ export function normalizePlate(value: string | undefined | null): string {
   return (value ?? '').replace(/[\s.-]/g, '').toUpperCase();
 }
 
-const optionalText = (max: number, message: string) => z.string().trim().max(max, message).optional();
+const optionalText = (max: number, message: string) =>
+  z.string().trim().max(max, message).optional();
 
 export const bookingFormSchema = z
   .object({
@@ -158,6 +159,8 @@ export const checkInFormSchema = z.object({
     .optional()
     .or(z.nan()),
   customerComplaint: z.string().trim().max(500, 'Yêu cầu kiểm tra tối đa 500 ký tự').optional(),
+  diagnosticTechnicianId: z.string().optional(),
+  serviceBayId: z.string().optional(),
 });
 
 export type CheckInFormValues = z.infer<typeof checkInFormSchema>;

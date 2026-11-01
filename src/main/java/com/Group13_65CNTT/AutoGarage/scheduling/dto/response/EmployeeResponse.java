@@ -21,6 +21,9 @@ public class EmployeeResponse {
     private String skillsJson;
     private Boolean canQc;
     private BigDecimal hourlyCost;
+    private BigDecimal baseSalary;
+    private BigDecimal overtimeMultiplier;
+    private BigDecimal defaultCommissionRate;
     private Boolean isActive;
     private Instant createdAt;
     private Instant updatedAt;

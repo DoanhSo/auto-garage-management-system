@@ -1,12 +1,4 @@
-import {
-  Calendar,
-  Gauge,
-  History,
-  ArrowRightLeft,
-  SquarePen,
-  Trash2,
-  Fuel,
-} from 'lucide-react';
+import { Calendar, Gauge, History, ArrowRightLeft, SquarePen, Trash2, Fuel } from 'lucide-react';
 import type { Vehicle } from '../../../shared/types/contracts';
 import { Button, Empty, StatusBadge } from '../../../shared/components/ui';
 import { formatDate } from '../../../shared/utils/format';

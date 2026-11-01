@@ -8,6 +8,7 @@ import type {
   VehicleTimeline,
 } from '../../../shared/types/contracts';
 import { z } from 'zod';
+import type { VehicleWorkHistoryEntry } from '../types/workHistory';
 
 export interface VehicleQueryParams {
   customerId?: string;
@@ -89,4 +90,7 @@ export const vehicleApi = {
     );
     return vehicleTimelineSchema.parse(raw);
   },
+
+  workHistory: (id: string, signal?: AbortSignal) =>
+    request<VehicleWorkHistoryEntry[]>(`/vehicles/${id}/work-history`, { signal }),
 };

@@ -1,12 +1,5 @@
 export type BayType =
-  | 'TWO_POST'
-  | 'FOUR_POST'
-  | 'SCISSOR'
-  | 'DIAGNOSTIC'
-  | 'INSPECTION'
-  | 'PAINT'
-  | 'WASH'
-  | 'GENERAL';
+  'TWO_POST' | 'FOUR_POST' | 'SCISSOR' | 'DIAGNOSTIC' | 'INSPECTION' | 'PAINT' | 'WASH' | 'GENERAL';
 
 export interface ServiceBay {
   id: number;
