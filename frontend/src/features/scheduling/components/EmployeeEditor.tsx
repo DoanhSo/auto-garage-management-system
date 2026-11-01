@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { errorMessage } from '../../../shared/api/errors';
-import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
+import { Button, Combobox, Field, FormError, Sheet } from '../../../shared/components/ui';
 import { useUsersQuery } from '../../identity/hooks/useUsers';
 import { useCreateEmployeeMutation, useUpdateEmployeeMutation } from '../hooks/useScheduling';
-import { SKILL_LABELS, parseSkills, type Employee } from '../types/scheduling';
+import {
+  BANK_NAMES,
+  SKILL_LABELS,
+  hourlyCostFromSalary,
+  parseSkills,
+  salaryRoleTemplates,
+  type Employee,
+} from '../types/scheduling';
 
 export function EmployeeEditor({
   employee,
@@ -36,6 +43,12 @@ export function EmployeeEditor({
   const [canQc, setCanQc] = useState(false);
   const [hourlyCost, setHourlyCost] = useState('0');
   const [baseSalary, setBaseSalary] = useState('0');
+  const [joinedAt, setJoinedAt] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankAccountHolder, setBankAccountHolder] = useState('');
+  const [role, setRole] = useState('');
+  const [coefficient, setCoefficient] = useState('1');
   const [overtimeMultiplier, setOvertimeMultiplier] = useState('1.5');
   const [commissionRate, setCommissionRate] = useState('10');
 
@@ -47,12 +60,40 @@ export function EmployeeEditor({
     setCanQc(employee?.canQc ?? false);
     setHourlyCost(String(employee?.hourlyCost ?? 0));
     setBaseSalary(String(employee?.baseSalary ?? 0));
+    setJoinedAt(employee?.joinedAt ?? '');
+    setBankName(employee?.bankName ?? '');
+    setBankAccountNumber(employee?.bankAccountNumber ?? '');
+    setBankAccountHolder(employee?.bankAccountHolder ?? '');
+    setRole('');
+    setCoefficient(String(employee?.salaryCoefficient ?? 1));
     setOvertimeMultiplier(String(employee?.overtimeMultiplier ?? 1.5));
     setCommissionRate(String(employee?.defaultCommissionRate ?? 10));
   }, [open, employee]);
 
   const busy = createMutation.isPending || updateMutation.isPending;
   const candidates = (users.data?.content ?? []).filter((u) => u.role !== 'CUSTOMER');
+
+  const applyRole = (key: string) => {
+    setRole(key);
+    const template = salaryRoleTemplates[key];
+    if (!template) return;
+    const salary = Math.round(template.frameSalary * template.coefficient);
+    setCoefficient(String(template.coefficient));
+    setBaseSalary(String(salary));
+    setHourlyCost(String(hourlyCostFromSalary(salary)));
+    setCommissionRate(String(template.commissionRate));
+    if (key === 'QC') setCanQc(true);
+  };
+
+  const changeCoefficient = (value: string) => {
+    setCoefficient(value);
+    const template = salaryRoleTemplates[role];
+    const next = Number(value);
+    if (!template || !Number.isFinite(next)) return;
+    const salary = Math.round(template.frameSalary * next);
+    setBaseSalary(String(salary));
+    setHourlyCost(String(hourlyCostFromSalary(salary)));
+  };
 
   const toggleSkill = (key: string) =>
     setSkills((prev) => (prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key]));
@@ -65,6 +106,11 @@ export function EmployeeEditor({
       return;
     }
     const salary = Number(baseSalary);
+    const factor = Number(coefficient);
+    if (!Number.isFinite(factor) || factor < 0.5 || factor > 3) {
+      notify('Hệ số lương phải nằm trong khoảng 0.5–3.0');
+      return;
+    }
     const multiplier = Number(overtimeMultiplier);
     const rate = Number(commissionRate);
     if (!Number.isFinite(salary) || salary < 0) {
@@ -79,16 +125,28 @@ export function EmployeeEditor({
       notify('Tỷ lệ hoa hồng phải nằm trong khoảng 0–100%');
       return;
     }
+    if (bankAccountNumber && !/^\d{6,30}$/.test(bankAccountNumber.trim())) {
+      notify('Số tài khoản ngân hàng chỉ gồm chữ số (6–30 ký tự)');
+      return;
+    }
+    const hr = {
+      joinedAt: joinedAt || undefined,
+      bankName: bankName || undefined,
+      bankAccountNumber: bankAccountNumber.trim() || undefined,
+      bankAccountHolder: bankAccountHolder.trim().toUpperCase() || undefined,
+    };
     const skillsJson = JSON.stringify(skills);
     try {
       if (employee) {
         await updateMutation.mutateAsync({
           id: employee.id,
           data: {
+            ...hr,
             skillsJson,
             canQc,
             hourlyCost: cost,
             baseSalary: salary,
+            salaryCoefficient: factor,
             overtimeMultiplier: multiplier,
             defaultCommissionRate: rate,
           },
@@ -102,10 +160,12 @@ export function EmployeeEditor({
         await createMutation.mutateAsync({
           userId: Number(userId),
           employeeCode: code.trim(),
+          ...hr,
           skillsJson,
           canQc,
           hourlyCost: cost,
           baseSalary: salary,
+          salaryCoefficient: factor,
           overtimeMultiplier: multiplier,
           defaultCommissionRate: rate,
         });
@@ -157,18 +217,98 @@ export function EmployeeEditor({
             onChange={(e) => setCode(e.target.value)}
           />
         </Field>
-        <Field label="Đơn giá giờ công (đ)" required>
+        <Field label="Ngày tham gia công ty">
           <input
-            type="number"
-            min="0"
-            step="1000"
+            type="date"
             className="input"
-            value={hourlyCost}
+            value={joinedAt}
+            max={new Date().toISOString().slice(0, 10)}
             disabled={busy}
-            onChange={(e) => setHourlyCost(e.target.value)}
+            onChange={(e) => setJoinedAt(e.target.value)}
           />
         </Field>
-        <Field label="Lương cứng cơ bản (đ/tháng)">
+        <Field label="Ngân hàng nhận lương">
+          <Combobox
+            value={bankName}
+            onChange={setBankName}
+            disabled={busy}
+            placeholder="Gõ để tìm ngân hàng…"
+            options={BANK_NAMES.map((name) => ({ value: name, label: name }))}
+          />
+        </Field>
+        <Field label="Số tài khoản">
+          <input
+            className="input"
+            inputMode="numeric"
+            maxLength={30}
+            value={bankAccountNumber}
+            disabled={busy}
+            onChange={(e) => setBankAccountNumber(e.target.value)}
+          />
+        </Field>
+        <Field label="Tên chủ tài khoản" hint="Viết hoa, không dấu">
+          <input
+            className="input"
+            maxLength={100}
+            value={bankAccountHolder}
+            disabled={busy}
+            onChange={(e) => setBankAccountHolder(e.target.value)}
+          />
+        </Field>
+        <div className="full-width-field">
+          <Field
+            label="Vai trò / cấp bậc"
+            hint="Chọn mẫu để tự điền khung lương, hệ số, đơn giá giờ công và hoa hồng; vẫn chỉnh tay được."
+          >
+            <select
+              className="select"
+              value={role}
+              disabled={busy}
+              onChange={(e) => applyRole(e.target.value)}
+            >
+              <option value="">-- Tự nhập (không theo mẫu) --</option>
+              {Object.entries(salaryRoleTemplates).map(([key, t]) => (
+                <option key={key} value={key}>
+                  {t.label} · {t.frameSalary.toLocaleString('vi-VN')} đ × {t.coefficient}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+        <Field label="Hệ số lương" hint="Từ 0.5 đến 3.0, bước 0.05">
+          <input
+            type="number"
+            min="0.5"
+            max="3"
+            step="0.05"
+            className="input"
+            value={coefficient}
+            disabled={busy}
+            onChange={(e) => changeCoefficient(e.target.value)}
+          />
+        </Field>
+        <Field label="Đơn giá giờ công (đ)" required hint={`Lương cơ bản ÷ ${208} giờ công chuẩn`}>
+          <div className="row-actions">
+            <input
+              type="number"
+              min="0"
+              step="500"
+              className="input grow"
+              value={hourlyCost}
+              disabled={busy}
+              onChange={(e) => setHourlyCost(e.target.value)}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy}
+              onClick={() => setHourlyCost(String(hourlyCostFromSalary(Number(baseSalary) || 0)))}
+            >
+              Tự quy đổi
+            </Button>
+          </div>
+        </Field>
+        <Field label="Lương cơ bản áp dụng (đ/tháng)">
           <input
             type="number"
             min="0"

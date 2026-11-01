@@ -1,6 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.payroll.repository;
 
 import com.Group13_65CNTT.AutoGarage.payroll.entity.CommissionStatus;
+import com.Group13_65CNTT.AutoGarage.payroll.entity.CommissionType;
 import com.Group13_65CNTT.AutoGarage.payroll.entity.OrderCommission;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +18,11 @@ public interface OrderCommissionRepository extends JpaRepository<OrderCommission
     boolean existsByRepairOrderId(Long repairOrderId);
 
     List<OrderCommission> findByPayrollItemId(Long payrollItemId);
+
+    List<OrderCommission> findByEmployeeIdAndShiftId(Long employeeId, Long shiftId);
+
+    long countByEmployeeIdAndShiftIdAndCommissionTypeAndStatusNot(
+            Long employeeId, Long shiftId, CommissionType commissionType, CommissionStatus status);
 
     @Query("SELECT c FROM OrderCommission c WHERE (:employeeId IS NULL OR c.employeeId = :employeeId) "
             + "AND (:repairOrderId IS NULL OR c.repairOrderId = :repairOrderId) "

@@ -49,7 +49,21 @@ public class GlobalExceptionHandler {
         if (failure.getResponseCode().getHttpStatus().is5xxServerError()) {
             SafeFailureLog.error(log, "Business operation unavailable", failure);
         }
-        return error(failure.getResponseCode(), request);
+        return ResponseEntity.status(failure.getResponseCode().getHttpStatus())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(ApiResponse.error(
+                        failure.getResponseCode(), authoredDetail(failure), null, request.getRequestURI()));
+    }
+
+    /** Only messages written for users in the service layer are exposed; framework errors stay generic. */
+    private String authoredDetail(BusinessException failure) {
+        boolean authored = failure instanceof com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException
+                || failure instanceof com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException
+                || failure instanceof com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
+        String message = failure.getMessage();
+        return authored && message != null && !message.equals(failure.getResponseCode().getMessage())
+                ? message
+                : null;
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class})

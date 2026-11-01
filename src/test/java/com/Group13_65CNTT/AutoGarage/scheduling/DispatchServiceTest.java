@@ -32,6 +32,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +45,7 @@ class DispatchServiceTest {
     @Mock private TaskAssignmentRepository assignmentRepository;
     @Mock private RepairTaskRepository taskRepository;
     @Mock private LaborSessionRepository laborSessionRepository;
+    @Mock private com.Group13_65CNTT.AutoGarage.payroll.repository.OrderCommissionRepository commissionRepository;
 
     @InjectMocks private DispatchServiceImpl service;
 
@@ -81,9 +83,33 @@ class DispatchServiceTest {
         assertThat(tech.skills()).containsExactly("ENGINE", "BRAKE");
         assertThat(tech.canQc()).isTrue();
         assertThat(tech.activeOrdersCount()).isEqualTo(1);
+        assertThat(tech.completedOrdersInShift()).isZero();
+        assertThat(tech.currentShiftBonus()).isEqualByComparingTo("0");
         assertThat(tech.hasActiveTimer()).isTrue();
         assertThat(tech.activeTaskId()).isEqualTo(25L);
         assertThat(tech.availabilityStatus()).isEqualTo(Availability.BUSY);
+    }
+
+    @Test
+    @DisplayName("Thợ phân ca tại khoang trong ngày: ca đang diễn ra được đánh dấu, ca buổi chiều chưa đến giờ thì không")
+    void bayDayRosterFlagsWhichShiftsCoverTheCurrentMoment() {
+        Instant now = Instant.now();
+        EmployeeShift current = EmployeeShift.builder().id(1L).employeeId(6L).serviceBayId(2L)
+                .shiftType(ShiftType.MORNING).startsAt(now.minusSeconds(600)).endsAt(now.plusSeconds(600)).build();
+        EmployeeShift later = EmployeeShift.builder().id(2L).employeeId(7L).serviceBayId(2L)
+                .shiftType(ShiftType.AFTERNOON).startsAt(now.plusSeconds(7200)).endsAt(now.plusSeconds(21600)).build();
+        Employee first = Employee.builder().id(6L).userId(60L).employeeCode("KT-A").isActive(true).build();
+        Employee second = Employee.builder().id(7L).userId(70L).employeeCode("KT-B").isActive(true).build();
+        when(shiftRepository.findActiveByBayBetween(eq(2L), any(), any())).thenReturn(List.of(current, later));
+        when(employeeRepository.findAllById(anyCollection())).thenReturn(List.of(first, second));
+        when(userRepository.findAllById(anyCollection())).thenReturn(List.of());
+
+        var roster = service.getBayDayRoster(2L, java.time.LocalDate.now());
+
+        assertThat(roster).hasSize(2);
+        assertThat(roster.get(0).onShiftNow()).isTrue();
+        assertThat(roster.get(1).onShiftNow()).isFalse();
+        assertThat(roster.get(1).shiftType()).isEqualTo(ShiftType.AFTERNOON);
     }
 
     @Test

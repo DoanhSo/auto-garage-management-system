@@ -7,6 +7,8 @@ import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ShiftCreateRequest;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ShiftRegisterRequest;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.request.ShiftRejectRequest;
 import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.ShiftResponse;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftStatus;
 import com.Group13_65CNTT.AutoGarage.scheduling.service.SchedulingService;
@@ -29,7 +31,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.Group13_65CNTT.AutoGarage.scheduling.constant.ShiftPolicy;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.ShiftReconciliationResponse;
+import com.Group13_65CNTT.AutoGarage.scheduling.service.ShiftAttendanceService;
+import org.springframework.format.annotation.DateTimeFormat;
+
 import java.net.URI;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 
 @RestController
@@ -45,6 +54,7 @@ public class EmployeeShiftController {
     private final SchedulingService schedulingService;
     private final PaginationPolicy pagination;
     private final CurrentUserProvider currentUserProvider;
+    private final ShiftAttendanceService attendanceService;
 
     @PostMapping
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
@@ -56,6 +66,91 @@ public class EmployeeShiftController {
         ShiftResponse response = schedulingService.createShift(actorId, request);
         return ResponseEntity.created(URI.create(ApiPaths.SHIFTS_BASE + "/" + response.getId()))
                 .body(ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
+    }
+
+    @PostMapping("/register")
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
+    @Operation(summary = "Kỹ thuật viên tự đăng ký ca làm việc, chờ quản đốc duyệt")
+    public ResponseEntity<ApiResponse<ShiftResponse>> registerShift(
+            @Valid @RequestBody ShiftRegisterRequest request, HttpServletRequest httpRequest) {
+        ShiftResponse response = schedulingService.registerShift(currentUserProvider.userId(), request);
+        return ResponseEntity.created(URI.create(ApiPaths.SHIFTS_BASE + "/" + response.getId()))
+                .body(ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
+    }
+
+    @GetMapping("/pending-registrations")
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
+    @Operation(summary = "Danh sách đăng ký ca đang chờ duyệt")
+    public ResponseEntity<ApiResponse<Page<ShiftResponse>>> pendingRegistrations(
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(required = false) Integer size,
+            HttpServletRequest httpRequest) {
+        Page<ShiftResponse> responses = schedulingService.getPendingRegistrations(
+                pagination.page(page, size != null ? size : pagination.defaultSize(), "startsAt", "asc", SORT_FIELDS));
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, responses, httpRequest.getRequestURI()));
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
+    @Operation(summary = "Các ca (kể cả đăng ký chờ duyệt) của chính kỹ thuật viên")
+    public ResponseEntity<ApiResponse<Page<ShiftResponse>>> myShifts(
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(required = false) Integer size,
+            HttpServletRequest httpRequest) {
+        Page<ShiftResponse> responses = schedulingService.getMyShifts(
+                currentUserProvider.userId(),
+                pagination.page(page, size != null ? size : pagination.defaultSize(), "startsAt", "desc", SORT_FIELDS));
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, responses, httpRequest.getRequestURI()));
+    }
+
+    @PostMapping("/{id}/approve-registration")
+    @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
+    @Operation(summary = "Phê duyệt đăng ký ca làm")
+    public ResponseEntity<ApiResponse<ShiftResponse>> approveRegistration(
+            @PathVariable Long id, HttpServletRequest httpRequest) {
+        ShiftResponse response = schedulingService.approveShiftRegistration(currentUserProvider.userId(), id);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
+    }
+
+    @PostMapping("/{id}/reject-registration")
+    @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
+    @Operation(summary = "Từ chối đăng ký ca làm")
+    public ResponseEntity<ApiResponse<ShiftResponse>> rejectRegistration(
+            @PathVariable Long id,
+            @Valid @RequestBody ShiftRejectRequest request,
+            HttpServletRequest httpRequest) {
+        ShiftResponse response = schedulingService.rejectShiftRegistration(
+                currentUserProvider.userId(), id, request.getReason());
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
+    }
+
+    @PostMapping("/{id}/check-in")
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
+    @Operation(summary = "Chấm công vào ca trực")
+    public ResponseEntity<ApiResponse<ShiftResponse>> checkIn(
+            @PathVariable Long id, HttpServletRequest httpRequest) {
+        ShiftResponse response = attendanceService.checkIn(currentUserProvider.userId(), id);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
+    }
+
+    @PostMapping("/{id}/check-out")
+    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
+    @Operation(summary = "Chấm công ra ca trực")
+    public ResponseEntity<ApiResponse<ShiftResponse>> checkOut(
+            @PathVariable Long id, HttpServletRequest httpRequest) {
+        ShiftResponse response = attendanceService.checkOut(currentUserProvider.userId(), id);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
+    }
+
+    @GetMapping("/reconciliation")
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
+    @Operation(summary = "Đối soát giờ trực ca với giờ bấm giờ thi công theo ngày")
+    public ResponseEntity<ApiResponse<List<ShiftReconciliationResponse>>> reconcile(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            HttpServletRequest httpRequest) {
+        LocalDate day = date != null ? date : LocalDate.now(ShiftPolicy.ZONE);
+        return ResponseEntity.ok(ApiResponse.success(
+                ResponseCode.SUCCESS, attendanceService.reconcile(day), httpRequest.getRequestURI()));
     }
 
     @PutMapping("/{id}/cancel")

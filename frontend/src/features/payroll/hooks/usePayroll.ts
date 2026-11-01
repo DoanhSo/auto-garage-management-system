@@ -17,6 +17,13 @@ export function usePayrollPeriodQuery(id: string | number | null | undefined) {
   });
 }
 
+export function usePayrollPeriodByMonthQuery(month: string) {
+  return useQuery({
+    queryKey: ['payroll-period', 'by-month', month],
+    queryFn: () => payrollApi.getPeriodByMonth(month),
+  });
+}
+
 function useInvalidatePayroll() {
   const queryClient = useQueryClient();
   return () => {

@@ -36,7 +36,13 @@ const categoryMeta: Record<
 const GROUP_ORDER: AttachmentCategory[] = ['CHECK_IN', 'DIAGNOSIS', 'QC', 'HANDOVER', 'WARRANTY'];
 const isPdf = (a: Attachment) => a.contentType === 'application/pdf';
 
-function AttachmentImage({ attachment, className }: { attachment: Attachment; className?: string }) {
+function AttachmentImage({
+  attachment,
+  className,
+}: {
+  attachment: Attachment;
+  className?: string;
+}) {
   const { url, failed } = useAttachmentBlobUrl(isPdf(attachment) ? null : attachment.id);
   if (isPdf(attachment))
     return (
@@ -101,7 +107,9 @@ export function DiagnosisAttachmentGallery({
     <section className="panel diagnosis-gallery">
       <div className="diagnosis-gallery-head">
         <strong>Ảnh hiện trạng & bằng chứng chẩn đoán</strong>
-        <span className="muted">Bấm vào ảnh để đối chiếu với mô tả của khách và kết luận kỹ thuật.</span>
+        <span className="muted">
+          Bấm vào ảnh để đối chiếu với mô tả của khách và kết luận kỹ thuật.
+        </span>
       </div>
 
       {canUpload && (
@@ -123,7 +131,11 @@ export function DiagnosisAttachmentGallery({
             label="Chọn ảnh"
           />
           {files.length > 0 && (
-            <Button variant="primary" pending={upload.isPending} onClick={() => void handleUpload()}>
+            <Button
+              variant="primary"
+              pending={upload.isPending}
+              onClick={() => void handleUpload()}
+            >
               <Upload size={15} /> Tải lên {files.length} ảnh
             </Button>
           )}

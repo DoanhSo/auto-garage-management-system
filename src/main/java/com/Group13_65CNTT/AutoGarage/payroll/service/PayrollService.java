@@ -24,6 +24,9 @@ public interface PayrollService extends PayrollOperations {
 
     PayrollPeriodDetailResponse getPeriod(Long periodId);
 
+    /** Period of the given YYYY-MM month with its payslips, or null when it has not been created yet. */
+    PayrollPeriodDetailResponse getPeriodByMonth(String periodMonth);
+
     PayrollPeriodDetailResponse calculatePeriod(long actorUserId, Long periodId);
 
     PayrollItemResponse adjustItem(long actorUserId, Long periodId, Long itemId, PayrollItemAdjustRequest request);

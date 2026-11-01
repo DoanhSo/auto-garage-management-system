@@ -5,9 +5,12 @@ import type {
   ServiceBay,
   ServiceBayCreateInput,
   Employee,
+  BayShiftTechnician,
   OnShiftTechnician,
   Shift,
+  ShiftReconciliation,
   ShiftCreateInput,
+  ShiftRegisterInput,
   ShiftStatus,
   MaintenanceInput,
   EmployeeCreateInput,
@@ -92,6 +95,18 @@ export const schedulingApi = {
         }),
     ),
 
+  checkInShift: (id: string | number) =>
+    request<Shift>(`/shifts/${id}/check-in`, { method: 'POST' }),
+
+  checkOutShift: (id: string | number) =>
+    request<Shift>(`/shifts/${id}/check-out`, { method: 'POST' }),
+
+  getShiftReconciliation: (date?: string) =>
+    request<ShiftReconciliation[]>('/shifts/reconciliation' + queryString({ date })),
+
+  getBayDayRoster: (bayId: string | number, date?: string) =>
+    request<BayShiftTechnician[]>(`/scheduling/bays-roster/${bayId}` + queryString({ date })),
+
   getOnShiftTechnicians: () => request<OnShiftTechnician[]>('/scheduling/on-shift-technicians'),
 
   scheduleMaintenance: (bayId: string | number, data: MaintenanceInput) =>
@@ -127,6 +142,26 @@ export const schedulingApi = {
           sortDir: 'desc',
         }),
     ),
+
+  registerShift: (data: ShiftRegisterInput) =>
+    request<Shift>('/employee-shifts/register', { method: 'POST', body: data }),
+
+  getPendingRegistrations: () =>
+    request<Page<Shift>>(
+      '/employee-shifts/pending-registrations' + queryString({ page: 0, size: 50 }),
+    ),
+
+  getMyShifts: () =>
+    request<Page<Shift>>('/employee-shifts/my' + queryString({ page: 0, size: 20 })),
+
+  approveRegistration: (id: string | number) =>
+    request<Shift>(`/employee-shifts/${id}/approve-registration`, { method: 'POST' }),
+
+  rejectRegistration: (id: string | number, reason: string) =>
+    request<Shift>(`/employee-shifts/${id}/reject-registration`, {
+      method: 'POST',
+      body: { reason },
+    }),
 
   createShift: (data: ShiftCreateInput) =>
     request<Shift>('/employee-shifts', {

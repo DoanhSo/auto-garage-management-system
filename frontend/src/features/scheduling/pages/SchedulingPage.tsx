@@ -28,7 +28,6 @@ import { DataTable, Pagination } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { useUiPolicy } from '../../../shared/config/policy';
 import { money } from '../../../shared/utils/format';
-import { useUsersQuery } from '../../identity/hooks/useUsers';
 import {
   useServiceBaysQuery,
   useDeleteServiceBayMutation,
@@ -111,7 +110,6 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const shiftsQuery = useShiftsQuery({ size: 100 });
   const reservationsQuery = useActiveReservationsQuery();
   const employeesQuery = useSchedulingEmployeesQuery();
-  const users = useUsersQuery({ page: 0, size: 100, sortBy: 'fullName', sortDir: 'asc' });
 
   const deleteBayMutation = useDeleteServiceBayMutation();
   const cancelShiftMutation = useCancelShiftMutation();
@@ -123,8 +121,17 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
     [employees],
   );
   const userMap = useMemo(
-    () => new Map((users.data?.content ?? []).map((u) => [String(u.id), u] as const)),
-    [users.data?.content],
+    () =>
+      new Map(
+        employees.map(
+          (e) =>
+            [
+              String(e.userId),
+              { fullName: e.fullName ?? undefined, email: e.email, username: e.username },
+            ] as const,
+        ),
+      ),
+    [employees],
   );
   const takenUserIds = useMemo(() => new Set(employees.map((e) => String(e.userId))), [employees]);
 
@@ -352,7 +359,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
             <div className="account-cell">
               <div>
                 <strong>{hours.toFixed(1)} giờ</strong>
-                <span>{emp ? `${money(emp.hourlyCost)}/giờ` : ''}</span>
+                <span>{emp?.hourlyCost != null ? `${money(emp.hourlyCost)}/giờ` : ''}</span>
               </div>
             </div>
           );
@@ -421,7 +428,9 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
       {
         accessorKey: 'hourlyCost',
         header: 'Giá giờ công',
-        cell: ({ row }) => <strong>{money(row.original.hourlyCost)}</strong>,
+        cell: ({ row }) => (
+          <strong>{row.original.hourlyCost != null ? money(row.original.hourlyCost) : '—'}</strong>
+        ),
       },
       {
         id: 'shifts',

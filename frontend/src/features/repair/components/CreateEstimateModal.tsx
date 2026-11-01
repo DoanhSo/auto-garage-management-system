@@ -82,7 +82,9 @@ export function CreateEstimateModal({
       description="Chọn dịch vụ và phụ tùng từ danh mục để gửi khách hàng phê duyệt."
     >
       <form onSubmit={handleSubmit} noValidate className="editor-form">
-        <FormError message={createEstimate.error ? errorMessage(createEstimate.error) : undefined} />
+        <FormError
+          message={createEstimate.error ? errorMessage(createEstimate.error) : undefined}
+        />
 
         <Field label="Ghi chú báo giá">
           <input

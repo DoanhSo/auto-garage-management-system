@@ -1,6 +1,7 @@
 export * from './schedulingTypes';
 
-export type ShiftStatus = 'ACTIVE' | 'CANCELLED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED';
+export type ShiftStatus =
+  'ACTIVE' | 'CANCELLED' | 'PENDING' | 'REJECTED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED';
 
 export type ShiftType = 'MORNING' | 'AFTERNOON' | 'OVERTIME' | 'FULL_DAY' | 'NIGHT';
 
@@ -24,6 +25,8 @@ export const shiftTypeWindows: Record<ShiftType, { start: string; end: string }>
 export const shiftStatusLabels: Record<ShiftStatus, string> = {
   ACTIVE: 'Đang hoạt động',
   CANCELLED: 'Đã hủy',
+  PENDING: 'Chờ duyệt',
+  REJECTED: 'Bị từ chối',
   SCHEDULED: 'Đã lên lịch',
   IN_PROGRESS: 'Đang trong ca',
   COMPLETED: 'Đã hoàn thành',
@@ -55,10 +58,19 @@ export interface Employee {
   id: string | number;
   userId: string | number;
   employeeCode: string;
+  fullName?: string | null;
+  username?: string | null;
+  email?: string | null;
+  joinedAt?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountHolder?: string | null;
   skillsJson?: string | null;
   canQc: boolean;
-  hourlyCost: number;
+  /** Ẩn (null) với nhân viên không thuộc lễ tân/quản trị. */
+  hourlyCost: number | null;
   baseSalary?: number | string;
+  salaryCoefficient?: number | string;
   overtimeMultiplier?: number | string;
   defaultCommissionRate?: number | string;
   isActive: boolean;
@@ -73,11 +85,25 @@ export interface Shift {
   endsAt: string;
   shiftType?: ShiftType;
   serviceBayId?: string | number | null;
+  attendanceStatus?: AttendanceStatus;
+  actualStartsAt?: string | null;
+  actualEndsAt?: string | null;
   status: ShiftStatus;
   notes?: string | null;
+  registeredAt?: string | null;
+  approvedBy?: string | number | null;
+  rejectionReason?: string | null;
   createdBy: string | number;
   createdAt: string;
   version?: string | number;
+}
+
+export interface ShiftRegisterInput {
+  startsAt: string;
+  endsAt: string;
+  shiftType?: ShiftType;
+  serviceBayId?: number | null;
+  notes?: string | null;
 }
 
 export interface ShiftCreateInput {
@@ -85,8 +111,53 @@ export interface ShiftCreateInput {
   startsAt: string;
   endsAt: string;
   shiftType?: ShiftType;
-  serviceBayId?: number;
+  serviceBayId?: number | null;
   notes?: string | null;
+}
+
+/** Khớp RepairServiceImpl.RECEPTION_BAY_HOLD: khoang được giữ từ lúc tiếp nhận trong khoảng này. */
+export const RECEPTION_BAY_HOLD_HOURS = 12;
+
+export type AttendanceStatus = 'SCHEDULED' | 'CHECKED_IN' | 'LATE' | 'CHECKED_OUT' | 'ABSENT';
+
+export const attendanceLabels: Record<AttendanceStatus, string> = {
+  SCHEDULED: 'Chưa vào ca',
+  CHECKED_IN: 'Đã vào ca',
+  LATE: 'Vào ca muộn',
+  CHECKED_OUT: 'Đã ra ca',
+  ABSENT: 'Vắng mặt',
+};
+
+export interface BayShiftTechnician {
+  employeeId: string;
+  employeeCode: string;
+  fullName: string;
+  shiftId: string;
+  shiftType?: ShiftType | null;
+  attendanceStatus?: AttendanceStatus | null;
+  shiftStartsAt: string;
+  shiftEndsAt: string;
+  skills: string[];
+  canQc: boolean;
+  onShiftNow: boolean;
+}
+
+export interface ShiftReconciliation {
+  shiftId: string;
+  employeeId: string;
+  employeeCode?: string | null;
+  employeeName?: string | null;
+  shiftType?: ShiftType | null;
+  startsAt: string;
+  endsAt: string;
+  attendanceStatus: AttendanceStatus;
+  actualStartsAt?: string | null;
+  actualEndsAt?: string | null;
+  scheduledHours: number | string;
+  laborHours: number | string;
+  idleHours: number | string;
+  overShiftHours: number | string;
+  utilizationPercent: number;
 }
 
 export type TechnicianAvailability = 'AVAILABLE' | 'BUSY' | 'OVERLOADED';
@@ -103,6 +174,7 @@ export interface OnShiftTechnician {
   fullName: string;
   shiftId: string;
   shiftType?: ShiftType | null;
+  attendanceStatus?: AttendanceStatus | null;
   shiftStartsAt: string;
   shiftEndsAt: string;
   serviceBayId?: string | null;
@@ -111,6 +183,8 @@ export interface OnShiftTechnician {
   skills: string[];
   canQc: boolean;
   activeOrdersCount: number;
+  completedOrdersInShift: number;
+  currentShiftBonus: number | string;
   hasActiveTimer: boolean;
   activeTaskId?: string | null;
   availabilityStatus: TechnicianAvailability;
@@ -125,19 +199,29 @@ export interface MaintenanceInput {
 export interface EmployeeCreateInput {
   userId: number;
   employeeCode: string;
+  joinedAt?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountHolder?: string | null;
   skillsJson?: string | null;
   canQc: boolean;
   hourlyCost: number;
   baseSalary?: number;
+  salaryCoefficient?: number;
   overtimeMultiplier?: number;
   defaultCommissionRate?: number;
 }
 
 export interface EmployeeUpdateInput {
+  joinedAt?: string | null;
+  bankName?: string | null;
+  bankAccountNumber?: string | null;
+  bankAccountHolder?: string | null;
   skillsJson?: string | null;
   canQc?: boolean;
   hourlyCost?: number;
   baseSalary?: number;
+  salaryCoefficient?: number;
   overtimeMultiplier?: number;
   defaultCommissionRate?: number;
   isActive?: boolean;
@@ -176,3 +260,48 @@ export function parseSkills(skillsJson?: string | null): string[] {
     return [];
   }
 }
+
+/** Số giờ công chuẩn một tháng: 26 ngày × 8 giờ. */
+export const STANDARD_MONTHLY_HOURS = 208;
+
+export interface SalaryRoleTemplate {
+  label: string;
+  frameSalary: number;
+  coefficient: number;
+  commissionRate: number;
+}
+
+export const salaryRoleTemplates: Record<string, SalaryRoleTemplate> = {
+  FOREMAN: {
+    label: 'Quản đốc xưởng',
+    frameSalary: 10_000_000,
+    coefficient: 1.5,
+    commissionRate: 15,
+  },
+  LEAD: { label: 'KTV Trưởng', frameSalary: 10_000_000, coefficient: 1.3, commissionRate: 12 },
+  SENIOR: { label: 'KTV Chính', frameSalary: 8_000_000, coefficient: 1.2, commissionRate: 10 },
+  STANDARD: { label: 'KTV Tiêu chuẩn', frameSalary: 8_000_000, coefficient: 1, commissionRate: 10 },
+  QC: { label: 'KTV Kiểm định QC', frameSalary: 8_000_000, coefficient: 1.15, commissionRate: 10 },
+  APPRENTICE: {
+    label: 'Thợ phụ / Học việc',
+    frameSalary: 5_000_000,
+    coefficient: 0.8,
+    commissionRate: 5,
+  },
+};
+
+export const hourlyCostFromSalary = (baseSalary: number): number =>
+  Math.round(baseSalary / STANDARD_MONTHLY_HOURS / 500) * 500;
+
+export const BANK_NAMES = [
+  'Vietcombank',
+  'VietinBank',
+  'BIDV',
+  'Agribank',
+  'Techcombank',
+  'MB Bank',
+  'ACB',
+  'VPBank',
+  'Sacombank',
+  'TPBank',
+];

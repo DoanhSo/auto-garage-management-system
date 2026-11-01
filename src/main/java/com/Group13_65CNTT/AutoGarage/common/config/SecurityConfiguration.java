@@ -115,6 +115,7 @@ public class SecurityConfiguration {
                                     .hasAnyRole(
                                             Role.ADMIN.name(),
                                             Role.RECEPTIONIST.name(),
+                                            Role.TECHNICIAN.name(),
                                             Role.CUSTOMER.name())
                                     .requestMatchers(
                                             ApiPaths.VEHICLES_BASE, ApiPaths.VEHICLES_WILDCARD)

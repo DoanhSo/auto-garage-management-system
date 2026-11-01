@@ -37,6 +37,18 @@ public class Employee {
     @Column(name = "employee_code", nullable = false, unique = true, length = 30)
     private String employeeCode;
 
+    @Column(name = "joined_at")
+    private java.time.LocalDate joinedAt;
+
+    @Column(name = "bank_name", length = 50)
+    private String bankName;
+
+    @Column(name = "bank_account_number", length = 30)
+    private String bankAccountNumber;
+
+    @Column(name = "bank_account_holder", length = 100)
+    private String bankAccountHolder;
+
     @Column(name = "skills_json", columnDefinition = "JSON")
     private String skillsJson;
 
@@ -51,6 +63,10 @@ public class Employee {
     @Builder.Default
     @Column(name = "base_salary", nullable = false, precision = 18, scale = 2)
     private BigDecimal baseSalary = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "salary_coefficient", nullable = false, precision = 4, scale = 2)
+    private BigDecimal salaryCoefficient = new BigDecimal("1.00");
 
     @Builder.Default
     @Column(name = "overtime_multiplier", nullable = false, precision = 4, scale = 2)
@@ -91,6 +107,9 @@ public class Employee {
         }
         if (baseSalary == null) {
             baseSalary = BigDecimal.ZERO;
+        }
+        if (salaryCoefficient == null) {
+            salaryCoefficient = new BigDecimal("1.00");
         }
         if (overtimeMultiplier == null) {
             overtimeMultiplier = new BigDecimal("1.50");

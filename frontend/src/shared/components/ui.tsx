@@ -2,6 +2,8 @@ import {
   cloneElement,
   isValidElement,
   useId,
+  useMemo,
+  useRef,
   useState,
   type ComponentPropsWithRef,
   type InputHTMLAttributes,
@@ -401,5 +403,178 @@ export function ConfirmModal({
       onConfirm={onConfirm}
       onCancel={() => onOpenChange(false)}
     />
+  );
+}
+
+export interface ComboboxOption {
+  value: string;
+  label: string;
+  /** Tên nhóm hiển thị làm tiêu đề trong danh sách. */
+  group?: string;
+  disabled?: boolean;
+  /** Dòng phụ nhỏ bên dưới nhãn. */
+  description?: string;
+}
+
+const foldText = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+
+/** Ô chọn có gõ phím tìm kiếm (không phân biệt dấu), điều hướng bằng phím mũi tên. */
+export function Combobox({
+  id,
+  options,
+  value,
+  onChange,
+  placeholder = 'Chọn hoặc gõ để tìm…',
+  disabled = false,
+  clearable = true,
+  emptyText = 'Không có kết quả phù hợp',
+  ...aria
+}: {
+  id?: string;
+  options: ComboboxOption[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  clearable?: boolean;
+  emptyText?: string;
+  'aria-required'?: boolean;
+  'aria-invalid'?: boolean;
+  'aria-describedby'?: string;
+  'aria-label'?: string;
+}) {
+  const generated = useId();
+  const inputId = id ?? generated;
+  const listId = `${inputId}-list`;
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const selected = options.find((option) => option.value === value);
+  const filtered = useMemo(() => {
+    const term = foldText(query.trim());
+    return options.filter(
+      (option) =>
+        !term || foldText(`${option.label} ${option.description ?? ''}`).includes(term),
+    );
+  }, [options, query]);
+
+  const choose = (option: ComboboxOption) => {
+    if (option.disabled) return;
+    onChange(option.value);
+    setOpen(false);
+    setQuery('');
+  };
+
+  const move = (delta: number) => {
+    if (filtered.length === 0) return;
+    let next = active;
+    for (let i = 0; i < filtered.length; i += 1) {
+      next = (next + delta + filtered.length) % filtered.length;
+      if (!filtered[next].disabled) break;
+    }
+    setActive(next);
+  };
+
+  return (
+    <div
+      className="combobox"
+      ref={rootRef}
+      onBlur={(event) => {
+        if (!rootRef.current?.contains(event.relatedTarget as Node | null)) {
+          setOpen(false);
+          setQuery('');
+        }
+      }}
+    >
+      <input
+        {...aria}
+        id={inputId}
+        className="input combobox-input"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={open && filtered[active] ? `${inputId}-opt-${active}` : undefined}
+        autoComplete="off"
+        disabled={disabled}
+        placeholder={selected ? selected.label : placeholder}
+        value={open ? query : (selected?.label ?? '')}
+        onFocus={() => {
+          setOpen(true);
+          setActive(Math.max(0, filtered.findIndex((option) => option.value === value)));
+        }}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setOpen(true);
+          setActive(0);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            if (!open) setOpen(true);
+            else move(1);
+          } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            move(-1);
+          } else if (event.key === 'Enter' && open) {
+            event.preventDefault();
+            if (filtered[active]) choose(filtered[active]);
+          } else if (event.key === 'Escape' && open) {
+            event.stopPropagation();
+            setOpen(false);
+            setQuery('');
+          }
+        }}
+      />
+      {clearable && value && !disabled && (
+        <button
+          type="button"
+          className="combobox-clear"
+          aria-label="Xóa lựa chọn"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            onChange('');
+            setQuery('');
+          }}
+        >
+          <X size={14} aria-hidden />
+        </button>
+      )}
+      {open && (
+        <ul className="combobox-list" id={listId} role="listbox">
+          {filtered.length === 0 && <li className="combobox-empty">{emptyText}</li>}
+          {filtered.map((option, index) => (
+            <li key={option.value} role="presentation">
+              {option.group && option.group !== filtered[index - 1]?.group && (
+                <div className="combobox-group">{option.group}</div>
+              )}
+              <div
+                id={`${inputId}-opt-${index}`}
+                role="option"
+                aria-selected={option.value === value}
+                aria-disabled={option.disabled || undefined}
+                className={`combobox-option${index === active ? ' is-active' : ''}${
+                  option.disabled ? ' is-disabled' : ''
+                }`}
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setActive(index)}
+                onClick={() => choose(option)}
+              >
+                <span>{option.label}</span>
+                {option.description && <small>{option.description}</small>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

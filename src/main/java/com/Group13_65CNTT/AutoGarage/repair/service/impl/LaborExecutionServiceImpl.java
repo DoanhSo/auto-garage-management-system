@@ -45,6 +45,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     private final com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository serviceRepository;
     private final com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
     private final com.Group13_65CNTT.AutoGarage.repair.service.WorkLogRecorder workLogRecorder;
+    private final com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository userRepository;
 
     private final TaskAssignmentMapper taskAssignmentMapper;
     private final LaborSessionMapper laborSessionMapper;
@@ -147,7 +148,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         }
 
         TaskAssignmentResponse response = taskAssignmentMapper.toResponse(saved);
-        response.setEmployeeName(employee.getEmployeeCode());
+        response.setEmployeeName(displayName(employee));
         return response;
     }
 
@@ -182,7 +183,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         List<TaskAssignmentResponse> responses = new ArrayList<>();
         for (TaskAssignment a : assignments) {
             TaskAssignmentResponse res = taskAssignmentMapper.toResponse(a);
-            employeeRepository.findById(a.getEmployeeId()).ifPresent(e -> res.setEmployeeName(e.getEmployeeCode()));
+            employeeRepository.findById(a.getEmployeeId()).ifPresent(e -> res.setEmployeeName(displayName(e)));
             responses.add(res);
         }
         return responses;
@@ -270,6 +271,23 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     }
 
     @Override
+    @Transactional
+    public void pauseOpenTimersForEmployee(Long employeeId, Instant at) {
+        for (LaborSession session : laborSessionRepository.findByEmployeeIdAndEndsAtIsNull(employeeId)) {
+            session.setEndsAt(at);
+            session.setStopReason(StopReason.PAUSE);
+            laborSessionRepository.save(session);
+            taskAssignmentRepository.findById(session.getAssignmentId())
+                    .flatMap(assignment -> repairTaskRepository.findByIdForUpdate(assignment.getTaskId()))
+                    .filter(task -> task.getStatus() == TaskStatus.IN_PROGRESS)
+                    .ifPresent(task -> {
+                        task.setStatus(TaskStatus.PAUSED);
+                        repairTaskRepository.save(task);
+                    });
+        }
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public LaborSessionResponse getActiveTimerByEmployee(Long employeeId) {
         return laborSessionRepository.findTopByEmployeeIdAndEndsAtIsNull(employeeId)
@@ -345,6 +363,16 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         return getTaskWorkSummary(taskId);
     }
 
+    /** Full name for display, falling back to the employee code when the account is unavailable. */
+    private String displayName(Employee employee) {
+        if (userRepository == null || employee.getUserId() == null) {
+            return employee.getEmployeeCode();
+        }
+        return userRepository.findById(employee.getUserId())
+                .map(user -> user.getFullName() + " · " + employee.getEmployeeCode())
+                .orElse(employee.getEmployeeCode());
+    }
+
     private void requireOpenOrder(Long orderId) {
         RepairOrder order = repairOrderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa"));
@@ -383,7 +411,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
 
         for (TaskAssignment a : assignments) {
             TaskAssignmentResponse res = taskAssignmentMapper.toResponse(a);
-            employeeRepository.findById(a.getEmployeeId()).ifPresent(e -> res.setEmployeeName(e.getEmployeeCode()));
+            employeeRepository.findById(a.getEmployeeId()).ifPresent(e -> res.setEmployeeName(displayName(e)));
             assignmentResponses.add(res);
             assignmentIds.add(a.getId());
         }

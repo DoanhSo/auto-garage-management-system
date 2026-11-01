@@ -43,6 +43,9 @@ class EmployeeServiceTest {
     @Mock
     private EmployeeMapper employeeMapper;
 
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUser;
+
     @InjectMocks
     private SchedulingServiceImpl schedulingService;
 
@@ -52,6 +55,7 @@ class EmployeeServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(currentUser.role()).thenReturn(com.Group13_65CNTT.AutoGarage.common.enums.Role.ADMIN);
         createRequest = EmployeeCreateRequest.builder()
                 .userId(10L)
                 .employeeCode("EMP001")
@@ -195,5 +199,28 @@ class EmployeeServiceTest {
 
         assertThat(employee.getIsActive()).isFalse();
         verify(employeeRepository).save(employee);
+    }
+
+    @Test
+    @DisplayName("Hồ sơ nhân viên kèm họ tên tài khoản; kỹ thuật viên không thấy lương và ngân hàng")
+    void getEmployeeById_addsNameAndHidesPayDataFromTechnicians() {
+        response.setBankAccountNumber("0123456789");
+        response.setBaseSalary(new BigDecimal("8000000"));
+        response.setHourlyCost(new BigDecimal("150000"));
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(employee));
+        when(employeeMapper.toResponse(employee)).thenReturn(response);
+        com.Group13_65CNTT.AutoGarage.identity.entity.User account =
+                com.Group13_65CNTT.AutoGarage.identity.entity.User.builder()
+                        .username("ktv1").fullName("Lê Hoàng Minh").build();
+        account.setId(10L);
+        when(userRepository.findAllById(any())).thenReturn(List.of(account));
+        when(currentUser.role()).thenReturn(com.Group13_65CNTT.AutoGarage.common.enums.Role.TECHNICIAN);
+
+        EmployeeResponse actual = schedulingService.getEmployeeById(1L);
+
+        assertThat(actual.getFullName()).isEqualTo("Lê Hoàng Minh");
+        assertThat(actual.getBankAccountNumber()).isNull();
+        assertThat(actual.getBaseSalary()).isNull();
+        assertThat(actual.getHourlyCost()).isNull();
     }
 }

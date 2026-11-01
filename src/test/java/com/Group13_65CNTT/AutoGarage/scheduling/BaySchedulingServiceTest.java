@@ -124,7 +124,7 @@ class BaySchedulingServiceTest {
 
         assertThatThrownBy(() -> schedulingService.reserveBooking(1L, 10L, 1L, startsAt, endsAt))
                 .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.DUPLICATE_RESOURCE);
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.BAY_UNAVAILABLE);
 
         verify(bayReservationRepository, never()).save(argThat(r -> r.getBookingId() != null && r.getBookingId().equals(10L)));
     }

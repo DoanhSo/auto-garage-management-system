@@ -70,7 +70,10 @@ export interface TaskAssignment {
   taskId: string;
   employeeId: string;
   employeeName?: string;
-  role: AssignmentRole;
+  assignmentRole: AssignmentRole;
+  isActive: boolean;
+  startsAt: string;
+  endsAt: string;
   assignedAt: string;
   releasedAt?: string | null;
 }
@@ -80,18 +83,22 @@ export type StopReason = 'PAUSE' | 'COMPLETE' | 'CANCEL';
 export interface LaborSession {
   id: string;
   assignmentId: string;
-  startedAt: string;
-  endedAt?: string | null;
+  employeeId: string;
+  startsAt: string;
+  endsAt?: string | null;
   stopReason?: StopReason | null;
+  hourlyCostSnapshot?: number | null;
   durationSeconds?: number | null;
-  hourlyCost?: number | null;
 }
 
 export interface TaskWorkSummary {
   taskId: string;
+  repairOrderId: string;
   taskName: string;
   status: TaskStatus;
-  totalDurationSeconds: number;
-  totalCost: number;
-  sessionCount: number;
+  completionNote?: string | null;
+  totalActualSeconds: number;
+  totalLaborCost: number;
+  assignments: TaskAssignment[];
+  sessions: LaborSession[];
 }

@@ -14,6 +14,9 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class CustomerScope {
+    /** Matches no row: a new account without a customer profile queries to an empty result. */
+    private static final long NO_PROFILE_ID = 0L;
+
     private final CurrentUserProvider currentUser;
     private final CustomerRepository customers;
     private final ObjectAccessService access;
@@ -39,7 +42,7 @@ public class CustomerScope {
         if (currentUser.role() != Role.CUSTOMER) {
             return requestedCustomerId;
         }
-        long ownId = currentCustomerId();
+        long ownId = customers.findByUserId(currentUser.userId()).map(Customer::getId).orElse(NO_PROFILE_ID);
         if (requestedCustomerId != null && requestedCustomerId != ownId) {
             throw new BusinessException(ResponseCode.FORBIDDEN);
         }

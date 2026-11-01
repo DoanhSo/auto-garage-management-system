@@ -126,6 +126,14 @@ SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id J
     @Query(
             value =
                     """
+SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id JOIN repair_tasks t ON t.id=a.task_id JOIN repair_orders r ON r.id=t.repair_order_id WHERE e.user_id=:actorId AND e.is_active=TRUE AND a.is_active=TRUE AND r.customer_id=:resourceId AND r.status NOT IN ('CLOSED','CANCELLED')
+""",
+            nativeQuery = true)
+    long assignedToCustomer(@Param("actorId") Long actorId, @Param("resourceId") Long resourceId);
+
+    @Query(
+            value =
+                    """
 SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id JOIN repair_tasks t ON t.id=a.task_id WHERE e.user_id=:actorId AND e.is_active=TRUE AND e.can_qc=TRUE AND a.is_active=TRUE AND a.assignment_role='QC' AND t.repair_order_id=:resourceId
 """,
             nativeQuery = true)

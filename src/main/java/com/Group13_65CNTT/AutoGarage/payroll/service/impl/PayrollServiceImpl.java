@@ -44,6 +44,11 @@ import com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderRepository;
 import com.Group13_65CNTT.AutoGarage.repair.repository.RepairTaskRepository;
 import com.Group13_65CNTT.AutoGarage.repair.repository.TaskAssignmentRepository;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.Employee;
+import com.Group13_65CNTT.AutoGarage.scheduling.entity.EmployeeShift;
+import com.Group13_65CNTT.AutoGarage.scheduling.entity.ServiceBay;
+import com.Group13_65CNTT.AutoGarage.scheduling.repository.ServiceBayRepository;
+import com.Group13_65CNTT.AutoGarage.vehicle.entity.Vehicle;
+import com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleRepository;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftStatus;
 import com.Group13_65CNTT.AutoGarage.scheduling.repository.EmployeeRepository;
 import com.Group13_65CNTT.AutoGarage.scheduling.repository.EmployeeShiftRepository;
@@ -99,6 +104,9 @@ public class PayrollServiceImpl implements PayrollService {
     private final RepairTaskRepository repairTaskRepository;
     private final TaskAssignmentRepository assignmentRepository;
     private final VehicleCheckRepository vehicleCheckRepository;
+    private final com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository serviceRepository;
+    private final ServiceBayRepository serviceBayRepository;
+    private final VehicleRepository vehicleRepository;
     private final PayrollMapper mapper;
 
     @Autowired
@@ -154,6 +162,12 @@ public class PayrollServiceImpl implements PayrollService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PayrollPeriodDetailResponse getPeriodByMonth(String periodMonth) {
+        return periodRepository.findByPeriodMonth(periodMonth).map(this::detail).orElse(null);
+    }
+
+    @Override
     @Transactional
     @Audited(action = "CALCULATE_PAYROLL", entity = "PayrollPeriod")
     public PayrollPeriodDetailResponse calculatePeriod(long actorUserId, Long periodId) {
@@ -197,9 +211,19 @@ public class PayrollServiceImpl implements PayrollService {
             applyLabor(item, employee, sessions);
             item.setShiftCount((int) shifts);
             item.setCommissionAmount(commissions.stream()
+                    .map(commission -> commission.getCommissionType() == CommissionType.WARRANTY_DEDUCTION
+                            ? commission.getCommissionAmount().negate()
+                            : commission.getCommissionAmount())
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+            item.setOrderBonusAmount(commissions.stream()
+                    .filter(commission -> commission.getCommissionType() == CommissionType.ORDER_COMPLETION)
                     .map(OrderCommission::getCommissionAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add));
-            item.setCompletedOrderCount((int) commissions.stream().map(OrderCommission::getRepairOrderId).distinct().count());
+            item.setCompletedOrderCount((int) commissions.stream()
+                    .filter(commission -> commission.getCommissionType() != CommissionType.WARRANTY_DEDUCTION)
+                    .map(OrderCommission::getRepairOrderId)
+                    .distinct()
+                    .count());
             item.setStatus(PayrollItemStatus.CALCULATED);
             recompute(item);
             PayrollItem saved = itemRepository.save(item);
@@ -421,8 +445,8 @@ public class PayrollServiceImpl implements PayrollService {
 
         List<OrderCommission> created = new ArrayList<>();
         BigDecimal totalLabor = BigDecimal.ZERO;
-        Long firstMain = null;
         Set<Long> qcEmployees = new LinkedHashSet<>();
+        List<TimeSavedCandidate> timeSavedTasks = new ArrayList<>();
 
         for (RepairTask task : tasks) {
             BigDecimal labor = task.getQuantity().multiply(task.getUnitPrice()).setScale(MONEY_SCALE, RoundingMode.HALF_UP);
@@ -434,9 +458,7 @@ public class PayrollServiceImpl implements PayrollService {
             if (mains.isEmpty()) {
                 continue;
             }
-            if (firstMain == null) {
-                firstMain = mains.iterator().next();
-            }
+            timeSavedTasks.add(new TimeSavedCandidate(task, mains, assignments));
             BigDecimal mainShare = assistants.isEmpty() ? BigDecimal.ONE : PayrollConstants.MAIN_SHARE_WITH_ASSISTANTS;
             addLaborShares(created, order, task, labor, mains, mainShare, employees, earnedAt);
             addLaborShares(created, order, task, labor, assistants, PayrollConstants.ASSISTANT_SHARE, employees, earnedAt);
@@ -447,10 +469,14 @@ public class PayrollServiceImpl implements PayrollService {
         boolean passedFirstTime = !qcChecks.isEmpty() && qcChecks.get(0).getResult() == CheckResult.PASSED;
         boolean anyPassed = qcChecks.stream().anyMatch(check -> check.getResult() == CheckResult.PASSED);
 
-        Long bonusRecipient = order.getLeadTechnicianId() != null ? order.getLeadTechnicianId() : firstMain;
-        if (passedFirstTime && bonusRecipient != null) {
-            created.add(commission(order.getId(), null, bonusRecipient, CommissionType.ORDER_COMPLETION,
-                    totalLabor, BigDecimal.ZERO, completionBonus(totalLabor), earnedAt, null));
+        if (passedFirstTime) {
+            for (TimeSavedCandidate candidate : timeSavedTasks) {
+                addTimeSavedBonus(created, order, candidate, employees, earnedAt);
+            }
+        }
+
+        if (passedFirstTime) {
+            addShiftOrderBonuses(created, order, tasks, assignmentsByTask, employees, earnedAt);
         }
         if (anyPassed) {
             for (Long qcEmployee : qcEmployees) {
@@ -465,6 +491,173 @@ public class PayrollServiceImpl implements PayrollService {
         commissionRepository.saveAll(payable);
         log.info("Recorded {} commissions for repair order {}", payable.size(), order.getId());
         return payable.size();
+    }
+
+    /**
+     * Pays the per-order bonus for a repair that passed QC first time. The tier depends on how many
+     * orders the main technician has already completed in the same shift (1-2, 3-4, 5+); the main
+     * technician takes 70% and assistants share 30%, or 100% when working alone.
+     */
+    private void addShiftOrderBonuses(
+            List<OrderCommission> sink,
+            RepairOrder order,
+            List<RepairTask> tasks,
+            Map<Long, List<TaskAssignment>> assignmentsByTask,
+            Map<Long, Employee> employees,
+            Instant earnedAt) {
+        Set<Long> mains = new LinkedHashSet<>();
+        Set<Long> assistants = new LinkedHashSet<>();
+        for (RepairTask task : tasks) {
+            List<TaskAssignment> assignments = assignmentsByTask.get(task.getId());
+            mains.addAll(distinctEmployees(assignments, AssignmentRole.MAIN));
+            assistants.addAll(distinctEmployees(assignments, AssignmentRole.ASSISTANT));
+        }
+        assistants.removeAll(mains);
+        if (mains.isEmpty()) {
+            return;
+        }
+        String plate = vehicleRepository.findById(order.getVehicleId()).map(Vehicle::getLicensePlate).orElse(null);
+        Map<Long, EmployeeShift> shifts = new HashMap<>();
+        for (Long employeeId : new LinkedHashSet<>(java.util.stream.Stream.concat(mains.stream(), assistants.stream()).toList())) {
+            EmployeeShift shift = resolveShift(employeeId, order, tasks, assignmentsByTask, earnedAt);
+            if (shift != null) {
+                shifts.put(employeeId, shift);
+            }
+        }
+
+        Long primary = mains.iterator().next();
+        EmployeeShift primaryShift = shifts.get(primary);
+        int orderNumber = primaryShift == null ? 1
+                : (int) commissionRepository.countByEmployeeIdAndShiftIdAndCommissionTypeAndStatusNot(
+                        primary, primaryShift.getId(), CommissionType.ORDER_COMPLETION, CommissionStatus.CANCELLED) + 1;
+        BigDecimal pool = orderBonusForPosition(orderNumber);
+
+        BigDecimal mainShare = assistants.isEmpty() ? BigDecimal.ONE : PayrollConstants.MAIN_SHARE_WITH_ASSISTANTS;
+        addOrderBonusRows(sink, order, plate, mains, pool.multiply(mainShare), shifts, employees, earnedAt);
+        addOrderBonusRows(sink, order, plate, assistants, pool.multiply(PayrollConstants.ASSISTANT_SHARE), shifts, employees, earnedAt);
+    }
+
+    private BigDecimal orderBonusForPosition(int orderNumber) {
+        if (orderNumber <= PayrollConstants.TIER1_LAST_ORDER) {
+            return PayrollConstants.TIER1_ORDER_BONUS;
+        }
+        return orderNumber <= PayrollConstants.TIER2_LAST_ORDER
+                ? PayrollConstants.TIER2_ORDER_BONUS
+                : PayrollConstants.TIER3_ORDER_BONUS;
+    }
+
+    private void addOrderBonusRows(
+            List<OrderCommission> sink,
+            RepairOrder order,
+            String plate,
+            Set<Long> recipients,
+            BigDecimal groupAmount,
+            Map<Long, EmployeeShift> shifts,
+            Map<Long, Employee> employees,
+            Instant earnedAt) {
+        if (recipients.isEmpty()) {
+            return;
+        }
+        BigDecimal each = groupAmount.divide(BigDecimal.valueOf(recipients.size()), MONEY_SCALE, RoundingMode.HALF_UP);
+        for (Long employeeId : recipients) {
+            if (!employees.containsKey(employeeId)) {
+                continue;
+            }
+            EmployeeShift shift = shifts.get(employeeId);
+            String bayCode = shift == null || shift.getServiceBayId() == null ? null
+                    : serviceBayRepository.findById(shift.getServiceBayId()).map(ServiceBay::getBayCode).orElse(null);
+            String shiftLabel = shift == null || shift.getShiftType() == null ? null
+                    : PayrollConstants.SHIFT_LABELS.get(shift.getShiftType());
+            StringBuilder note = new StringBuilder("Thưởng đơn xe ").append(plate == null ? "#" + order.getId() : plate);
+            if (shiftLabel != null) {
+                note.append(" ca ").append(shiftLabel);
+            }
+            if (bayCode != null) {
+                note.append(" tại khoang ").append(bayCode);
+            }
+            OrderCommission row = commission(order.getId(), null, employeeId, CommissionType.ORDER_COMPLETION,
+                    BigDecimal.ZERO, BigDecimal.ZERO, each, earnedAt, note.toString());
+            row.setShiftId(shift == null ? null : shift.getId());
+            row.setShiftType(shift == null || shift.getShiftType() == null ? null : shift.getShiftType().name());
+            row.setServiceBayId(shift == null ? null : shift.getServiceBayId());
+            row.setBayCode(bayCode);
+            row.setLicensePlate(plate);
+            sink.add(row);
+        }
+    }
+
+    /** The shift covering the end of the technician's labor on this order, else the closing time. */
+    private EmployeeShift resolveShift(
+            Long employeeId,
+            RepairOrder order,
+            List<RepairTask> tasks,
+            Map<Long, List<TaskAssignment>> assignmentsByTask,
+            Instant earnedAt) {
+        List<Long> assignmentIds = tasks.stream()
+                .flatMap(task -> assignmentsByTask.get(task.getId()).stream())
+                .filter(assignment -> assignment.getEmployeeId().equals(employeeId))
+                .map(TaskAssignment::getId)
+                .toList();
+        List<Instant> candidates = new ArrayList<>();
+        laborSessionRepository.findByAssignmentIdIn(assignmentIds).stream()
+                .map(LaborSession::getEndsAt)
+                .filter(java.util.Objects::nonNull)
+                .max(Instant::compareTo)
+                .ifPresent(candidates::add);
+        candidates.add(earnedAt);
+        for (Instant at : candidates) {
+            List<EmployeeShift> found = shiftRepository.findActiveAt(employeeId, at);
+            if (!found.isEmpty()) {
+                return found.get(0);
+            }
+        }
+        return null;
+    }
+
+    private record TimeSavedCandidate(RepairTask task, Set<Long> mains, List<TaskAssignment> assignments) {}
+
+    /** Pays half the value of the book-hours the main technicians saved on a task that passed QC first time. */
+    private void addTimeSavedBonus(
+            List<OrderCommission> sink,
+            RepairOrder order,
+            TimeSavedCandidate candidate,
+            Map<Long, Employee> employees,
+            Instant earnedAt) {
+        RepairTask task = candidate.task();
+        if (task.getServiceId() == null) {
+            return;
+        }
+        BigDecimal standardMinutes = serviceRepository.findById(task.getServiceId())
+                .map(service -> BigDecimal.valueOf(service.getStandardMinutes()))
+                .orElse(BigDecimal.ZERO);
+        BigDecimal estimatedHours = standardMinutes.multiply(task.getQuantity())
+                .divide(PayrollConstants.MINUTES_PER_HOUR, 4, RoundingMode.HALF_UP);
+        List<Long> assignmentIds = candidate.assignments().stream().map(TaskAssignment::getId).toList();
+        long actualSeconds = laborSessionRepository.findByAssignmentIdIn(assignmentIds).stream()
+                .filter(session -> session.getEndsAt() != null)
+                .mapToLong(session -> Duration.between(session.getStartsAt(), session.getEndsAt()).getSeconds())
+                .sum();
+        if (actualSeconds <= 0) {
+            return;
+        }
+        BigDecimal actualHours = BigDecimal.valueOf(actualSeconds)
+                .divide(PayrollConstants.SECONDS_PER_HOUR, 4, RoundingMode.HALF_UP);
+        BigDecimal savedHours = estimatedHours.subtract(actualHours);
+        if (savedHours.signum() <= 0) {
+            return;
+        }
+        BigDecimal perMainHours = savedHours.divide(BigDecimal.valueOf(candidate.mains().size()), 4, RoundingMode.HALF_UP);
+        for (Long employeeId : candidate.mains()) {
+            Employee employee = employees.get(employeeId);
+            if (employee == null) {
+                continue;
+            }
+            BigDecimal base = perMainHours.multiply(employee.getHourlyCost()).setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+            BigDecimal amount = base.multiply(PayrollConstants.TIME_SAVED_BONUS_RATE).setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+            sink.add(commission(order.getId(), task.getId(), employeeId, CommissionType.TIME_SAVED_EFFICIENCY, base,
+                    PayrollConstants.TIME_SAVED_BONUS_RATE.multiply(PayrollConstants.HUNDRED), amount, earnedAt,
+                    "Tiết kiệm " + perMainHours.setScale(2, RoundingMode.HALF_UP) + " giờ so với định mức"));
+        }
     }
 
     private void addLaborShares(

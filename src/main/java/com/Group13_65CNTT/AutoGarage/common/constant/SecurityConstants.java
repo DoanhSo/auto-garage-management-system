@@ -30,6 +30,8 @@ public final class SecurityConstants {
     public static final String HAS_STAFF_OR_ADMIN =
             "hasAnyRole('ADMIN','RECEPTIONIST','WAREHOUSE_STAFF','TECHNICIAN')";
     public static final String HAS_FRONT_DESK = "hasAnyRole('ADMIN','RECEPTIONIST')";
+    public static final String HAS_CUSTOMER_PROFILE_ACCESS =
+            "hasAnyRole('ADMIN','RECEPTIONIST','TECHNICIAN','CUSTOMER')";
     public static final String HAS_BOOKING_ACCESS = "hasAnyRole('ADMIN','RECEPTIONIST','CUSTOMER')";
     public static final String HAS_TECHNICAL_ACCESS =
             "hasAnyRole('ADMIN','RECEPTIONIST','TECHNICIAN')";

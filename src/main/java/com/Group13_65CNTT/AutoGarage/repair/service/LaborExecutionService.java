@@ -1,5 +1,6 @@
 package com.Group13_65CNTT.AutoGarage.repair.service;
 
+import java.time.Instant;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.LaborSessionStopRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.TaskAssignmentRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.TaskCompletionRequest;
@@ -22,6 +23,9 @@ public interface LaborExecutionService {
     LaborSessionResponse stopTimer(Long actorUserId, Long assignmentId, LaborSessionStopRequest request);
 
     LaborSessionResponse getActiveTimerByEmployee(Long employeeId);
+
+    /** Pauses every running timer of the technician (end of shift) so it cannot run overnight. */
+    void pauseOpenTimersForEmployee(Long employeeId, Instant at);
 
     TaskWorkSummaryResponse completeTask(Long actorUserId, Long taskId, TaskCompletionRequest request);
 

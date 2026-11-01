@@ -395,6 +395,19 @@ export function BookingsPage() {
             columns={columns}
             data={bookings}
             caption="Danh sách lịch hẹn & tiếp nhận"
+            emptyTitle="Chưa có lịch hẹn nào"
+            emptyDescription="Đặt lịch hẹn đầu tiên để xưởng giữ chỗ và chuẩn bị tiếp nhận xe."
+            emptyAction={
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setEditorSlot(undefined);
+                  setEditorOpen(true);
+                }}
+              >
+                Đặt lịch hẹn đầu tiên
+              </Button>
+            }
           />
         )}
       </section>

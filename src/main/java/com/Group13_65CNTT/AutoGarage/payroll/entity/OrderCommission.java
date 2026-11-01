@@ -39,6 +39,21 @@ public class OrderCommission {
     @Column(name = "task_id")
     private Long taskId;
 
+    @Column(name = "shift_id")
+    private Long shiftId;
+
+    @Column(name = "shift_type", length = 20)
+    private String shiftType;
+
+    @Column(name = "service_bay_id")
+    private Long serviceBayId;
+
+    @Column(name = "bay_code", length = 30)
+    private String bayCode;
+
+    @Column(name = "license_plate", length = 20)
+    private String licensePlate;
+
     @Column(name = "employee_id", nullable = false)
     private Long employeeId;
 

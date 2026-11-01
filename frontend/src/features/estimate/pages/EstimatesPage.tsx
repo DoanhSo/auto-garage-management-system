@@ -66,6 +66,11 @@ function ReadyEstimates({ policy }: { policy: NonNullable<ReturnType<typeof useU
     [vehicles],
   );
 
+  const selectedOrder = selectedEstimate
+    ? orderMap.get(String(selectedEstimate.repairOrderId))
+    : undefined;
+  const selectedOrderVehicle = selectedOrder ? vehicleMap.get(String(selectedOrder.vehicleId)) : null;
+
   const estimates = useMemo(() => {
     const term = keyword.trim().toLowerCase();
     return pageEstimates.filter((e) => {
@@ -361,6 +366,8 @@ function ReadyEstimates({ policy }: { policy: NonNullable<ReturnType<typeof useU
 
       <EstimateDecisionModal
         estimate={selectedEstimate}
+        repairOrder={selectedEstimate ? orderMap.get(String(selectedEstimate.repairOrderId)) : null}
+        vehicle={selectedOrderVehicle}
         open={!!selectedEstimate}
         onClose={() => setSelectedEstimate(null)}
       />

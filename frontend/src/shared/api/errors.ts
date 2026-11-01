@@ -14,6 +14,7 @@ const messages: Record<number, string> = {
   2016: 'Hãy chọn khách hàng có sẵn hoặc nhập khách hàng mới.',
   2017: 'Hãy chọn xe có sẵn hoặc nhập xe mới.',
   2018: 'Xe đã chọn không thuộc khách hàng này.',
+  2019: 'Khoang đã có lịch trong khung giờ này. Hãy chọn khoang khác hoặc đổi giờ.',
   3001: 'Phiên đăng nhập không còn hợp lệ.',
   3002: 'Bạn không có quyền thực hiện thao tác này.',
   3003: 'Phiên đăng nhập đã hết hạn hoặc bị thu hồi.',
@@ -29,11 +30,13 @@ export class ApiError extends Error {
     public readonly code: number,
     public readonly fields: Record<string, string> = {},
     public readonly uncertain = false,
+    public readonly detail?: string,
   ) {
     super(
       uncertain
         ? 'Chưa xác nhận được kết quả trên máy chủ. Kiểm tra trạng thái trước khi gửi lại.'
-        : (messages[code] ??
+        : (detail ??
+            messages[code] ??
             (status === 0
               ? 'Không kết nối được máy chủ. Kiểm tra mạng và thử lại.'
               : 'Không thể xử lý yêu cầu. Vui lòng thử lại.')),

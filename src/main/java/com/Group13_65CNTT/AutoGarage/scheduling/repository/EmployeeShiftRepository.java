@@ -19,6 +19,10 @@ public interface EmployeeShiftRepository extends JpaRepository<EmployeeShift, Lo
             "AND s.startsAt <= :at AND s.endsAt >= :at ORDER BY s.startsAt")
     List<EmployeeShift> findActiveAt(@Param("employeeId") Long employeeId, @Param("at") Instant at);
 
+    @Query("SELECT s FROM EmployeeShift s WHERE s.status = 'ACTIVE' AND s.startsAt >= :from AND s.startsAt < :to " +
+            "ORDER BY s.startsAt, s.employeeId")
+    List<EmployeeShift> findActiveStartingBetween(@Param("from") Instant from, @Param("to") Instant to);
+
     @Query("SELECT s FROM EmployeeShift s WHERE s.status = 'ACTIVE' AND s.startsAt <= :at AND s.endsAt >= :at " +
             "ORDER BY s.startsAt")
     List<EmployeeShift> findAllActiveAt(@Param("at") Instant at);
@@ -37,6 +41,16 @@ public interface EmployeeShiftRepository extends JpaRepository<EmployeeShift, Lo
     Page<EmployeeShift> findByEmployeeIdAndStatus(Long employeeId, ShiftStatus status, Pageable pageable);
 
     Page<EmployeeShift> findByStatus(ShiftStatus status, Pageable pageable);
+
+    @Query("SELECT s FROM EmployeeShift s WHERE s.serviceBayId = :bayId AND s.status = 'ACTIVE' " +
+           "AND s.startsAt < :to AND s.endsAt > :from ORDER BY s.startsAt, s.employeeId")
+    List<EmployeeShift> findActiveByBayBetween(
+            @Param("bayId") Long bayId, @Param("from") Instant from, @Param("to") Instant to);
+
+    @Query("SELECT s FROM EmployeeShift s WHERE s.serviceBayId = :bayId AND s.status = 'ACTIVE' " +
+           "AND s.startsAt < :endsAt AND s.endsAt > :startsAt")
+    List<EmployeeShift> findOverlappingByBay(
+            @Param("bayId") Long bayId, @Param("startsAt") Instant startsAt, @Param("endsAt") Instant endsAt);
 
     @Query("SELECT s FROM EmployeeShift s WHERE s.employeeId = :employeeId AND s.status = :status " +
            "AND s.startsAt < :endsAt AND s.endsAt > :startsAt")

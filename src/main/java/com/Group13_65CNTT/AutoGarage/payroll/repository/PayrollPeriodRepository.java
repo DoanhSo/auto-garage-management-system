@@ -15,6 +15,8 @@ public interface PayrollPeriodRepository extends JpaRepository<PayrollPeriod, Lo
 
     boolean existsByPeriodMonth(String periodMonth);
 
+    Optional<PayrollPeriod> findByPeriodMonth(String periodMonth);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM PayrollPeriod p WHERE p.id = :id")
     Optional<PayrollPeriod> findByIdForUpdate(@Param("id") Long id);

@@ -2,20 +2,29 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { applyFormError, errorMessage } from '../../../shared/api/errors';
-import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
+import { Button, Combobox, Field, FormError, Sheet } from '../../../shared/components/ui';
 import type { Booking, Vehicle } from '../../../shared/types/contracts';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
 import {
   useActiveReservationsQuery,
+  useBayDayRosterQuery,
   useOnShiftTechniciansQuery,
   useServiceBaysQuery,
 } from '../../scheduling/hooks/useScheduling';
-import { SKILL_LABELS, availabilityLabels } from '../../scheduling/types/scheduling';
+import {
+  RECEPTION_BAY_HOLD_HOURS,
+  SKILL_LABELS,
+  availabilityLabels,
+  shiftTypeLabels,
+} from '../../scheduling/types/scheduling';
 import { useState } from 'react';
 import { useCheckInVehicleMutation, useUploadOrderAttachmentMutation } from '../hooks/useReception';
 import { AttachmentFilePicker } from './AttachmentFilePicker';
 import { checkInFormSchema, type CheckInFormValues } from '../schemas/receptionSchema';
 import { LogIn, Car } from 'lucide-react';
+
+const hhmm = (iso: string) =>
+  new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
 export function CheckInModal({
   booking,
@@ -38,16 +47,26 @@ export function CheckInModal({
     isActive: true,
   });
 
-  const onShift = useOnShiftTechniciansQuery(open);
   const bays = useServiceBaysQuery({ isActive: true, page: 0, size: 100 });
   const reservations = useActiveReservationsQuery();
-  const occupiedBayIds = new Set((reservations.data ?? []).map((r) => String(r.bayId)));
+  // Khoang được giữ cả khung giờ sắp tới nên chỉ coi là trống khi không có lịch nào chồng lên khung đó.
+  const occupiedBayIds = new Set(
+    (reservations.data ?? [])
+      .filter((r) => {
+        const from = Date.now();
+        const to = from + RECEPTION_BAY_HOLD_HOURS * 3_600_000;
+        return new Date(r.startsAt).getTime() < to && new Date(r.endsAt).getTime() > from;
+      })
+      .map((r) => String(r.bayId)),
+  );
 
   const activeVehicle =
     vehicle || (booking ? vehicles.find((v) => v.id === booking.vehicleId) : null);
 
   const {
     register,
+    watch,
+    setValue,
     handleSubmit,
     setError,
     reset,
@@ -65,6 +84,16 @@ export function CheckInModal({
     },
   });
 
+  const selectedBayId = watch('serviceBayId') || null;
+  const today = (() => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  })();
+  const roster = useBayDayRosterQuery(selectedBayId, today);
+  const onShift = useOnShiftTechniciansQuery(open);
+  const bayCrew = (roster.data ?? []).filter((tech) => tech.onShiftNow);
+  const mobileTechs = (onShift.data ?? []).filter((tech) => !tech.serviceBayId);
   async function onSubmit(values: CheckInFormValues) {
     if (activeVehicle && values.odometerIn < activeVehicle.odometer) {
       setError('odometerIn', {
@@ -159,18 +188,17 @@ export function CheckInModal({
               error={errors.vehicleId?.message}
               hint="Chọn xe cần tiếp nhận vào gara"
             >
-              <select
-                className="select"
+              <Combobox
                 disabled={isLoadingVehicles || checkIn.isPending}
-                {...register('vehicleId')}
-              >
-                <option value="">-- Chọn phương tiện --</option>
-                {vehicles.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.licensePlate} ({v.brand} {v.model}) - Chủ xe: {v.customerName}
-                  </option>
-                ))}
-              </select>
+                placeholder="Gõ biển số hoặc tên chủ xe để tìm…"
+                value={watch('vehicleId') ?? ''}
+                onChange={(next) => setValue('vehicleId', next, { shouldValidate: true })}
+                options={vehicles.map((v) => ({
+                  value: String(v.id),
+                  label: `${v.licensePlate} (${v.brand} ${v.model})`,
+                  description: `Chủ xe: ${v.customerName}`,
+                }))}
+              />
             </Field>
           </div>
         )}
@@ -215,35 +243,71 @@ export function CheckInModal({
         <div className="form-section-label">ĐIỀU PHỐI TIẾP NHẬN</div>
 
         <Field
-          label="Kỹ thuật viên chẩn đoán"
-          hint={
-            onShift.data && onShift.data.length === 0
-              ? 'Hiện chưa có kỹ thuật viên nào trong ca trực'
-              : 'Chỉ hiển thị kỹ thuật viên đang trong ca trực'
-          }
+          label="Khoang tiếp nhận"
+          hint={`Khoang có lịch trong ${RECEPTION_BAY_HOLD_HOURS} giờ tới được đánh dấu bận`}
         >
-          <select className="select" disabled={busy} {...register('diagnosticTechnicianId')}>
-            <option value="">-- Chưa chỉ định --</option>
-            {(onShift.data ?? []).map((tech) => (
-              <option key={tech.employeeId} value={tech.employeeId}>
-                {tech.fullName} ·{' '}
-                {tech.skills.map((s) => SKILL_LABELS[s] ?? s).join(', ') || 'Đa năng'} ·{' '}
-                {availabilityLabels[tech.availabilityStatus]}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            disabled={busy}
+            placeholder="Gõ mã khoang để tìm…"
+            value={watch('serviceBayId') ?? ''}
+            onChange={(next) => {
+              setValue('serviceBayId', next);
+              setValue('diagnosticTechnicianId', '');
+            }}
+            options={(bays.data?.content ?? []).map((bay) => ({
+              value: String(bay.id),
+              label: `${bay.bayCode} · ${bay.bayName}`,
+              description: occupiedBayIds.has(String(bay.id)) ? 'Đang bận' : undefined,
+              disabled: occupiedBayIds.has(String(bay.id)),
+            }))}
+          />
         </Field>
 
-        <Field label="Khoang tiếp nhận" hint="Khoang đang có xe được đánh dấu bận">
-          <select className="select" disabled={busy} {...register('serviceBayId')}>
-            <option value="">-- Chưa chọn khoang --</option>
-            {(bays.data?.content ?? []).map((bay) => (
-              <option key={bay.id} value={bay.id} disabled={occupiedBayIds.has(String(bay.id))}>
-                {bay.bayCode} · {bay.bayName}
-                {occupiedBayIds.has(String(bay.id)) ? ' (đang bận)' : ''}
-              </option>
-            ))}
-          </select>
+        <Field
+          label="Kỹ thuật viên chẩn đoán"
+          hint={
+            !selectedBayId
+              ? 'Chọn khoang để xem thợ trực khoang đó; thợ cơ động chưa gán khoang luôn có thể điều động'
+              : roster.isLoading
+                ? 'Đang tải thợ trực khoang…'
+                : bayCrew.length === 0
+                  ? 'Khoang này chưa có thợ trực trong ca hiện tại, có thể điều động thợ cơ động'
+                  : 'Chọn thợ trực khoang hoặc điều động thợ cơ động đang trong ca'
+          }
+        >
+          <Combobox
+            disabled={busy}
+            placeholder="Gõ tên thợ để tìm…"
+            value={watch('diagnosticTechnicianId') ?? ''}
+            onChange={(next) => setValue('diagnosticTechnicianId', next)}
+            options={[
+              ...(selectedBayId ? (roster.data ?? []) : []).map((tech) => ({
+                value: String(tech.employeeId),
+                label: tech.fullName,
+                group: 'Thợ trực tại khoang này',
+                disabled: !tech.onShiftNow,
+                description: [
+                  `${tech.shiftType ? `${shiftTypeLabels[tech.shiftType]} ` : 'Ca '}${hhmm(tech.shiftStartsAt)}–${hhmm(tech.shiftEndsAt)}`,
+                  tech.skills.map((skill) => SKILL_LABELS[skill] ?? skill).join(', '),
+                  tech.onShiftNow ? '' : 'ngoài giờ ca',
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
+              })),
+              ...mobileTechs.map((tech) => ({
+                value: String(tech.employeeId),
+                label: tech.fullName,
+                group: 'Thợ đang đi làm (chưa phân khoang - sẵn sàng điều động)',
+                description: [
+                  availabilityLabels[tech.availabilityStatus],
+                  `${tech.activeOrdersCount} xe đang làm`,
+                  tech.skills.map((skill) => SKILL_LABELS[skill] ?? skill).join(', '),
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
+              })),
+            ]}
+          />
         </Field>
 
         <div className="full-width-field">
