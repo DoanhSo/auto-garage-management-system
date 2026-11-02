@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { request, queryString } from '../../../shared/api/client';
 import type { NoticeBroadcastRequest } from '../../../shared/types/contracts';
 import {
@@ -25,6 +26,13 @@ export const notificationsApi = {
     noticeSchema.parse(await request<unknown>(`/notifications/${id}`, { signal })),
   markRead: async (id: string) =>
     noticeSchema.parse(await request<unknown>(`/notifications/${id}/read`, { method: 'POST' })),
+  /** Marks every unread web notice of the current user read; resolves to how many changed. */
+  markAllRead: async () =>
+    z
+      .number()
+      .int()
+      .nonnegative()
+      .parse(await request<unknown>('/notifications/read-all', { method: 'POST' })),
   broadcast: async (values: NoticeBroadcastRequest) =>
     noticeBroadcastResultSchema.parse(
       await request<unknown>('/notifications/broadcast', {

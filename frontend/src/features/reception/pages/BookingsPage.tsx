@@ -24,6 +24,7 @@ import {
 } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
+import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import { errorMessage } from '../../../shared/api/errors';
 import { formatDateTime } from '../../../shared/utils/format';
 import type { Booking, BookingStatus } from '../../../shared/types/contracts';
@@ -43,6 +44,8 @@ import { BookingTimelineBoard } from '../components/BookingTimelineBoard';
 import { todayKey } from '../constants/bookingSlots';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 
+const BOOKING_VIEWS = ['list', 'timeline'] as const;
+
 export function BookingsPage() {
   const compact = useMediaQuery('(max-width: 640px)');
   const notify = useToast();
@@ -54,7 +57,7 @@ export function BookingsPage() {
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorSlot, setEditorSlot] = useState<string | undefined>();
-  const [view, setView] = useState<'list' | 'timeline'>('list');
+  const [view, setView] = useUrlTab('view', BOOKING_VIEWS);
   const [timelineDate, setTimelineDate] = useState(todayKey);
 
   const [checkInBooking, setCheckInBooking] = useState<Booking | null>(null);

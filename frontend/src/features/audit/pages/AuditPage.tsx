@@ -4,6 +4,7 @@ import { Eye, ShieldCheck } from 'lucide-react';
 import { parse, stringify } from 'lossless-json';
 import { useUiPolicy } from '../../../shared/config/policy';
 import {
+  Badge,
   Button,
   Field,
   Loading,
@@ -18,74 +19,25 @@ import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { dateTime } from '../../../shared/utils/format';
 import { roleLabels, type AuditEvent, type UiPolicy } from '../../../shared/types/contracts';
 import { useAuditEventsQuery } from '../hooks/useAuditEvents';
-const actionInfo: Record<string, { label: string; description: string }> = {
-  AUTH_LOGIN: { label: 'Đăng nhập', description: 'Đăng nhập vào hệ thống thành công.' },
-  AUTH_LOGIN_FAILED: {
-    label: 'Đăng nhập thất bại',
-    description: 'Nhập sai thông tin hoặc tài khoản bị khóa.',
-  },
-  AUTH_LOGOUT_ALL: {
-    label: 'Đăng xuất',
-    description: 'Đăng xuất và thu hồi mọi phiên đăng nhập trên các thiết bị.',
-  },
-  ADMIN_BOOTSTRAPPED: {
-    label: 'Khởi tạo quản trị viên',
-    description: 'Tạo tài khoản quản trị đầu tiên của hệ thống.',
-  },
-  CUSTOMER_JIT_PROVISIONED: {
-    label: 'Tự tạo hồ sơ khách hàng',
-    description: 'Hệ thống tự tạo tài khoản khách hàng ở lần đăng nhập đầu tiên.',
-  },
-  USER_CREATED: { label: 'Tạo tài khoản', description: 'Thêm một tài khoản người dùng mới.' },
-  USER_UPDATED: {
-    label: 'Cập nhật tài khoản',
-    description: 'Sửa thông tin, vai trò hoặc trạng thái của tài khoản.',
-  },
-  USER_DELETED: { label: 'Xóa tài khoản', description: 'Xóa một tài khoản người dùng.' },
-  USER_PASSWORD_CHANGED: {
-    label: 'Đổi mật khẩu',
-    description: 'Mật khẩu của tài khoản đã được thay đổi.',
-  },
-  NOTIFICATION_ENQUEUED: {
-    label: 'Tạo thông báo',
-    description: 'Gửi một thông báo tới người dùng.',
-  },
-  NOTIFICATION_BROADCAST: {
-    label: 'Gửi thông báo hàng loạt',
-    description: 'Gửi một thông báo tới nhiều người dùng cùng lúc.',
-  },
-  NOTIFICATION_READ: { label: 'Đọc thông báo', description: 'Người dùng đã đọc một thông báo.' },
-  NOTIFICATION_DELETED: { label: 'Xóa thông báo', description: 'Xóa một thông báo.' },
-  CREATE_EMPLOYEE: { label: 'Thêm nhân viên', description: 'Thêm một nhân viên mới vào xưởng.' },
-  UPDATE_EMPLOYEE: { label: 'Cập nhật nhân viên', description: 'Sửa thông tin nhân viên.' },
-  DEACTIVATE_EMPLOYEE: {
-    label: 'Ngừng hoạt động nhân viên',
-    description: 'Nhân viên không còn được xếp ca làm việc.',
-  },
-  CREATE_SHIFT: { label: 'Tạo ca làm việc', description: 'Xếp một ca làm việc cho nhân viên.' },
-  CANCEL_SHIFT: { label: 'Hủy ca làm việc', description: 'Hủy một ca làm việc đã xếp.' },
-  CREATE_BAY: { label: 'Thêm khoang sửa chữa', description: 'Thêm một khoang sửa chữa mới.' },
-  UPDATE_BAY: { label: 'Cập nhật khoang sửa chữa', description: 'Sửa thông tin khoang sửa chữa.' },
-  DEACTIVATE_BAY: {
-    label: 'Ngừng sử dụng khoang',
-    description: 'Khoang sửa chữa không còn nhận xe.',
-  },
-  SCHEDULE_MAINTENANCE: {
-    label: 'Lên lịch bảo trì khoang',
-    description: 'Đặt lịch bảo trì, khoang tạm ngưng nhận xe trong thời gian đó.',
-  },
-};
-const entityLabels: Record<string, string> = {
-  USER: 'Tài khoản',
-  NOTIFICATION: 'Thông báo',
-  Employee: 'Nhân viên',
-  EmployeeShift: 'Ca làm việc',
-  ServiceBay: 'Khoang sửa chữa',
-  BayReservation: 'Lịch giữ khoang',
-};
-const actionLabel = (action: string) => actionInfo[action]?.label ?? action;
-const entityText = (type: string, id: string | null, label?: string | null) =>
-  `${entityLabels[type] ?? type}${label ? `: ${label}` : id ? ` #${id}` : ''}`;
+import { useUsersQuery } from '../../identity/hooks/useUsers';
+import {
+  auditActionsOf,
+  auditDomains,
+  auditSeverityBadge,
+  auditSeverityLabels,
+  formatAuditEntity,
+  getAuditActionMeta,
+  type AuditDomain,
+} from '../constants/auditCatalog';
+
+const ACTOR_OPTION_LIMIT = 100;
+const isAuditDomain = (value: string): value is AuditDomain =>
+  auditDomains.some((domain) => domain.key === value);
+
+function ActionBadge({ action }: { action: string }) {
+  const meta = getAuditActionMeta(action);
+  return <Badge variant={auditSeverityBadge[meta.severity]}>{meta.domainLabel}</Badge>;
+}
 function ActorCell({ event }: { event: AuditEvent }) {
   if (!event.actorUserId) return <span className="muted">Hệ thống (tự động)</span>;
   if (!event.actorFullName) return <span>Tài khoản #{event.actorUserId}</span>;
@@ -105,9 +57,6 @@ const actorText = (event: AuditEvent) =>
     : event.actorFullName
       ? `${event.actorFullName} (@${event.actorUsername}${event.actorRole ? ` · ${roleLabels[event.actorRole]}` : ''})`
       : `Tài khoản #${event.actorUserId}`;
-const actionLabels = Object.fromEntries(
-  Object.entries(actionInfo).map(([code, info]) => [code, info.label]),
-);
 export function safeAuditDetails(raw: string | null) {
   if (!raw) return 'Không có metadata bổ sung.';
   try {
@@ -128,9 +77,19 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
   const table = useTableSearchParams(policy);
   const actor = table.params.get('actorId') ?? '';
   const action = table.params.get('action')?.slice(0, 100) ?? '';
+  const rawDomain = table.params.get('domain') ?? '';
+  const domain: AuditDomain | '' = isAuditDomain(rawDomain) ? rawDomain : '';
+  const domainActions = auditActionsOf(domain);
   const debouncedActor = useDebouncedValue(actor);
   const debouncedAction = useDebouncedValue(action);
   const [selected, setSelected] = useState<AuditEvent | null>(null);
+  const users = useUsersQuery({
+    page: 0,
+    size: ACTOR_OPTION_LIMIT,
+    sortBy: 'fullName',
+    sortDir: 'asc',
+  });
+  // actorId arrives from the URL, so an edited link must not reach the API with a bad id.
   const validActor =
     !actor || (/^[1-9]\d{0,18}$/.test(actor) && BigInt(actor) <= 9223372036854775807n);
   const ready = actor === debouncedActor && action === debouncedAction;
@@ -157,12 +116,16 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
       {
         accessorKey: 'action',
         header: 'Hành động',
-        cell: ({ row }) => (
-          <div className="two-lines">
-            <strong>{actionLabel(row.original.action)}</strong>
-            <span>{actionInfo[row.original.action]?.description ?? row.original.action}</span>
-          </div>
-        ),
+        cell: ({ row }) => {
+          const meta = getAuditActionMeta(row.original.action);
+          return (
+            <div className="two-lines audit-action-cell">
+              <ActionBadge action={row.original.action} />
+              <strong>{meta.label}</strong>
+              <span>{meta.description}</span>
+            </div>
+          );
+        },
       },
       {
         accessorKey: 'actorUserId',
@@ -174,7 +137,11 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
         header: 'Đối tượng',
         cell: ({ row }) => (
           <span>
-            {entityText(row.original.entityType, row.original.entityId, row.original.entityLabel)}
+            {formatAuditEntity(
+              row.original.entityType,
+              row.original.entityId,
+              row.original.entityLabel,
+            )}
           </span>
         ),
       },
@@ -208,47 +175,93 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
       </div>
       <section className="panel table-panel">
         <div className="filter-bar audit-filters">
-          <Field
-            label="Mã người thực hiện"
-            error={!validActor ? 'Nhập ID dương hợp lệ.' : undefined}
-          >
-            <input
+          <Field label="Phân hệ nghiệp vụ">
+            <select
               className="input"
-              inputMode="numeric"
-              value={actor}
-              maxLength={19}
-              placeholder="Ví dụ: 12"
-              onChange={(event) => table.update({ actorId: event.target.value, page: 0 })}
-            />
+              value={domain}
+              onChange={(event) => {
+                const next = event.target.value;
+                const keepAction =
+                  !next || auditActionsOf(next as AuditDomain).some(([code]) => code === action);
+                table.update({
+                  domain: next || undefined,
+                  action: keepAction ? action || undefined : undefined,
+                  page: 0,
+                });
+              }}
+            >
+              <option value="">Tất cả phân hệ</option>
+              {auditDomains.map((item) => (
+                <option key={item.key} value={item.key}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Hành động">
-            <input
+            <select
               className="input"
               value={action}
-              maxLength={100}
-              list="audit-actions"
-              placeholder="Tất cả hành động"
-              onChange={(event) => table.update({ action: event.target.value, page: 0 })}
-            />
+              onChange={(event) =>
+                table.update({ action: event.target.value || undefined, page: 0 })
+              }
+            >
+              <option value="">Tất cả hành động</option>
+              {domainActions.map(([code, meta]) => (
+                <option key={code} value={code}>
+                  {meta.label}
+                </option>
+              ))}
+              {action && !domainActions.some(([code]) => code === action) && (
+                <option value={action}>{getAuditActionMeta(action).label}</option>
+              )}
+            </select>
           </Field>
-          <datalist id="audit-actions">
-            {Object.entries(actionLabels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </datalist>
-          {(actor || action) && (
+          <Field label="Người thực hiện">
+            <select
+              className="input"
+              value={actor}
+              onChange={(event) =>
+                table.update({ actorId: event.target.value || undefined, page: 0 })
+              }
+            >
+              <option value="">Tất cả người dùng</option>
+              {users.data?.content.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.fullName} (@{user.username} · {roleLabels[user.role]})
+                </option>
+              ))}
+              {actor && !users.data?.content.some((user) => user.id === actor) && (
+                <option value={actor}>Tài khoản #{actor}</option>
+              )}
+            </select>
+          </Field>
+          {(actor || action || domain) && (
             <Button
               variant="ghost"
-              onClick={() => table.update({ actorId: undefined, action: undefined, page: 0 })}
+              onClick={() =>
+                table.update({
+                  actorId: undefined,
+                  action: undefined,
+                  domain: undefined,
+                  page: 0,
+                })
+              }
             >
               Đặt lại
             </Button>
           )}
         </div>
+        {domain && !action && (
+          <p className="filter-help">
+            Đang gợi ý {domainActions.length} hành động thuộc phân hệ này. Chọn một hành động để lọc
+            nhật ký.
+          </p>
+        )}
         {!validActor ? (
-          <p className="filter-help">Sửa mã người thực hiện để tìm kiếm.</p>
+          <p className="filter-help">
+            Đường dẫn chứa mã người thực hiện không hợp lệ, hãy bấm Đặt lại bộ lọc.
+          </p>
         ) : !ready || events.isPending ? (
           <Loading />
         ) : events.error ? (
@@ -288,10 +301,15 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
         <div className="editor-form">
           {selected && (
             <>
-              <dl className="detail-list">
-                <ReadOnlyField label="Hành động">{actionLabel(selected.action)}</ReadOnlyField>
-                <ReadOnlyField label="Mô tả">
-                  {actionInfo[selected.action]?.description ?? 'Không có mô tả.'}
+              <div className="audit-detail-head">
+                <ActionBadge action={selected.action} />
+                <Badge variant="outline">
+                  {auditSeverityLabels[getAuditActionMeta(selected.action).severity]}
+                </Badge>
+              </div>
+              <dl className="detail-list audit-detail-grid">
+                <ReadOnlyField label="Hành động">
+                  {getAuditActionMeta(selected.action).label}
                 </ReadOnlyField>
                 <ReadOnlyField label="Mã kỹ thuật">{selected.action}</ReadOnlyField>
                 <ReadOnlyField label="Thời gian">
@@ -299,7 +317,10 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
                 </ReadOnlyField>
                 <ReadOnlyField label="Người thực hiện">{actorText(selected)}</ReadOnlyField>
                 <ReadOnlyField label="Đối tượng">
-                  {entityText(selected.entityType, selected.entityId, selected.entityLabel)}
+                  {formatAuditEntity(selected.entityType, selected.entityId, selected.entityLabel)}
+                </ReadOnlyField>
+                <ReadOnlyField label="Mô tả">
+                  {getAuditActionMeta(selected.action).description}
                 </ReadOnlyField>
               </dl>
               <h3>Metadata</h3>

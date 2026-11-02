@@ -27,7 +27,8 @@ import {
 import { DataTable, Pagination } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { useUiPolicy } from '../../../shared/config/policy';
-import { money } from '../../../shared/utils/format';
+import { useUrlTab } from '../../../shared/hooks/useUrlTab';
+import { formatDate, money } from '../../../shared/utils/format';
 import {
   useServiceBaysQuery,
   useDeleteServiceBayMutation,
@@ -47,7 +48,8 @@ import type { BayReservation, Employee, ServiceBay, Shift } from '../types/sched
 import { bayTypeLabels, parseSkills, SKILL_LABELS, shiftStatusLabels } from '../types/scheduling';
 import type { UiPolicy } from '../../../shared/types/contracts';
 
-type Tab = 'dispatch' | 'bays' | 'shifts' | 'employees';
+const TABS = ['dispatch', 'bays', 'shifts', 'employees'] as const;
+type Tab = (typeof TABS)[number];
 type BayFilter = 'ALL' | 'FREE' | 'BUSY' | 'INACTIVE';
 
 const hhmm = (iso: string) =>
@@ -82,8 +84,11 @@ function liveShiftState(shift: Shift, now: number) {
 
 function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const notify = useToast();
-  const [activeTab, setActiveTab] = useState<Tab>('dispatch');
-  const [page, setPage] = useState(0);
+  const [activeTab, setActiveTab] = useUrlTab<Tab>('tab', TABS);
+  // Paging belongs to one tab; switching tabs from the sidebar tree starts again at page 1.
+  const [paging, setPaging] = useState<{ tab: Tab; page: number }>({ tab: activeTab, page: 0 });
+  const page = paging.tab === activeTab ? paging.page : 0;
+  const setPage = (next: number) => setPaging({ tab: activeTab, page: next });
   const [size, setSize] = useState(policy.paginationDefaultSize);
 
   const [bayFilter, setBayFilter] = useState<BayFilter>('ALL');
@@ -426,10 +431,43 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
       },
       { id: 'skills', header: 'Chuyên môn & QC', cell: ({ row }) => skillBadges(row.original) },
       {
-        accessorKey: 'hourlyCost',
-        header: 'Giá giờ công',
+        id: 'joinedAt',
+        header: 'Ngày vào làm',
         cell: ({ row }) => (
-          <strong>{row.original.hourlyCost != null ? money(row.original.hourlyCost) : '—'}</strong>
+          <span>{row.original.joinedAt ? formatDate(row.original.joinedAt) : '—'}</span>
+        ),
+      },
+      {
+        id: 'bank',
+        header: 'Ngân hàng & STK',
+        cell: ({ row }) =>
+          row.original.bankAccountNumber ? (
+            <div className="account-cell">
+              <div>
+                <strong>{row.original.bankName ?? '—'}</strong>
+                <span>{row.original.bankAccountNumber}</span>
+              </div>
+            </div>
+          ) : (
+            <span className="muted">Chưa cập nhật STK</span>
+          ),
+      },
+      {
+        accessorKey: 'hourlyCost',
+        header: 'Giá giờ công & hệ số',
+        cell: ({ row }) => (
+          <div className="account-cell">
+            <div>
+              <strong>
+                {row.original.hourlyCost != null ? money(row.original.hourlyCost) : '—'}
+              </strong>
+              <span>
+                {row.original.salaryCoefficient != null
+                  ? `Hệ số ${Number(row.original.salaryCoefficient).toFixed(2)}x`
+                  : '—'}
+              </span>
+            </div>
+          </div>
         ),
       },
       {

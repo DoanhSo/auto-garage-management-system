@@ -33,6 +33,7 @@ import {
   type ReportRange,
 } from '../../../shared/utils/dates';
 import { dateTime, formatDate, hours, money } from '../../../shared/utils/format';
+import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import {
   csvDate,
   csvDateTime,
@@ -44,13 +45,18 @@ import {
 } from '../../../shared/utils/csvExport';
 import type { UiPolicy } from '../../../shared/types/contracts';
 import { useDashboardQuery } from '../hooks/useReports';
-import { useCustomerDebtsQuery, usePaymentsQuery, useSupplierDebtsQuery } from '../../billing/hooks/useBilling';
+import {
+  useCustomerDebtsQuery,
+  usePaymentsQuery,
+  useSupplierDebtsQuery,
+} from '../../billing/hooks/useBilling';
 import { usePartsQuery } from '../../inventory/hooks/useInventory';
 import type { InvoiceBalanceItem, Payment, SupplierDebtBalance } from '../../billing/types/billing';
 import type { Part } from '../../inventory/types/inventory';
 import { useToast } from '../../../app/providers/ToastProvider';
 
-type TabKey = 'receivables' | 'payables' | 'cashflow' | 'inventory';
+const REPORT_TABS = ['receivables', 'payables', 'cashflow', 'inventory'] as const;
+type TabKey = (typeof REPORT_TABS)[number];
 
 interface ReceivableRow extends InvoiceBalanceItem {
   id: string;
@@ -135,8 +141,11 @@ function ReadyReports({ policy }: { policy: UiPolicy }) {
   const [applied, setApplied] = useState(
     () => parseRange(initial.from, initial.through, policy).range,
   );
-  const [tab, setTab] = useState<TabKey>('receivables');
-  const [page, setPage] = useState(0);
+  const [tab, setTab] = useUrlTab<TabKey>('tab', REPORT_TABS);
+  // Paging belongs to one report; opening another from the sidebar tree starts at page 1.
+  const [paging, setPaging] = useState<{ tab: TabKey; page: number }>({ tab, page: 0 });
+  const page = paging.tab === tab ? paging.page : 0;
+  const setPage = (next: number) => setPaging({ tab, page: next });
   const [size, setSize] = useState(policy.paginationDefaultSize);
   const checked = parseRange(dates.from, dates.through, policy);
 
@@ -489,7 +498,10 @@ function ReadyReports({ policy }: { policy: UiPolicy }) {
   } satisfies Record<TabKey, { title: string; file: string; headers: string[]; rows: CsvRow[] }>;
 
   const periodLabel = applied
-    ? `${csvDate(applied.from)}_den_${csvDate(new Date(new Date(applied.until).getTime() - 1).toISOString())}`.replace(/\//g, '-')
+    ? `${csvDate(applied.from)}_den_${csvDate(new Date(new Date(applied.until).getTime() - 1).toISOString())}`.replace(
+        /\//g,
+        '-',
+      )
     : '';
 
   const exportFull = () => {
@@ -561,7 +573,8 @@ function ReadyReports({ policy }: { policy: UiPolicy }) {
 
   const d = dashboard.data;
   const netCash = d ? csvMoney(d.cashIn) - csvMoney(d.cashOut) : 0;
-  const collectRate = d && csvMoney(d.revenue) > 0 ? Math.round((csvMoney(d.cashIn) / csvMoney(d.revenue)) * 100) : 0;
+  const collectRate =
+    d && csvMoney(d.revenue) > 0 ? Math.round((csvMoney(d.cashIn) / csvMoney(d.revenue)) * 100) : 0;
 
   return (
     <>
@@ -571,11 +584,7 @@ function ReadyReports({ policy }: { policy: UiPolicy }) {
         description="Theo dõi kết quả trong kỳ, số dư hiện tại và xuất báo cáo CSV cho kế toán."
         actions={
           <div className="row-actions">
-            <Button
-              variant="primary"
-              disabled={!applied || !d}
-              onClick={exportFull}
-            >
+            <Button variant="primary" disabled={!applied || !d} onClick={exportFull}>
               <Download size={17} />
               Xuất báo cáo CSV đầy đủ
             </Button>
@@ -761,7 +770,9 @@ function ReadyReports({ policy }: { policy: UiPolicy }) {
               },
               {
                 label: 'Công nợ ròng',
-                value: money(csvMoney(dashboard.data.customerDebt) - csvMoney(dashboard.data.supplierDebt)),
+                value: money(
+                  csvMoney(dashboard.data.customerDebt) - csvMoney(dashboard.data.supplierDebt),
+                ),
                 hint: 'Phải thu − phải trả',
                 tone: 'info',
                 icon: <Scale size={18} />,
@@ -827,7 +838,11 @@ function ReadyReports({ policy }: { policy: UiPolicy }) {
               />
             )}
             {tab === 'cashflow' && (
-              <DataTable caption="Giao dịch thu chi" columns={cashColumns} data={slice(periodPayments)} />
+              <DataTable
+                caption="Giao dịch thu chi"
+                columns={cashColumns}
+                data={slice(periodPayments)}
+              />
             )}
             {tab === 'inventory' && (
               <DataTable

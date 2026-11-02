@@ -155,3 +155,34 @@ export interface PayrollItemAdjustInput {
   deductionAmount?: number;
   notes?: string;
 }
+
+/** Sub-screens of /payroll, kept in `?tab=` so the sidebar tree and the page tabs agree. */
+export const PAYROLL_TABS = ['monthly', 'employees', 'coefficients', 'bonus'] as const;
+export type PayrollTab = (typeof PAYROLL_TABS)[number];
+export const payrollTabLabels: Record<PayrollTab, string> = {
+  monthly: 'Bảng lương tháng',
+  employees: 'Quản lý nhân viên',
+  coefficients: 'Hệ số & Đơn giá lương',
+  bonus: 'Chính sách thưởng ca',
+};
+
+/** Mirrors PayrollConstants on the backend: per-order bonus by the order's rank within one shift. */
+export const SHIFT_BONUS_TIERS = [
+  { label: 'Bậc 1', range: '1 – 2 đơn/ca', amount: 50_000 },
+  { label: 'Bậc 2', range: '3 – 4 đơn/ca', amount: 80_000 },
+  { label: 'Bậc 3', range: 'Từ 5 đơn/ca', amount: 120_000 },
+] as const;
+export const QC_PASS_BONUS = 30_000;
+
+/** Bounds enforced by the `salary_coefficient` check constraint. */
+export const SALARY_COEFFICIENT_MIN = 0.5;
+export const SALARY_COEFFICIENT_MAX = 3;
+export const SALARY_COEFFICIENT_PRESETS = [
+  { value: 1, label: 'Cơ bản' },
+  { value: 1.15, label: 'Thợ khá' },
+  { value: 1.3, label: 'Thợ giỏi' },
+  { value: 1.5, label: 'Thợ chính / QC' },
+  { value: 2, label: 'Chuyên gia' },
+] as const;
+export const STANDARD_SHIFT_HOURS = 8;
+export const STANDARD_WORKDAYS_PER_MONTH = 26;

@@ -25,6 +25,9 @@ function app(destination: React.ReactNode = <UsersPage />) {
       { path: '/login', element: <LoginPage /> },
       { path: '/admin/reports', element: destination },
       { path: '/notifications', element: destination },
+      { path: '/reception', element: destination },
+      { path: '/repair-orders', element: destination },
+      { path: '/inventory/parts', element: destination },
     ],
     { initialEntries: ['/login'] },
   );

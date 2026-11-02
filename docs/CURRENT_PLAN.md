@@ -1,264 +1,297 @@
-# PLAN: Kiểm Tra Tổng Thể & Chi Tiết Toàn Bộ Hệ Thống AutoGarage — Báo Cáo Thiếu Sót, Lỗ Hổng & Kế Hoạch Cải Thiện Toàn Dự Án
+# Kế Hoạch Tái Thiết Kế Màn Hình Thông Báo (Notifications), Đa Dạng Hóa Thông Tin & Chuẩn Hóa Trình Bày Trực Quan
 
 > **Chế độ**: `PLAN:` (Tuân thủ nghiêm ngặt `AutoGarage/AGENTS.md`, `AutoGarage/docs/CODING_GUIDELINES.md`, và `AutoGarage/docs/UI_DESIGN_GUIDELINES.md`).
-> **Mục tiêu**: Thực hiện rà soát chuyên sâu (Comprehensive System Audit) từ kiến trúc tổng thể đến chi tiết từng dòng code và luồng nghiệp vụ trên toàn bộ dự án AutoGarage:
-> 1. **Vạch rõ toàn bộ các thiếu sót, lỗ hổng, những điểm chưa đúng chuẩn thực tế** trong 11 luồng nghiệp vụ cốt lõi của xưởng gara.
-> 2. **Giải quyết triệt để lỗi "Màn hình chạy ổn ở Admin nhưng chuyển sang tài khoản khác lại không load được dữ liệu"** (Role mismatch, 403 Forbidden, gãy liên kết thực thể, truy vấn sai quyền).
-> 3. **Xây dựng lộ trình cải thiện chuẩn hóa toàn dự án**: Kiến trúc Backend, Bảo mật & Phân quyền, Toàn vẹn Dữ liệu Tài chính - Kho - Lương, và Tối ưu hóa Trải nghiệm Giao diện UI/UX.
+> **Nguyên tắc**: Không sửa code ứng dụng trong chế độ `PLAN`. Khảo sát toàn diện hệ thống Thông báo từ Backend (`notification` module, `ReminderRepository`, `NotificationAuditServiceImpl`, `EstimateServiceImpl`) đến Frontend (`NotificationsPage.tsx`, `NoticeDetails.tsx`, `BroadcastModal.tsx`, `useNotifications.ts`, `notificationsApi.ts`, `message.ts`). Xây dựng trải nghiệm hộp thư thông báo hiện đại, giàu thông tin ngữ cảnh, có icon/badge phân loại nghiệp vụ, liên kết điều hướng nhanh (Deep Link CTA), hỗ trợ đánh dấu đọc tất cả và xem trước thông báo.
 
 ---
 
-## 1. Tổng Quan Kiến Trúc & Hiện Trạng Dự Án (Architectural Overview)
+## 1. Mục Tiêu & Phạm Vi (Goal & Scope)
 
-### 1.1. Bản Đồ Công Nghệ Hiện Tại
-- **Backend**: Spring Boot 3.3.4, Java 21 LTS, Spring Security + OAuth2 Resource Server (Keycloak 26 OIDC / JWT), Flyway (V1 $\to$ V17), Spring Data JPA / Hibernate, MySQL 8.4 LTS (Port 3307).
-- **Frontend**: React 18, TypeScript, TailwindCSS, Vite, TanStack Query v5, TanStack Table v8, React Router DOM v6, Radix UI Dialogs / Primitives, Lucide Icons.
-- **DevOps & Môi trường**: Docker Compose (`mysql:8.4`, `keycloak:26.0`, `autogarage-backend`), Maven Wrapper (`./mvnw.cmd`).
-- **Phân hệ nghiệp vụ (15 modules)**: `identity`, `customer`, `vehicle`, `catalog`, `reception`, `estimate`, `repair`, `scheduling`, `quality`, `inventory`, `billing`, `warranty`, `payroll`, `reporting`, `audit`.
+### 1.1. Hiện trạng & Thiếu sót của màn hình Thông báo hiện tại
+1. **Trình bày đơn điệu, thiếu thông tin ngữ cảnh nghiệp vụ**:
+   - Trang `/notifications` hiện tại dùng bảng `DataTable` đơn điệu, chỉ có tiêu đề và văn bản cụt lủn, hoàn toàn thiếu tính trực quan của một trung tâm thông báo hiện đại.
+   - Không có icon phân loại (Lịch hẹn 📅, Bảo dưỡng định kỳ 🔧, Hết hạn bảo hành 🛡️, Báo giá dịch vụ 📄, Bảng lương 💰, Cảnh báo kho 📦, Thông báo chung 📢).
+   - Không phân biệt được mức độ quan trọng/khẩn cấp (`severity`/`tone`: Khẩn cấp `danger`, Cảnh báo `warning`, Thông tin nghiệp vụ `info`, Hoàn thành `success`).
+2. **Lỗi "nuốt" nội dung biến thành thông báo vô nghĩa**:
+   - Trong `message.ts`: Hàm `notificationMessage` chỉ đọc trường `message` hoặc `text`. Khi hệ thống tự động sinh thông báo nhắc lịch bảo hành (`WARRANTY_EXPIRY`), bảo dưỡng (`MAINTENANCE`) từ `ReminderRepository`, hoặc báo giá (`ESTIMATE_SENT`) từ `EstimateServiceImpl`, payload JSON chứa `{ vehicleId, warrantyId, expiresAt, serviceName, estimateId, code... }` mà không có trường `message`.
+   - Kết quả: Tiêu đề hiển thị mặc định *"Thông báo từ gara"*, nội dung hiển thị câu chung chung *"Thông báo từ gara. Liên hệ nhân viên phụ trách nếu cần thêm thông tin."*! Khách hàng và nhân viên không biết là xe nào, bảo dưỡng món gì, báo giá bao nhiêu tiền!
+3. **Thiếu nút hành động điều hướng nhanh (Actionable CTA)**:
+   - Khi nhận thông báo "Có báo giá mới", người dùng không thể bấm 1 chạm để mở ngay trang Báo giá (`/estimates`).
+   - Khi nhận thông báo "Đến kỳ bảo dưỡng", khách hàng không có nút "Đặt lịch ngay" (`/reception`).
+   - Khi nhân viên nhận thông báo "Lương tháng đã duyệt", không có nút "Xem phiếu lương" (`/payroll`).
+4. **Trải nghiệm thao tác bất tiện**:
+   - Chưa có tính năng "Đánh dấu tất cả đã đọc" (Mark all as read), người dùng phải click từng thông báo để đánh dấu đọc.
+   - Chưa có phân nhóm thông báo theo thời gian (Hôm nay, Hôm qua, Tuần này, Cũ hơn).
+   - Modal phát thông báo (`BroadcastModal.tsx`) chỉ cho nhập văn bản thô, không chọn được mức độ ưu tiên và không có khung xem trước (Live Preview).
+
+### 1.2. Mục tiêu cải tiến trọng tâm
+1. **Bộ giải mã thông báo thông minh (`notificationParser.ts`)**:
+   - Phân tích và định dạng thông minh mọi payload JSON từ hệ thống gara:
+     * `MAINTENANCE`: Nhắc bảo dưỡng định kỳ kèm tên dịch vụ, biển số/mã xe, hạn ngày và mốc km. CTA $\rightarrow$ `/reception`.
+     * `WARRANTY_EXPIRY`: Nhắc hết hạn bảo hành kèm mã sổ, hạn bảo hành, số km. CTA $\rightarrow$ `/warranties`.
+     * `ESTIMATE_SENT`: Báo giá dịch vụ mới kèm mã báo giá. CTA $\rightarrow$ `/estimates`.
+     * `PAYROLL_APPROVED` / `PAYROLL_DISBURSED`: Bảng lương tháng kèm kỳ công. CTA $\rightarrow$ `/payroll`.
+     * `REPAIR_COMPLETED` / `QC_PASSED`: Xe sửa xong, nghiệm thu đạt, sẵn sàng nhận xe. CTA $\rightarrow$ `/repair-orders`.
+     * `BROADCAST`: Thông báo quản trị kèm cấp độ ưu tiên và nút liên kết tùy chọn.
+2. **Tái thiết kế giao diện Hộp thư Thông báo (`NotificationsPage.tsx`)**:
+   - Chuyển đổi hiển thị sang **Thẻ Thông Báo Tương Tác Giàu Thông Tin (Rich Notification Feed Cards)**:
+     * Icon loại thông báo với nền màu nhận diện riêng biệt.
+     * Badge phân hệ (Bảo dưỡng, Báo giá, Bảo hành, Tiền lương, Hệ thống...).
+     * Tiêu đề to rõ, phân biệt Chưa đọc (đậm + chấm xanh `unread-dot`) và Đã đọc (`muted`).
+     * Nội dung xúc tích, trích xuất đúng thông tin cốt lõi (biển số, ngày giờ, số tiền).
+     * Thời gian hiển thị tương đối thân thiện ("10 phút trước", "Hôm nay 08:30" kèm tooltip ngày giờ đầy đủ).
+     * Nút hành động nhanh (CTA) dẫn thẳng đến phân hệ tương ứng.
+3. **Cửa sổ Thông Báo Nhanh (Notification Popover / Dropdown Window) trên Thanh Tiêu Đề Header (`AppShell.tsx`)**:
+   - Hiện tại, nút chuông nhỏ (`bell-button`) trên thanh header chỉ là một thẻ `<NavLink to="/notifications">` chuyển trang đơn thuần, **chưa có cửa sổ popover nhỏ**.
+   - Bổ sung component `NotificationPopover.tsx` gắn vào nút chuông nhỏ trên Header:
+     * Khi click vào nút chuông $\rightarrow$ bung ra một **cửa sổ popover nhỏ (Dropdown Menu)** nằm gọn gàng bên dưới nút chuông.
+     * Header cửa sổ nhỏ: Tiêu đề "Thông báo" + Huy hiệu số lượng chưa đọc + Nút "✓ Đọc tất cả".
+     * Thân cửa sổ: Danh sách 5 thông báo mới nhất (dạng thẻ rút gọn có icon phân loại, tiêu đề in đậm, trích đoạn nội dung, thời gian "vừa xong/5 phút trước", chấm xanh chưa đọc).
+     * Bấm vào từng thông báo trong cửa sổ nhỏ: Đánh dấu đã đọc và điều hướng ngay đến trang xử lý liên quan (ví dụ: `/estimates`, `/warranties`, `/payroll`...).
+     * Chân cửa sổ (Footer): Nút **"Xem tất cả thông báo trong hộp thư →"** chuyển đến trang `/notifications`.
+     * Tự động đóng khi người dùng click ra ngoài (click-outside) hoặc nhấn phím `Escape`.
+4. **Thanh công cụ & Bộ lọc đa năng trên trang Hộp thư `/notifications`**:
+   - Bổ sung nút **"✓ Đánh dấu tất cả đã đọc"** gọi API hàng loạt nhanh chóng.
+   - Tabs lọc nhanh: `Tất cả`, `Chưa đọc` (kèm badge đếm số lượng), `Dịch vụ & Xe`, `Báo giá & Hóa đơn`, `Toàn hệ thống` (dành cho Admin).
+5. **Hộp thoại Chi Tiết Căn Giữa Màn Hình (`Sheet` placement="center")**:
+   - Hiển thị đầy đủ thông tin, thời gian, người nhận, các thông số kỹ thuật (xe, ODO, số tiền...) và nút chính chuyển đến trang nghiệp vụ tương ứng.
+6. **Nâng cấp Modal Phát Thông Báo (`BroadcastModal.tsx`)**:
+   - Cho phép Admin chọn loại thông báo (Tin tức chung, Cảnh báo khẩn, Nhắc việc).
+   - Tùy chọn gắn liên kết điều hướng (chọn đích đến: Lệnh sửa chữa, Báo giá, Bảng lương...).
+   - Khung **Xem trước trực quan (Live Preview)** hiển thị ngay thẻ thông báo thực tế.
+7. **Backend hỗ trợ Đánh dấu đọc tất cả (Atomic Bulk Mark Read)**:
+   - Bổ sung API `POST /api/v1/notifications/read-all` cập nhật nguyên tử trạng thái đã đọc cho tất cả thông báo web chưa đọc của người dùng hiện tại trong 1 câu SQL duy nhất.
 
 ---
 
-## 2. Báo Cáo Kiểm Tra Chi Tiết Các Luồng Nghiệp Vụ & Danh Mục Lỗ Hổng (Defect & Gap Analysis)
+## 2. Thiết Kế Trực Quan & Hệ Thống Nhận Diện Loại Thông Báo
 
-### 2.1. Phân Tích Lỗ Hổng Lớn Nhất: Lỗi Phân Quyền & Không Load Được Dữ Liệu Khi Đổi Role
+### 2.1. Bảng phân loại & Nhận diện thông báo gara
 
-```mermaid
-flowchart TD
-    User([Người dùng đăng nhập]) --> Keycloak{Keycloak Role}
-    
-    Keycloak -->|Role ADMIN| AdminPass[Truy cập thành công 100% API & Màn hình]
-    
-    Keycloak -->|Role RECEPTIONIST| ReceptCheck{Màn hình Khoang & Lịch ca / Chi tiết Lệnh}
-    ReceptCheck -->|Gọi useUsersQuery| Error403_1[❌ 403 Forbidden do GET /users chỉ cho ADMIN]
-    
-    Keycloak -->|Role TECHNICIAN| TechCheck{Màn hình Lịch ca / Bảng lương / Chi tiết xe}
-    TechCheck -->|Gọi useUsersQuery| Error403_2[❌ 403 Forbidden do GET /users chỉ cho ADMIN]
-    TechCheck -->|Vào xem khách hàng| Error403_3[❌ 403 Forbidden do GET /customers/:id chỉ cho Lễ tân]
-    TechCheck -->|Xem phiếu lương| ErrorNoEmp[❌ Lỗi nếu tài khoản chưa có bản ghi employees]
-    
-    Keycloak -->|Role CUSTOMER| CusCheck{Vào xem Xe / Lịch hẹn / Hóa đơn}
-    CusCheck -->|Gọi CustomerScope| Error403_4[❌ 403 Forbidden nếu chưa có bản ghi trong bảng customers]
+| Loại thông báo (`type`) | Phân hệ / Badge | Biểu tượng (Icon) | Màu sắc (`tone`) | Tiêu đề mẫu | Nút hành động (CTA) | Đích đến liên kết |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `MAINTENANCE` | Bảo dưỡng định kỳ | 🔧 `Wrench` | `info` (Xanh dương) | Nhắc lịch bảo dưỡng định kỳ | Đặt lịch ngay | `/reception?view=timeline` |
+| `WARRANTY_EXPIRY` | Bảo hành xe | 🛡️ `ShieldAlert` | `warning` (Vàng cam) | Sắp hết hạn bảo hành xe | Xem sổ bảo hành | `/warranties?tab=warranties` |
+| `ESTIMATE_SENT` | Báo giá dịch vụ | 📄 `FileText` | `info` (Tím chàm) | Báo giá dịch vụ mới #[Mã] | Xem & duyệt báo giá | `/estimates` |
+| `REPAIR_COMPLETED` | Lệnh sửa chữa | 🚘 `Car` | `success` (Xanh lá) | Xe sửa chữa hoàn tất | Xem lệnh sửa | `/repair-orders` |
+| `QC_PASSED` | Nghiệm thu KCS | ✅ `CheckCircle2` | `success` (Xanh ngọc) | Xe đã nghiệm thu xuất xưởng | Chi tiết nghiệm thu | `/repair-orders` |
+| `PAYROLL_APPROVED` | Bảng lương | 💰 `Coins` | `success` (Xanh lục) | Bảng lương kỳ [Tháng] đã duyệt | Xem phiếu lương | `/payroll` |
+| `STOCK_ALERT` | Kho & Vật tư | 📦 `PackageAlert`| `danger` (Đỏ cảnh báo) | Cảnh báo tồn kho vật tư | Kiểm tra kho | `/inventory/parts` |
+| `BROADCAST_URGENT`| Cảnh báo khẩn | ⚠️ `AlertTriangle`| `danger` (Đỏ) | [Tiêu đề khẩn cấp] | Xem chi tiết | Modal / Link đính kèm |
+| `BROADCAST_GENERAL`| Thông báo chung | 📢 `Megaphone` | `neutral` (Xám tro) | [Tiêu đề ban quản trị] | Xem chi tiết | Modal / Link đính kèm |
+
+### 2.2. Bố cục giao diện Hộp thư Thông báo mới
+
+```text
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ THÔNG BÁO                                                    [↻ Làm mới] [✓ Đọc tất cả] [＋ Phát thông báo] │
+│ Theo dõi cập nhật tiến độ xe, nhắc bảo dưỡng định kỳ và thông báo từ ban quản trị gara. │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ [ Tất cả (24) ] [ Chưa đọc (3) ] [ 🔧 Dịch vụ & Xe ] [ 📄 Báo giá & Hóa đơn ] [ ⚙️ Toàn hệ thống ]  │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ 📌 HÔM NAY                                                                             │
+│ ┌────────────────────────────────────────────────────────────────────────────────────┐ │
+│ │ [🔧]  BẢO DƯỠNG ĐỊNH KỲ • 15 phút trước                                     • Chưa đọc │ │
+│ │ <strong>Nhắc lịch bảo dưỡng định kỳ xe Mazda 3 (30A-999.88)</strong>                 │ │
+│ │ Xe đã đến hạn thực hiện dịch vụ "Thay dầu động cơ & Cân chỉnh góc đặt bánh xe".   │ │
+│ │ Hạn khuyến nghị: 05/11/2026 hoặc mốc 45.000 km.                                     │ │
+│ │ [ 📅 Đặt lịch bảo dưỡng ngay → ]                 [✓ Đã đọc] [🗑️ Xóa]             │ │
+│ └────────────────────────────────────────────────────────────────────────────────────┘ │
+│ ┌────────────────────────────────────────────────────────────────────────────────────┐ │
+│ │ [📄]  BÁO GIÁ DỊCH VỤ • 2 giờ trước                                          • Chưa đọc │ │
+│ │ <strong>Báo giá dịch vụ #BG-2026-088 đã sẵn sàng</strong>                          │ │
+│ │ Cố vấn dịch vụ vừa gửi bảng báo giá 4 hạng mục sửa chữa gầm cho xe Honda CR-V.     │ │
+│ │ Tổng số tiền dự kiến: 4.850.000 đ.                                                 │ │
+│ │ [ 👁️ Xem & Duyệt báo giá → ]                     [✓ Đã đọc] [🗑️ Xóa]             │ │
+│ └────────────────────────────────────────────────────────────────────────────────────┘ │
+│                                                                                        │
+│ 📌 TUẦN TRƯỚC                                                                          │
+│ ┌────────────────────────────────────────────────────────────────────────────────────┐ │
+│ │ [💰]  BẢNG LƯƠNG • 25/10/2026 17:30                                           Đã đọc │ │
+│ │ <strong>Bảng lương kỳ Tháng 10/2026 đã được phê duyệt</strong>                       │ │
+│ │ Quản lý đã duyệt chi bảng lương tháng 10. Thu nhập thực nhận: 14.250.000 đ.        │ │
+│ │ [ 💵 Xem phiếu lương chi tiết → ]                               [🗑️ Xóa]             │ │
+│ └────────────────────────────────────────────────────────────────────────────────────┘ │
+│                                                                                        │
+│ [ < ] Trang 1 / 3 [ > ]                                                Hiển thị: [ 10 ]│
+└────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Chi tiết 4 Điểm Gãy Phân Quyền Cốt Lõi:
-1. **Điểm gãy 1 — Phụ thuộc chết người vào `useUsersQuery` (`GET /api/v1/users`)**:
-   - `SchedulingPage.tsx`, `ShiftEditor.tsx`, `EmployeeEditor.tsx`, `RepairOrderDetailModal.tsx` đều gọi `useUsersQuery()` để lấy `fullName` của Kỹ thuật viên từ `userId`.
-   - Nhưng `GET /api/v1/users` chỉ cho phép `ADMIN` (`@PreAuthorize("hasRole('ADMIN')")`).
-   - $\rightarrow$ **Hậu quả**: Bất kỳ ai không phải Admin (`RECEPTIONIST`, `TECHNICIAN`, `CUSTOMER`) mở các màn hình này đều bị mã lỗi **403 Forbidden**, tên thợ hiển thị `—`, hoặc query error làm sập giao diện.
-2. **Điểm gãy 2 — Ràng buộc cứng nhắc trong `CustomerScope.java` làm sập tài khoản Khách hàng**:
-   - Hàm `currentCustomerId()` ném `BusinessException(ResponseCode.FORBIDDEN)` nếu không tìm thấy bản ghi `Customer` có `user_id == currentUser.userId()`.
-   - $\rightarrow$ **Hậu quả**: Khách hàng tạo tài khoản trên Keycloak hoặc đăng ký mới khi đăng nhập vào hệ thống thì **100% màn hình (`/vehicles`, `/reception`, `/repair-orders`, `/billing/invoices`) đều bị chặn 403**, không thể thao tác bất kỳ điều gì!
-3. **Điểm gãy 3 — Quyền hạn của Thợ bị khóa quá chặt đối với thông tin liên hệ**:
-   - `CustomerController.java` đặt `@PreAuthorize(SecurityConstants.HAS_FRONT_DESK)` cho cả thao tác đọc chi tiết khách hàng.
-   - $\rightarrow$ **Hậu quả**: Thợ sửa xe khi đang thi công muốn gọi điện xác nhận lỗi kỹ thuật với chủ xe thì không thể xem được số điện thoại.
-4. **Điểm gãy 4 — Thiếu cơ chế Auto-Provisioning cho Thợ kỹ thuật**:
-   - Khi tạo user `TECHNICIAN` trên Keycloak, nếu Quản trị viên chưa vào tạo một bản ghi `Employee` tương ứng trong MySQL, thợ đăng nhập vào `/payroll` sẽ bị lỗi sập màn hình phiếu lương cá nhân.
+### 2.3. Bố cục Cửa sổ Thông Báo Nhanh (Notification Popover Dropdown)
 
----
-
-### 2.2. Kiểm Tra Tổng Thể 11 Luồng Nghiệp Vụ Cốt Lõi Của Xưởng
-
-#### Luồng 1: Khách hàng & Phương tiện (Customer & Vehicle)
-- **Thiếu sót hiện tại**:
-  - Biển số xe chưa có chuẩn hóa tự động bỏ dấu gạch ngang/dấu chấm khi tìm kiếm (ví dụ: `30A-123.45` vs `30A12345`).
-  - Chưa lưu lịch sử chuyển nhượng chủ sở hữu xe khi bán lại (`vehicle_ownership_history`).
-  - Khi xóa phương tiện, chưa kiểm tra ràng buộc xem xe đó có đang nằm trong Lệnh sửa chữa đang mở hay không.
-
-#### Luồng 2: Đặt lịch hẹn & Lễ tân Tiếp nhận xe (Booking & Check-in)
-- **Thiếu sót hiện tại**:
-  - Form tiếp nhận (`CheckInModal.tsx`) dùng thẻ `<select>` thuần, khó tìm kiếm khi gara có nhiều xe và nhiều thợ.
-  - Lúc chọn khoang, form trước đây chỉ tìm thợ được gán trước vào khoang đó, không cho chọn thợ cơ động đang đi làm trong xưởng.
-  - Chưa hỗ trợ chụp ảnh tình trạng xe trước khi vào xưởng (vết xước, móp méo) để so khớp chẩn đoán và chống tranh chấp khi bàn giao.
-
-#### Luồng 3: Chẩn đoán & Lập Báo giá (Diagnosis & Estimates)
-- **Thiếu sót hiện tại**:
-  - Modal chi tiết báo giá (`EstimateDecisionModal.tsx`) thiếu tên Khách hàng và thông tin Xe.
-  - Bố cục thông số *Loại báo giá / Gửi khách lúc / Hiệu lực đến* bị xếp dọc tốn diện tích, xuất hiện số `0` thừa do lỗi JSX `{(it.warrantyDays || ...) &&}`.
-  - Box duyệt từng dòng quá to, nút bấm cồng kềnh, chữ chưa được dàn ngang cân đối.
-
-#### Luồng 4: Điều phối Khoang & Lịch ca Trực (Service Bay & Shifts)
-- **Thiếu sót hiện tại**:
-  - Lỗi giao diện trên màn hình `/scheduling` (Ảnh 1): Thẻ Khoang xưởng bị chèn chữ đè mất nửa thân chữ ở đáy card; thẻ Thợ bị cắt cụt dòng chữ thưởng ca do khung quá hẹp.
-  - Nếu khi xếp ca bắt buộc phải chọn khoang thì triệt tiêu mất nhóm thợ cơ động và gây tắc nghẽn khi thợ nhiều hơn số cầu nâng.
-  - Chưa cho phép nhân viên tự gửi yêu cầu đăng ký ca làm việc mong muốn để Quản đốc duyệt.
-
-#### Luồng 5: Phân công Công việc & Thi công Bấm giờ (Labor Sessions & Timers)
-- **Thiếu sót hiện tại**:
-  - Chưa có cơ chế **Tự động đóng Timer khi hết ca trực**: Nếu thợ quên bấm "Dừng giờ" (`stopTimer`) khi tan ca, timer sẽ chạy qua đêm, tính sai lệch hàng chục giờ công ảo.
-  - Thợ phụ (`ASSISTANT`) và Thợ chính (`MAIN`) chưa hiển thị rõ tỷ lệ chia công việc trên từng tác vụ.
-
-#### Luồng 6: Quản lý Kho Phụ tùng & Xuất/Nhập vật tư (Inventory & Parts)
-- **Thiếu sót hiện tại**:
-  - Khi Báo giá được duyệt, phụ tùng được giữ chỗ (`reservedQuantity`). Nhưng nếu lệnh sửa chữa bị hủy hoặc thay đổi vật tư, chưa có cơ chế tự động hoàn kho / giải phóng số lượng giữ chỗ (`unreservePart`), dẫn đến tồn kho ảo.
-  - Chưa có cảnh báo khi phụ tùng chạm ngưỡng tồn kho tối thiểu (Min Stock Reorder Alert).
-
-#### Luồng 7: Kiểm định Chất lượng & Nghiệm thu Độc lập (Quality Control - QC)
-- **Lỗ hổng cốt lõi**:
-  - Chưa chặn triệt để nguyên tắc **Độc lập 4 Mắt (Four-Eyes Principle)**: Cần ràng buộc tuyệt đối: Kỹ thuật viên kiểm thử QC không được trùng với Kỹ thuật viên trưởng hoặc Thợ thi công chính của lệnh đó.
-
-#### Luồng 8: Bàn giao Xe, Hóa đơn & Thu tiền Sổ quỹ (Invoicing & Cash Ledger)
-- **Thiếu sót hiện tại**:
-  - Khi chi trả lương cho nhân viên (`payout`), hệ thống chưa tự động sinh phiếu chi tiền trong Sổ quỹ (`Payment` loại `OUT`, nhóm `EXPENSE_PAYROLL`).
-  - Chưa hỗ trợ thanh toán từng phần (Partially Paid) và theo dõi công nợ lũy kế trên sổ nợ khách hàng (`v_customer_balances`).
-
-#### Luồng 9: Bảo hành, Khiếu nại & Làm lại (Warranty & Rework)
-- **Thiếu sót hiện tại**:
-  - Khi xe phải làm lại do lỗi kỹ thuật (`REWORK`), giờ công của thợ vẫn bị tính lương nếu không có cờ `isWarranty = true`.
-  - Chưa có cơ chế thu hồi hoa hồng đơn hàng của thợ thi công ẩu khi xe phát sinh khiếu nại bảo hành trong vòng 30 ngày.
-
-#### Luồng 10: Quản lý Nhân sự, Chấm công & Tính Lương Thưởng Năng suất (HR & Payroll)
-- **Thiếu sót hiện tại**:
-  - Hồ sơ nhân viên thiếu Ngày tham gia công ty (`joinedAt`), thiếu thông tin Số tài khoản ngân hàng để chuyển khoản lương.
-  - Chưa quản lý Hệ số lương theo cấp bậc tay nghề (`salaryCoefficient`) và khung lương chuẩn theo từng vai trò (Quản đốc, KTV Trưởng, KTV Chính, Thợ phụ, QC).
-  - Chưa có màn hình Bảng chấm công theo ngày và giờ công thực tế.
-  - Trang tính lương (`PayrollPage.tsx`) giấu dữ liệu nhân viên vào modal, thiếu bộ lọc Tháng/Năm trực tiếp.
-  - Công thức tính lương chưa gắn kết: Lương cơ bản = Số giờ công × Đơn giá giờ; và Thưởng thêm theo từng ca tương ứng với số đơn sửa xong trong ca đó.
-
-#### Luồng 11: Báo cáo Doanh thu, Hiệu suất & Nhật ký Kiểm toán (Reporting & Audit)
-- **Thiếu sót hiện tại**:
-  - Báo cáo tài chính chưa tách biệt rõ ràng giữa Doanh thu Phụ tùng và Doanh thu Tiền công dịch vụ.
-  - Chưa có biểu đồ theo dõi Tỷ lệ xe đạt nghiệm thu ngay lần đầu (First-Time Pass Rate) của từng thợ để làm căn cứ thưởng/phạt KPI.
-
----
-
-## 3. Bản Thiết Kế Chuẩn Hóa Kiến Trúc & Hợp Đồng Kỹ Thuật (Target Architecture)
-
-### 3.1. Sửa Lỗi Phân Quyền Đa Role & Loại Bỏ 403
-
-```
-+----------------------------------------------------------------------------------------------------+
-| GIẢI PHÁP TRIỆT TIÊU 403 CHO NON-ADMIN:                                                           |
-|                                                                                                    |
-| 1. Bổ sung trực tiếp fullName, email, phone vào EmployeeResponse:                                  |
-|    EmployeeResponse = { id, userId, employeeCode, fullName, email, phone, skills, canQc, ... }     |
-|    ==> Frontend KHÔNG CẦN gọi GET /api/v1/users (Admin only) nữa!                                  |
-|                                                                                                    |
-| 2. Cung cấp API tra cứu danh bạ nội bộ cho toàn bộ nhân viên:                                      |
-|    GET /api/v1/users/lookup (Quyền: HAS_ROLE_STAFF) ==> Chỉ trả về id, fullName, username, role.  |
-|                                                                                                    |
-| 3. Xử lý mềm dẻo CustomerScope.java:                                                               |
-|    Nếu role CUSTOMER mới chưa có xe/hồ sơ: Trả về [] (HTTP 200) thay vì ném 403 Forbidden!         |
-|                                                                                                    |
-| 4. Nới lỏng quyền đọc chi tiết khách hàng:                                                         |
-|    GET /api/v1/customers/{id} (Quyền: HAS_ROLE_STAFF) ==> Thợ xem được SĐT chủ xe khi sửa.        |
-+----------------------------------------------------------------------------------------------------+
+```text
+               ┌────────────────────── [🔔] 3 ───┐  <- Nút chuông nhỏ trên Header
+               │ <strong>Thông báo</strong>         [✓ Đọc tất cả]│
+               ├─────────────────────────────────┤
+               │ [🔧] <strong>Lịch bảo dưỡng định kỳ</strong>     │
+               │ Xe 30A-999.88 đến hạn thay dầu. │
+               │ <small>15 phút trước</small>              • │  <- Chấm xanh chưa đọc
+               ├─────────────────────────────────┤
+               │ [📄] <strong>Báo giá dịch vụ mới</strong>        │
+               │ Phiếu #BG-2026-088 đã sẵn sàng. │
+               │ <small>2 giờ trước</small>               • │
+               ├─────────────────────────────────┤
+               │ [💰] <strong>Bảng lương Tháng 10/2026</strong>  │
+               │ Đã được duyệt chi: 14.250.000 đ │
+               │ <small>Hôm qua 17:30</small>              │
+               ├─────────────────────────────────┤
+               │ [ <strong>Xem tất cả thông báo trong hộp thư →</strong> ]│
+               └─────────────────────────────────┘
 ```
 
 ---
 
-### 3.2. Cơ Chế Tính Lương & Thưởng Chuẩn Hóa Theo Thực Tế Gara
+## 3. Danh Sách File Mục Tiêu (Target Files & Line Ranges)
 
+### 3.1. Frontend Files
+1. **`AutoGarage/frontend/src/features/notification/utils/notificationParser.ts` (Tạo mới hoàn toàn)**
+   - Khai báo kiểu dữ liệu:
+     * `NotificationCategory`: `'maintenance' | 'warranty' | 'estimate' | 'repair' | 'payroll' | 'inventory' | 'system' | 'broadcast'`
+     * `ParsedNotification`: `{ category, categoryLabel, icon, tone, title, summary, fullText, linkUrl, linkText, metadata, isUnread, timeFormatted }`
+   - Hàm `parseNotification(notice: Notice, zone: string): ParsedNotification`.
+   - Hàm `timeAgo(dateString: string, zone: string): string` (format thân thiện: "vừa xong", "15 phút trước", "hôm nay lúc...", "hôm qua...").
+2. **`AutoGarage/frontend/src/features/notification/utils/message.ts` (Dòng 1–12)**
+   - Nâng cấp hàm `notificationMessage(raw: string): string` sử dụng parser mới để không bao giờ bị trả về văn bản mặc định rỗng. Giữ export nguyên vẹn để không làm gãy test.
+3. **`AutoGarage/frontend/src/features/notification/api/notificationsApi.ts` (Dòng 8–39)**
+   - Bổ sung hàm API `markAllRead: async () => request<number>('/notifications/read-all', { method: 'POST' })`.
+4. **`AutoGarage/frontend/src/features/notification/hooks/useNotifications.ts` (Dòng 44–63)**
+   - Bổ sung hook `useMarkAllReadMutation()` tự động invalidate query cache `notifications` và `unread-count`.
+5. **`AutoGarage/frontend/src/features/notification/components/NotificationPopover.tsx` (Tạo mới hoàn toàn)**
+   - Component cửa sổ popover nhỏ gắn vào biểu tượng chuông:
+     * Hiển thị danh sách 5 thông báo mới nhất kèm icon, tiêu đề, thời gian tương đối.
+     * Nút "Đọc tất cả" nhanh và nút "Xem tất cả thông báo trong hộp thư →" dẫn sang `/notifications`.
+     * Tự động đóng khi click-outside hoặc phím `Esc`.
+6. **`AutoGarage/frontend/src/app/layouts/AppShell.tsx` (Dòng 543–552)**
+   - Tích hợp `NotificationPopover` vào nút `<button className="bell-button">` trên Header thay thế cho việc nhảy trang trực tiếp khi click.
+7. **`AutoGarage/frontend/src/features/notification/pages/NotificationsPage.tsx` (Dòng 31–270)**
+   - Tái thiết kế giao diện danh sách thẻ thông báo tương tác (`Rich Notification Cards`).
+   - Tích hợp nút "Đánh dấu tất cả đã đọc" trên header.
+   - Bổ sung các Filter Tabs (Tất cả, Chưa đọc, Dịch vụ & Xe, Báo giá & Tiền tệ, Toàn hệ thống).
+   - Nâng cấp Dialog xem chi tiết (`Sheet` placement="center"): hiển thị bảng tham số chi tiết và nút CTA hành động trực tiếp.
+8. **`AutoGarage/frontend/src/features/notification/components/BroadcastModal.tsx` (Dòng 1–118)**
+   - Bổ sung trường chọn Mức độ ưu tiên (`priority`: Thông thường, Quan trọng, Khẩn cấp).
+   - Bổ sung trường chọn Đường dẫn hành động đính kèm (`actionUrl`).
+   - Tích hợp khung **Xem trước trực quan (Live Preview)** dạng thẻ thông báo thu nhỏ.
+9. **`AutoGarage/frontend/src/styles.css` (Dòng 2430–2610)**
+   - Bổ sung styles cho thẻ thông báo tương tác (`.notification-card-item`, `.notification-card-header`, `.notification-badge-chip`, `.notification-cta-button`, `.notification-group-title`, `.broadcast-preview-box`, `.notification-popover-menu`, `.notification-popover-item`).
+
+### 3.2. Backend Files
+1. **`AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/notification/repository/NotificationRepository.java` (Dòng 18–83)**
+   - Bổ sung derived/custom query:
+     ```java
+     @Modifying
+     @Query("UPDATE Notification n SET n.readAt = :now, n.updatedBy = :userId WHERE n.userId = :userId AND n.channel = 'WEB' AND n.readAt IS NULL")
+     int markAllRead(@Param("userId") long userId, @Param("now") Instant now);
+     ```
+2. **`AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/notification/service/NotificationService.java` (Dòng 10–25)**
+   - Khai báo phương thức `int markAllRead();`.
+3. **`AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/notification/service/impl/NotificationServiceImpl.java` (Dòng 235–257)**
+   - Hiện thực phương thức `markAllRead()` có `@Transactional` và `@PreAuthorize(SecurityConstants.HAS_ANY_ROLE)`.
+4. **`AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/notification/controller/NotificationController.java` (Dòng 120–130)**
+   - Bổ sung endpoint `POST /api/v1/notifications/read-all`:
+     ```java
+     @PostMapping("/read-all")
+     @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
+     @Operation(summary = "Mark all unread web notifications read for current user")
+     public ApiResponse<Integer> markAllRead(HttpServletRequest http) {
+         return ApiResponse.success(ResponseCode.SUCCESS, notificationService.markAllRead(), http.getRequestURI());
+     }
+     ```
+
+---
+
+## 4. Hợp Đồng Kỹ Thuật (Technical Contract)
+
+### 4.1. TypeScript Contract (`notificationParser.ts`)
+```typescript
+export type NotificationCategory =
+  | 'maintenance'
+  | 'warranty'
+  | 'estimate'
+  | 'repair'
+  | 'payroll'
+  | 'inventory'
+  | 'system'
+  | 'broadcast';
+
+export interface NotificationMetaItem {
+  label: string;
+  value: string;
+}
+
+export interface ParsedNotification {
+  category: NotificationCategory;
+  categoryLabel: string;
+  tone: 'info' | 'success' | 'warning' | 'danger';
+  title: string;
+  summary: string;
+  fullMessage: string;
+  linkUrl?: string;
+  linkText?: string;
+  metadata: NotificationMetaItem[];
+  isUnread: boolean;
+  timeFormatted: string;
+  timeRelative: string;
+}
 ```
-+----------------------------------------------------------------------------------------------------+
-| CÔNG THỨC TÍNH LƯƠNG & THƯỞNG MỚI:                                                                |
-|                                                                                                    |
-| 1. LƯƠNG CƠ BẢN (Theo Giờ Công Thực Tế):                                                           |
-|    Đơn Giá Giờ Áp Dụng = hourlyCost * salaryCoefficient                                            |
-|    Lương Giờ Thường   = Tổng giờ thường * Đơn Giá Giờ Áp Dụng                                      |
-|    Lương Tăng Ca (OT) = Tổng giờ tăng ca * Đơn Giá Giờ Áp Dụng * overtimeMultiplier (1.5x)         |
-|    ==> LƯƠNG CƠ BẢN = Lương Giờ Thường + Lương Tăng Ca                                             |
-|                                                                                                    |
-| 2. THƯỞNG THÊM TỪNG CA LÀM VIỆC (Theo Số Đơn Hoàn Thành Trong Ca):                                 |
-|    - Đơn 1 & 2 trong ca : 50.000 đ / đơn                                                           |
-|    - Đơn 3 & 4 trong ca : 80.000 đ / đơn                                                           |
-|    - Từ đơn 5 trở lên   : 120.000 đ / đơn                                                          |
-|    ==> Thưởng Ca = Tổng thưởng các đơn xong trong ca (70% thợ chính, 30% thợ phụ)                  |
-|                                                                                                    |
-| 3. TỔNG THỰC NHẬN (Net Pay):                                                                       |
-|    THỰC NHẬN = Lương Cơ Bản (Giờ công * Đơn giá) + Tổng Thưởng Các Ca + Phụ Cấp - Giảm Trừ         |
-+----------------------------------------------------------------------------------------------------+
+
+### 4.2. REST Endpoint Contract (`NotificationController.java`)
+```http
+POST /api/v1/notifications/read-all
+Authorization: Bearer <JWT>
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "code": 1000,
+  "message": "Thành công",
+  "success": true,
+  "data": 5,
+  "timestamp": "2026-11-02T09:25:00Z",
+  "path": "/api/v1/notifications/read-all"
+}
 ```
 
 ---
 
-### 3.3. Tối Ưu Hóa Giao Diện Toàn Dự Án (UI/UX Redesign)
+## 5. Checklist Thực Thi (Execution Checklist)
 
-1. **Linh kiện `Combobox` (Searchable Select)**:
-   - Vừa cho dropdown menu, vừa cho gõ phím tìm kiếm nhanh tiếng Việt có dấu/không dấu, hỗ trợ phím mũi tên và Enter.
-   - Áp dụng vào: Chọn Phương tiện, Chọn KTV, Chọn Khoang, Chọn Phụ tùng/Dịch vụ.
-2. **Sửa lỗi giao diện Khoang & Lịch ca ([`LiveDispatchBoard.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/features/scheduling/components/LiveDispatchBoard.tsx))**:
-   - Thẻ khoang chỉ hiển thị ngắn gọn: `Tên thợ (Mã NV) · [Rảnh/Bận]`.
-   - Bỏ cố định `min-height: 72px`, mở rộng lưới `minmax(290px, 1fr)` chống đè mất chữ.
-3. **Thu nhỏ Box duyệt Báo giá & Dàn ngang ([`EstimateDecisionModal.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/features/estimate/components/EstimateDecisionModal.tsx))**:
-   - Thêm dải thông tin Khách hàng & Xe ở đầu modal.
-   - Dàn ngang *Loại báo giá / Gửi khách lúc / Hiệu lực đến*.
-   - Sửa lỗi số `0` thừa bằng `Boolean(...)`.
-   - Box duyệt compact: `[Badge] Tên hạng mục • SL × Đơn giá = Thành tiền` cùng hàng với nút `[✓ Duyệt] [✕ Bỏ qua]`.
-4. **Trang Bảng lương & Năng suất ([`PayrollPage.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/features/payroll/pages/PayrollPage.tsx))**:
-   - Hiển thị trực tiếp bảng lương từng nhân viên với bộ lọc Tháng/Năm (`YYYY-MM`), KPI grid năng suất xưởng và số tiền thực nhận to rõ.
+- [x] **Step 1: Bổ sung API & Repository cho tính năng "Đánh dấu tất cả đã đọc" tại Backend**
+  - Cập nhật [`NotificationRepository.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/notification/repository/NotificationRepository.java): Thêm method `@Modifying markAllRead(userId, now)`.
+  - Cập nhật [`NotificationService.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/notification/service/NotificationService.java) & [`NotificationServiceImpl.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/notification/service/impl/NotificationServiceImpl.java): Thêm method `markAllRead()`.
+  - Cập nhật [`NotificationController.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/notification/controller/NotificationController.java): Thêm endpoint `POST /api/v1/notifications/read-all`.
+  - Kiểm tra compile backend: chạy `.\AutoGarage\mvnw.cmd -f AutoGarage/pom.xml test-compile`.
 
----
+- [x] **Step 2: Xây dựng module Parser & Formatter thông báo thông minh trên Frontend**
+  - Tạo file `frontend/src/features/notification/utils/notificationParser.ts`:
+    + Trích xuất dữ liệu từ các loại payload JSON: `WARRANTY_EXPIRY`, `MAINTENANCE`, `ESTIMATE_SENT`, `PAYROLL`, `BROADCAST`.
+    + Sinh tiêu đề, nội dung, huy hiệu phân loại, icon, màu sắc và đường dẫn liên kết nhanh (CTA).
+    + Tính toán thời gian tương đối thân thiện ("10 phút trước", "Hôm nay 08:30"...).
+  - Cập nhật `frontend/src/features/notification/utils/message.ts`: Ủy quyền xử lý sang `notificationParser.ts`, đảm bảo fallback thông minh không bao giờ rỗng.
 
-## 4. Danh Sách File Mục Tiêu Theo Từng Phân Hệ (Target Files)
+- [x] **Step 3: Cập nhật API Client & Hook trên Frontend**
+  - Cập nhật `notificationsApi.ts`: Thêm method `markAllRead()`.
+  - Cập nhật `useNotifications.ts`: Thêm hook `useMarkAllReadMutation()` và hỗ trợ lọc theo nhóm phân hệ.
 
-### 4.1. Phân Hệ Bảo Mật, Người Dùng & Phân Quyền (Security & Access Control)
-- [`SecurityConstants.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/common/constant/SecurityConstants.java)
-- [`CustomerScope.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/common/security/CustomerScope.java): Sửa fallback không ném 403 khi khách hàng mới chưa có dữ liệu.
-- [`UserController.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/identity/controller/UserController.java): Thêm endpoint `GET /api/v1/users/lookup` cho nhân sự nội bộ.
-- [`CustomerController.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/customer/controller/CustomerController.java): Mở quyền đọc chi tiết cho thợ kỹ thuật.
-- [`access.ts`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/app/access.ts) & [`App.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/app/App.tsx): Chuẩn hóa role guards.
+- [x] **Step 4: Tái thiết kế giao diện Hộp thư Thông báo (`NotificationsPage.tsx` & `styles.css`)**
+  - Bổ sung thanh công cụ với nút "✓ Đọc tất cả" và các Tabs lọc phân loại (`Tất cả`, `Chưa đọc`, `Dịch vụ & Xe`, `Báo giá & Tiền tệ`, `Toàn hệ thống`).
+  - Thay thế bảng phẳng bằng danh sách **Thẻ Thông Báo Tương Tác (Rich Notification Cards)** có icon bo tròn, badge phân hệ, tiêu đề in đậm, nội dung trích dẫn và nút CTA điều hướng nhanh.
+  - Nâng cấp Dialog xem chi tiết (`Sheet` placement="center"): hiển thị bảng tham số chi tiết và nút điều hướng chính (`primary`).
+  - Cập nhật CSS trong `styles.css` theo đúng token màu sắc và nguyên tắc minimalism, không layout shift.
 
-### 4.2. Phân Hệ Nhân Sự, Ca Trực & Bảng Lương (HR, Shifts & Payroll)
-- [`Employee.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/scheduling/entity/Employee.java): Thêm `joinedAt`, `bankName`, `bankAccountNumber`, `bankAccountHolder`, `salaryCoefficient`.
-- [`EmployeeShift.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/scheduling/entity/EmployeeShift.java): Thêm `registrationStatus`, `regularHours`, `overtimeHours`, `completedOrderCount`, `shiftBonusAmount`.
-- [`EmployeeResponse.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/scheduling/dto/response/EmployeeResponse.java) & [`EmployeeMapper.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/scheduling/mapper/EmployeeMapper.java): Nhúng trực tiếp họ tên, email, SĐT.
-- [`ShiftServiceImpl.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/scheduling/service/impl/ShiftServiceImpl.java): Thêm đăng ký ca, duyệt ca, chấm công tính giờ thường/OT.
-- [`PayrollServiceImpl.java`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/src/main/java/com/Group13_65CNTT/AutoGarage/payroll/service/impl/PayrollServiceImpl.java): Động cơ tính lương mới (Giờ công × Đơn giá + Thưởng ca theo số đơn), tích hợp tự động hạch toán Sổ quỹ khi chi lương.
-- [`EmployeeEditor.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/features/scheduling/components/EmployeeEditor.tsx): Form hồ sơ HR đầy đủ ngày gia nhập, STK, hệ số lương.
-- [`PayrollPage.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/features/payroll/pages/PayrollPage.tsx): Giao diện bảng lương trực tiếp từng nhân viên kèm lọc tháng/năm.
+- [x] **Step 5: Xây dựng Cửa sổ Thông Báo Nhanh Popover (`NotificationPopover.tsx`) trên Header (`AppShell.tsx`)**
+  - Tạo component `NotificationPopover.tsx` hiển thị cửa sổ nhỏ dropdown ngay bên dưới biểu tượng chuông.
+  - Hiển thị 5 thông báo mới nhất kèm icon, tiêu đề, thời gian tương đối, chấm xanh chưa đọc, nút "Đọc tất cả" và nút "Xem tất cả thông báo trong hộp thư →".
+  - Tích hợp vào nút chuông nhỏ trong [`AppShell.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/app/layouts/AppShell.tsx), xử lý đóng mở mượt mà, hỗ trợ click-outside và phím `Escape`.
 
-### 4.3. Phân Hệ Tiếp Nhận, Điều Phối & Báo Giá (Reception, Dispatch & Estimates)
-- [`CheckInModal.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/features/reception/components/CheckInModal.tsx): Phân 2 nhóm thợ trực khoang & thợ cơ động, tích hợp Combobox.
-- [`LiveDispatchBoard.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/features/scheduling/components/LiveDispatchBoard.tsx): Sửa lỗi thẻ khoang đè chữ, duyệt ca đăng ký.
-- [`EstimateDecisionModal.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/features/estimate/components/EstimateDecisionModal.tsx): Thêm thông tin xe & khách hàng, box duyệt nhỏ gọn dàn ngang, xóa số 0 thừa.
-- [`EstimatesPage.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/features/estimate/pages/EstimatesPage.tsx): Truyền thông tin xe và khách vào modal.
+- [x] **Step 6: Nâng cấp Modal Phát thông báo (`BroadcastModal.tsx`)**
+  - Thêm tùy chọn loại thông báo (Tin tức chung, Cảnh báo khẩn, Nhắc việc).
+  - Thêm tùy chọn đính kèm liên kết điều hướng (`actionUrl`).
+  - Tích hợp khung **Xem trước trực quan (Live Preview)** dạng thẻ thông báo thực tế.
 
-### 4.4. Phân Hệ Thành Phần Dùng Chung & Giao Diện (Shared UI & Styling)
-- [`ui.tsx`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/shared/components/ui.tsx): Xây dựng component `Combobox`.
-- [`styles.css`](file:///c:/Users/mrdoanh/IdeaProjects/AutoGarage/AutoGarage/frontend/src/styles.css): Cập nhật styling khoang xưởng, box duyệt báo giá và combobox.
-
----
-
-## 5. Lộ Trình Triển Khai Toàn Diện 7 Giai Đoạn (Master Actionable Roadmap)
-
-### Giai đoạn 1: Vá Triệt Để Lỗ Hổng Phân Quyền & Lỗi 403 Đa Role
-- [x] **Step 1.1**: Sửa `CustomerScope.java`: Trả về `0L` (danh sách rỗng an toàn) thay vì ném exception `FORBIDDEN` khi khách hàng mới chưa có bản ghi trong bảng `customers`.
-- [x] **Step 1.2**: Bổ sung `fullName`, `email`, `phone`, `username` vào `EmployeeResponse.java` và cập nhật mapper nối từ `User`.
-- [x] **Step 1.3**: Bổ sung endpoint tra cứu danh bạ nội bộ `GET /api/v1/users/lookup` cấp quyền cho `HAS_ROLE_STAFF` trong `UserController.java`.
-- [x] **Step 1.4**: Mở rộng quyền `GET /api/v1/customers/{id}` cho `HAS_ROLE_STAFF` trong `CustomerController.java`.
-- [x] **Step 1.5**: Loại bỏ toàn bộ các lệnh gọi `useUsersQuery()` gây lỗi 403 trong `SchedulingPage.tsx`, `ShiftEditor.tsx`, `RepairOrderDetailModal.tsx`.
-
-### Giai đoạn 2: Chuẩn Hóa Hồ Sơ Nhân Sự, Đăng Ký Ca & Chấm Công
-- [x] **Step 2.1**: Tạo migration `V18__add_employee_hr_and_shift_registration.sql`: Bổ sung `joined_at`, `bank_name`, `bank_account_number`, `bank_account_holder`, `salary_coefficient` vào `employees` và các cột đăng ký ca, giờ công vào `employee_shifts`.
-- [x] **Step 2.2**: Cập nhật form `EmployeeEditor.tsx`: Thêm ngày gia nhập, STK ngân hàng, hệ số lương và chức năng tự động quy đổi đơn giá giờ công.
-- [x] **Step 2.3**: Xây dựng API và modal cho thợ tự gửi đăng ký ca làm việc (`ShiftRegistrationModal.tsx`), và cụm duyệt ca cho Quản đốc trên bảng điều phối.
-- [x] **Step 2.4**: Hoàn thiện chấm công theo ca: Ghi nhận giờ vào/ra thực tế, tính số giờ thường và giờ tăng ca OT.
-
-### Giai đoạn 3: Động Cơ Tính Lương Mới & Tự Động Hạch Toán Sổ Quỹ
-- [x] **Step 3.1**: Cập nhật thuật toán tính lương trong `PayrollServiceImpl.java`: Lương cơ bản = Số giờ công × Đơn giá giờ; Thưởng thêm ca = Tích lũy theo số đơn xe sửa xong đạt chuẩn QC trong ca.
-- [x] **Step 3.2**: Cung cấp endpoint `GET /api/v1/payroll/periods/by-month?month=YYYY-MM`.
-- [x] **Step 3.3**: Kết nối `BillingOperations`: Tự động tạo phiếu chi tiền trong Sổ quỹ (`Payment` hướng `OUT`, nhóm `EXPENSE_PAYROLL`) khi bấm Chi trả lương.
-
-### Giai đoạn 4: Tái Thiết Kế Giao Diện Bảng Lương & Năng Suất Nhân Viên
-- [x] **Step 4.1**: Tái cấu trúc `PayrollPage.tsx`: Màn hình chính hiển thị trực tiếp bảng lương từng nhân viên kèm bộ lọc Tháng/Năm (`YYYY-MM`).
-- [x] **Step 4.2**: Xây dựng cụm KPI Metric Grid năng suất xưởng trong tháng (Tổng chi, Tổng ca, Đơn xe xong, Top thợ).
-- [x] **Step 4.3**: Hiển thị minh bạch số giờ công, đơn giá giờ, thưởng đơn ca, STK ngân hàng và số tiền Thực nhận (to, rõ).
-- [x] **Step 4.4**: Nâng cấp modal chi tiết phiếu lương `MyPayslipModal.tsx` và `EmployeeWorkSummaryModal.tsx`.
-
-### Giai đoạn 5: Linh Kiện Combobox, Sửa Lỗi Thẻ Khoang & Box Báo Giá Dàn Ngang
-- [x] **Step 5.1**: Cài đặt component `Combobox` (Searchable Select) trong `ui.tsx` và CSS trong `styles.css`.
-- [x] **Step 5.2**: Tích hợp `Combobox` vào form tiếp nhận `CheckInModal.tsx` cho ô chọn xe, chọn KTV và chọn khoang.
-- [x] **Step 5.3**: Sửa lỗi thẻ khoang bị đè mất chữ trong `LiveDispatchBoard.tsx` (tách chip thợ gọn gàng, mở rộng lưới 290px, bỏ cứng chiều cao).
-- [x] **Step 5.4**: Nâng cấp `EstimateDecisionModal.tsx`: Thêm dải thông tin Xe & Khách hàng, dàn ngang 3 thông số báo giá, xóa số 0 thừa, thu nhỏ box duyệt và cụm nút duyệt.
-
-### Giai đoạn 6: Ràng Buộc Toàn Vẹn Quy Trình Nghiệp Vụ Xưởng
-- [x] **Step 6.1**: Tự động chốt Timer bấm giờ thi công khi thợ Check-out ca trực (chống chạy timer xuyên đêm).
-- [x] **Step 6.2**: Tự động giải phóng phụ tùng giữ chỗ (`unreserve`) khi lệnh sửa chữa bị hủy hoặc từ chối hạng mục.
-- [x] **Step 6.3**: Ràng buộc QC độc lập (Four-Eyes Principle): Thợ nghiệm thu QC không được trùng với thợ chính vừa thi công.
-
-### Giai đoạn 7: Kiểm Thử Toàn Diện Trên Cả 4 Vai Trò & Bàn Giao
-- [x] **Step 7.1**: Kiểm thử đăng nhập và vận hành với Role `ADMIN`: Toàn quyền quản trị, xem báo cáo, duyệt sổ quỹ.
-- [x] **Step 7.2**: Kiểm thử Role `RECEPTIONIST`: Tiếp nhận xe, chọn thợ cơ động, lập báo giá, xếp khoang (100% không còn lỗi 403).
-- [x] **Step 7.3**: Kiểm thử Role `TECHNICIAN`: Xem khoang, nhận việc, bấm giờ thi công, nghiệm thu QC, xem phiếu lương cá nhân (100% không còn lỗi 403).
-- [x] **Step 7.4**: Kiểm thử Role `CUSTOMER`: Đặt lịch hẹn, xem tiến độ sửa chữa xe, xem hóa đơn cá nhân (100% không còn lỗi 403).
-- [x] **Step 7.5**: Chạy toàn bộ 48 test suites backend (`mvn test`) và kiểm tra build frontend (`npm run build`) đảm bảo 0 lỗi.
+- [x] **Step 7: Kiểm thử và Xác minh toàn diện (Verify Phase)**
+  - Chạy toàn bộ test suite frontend: `npm --prefix AutoGarage/frontend run test` (đảm bảo 10/10 test files, 91/91 tests pass, bao gồm cả `NotificationsPage.test.tsx`).
+  - Chạy build frontend: `npm --prefix AutoGarage/frontend run build` (kiểm tra TypeScript và CSS không có lỗi).
+  - Chạy test suite backend: `.\AutoGarage\mvnw.cmd -f AutoGarage/pom.xml test '-Dtest=*Notification*,*ServiceTest'` đảm bảo tất cả tests pass.
+  - Kiểm tra thực tế trên trình duyệt: xác nhận thông báo hiển thị đầy đủ thông tin, icon màu sắc rõ ràng và các nút CTA hoạt động chính xác.

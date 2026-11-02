@@ -22,5 +22,8 @@ public interface NotificationService {
 
     NotificationResponse markRead(Long id);
 
+    /** Marks all of the current user's unread web notices read; returns how many changed. */
+    int markAllRead();
+
     void deleteNotification(Long id);
 }

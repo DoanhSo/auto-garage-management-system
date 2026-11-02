@@ -6,6 +6,7 @@ import com.Group13_65CNTT.AutoGarage.common.security.ActorIds;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
@@ -79,7 +80,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "CREATE_EMPLOYEE", entity = "Employee")
+    @Audited(action = AuditConstants.ACTION_CREATE_EMPLOYEE, entity = AuditConstants.ENTITY_EMPLOYEE)
     public EmployeeResponse createEmployee(EmployeeCreateRequest request) {
         if (!userRepository.existsById(request.getUserId())) {
             throw new BusinessException(ResponseCode.RESOURCE_NOT_FOUND);
@@ -153,7 +154,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "UPDATE_EMPLOYEE", entity = "Employee")
+    @Audited(action = AuditConstants.ACTION_UPDATE_EMPLOYEE, entity = AuditConstants.ENTITY_EMPLOYEE)
     public EmployeeResponse updateEmployee(Long id, EmployeeUpdateRequest request) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
@@ -165,7 +166,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "DEACTIVATE_EMPLOYEE", entity = "Employee")
+    @Audited(action = AuditConstants.ACTION_DEACTIVATE_EMPLOYEE, entity = AuditConstants.ENTITY_EMPLOYEE, idArgument = 0)
     public void deactivateEmployee(Long id) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
@@ -175,7 +176,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "CREATE_SHIFT", entity = "EmployeeShift")
+    @Audited(action = AuditConstants.ACTION_CREATE_SHIFT, entity = AuditConstants.ENTITY_EMPLOYEE_SHIFT)
     public ShiftResponse createShift(Long actorUserId, ShiftCreateRequest request) {
         if (!request.getEndsAt().isAfter(request.getStartsAt())) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
@@ -286,7 +287,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "REGISTER_SHIFT", entity = "EmployeeShift")
+    @Audited(action = AuditConstants.ACTION_REGISTER_SHIFT, entity = AuditConstants.ENTITY_EMPLOYEE_SHIFT)
     public ShiftResponse registerShift(Long actorUserId, ShiftRegisterRequest request) {
         Long actorId = ActorIds.require(actorUserId);
         if (!request.getEndsAt().isAfter(request.getStartsAt())) {
@@ -320,7 +321,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "APPROVE_SHIFT_REGISTRATION", entity = "EmployeeShift")
+    @Audited(action = AuditConstants.ACTION_APPROVE_SHIFT_REGISTRATION, entity = AuditConstants.ENTITY_EMPLOYEE_SHIFT)
     public ShiftResponse approveShiftRegistration(Long actorUserId, Long shiftId) {
         EmployeeShift shift = loadPendingShift(shiftId);
         requireNoOwnOverlap(shift.getEmployeeId(), shift.getStartsAt(), shift.getEndsAt());
@@ -339,7 +340,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "REJECT_SHIFT_REGISTRATION", entity = "EmployeeShift")
+    @Audited(action = AuditConstants.ACTION_REJECT_SHIFT_REGISTRATION, entity = AuditConstants.ENTITY_EMPLOYEE_SHIFT)
     public ShiftResponse rejectShiftRegistration(Long actorUserId, Long shiftId, String reason) {
         EmployeeShift shift = loadPendingShift(shiftId);
         shift.setStatus(ShiftStatus.REJECTED);
@@ -386,7 +387,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "CANCEL_SHIFT", entity = "EmployeeShift")
+    @Audited(action = AuditConstants.ACTION_CANCEL_SHIFT, entity = AuditConstants.ENTITY_EMPLOYEE_SHIFT, idArgument = 1)
     public void cancelShift(Long actorUserId, Long shiftId) {
         EmployeeShift shift = employeeShiftRepository.findById(shiftId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
@@ -419,7 +420,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "CREATE_BAY", entity = "ServiceBay")
+    @Audited(action = AuditConstants.ACTION_CREATE_BAY, entity = AuditConstants.ENTITY_SERVICE_BAY)
     public ServiceBayResponse createServiceBay(ServiceBayCreateRequest request) {
         if (serviceBayRepository.existsByBayCode(request.getBayCode().trim())) {
             throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
@@ -449,7 +450,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "UPDATE_BAY", entity = "ServiceBay")
+    @Audited(action = AuditConstants.ACTION_UPDATE_BAY, entity = AuditConstants.ENTITY_SERVICE_BAY)
     public ServiceBayResponse updateServiceBay(Long id, ServiceBayUpdateRequest request) {
         ServiceBay bay = serviceBayRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
@@ -460,7 +461,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "DEACTIVATE_BAY", entity = "ServiceBay")
+    @Audited(action = AuditConstants.ACTION_DEACTIVATE_BAY, entity = AuditConstants.ENTITY_SERVICE_BAY, idArgument = 0)
     public void deactivateServiceBay(Long id) {
         ServiceBay bay = serviceBayRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
@@ -470,7 +471,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional
-    @Audited(action = "SCHEDULE_MAINTENANCE", entity = "BayReservation")
+    @Audited(action = AuditConstants.ACTION_SCHEDULE_MAINTENANCE, entity = AuditConstants.ENTITY_BAY_RESERVATION)
     public BayReservationResponse scheduleMaintenance(Long actorUserId, MaintenanceReservationRequest request) {
         if (!request.getEndsAt().isAfter(request.getStartsAt())) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);

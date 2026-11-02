@@ -23,6 +23,7 @@ public final class ApiPaths {
     public static final String NOTIFICATIONS_ADMIN = "/admin";
     public static final String NOTIFICATIONS_BROADCAST = "/broadcast";
     public static final String NOTIFICATION_READ = "/{id}/read";
+    public static final String NOTIFICATION_READ_ALL = "/read-all";
 
     public static final String AUDIT_BASE = "/api/v1/admin/audit-events";
     public static final String AUDIT_WILDCARD = AUDIT_BASE + "/**";

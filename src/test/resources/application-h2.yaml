@@ -14,6 +14,7 @@ security:
   auth:
     issuer: http://localhost:8081/realms/autogarage-h2
     audience: autogarage-h2-api
+    jwk-set-uri: http://localhost:8081/realms/autogarage-h2/protocol/openid-connect/certs
     clock-skew: 0s
   bootstrap:
     enabled: false

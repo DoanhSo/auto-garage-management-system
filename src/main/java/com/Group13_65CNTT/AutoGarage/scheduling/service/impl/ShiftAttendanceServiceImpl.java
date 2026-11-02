@@ -1,6 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.scheduling.service.impl;
 
 import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
@@ -54,7 +55,7 @@ public class ShiftAttendanceServiceImpl implements ShiftAttendanceService {
 
     @Override
     @Transactional
-    @Audited(action = "SHIFT_CHECK_IN", entity = "EmployeeShift")
+    @Audited(action = AuditConstants.ACTION_SHIFT_CHECK_IN, entity = AuditConstants.ENTITY_EMPLOYEE_SHIFT)
     public ShiftResponse checkIn(Long actorUserId, Long shiftId) {
         EmployeeShift shift = loadActiveShift(shiftId);
         requireOwnerOrFrontDesk(actorUserId, shift);
@@ -79,7 +80,7 @@ public class ShiftAttendanceServiceImpl implements ShiftAttendanceService {
 
     @Override
     @Transactional
-    @Audited(action = "SHIFT_CHECK_OUT", entity = "EmployeeShift")
+    @Audited(action = AuditConstants.ACTION_SHIFT_CHECK_OUT, entity = AuditConstants.ENTITY_EMPLOYEE_SHIFT)
     public ShiftResponse checkOut(Long actorUserId, Long shiftId) {
         EmployeeShift shift = loadActiveShift(shiftId);
         requireOwnerOrFrontDesk(actorUserId, shift);

@@ -6,6 +6,14 @@ import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.identity.dto.response.UserResponse;
 import com.Group13_65CNTT.AutoGarage.notification.dto.response.NotificationResponse;
+import com.Group13_65CNTT.AutoGarage.payroll.dto.response.OrderCommissionResponse;
+import com.Group13_65CNTT.AutoGarage.payroll.dto.response.PayrollItemResponse;
+import com.Group13_65CNTT.AutoGarage.payroll.dto.response.PayrollPeriodDetailResponse;
+import com.Group13_65CNTT.AutoGarage.payroll.dto.response.PayrollPeriodResponse;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.BayReservationResponse;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.EmployeeResponse;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.ServiceBayResponse;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.ShiftResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -30,9 +38,14 @@ public class AuditLogAspect {
         Object result = invocation.proceed();
         if (audited.skipNullResult() && result == null) return null;
         Long actorId = currentUser.userIdOrNull();
-        Long entityId = actorId;
+        // Account-level actions (e.g. logout everywhere) target the actor's own account; any other
+        // entity must name its own id, otherwise it is left empty rather than pointing at the actor.
+        Long entityId = AuditConstants.ENTITY_USER.equals(audited.entity()) ? actorId : null;
         Map<String, Object> details = Map.of();
-        if (result instanceof UserResponse user) {
+        Long resultId = resultEntityId(result);
+        if (resultId != null) {
+            entityId = resultId;
+        } else if (result instanceof UserResponse user) {
             entityId = user.getId();
             details =
                     Map.of(
@@ -55,5 +68,21 @@ public class AuditLogAspect {
             auditService.recordEvent(
                     actorId, audited.action(), audited.entity(), entityId, details);
         return result;
+    }
+
+    /** Id of the record a service call created or changed, read from its typed response. */
+    private static Long resultEntityId(Object result) {
+        return switch (result) {
+            case PayrollPeriodResponse period -> period.id();
+            case PayrollPeriodDetailResponse detail ->
+                    detail.period() == null ? null : detail.period().id();
+            case PayrollItemResponse item -> item.id();
+            case OrderCommissionResponse commission -> commission.id();
+            case EmployeeResponse employee -> employee.getId();
+            case ShiftResponse shift -> shift.getId();
+            case ServiceBayResponse bay -> bay.getId();
+            case BayReservationResponse reservation -> reservation.getId();
+            case null, default -> null;
+        };
     }
 }

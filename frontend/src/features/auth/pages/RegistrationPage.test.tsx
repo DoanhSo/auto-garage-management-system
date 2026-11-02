@@ -20,7 +20,7 @@ function app() {
         <MemoryRouter initialEntries={['/register']}>
           <Routes>
             <Route path="/register" element={<RegistrationPage />} />
-            <Route path="/notifications" element={<div>Customer workspace</div>} />
+            <Route path="/reception" element={<div>Customer workspace</div>} />
             <Route path="/login" element={<div>Login page</div>} />
           </Routes>
         </MemoryRouter>

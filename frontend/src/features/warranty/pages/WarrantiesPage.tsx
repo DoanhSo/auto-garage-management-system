@@ -6,6 +6,7 @@ import { Badge, Button, PageHeader, Loading, QueryError } from '../../../shared/
 import { DataTable } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { formatDate, formatDateTime } from '../../../shared/utils/format';
+import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
 import { useCustomersQuery } from '../../customer/hooks/useCustomers';
@@ -29,6 +30,8 @@ const claimVariant = (status: ClaimStatus) =>
 const daysLeft = (expiresAt: string) =>
   Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000);
 
+const WARRANTY_TABS = ['warranties', 'claims'] as const;
+
 export function WarrantiesPage() {
   const { user } = useAuth();
   // Chỉ lễ tân/admin xem được danh mục khách hàng và mở khiếu nại; thẩm định dành riêng admin.
@@ -40,7 +43,7 @@ export function WarrantiesPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedWarrantyId, setSelectedWarrantyId] = useState(ALL_BOOKS);
   const [keyword, setKeyword] = useState('');
-  const [activeTab, setActiveTab] = useState<'warranties' | 'claims'>('warranties');
+  const [activeTab, setActiveTab] = useUrlTab('tab', WARRANTY_TABS);
 
   const [openClaimWarranty, setOpenClaimWarranty] = useState<Warranty | null>(null);
   const [decidingClaim, setDecidingClaim] = useState<WarrantyClaim | null>(null);
@@ -56,7 +59,10 @@ export function WarrantiesPage() {
   const warrantiesQuery = mode === 'vehicle' ? vehicleQuery : customerQuery;
 
   const vehicleMap = useMemo(() => new Map(vehicles.map((v) => [String(v.id), v])), [vehicles]);
-  const customerMap = useMemo(() => new Map(customers.map((c) => [String(c.id), c] as const)), [customers]);
+  const customerMap = useMemo(
+    () => new Map(customers.map((c) => [String(c.id), c] as const)),
+    [customers],
+  );
 
   const allWarranties = useMemo(
     () => warrantiesQuery.data?.content ?? [],
@@ -68,14 +74,14 @@ export function WarrantiesPage() {
     if (!term) return allWarranties;
     return allWarranties.filter((w) => {
       const plate = vehicleMap.get(String(w.vehicleId))?.licensePlate ?? '';
-      return [w.warrantyCode, plate, w.termsSnapshot ?? '']
-        .join(' ')
-        .toLowerCase()
-        .includes(term);
+      return [w.warrantyCode, plate, w.termsSnapshot ?? ''].join(' ').toLowerCase().includes(term);
     });
   }, [allWarranties, keyword, vehicleMap]);
 
-  const warrantyById = useMemo(() => new Map(allWarranties.map((w) => [String(w.id), w])), [allWarranties]);
+  const warrantyById = useMemo(
+    () => new Map(allWarranties.map((w) => [String(w.id), w])),
+    [allWarranties],
+  );
 
   // Khiếu nại của một sổ cụ thể hoặc gộp tất cả sổ đang tra cứu.
   const claimWarrantyIds = useMemo(
@@ -222,7 +228,7 @@ export function WarrantiesPage() {
         ),
       },
     ],
-    [vehicleMap, customerMap, canOpenClaim],
+    [vehicleMap, customerMap, canOpenClaim, setActiveTab],
   );
 
   const claimColumns = useMemo<ColumnDef<WarrantyClaim>[]>(
@@ -235,7 +241,9 @@ export function WarrantiesPage() {
             <div>
               <strong>#{row.original.claimCode}</strong>
               <span>
-                Sổ #{warrantyById.get(String(row.original.warrantyId))?.warrantyCode ?? row.original.warrantyId}
+                Sổ #
+                {warrantyById.get(String(row.original.warrantyId))?.warrantyCode ??
+                  row.original.warrantyId}
               </span>
             </div>
           </div>
@@ -341,7 +349,12 @@ export function WarrantiesPage() {
             value: allWarranties.length,
             icon: <ShieldCheck size={18} />,
           },
-          { label: 'Còn hiệu lực', value: activeCount, tone: 'success', icon: <ShieldCheck size={18} /> },
+          {
+            label: 'Còn hiệu lực',
+            value: activeCount,
+            tone: 'success',
+            icon: <ShieldCheck size={18} />,
+          },
           { label: 'Đã hết hạn', value: expiredCount, tone: 'danger', icon: <Clock size={18} /> },
           {
             label: 'Khiếu nại đang xử lý',

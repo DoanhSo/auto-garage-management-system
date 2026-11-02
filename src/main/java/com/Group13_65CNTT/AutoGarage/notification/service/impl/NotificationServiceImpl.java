@@ -257,6 +257,13 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
+    public int markAllRead() {
+        return notificationRepository.markAllRead(currentUser.userId(), clock.instant());
+    }
+
+    @Override
+    @Transactional
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
     @Audited(
             action = AuditConstants.ACTION_NOTIFICATION_DELETED,

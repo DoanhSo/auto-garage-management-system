@@ -61,9 +61,13 @@ export const noticeBroadcastResultSchema = z.object({
 export const auditSchema = z.object({
   id: idSchema,
   actorUserId: idSchema.nullable(),
+  actorFullName: z.string().nullable().optional(),
+  actorUsername: z.string().nullable().optional(),
+  actorRole: z.enum(roles).nullable().optional(),
   action: z.string(),
   entityType: z.string(),
   entityId: idSchema.nullable(),
+  entityLabel: z.string().nullable().optional(),
   afterJson: z.string().nullable(),
   createdAt: z.string(),
 });

@@ -30,6 +30,7 @@ import { useAuth } from '../../../app/providers/AuthProvider';
 import { DataTable } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
+import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import { formatDate, money } from '../../../shared/utils/format';
 import {
   csvDate,
@@ -91,10 +92,14 @@ function CreditBadge({ state }: { state: CreditState }) {
 const limitText = (limit: string) =>
   Number(limit || 0) > 0 ? money(limit) : '0 đ · Thanh toán ngay';
 
+const DEBT_TABS = ['customer', 'supplier'] as const;
+
 export function DebtLedgerPage() {
   const { user } = useAuth();
   // Thủ kho chỉ quản lý công nợ nhà cung cấp nên mở sẵn tab đó.
-  const [activeTab, setActiveTab] = useState<'customer' | 'supplier'>(
+  const [activeTab, setActiveTab] = useUrlTab(
+    'tab',
+    DEBT_TABS,
     user?.role === 'WAREHOUSE_STAFF' ? 'supplier' : 'customer',
   );
   const [hasBalanceOnly, setHasBalanceOnly] = useState(false);
@@ -224,7 +229,8 @@ export function DebtLedgerPage() {
         header: 'Đã thanh toán',
         cell: ({ row }) => {
           const invoiced = Number(row.original.totalInvoiced || 0);
-          const pct = invoiced > 0 ? Math.round((Number(row.original.totalPaid) / invoiced) * 100) : 0;
+          const pct =
+            invoiced > 0 ? Math.round((Number(row.original.totalPaid) / invoiced) * 100) : 0;
           return (
             <div className="account-cell">
               <div>
