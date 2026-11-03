@@ -8,6 +8,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class VehicleHistoryEntryDto {
+    private List<com.Group13_65CNTT.AutoGarage.vehicle.dto.response.VehicleWarrantyResponse> warranties = new ArrayList<>();
+
+    public List<com.Group13_65CNTT.AutoGarage.vehicle.dto.response.VehicleWarrantyResponse> getWarranties() { return warranties; }
+    public void setWarranties(List<com.Group13_65CNTT.AutoGarage.vehicle.dto.response.VehicleWarrantyResponse> warranties) { this.warranties = warranties; }
 
     private Long repairOrderId;
     private String orderCode;

@@ -50,3 +50,4 @@ release/
 .claudeignore
 CLAUDE.md
 scripts/backups/
+/data/attachments/

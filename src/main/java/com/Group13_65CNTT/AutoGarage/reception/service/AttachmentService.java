@@ -7,6 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 public interface AttachmentService {
+    com.Group13_65CNTT.AutoGarage.reception.dto.response.AttachmentDownloadResponse downloadAttachment(Long id);
 
     AttachmentResponse uploadAttachment(Long repairOrderId, Long vehicleCheckId, Long warrantyClaimId,
                                        AttachmentCategory category, Long uploadedBy, MultipartFile file);

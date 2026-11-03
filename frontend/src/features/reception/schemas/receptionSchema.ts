@@ -164,7 +164,7 @@ export type CheckInFormValues = z.infer<typeof checkInFormSchema>;
 
 export const vehicleCheckFormSchema = z.object({
   repairOrderId: z.string().min(1, 'Mã lệnh sửa chữa là bắt buộc'),
-  checkType: z.enum(['CHECK_IN', 'QC', 'HANDOVER']),
+  checkType: z.literal('CHECK_IN'),
   odometer: z.coerce.number<number>().int().min(0).optional(),
   notes: z.string().trim().max(1000).optional(),
   exteriorCondition: z.string().trim().optional(),

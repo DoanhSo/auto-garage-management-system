@@ -136,14 +136,29 @@ export const vehicleSchema = z.object({
   version: z.string().regex(/^\d+$/),
 });
 
-export const technicalAttachmentSchema = z.object({
+const attachmentResponseSchema = z.object({
   id: idSchema,
-  fileName: z.string(),
-  fileUrl: z.string(),
-  category: z.string(),
-  fileSize: z.number().optional(),
-  contentType: z.string().optional(),
-});
+  repairOrderId: idSchema.nullable().optional(),
+  vehicleCheckId: idSchema.nullable().optional(),
+  warrantyClaimId: idSchema.nullable().optional(),
+  originalFilename: z.string(),
+  sizeBytes: z.number(),
+  contentType: z.string(),
+  uploadedAt: z.string(),
+  category: z.enum(['CHECK_IN', 'DIAGNOSIS', 'QC', 'HANDOVER', 'WARRANTY']),
+}).transform((value) => ({
+  id: value.id,
+  repairOrderId: value.repairOrderId,
+  vehicleCheckId: value.vehicleCheckId,
+  warrantyClaimId: value.warrantyClaimId,
+  fileName: value.originalFilename,
+  fileSize: value.sizeBytes,
+  fileUrl: `/attachments/${value.id}/content`,
+  contentType: value.contentType,
+  createdAt: value.uploadedAt,
+  category: value.category,
+}));
+export const technicalAttachmentSchema = attachmentResponseSchema;
 
 export const vehicleHistoryEntrySchema = z.object({
   repairOrderId: idSchema,
@@ -154,13 +169,16 @@ export const vehicleHistoryEntrySchema = z.object({
   customerComplaint: z.string().nullable(),
   diagnosis: z.string().nullable(),
   status: z.string(),
-  orderCustomerId: idSchema,
-  isCurrentOwnerRecord: z.boolean(),
+  orderCustomerId: idSchema.nullable(),
+  isCurrentOwnerRecord: z.boolean().optional(),
+  currentOwnerRecord: z.boolean().optional(),
   totalAmount: decimal.nullable(),
   tasksDone: z.array(z.string()),
   partsReplaced: z.array(z.string()),
   technicalAttachments: z.array(technicalAttachmentSchema),
-});
+}).transform(({ currentOwnerRecord, isCurrentOwnerRecord, ...entry }) => ({
+  ...entry, isCurrentOwnerRecord: currentOwnerRecord ?? isCurrentOwnerRecord ?? false,
+}));
 
 export const vehicleTimelineSchema = z.object({
   vehicleId: idSchema,
@@ -242,7 +260,7 @@ export const checkInVehicleResultSchema = z.object({
 });
 
 export const checkTypeSchema = z.enum(['CHECK_IN', 'QC', 'HANDOVER']);
-export const checkResultSchema = z.enum(['PASS', 'FAIL', 'CONDITIONAL']);
+export const checkResultSchema = z.enum(['RECORDED', 'PASSED', 'FAILED']);
 export const attachmentCategorySchema = z.enum([
   'CHECK_IN',
   'DIAGNOSIS',
@@ -251,18 +269,7 @@ export const attachmentCategorySchema = z.enum([
   'WARRANTY',
 ]);
 
-export const attachmentSchema = z.object({
-  id: idSchema,
-  repairOrderId: idSchema.nullable().optional(),
-  vehicleCheckId: idSchema.nullable().optional(),
-  warrantyClaimId: idSchema.nullable().optional(),
-  category: attachmentCategorySchema,
-  fileName: z.string(),
-  fileSize: z.number().optional(),
-  contentType: z.string().optional(),
-  fileUrl: z.string(),
-  createdAt: z.string(),
-});
+export const attachmentSchema = attachmentResponseSchema;
 
 export const vehicleCheckSchema = z.object({
   id: idSchema,

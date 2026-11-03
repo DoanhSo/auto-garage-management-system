@@ -18,6 +18,25 @@ public class CustomerScope {
     private final CustomerRepository customers;
     private final ObjectAccessService access;
 
+    public void requireBookingAccess() {
+        access.requireRole(currentUser.userId(), Role.ADMIN.name(), Role.RECEPTIONIST.name(), Role.CUSTOMER.name());
+    }
+
+    public void requireAdmin() {
+        access.requireRole(currentUser.userId(), Role.ADMIN.name());
+    }
+
+    public void requireActor(Long actorId) {
+        if (actorId == null || actorId <= 0) throw new BusinessException(ResponseCode.UNAUTHORIZED);
+        if (currentUser.userId() != actorId) throw new BusinessException(ResponseCode.FORBIDDEN);
+    }
+
+    public void requireEvidenceAccess(Long orderId) {
+        access.requireRole(currentUser.userId(), Role.ADMIN.name(), Role.RECEPTIONIST.name(),
+                Role.TECHNICIAN.name(), Role.CUSTOMER.name());
+        requireResource(AccessResource.REPAIR_ORDER, orderId);
+    }
+
     public void requireFrontDesk() {
         access.requireRole(currentUser.userId(), Role.ADMIN.name(), Role.RECEPTIONIST.name());
     }

@@ -113,9 +113,7 @@ export function VehicleCheckModal({
 
         <Field label="Loại kiểm tra" required error={errors.checkType?.message}>
           <select className="select" disabled={busy} {...register('checkType')}>
-            <option value="CHECK_IN">Kiểm tra tiếp nhận (Check-in)</option>
-            <option value="CHECK_OUT">Kiểm tra xuất xưởng (Check-out)</option>
-            <option value="PERIODIC">Kiểm định định kỳ</option>
+            <option value="CHECK_IN">Kiểm tra tiếp nhận</option>
           </select>
         </Field>
 

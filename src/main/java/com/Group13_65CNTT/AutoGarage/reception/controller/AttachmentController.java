@@ -33,6 +33,21 @@ public class AttachmentController {
     private final AttachmentService attachmentService;
     private final CurrentUserProvider currentUserProvider;
 
+    @GetMapping("/{id}/content")
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
+    @Operation(summary = "Download an authorized attachment")
+    public ResponseEntity<byte[]> downloadAttachment(@PathVariable Long id) {
+        var download = attachmentService.downloadAttachment(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(download.contentType()))
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        org.springframework.http.ContentDisposition.attachment()
+                                .filename(download.filename(), java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(download.content());
+    }
+
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
     @Operation(summary = "Upload repair or vehicle attachment")

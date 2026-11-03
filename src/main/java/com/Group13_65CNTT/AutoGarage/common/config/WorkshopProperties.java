@@ -8,16 +8,21 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 import java.time.Duration;
+import java.nio.file.Path;
 
 @Getter
 @Setter
 @Validated
 @ConfigurationProperties("garage.workshop")
 public class WorkshopProperties {
+    @NotNull
+    private Path attachmentDirectory = Path.of("data", "attachments");
+
     @Min(1)
     private int defaultServiceMinutes = 60;
 
     @Min(1)
+    @jakarta.validation.constraints.Max(Integer.MAX_VALUE - 1)
     private long maxAttachmentBytes = 15L * 1024 * 1024;
 
     @Min(1)

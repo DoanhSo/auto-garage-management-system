@@ -31,6 +31,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ReceptionServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderRepository repairOrders;
+    @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
 
     @Mock
     private VehicleRepository vehicleRepository;
@@ -53,7 +55,8 @@ class ReceptionServiceTest {
 
     @BeforeEach
     void setUp() {
-        receptionService.setRepairWorkflow(repairWorkflow);
+        lenient().when(repairOrders.findById(anyLong())).thenReturn(Optional.of(
+                com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrder.builder().orderCode("RO-TEST").build()));
 
         customer = new Customer();
         customer.setId(1L);
@@ -89,9 +92,9 @@ class ReceptionServiceTest {
         req.setCustomerComplaint("Xe keu o banh truoc");
         req.setActorUserId(2L);
 
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(bookingRepository.findById(100L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(booking));
         when(repairWorkflow.receive(eq(2L), eq(100L), eq(1L), eq(10L), eq(20500))).thenReturn(999L);
 
         CheckInVehicleResponse response = receptionService.checkInVehicle(req);
@@ -120,7 +123,7 @@ class ReceptionServiceTest {
         req.setCustomerComplaint("Khach vang lai can thay dau");
         req.setActorUserId(2L);
 
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
         when(repairWorkflow.receive(eq(2L), isNull(), eq(1L), eq(10L), eq(20000))).thenReturn(888L);
 
@@ -142,9 +145,9 @@ class ReceptionServiceTest {
         req.setVehicleId(10L);
         req.setOdometerIn(20000);
 
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(bookingRepository.findById(100L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(booking));
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> receptionService.checkInVehicle(req));
         assertTrue(ex.getMessage().contains("không thuộc về xe"));
@@ -161,9 +164,9 @@ class ReceptionServiceTest {
         req.setVehicleId(10L);
         req.setOdometerIn(20000);
 
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(bookingRepository.findById(100L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(booking));
 
         ConflictException ex = assertThrows(ConflictException.class, () -> receptionService.checkInVehicle(req));
         assertTrue(ex.getMessage().contains("đã được tiếp nhận"));
@@ -177,7 +180,7 @@ class ReceptionServiceTest {
         req.setVehicleId(10L);
         req.setOdometerIn(19000); // Nhỏ hơn ODO hiện tại là 20000
 
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> receptionService.checkInVehicle(req));

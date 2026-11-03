@@ -137,7 +137,7 @@ export interface VehicleHistoryEntry {
   customerComplaint: string | null;
   diagnosis: string | null;
   status: string;
-  orderCustomerId: string;
+  orderCustomerId: string | null;
   isCurrentOwnerRecord: boolean;
   totalAmount: string | null;
   tasksDone: string[];
@@ -303,7 +303,7 @@ export interface CheckInVehicleResult {
 }
 
 export type CheckType = 'CHECK_IN' | 'QC' | 'HANDOVER';
-export type CheckResult = 'PASS' | 'FAIL' | 'CONDITIONAL';
+export type CheckResult = 'RECORDED' | 'PASSED' | 'FAILED';
 export type AttachmentCategory = 'CHECK_IN' | 'DIAGNOSIS' | 'QC' | 'HANDOVER' | 'WARRANTY';
 
 export interface Attachment {

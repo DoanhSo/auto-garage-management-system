@@ -31,6 +31,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class BaySchedulingServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.reception.repository.BookingRepository bookings;
+    @Mock private com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository services;
     @org.mockito.Spy private com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties workshop = new com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties();
 
     @Mock
@@ -49,6 +51,7 @@ class BaySchedulingServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(bookings.findById(10L)).thenReturn(Optional.of(new com.Group13_65CNTT.AutoGarage.reception.entity.Booking()));
         now = Instant.now();
         startsAt = now.plus(Duration.ofHours(1));
         endsAt = now.plus(Duration.ofHours(3));

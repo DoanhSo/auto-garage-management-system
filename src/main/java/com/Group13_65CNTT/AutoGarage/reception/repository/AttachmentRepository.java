@@ -15,6 +15,8 @@ public interface AttachmentRepository extends JpaRepository<Attachment, Long> {
 
     List<Attachment> findAllByVehicleCheckId(Long vehicleCheckId);
 
+    List<Attachment> findAllByVehicleCheckIdIn(java.util.Collection<Long> vehicleCheckIds);
+
     List<Attachment> findAllByRepairOrderIdAndCategory(Long repairOrderId, AttachmentCategory category);
 
     Optional<Attachment> findByStorageKey(String storageKey);
