@@ -104,7 +104,7 @@ export function VehicleCheckModal({
       <form
         onSubmit={handleSubmit(onSubmit)}
         noValidate
-        className="editor-form account-editor-form"
+        className="editor-form account-editor-form grid-3col"
       >
         <FormError message={generalError ? errorMessage(generalError) : undefined} />
 
@@ -119,7 +119,6 @@ export function VehicleCheckModal({
         <Field
           label="Số ODO kiểm tra (km)"
           error={errors.odometer?.message}
-          hint="Số km tại thời điểm bàn giao kiểm tra"
         >
           <input
             type="number"
@@ -131,11 +130,23 @@ export function VehicleCheckModal({
           />
         </Field>
 
+        <Field
+          label="Đèn cảnh báo trên táp-lô"
+          hint="Check Engine, ABS, Túi khí..."
+        >
+          <input
+            type="text"
+            className="input"
+            placeholder="Không có đèn báo lỗi..."
+            disabled={busy}
+            {...register('warningLights')}
+          />
+        </Field>
+
         <div className="form-section-label">TÌNH TRẠNG HIỆN TRƯỜNG PHƯƠNG TIỆN</div>
 
         <Field
-          label="Tình trạng ngoại thất (Vết trầy xước, móp méo)"
-          hint="Ví dụ: Xước nhẹ cản sau bên phụ, móp nhẹ vè cua lốp..."
+          label="Ngoại thất (Xước, móp)"
         >
           <input
             type="text"
@@ -147,35 +158,20 @@ export function VehicleCheckModal({
         </Field>
 
         <Field
-          label="Tình trạng nội thất & Đồ đạc trên xe"
-          hint="Ghi nhận đồ dùng cá nhân có giá trị hoặc tình trạng khoang lái"
+          label="Nội thất & Đồ đạc trên xe"
         >
           <input
             type="text"
             className="input"
-            placeholder="Ghế da sạch, không để đồ quý giá..."
+            placeholder="Ghế da sạch, đồ dùng..."
             disabled={busy}
             {...register('interiorCondition')}
           />
         </Field>
 
         <Field
-          label="Đèn cảnh báo trên bảng táp-lô"
-          hint="Kiểm tra các đèn Check Engine, ABS, Túi khí, Áp suất lốp..."
-        >
-          <input
-            type="text"
-            className="input"
-            placeholder="Không có đèn báo lỗi taplo..."
-            disabled={busy}
-            {...register('warningLights')}
-          />
-        </Field>
-
-        <Field
-          label="Ghi chú tổng kết của người kiểm tra"
+          label="Ghi chú tổng kết"
           error={errors.notes?.message}
-          hint="Ghi chú thêm về tiếng ồn bất thường, rò rỉ dung dịch..."
         >
           <input
             type="text"

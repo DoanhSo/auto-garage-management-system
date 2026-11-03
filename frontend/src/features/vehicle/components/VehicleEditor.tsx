@@ -116,7 +116,7 @@ function VehicleForm({
   return (
     <>
       <form
-        className="editor-form account-editor-form"
+        className="editor-form account-editor-form grid-3col"
         onSubmit={handleSubmit(onSubmit)}
         noValidate
       >
@@ -124,12 +124,11 @@ function VehicleForm({
 
         <div className="form-section-label">THÔNG TIN SỞ HỮU & ĐỊNH DANH</div>
 
-        <div className="full-width-field">
+        <div className="col-span-2">
           <Field
             label="Chủ sở hữu phương tiện"
             required={!existing}
             error={errors.customerId?.message}
-            hint={existing ? 'Chủ xe cố định. Để đổi chủ, hãy dùng tính năng Đổi chủ.' : undefined}
           >
             {existing ? (
               <input
@@ -160,7 +159,7 @@ function VehicleForm({
           <input
             type="text"
             className="input"
-            placeholder="Ví dụ: 30A-12345, 51K-99999"
+            placeholder="Ví dụ: 30A-12345"
             disabled={Boolean(existing) || busy}
             {...register('licensePlate')}
           />
@@ -170,7 +169,7 @@ function VehicleForm({
           <input
             type="text"
             className="input"
-            placeholder="17 ký tự chuẩn quốc tế"
+            placeholder="17 ký tự VIN"
             disabled={busy}
             maxLength={17}
             {...register('vin')}
@@ -181,7 +180,7 @@ function VehicleForm({
           <input
             type="text"
             className="input"
-            placeholder="Số hiệu động cơ trên đăng kiểm"
+            placeholder="Số máy động cơ"
             disabled={busy}
             {...register('engineNumber')}
           />
@@ -197,7 +196,7 @@ function VehicleForm({
           <input
             type="text"
             className="input"
-            placeholder="Toyota, Honda, Mazda, Hyundai, VinFast..."
+            placeholder="Toyota, Honda, Mazda..."
             disabled={busy}
             {...register('brand')}
           />
@@ -207,7 +206,7 @@ function VehicleForm({
           <input
             type="text"
             className="input"
-            placeholder="Camry, Civic, CX-5, VF8..."
+            placeholder="Camry, Civic, CX-5..."
             disabled={busy}
             {...register('model')}
           />
@@ -217,7 +216,7 @@ function VehicleForm({
           <input
             type="number"
             className="input"
-            placeholder="Ví dụ: 2022"
+            placeholder="2022"
             min="1990"
             max={new Date().getFullYear() + 1}
             disabled={busy}
@@ -229,7 +228,7 @@ function VehicleForm({
           <input
             type="text"
             className="input"
-            placeholder="Trắng ngọc trai, Đen, Đỏ..."
+            placeholder="Trắng, Đen, Đỏ..."
             disabled={busy}
             {...register('color')}
           />

@@ -253,7 +253,7 @@ function BookingForm({
 
   return (
     <>
-      <form className="editor-form account-editor-form" onSubmit={handleFormSubmit} noValidate>
+      <form className="editor-form account-editor-form grid-3col" onSubmit={handleFormSubmit} noValidate>
         <ol className="form-stepper full-width" aria-label="Các bước đặt lịch hẹn">
           {STEPS.map((item) => (
             <li
@@ -507,59 +507,63 @@ function BookingForm({
               {isNewVehicle ? ' (mới)' : ''}
             </p>
 
-            <Field
-              label="Thời gian hẹn tiếp nhận"
-              required
-              error={errors.appointmentAt?.message}
-              hint="Chọn ngày giờ tiếp nhận xe vào gara"
-            >
-              <input
-                type="datetime-local"
-                className="input"
-                disabled={busy}
-                {...register('appointmentAt')}
-              />
-            </Field>
-            <BookingTimeSlotPicker
-              value={watch('appointmentAt')}
-              disabled={busy}
-              onChange={(next) =>
-                setValue('appointmentAt', next, { shouldDirty: true, shouldValidate: true })
-              }
-            />
+            <div className="modal-split-columns">
+              <div className="modal-column-stack">
+                <Field
+                  label="Thời gian hẹn tiếp nhận"
+                  required
+                  error={errors.appointmentAt?.message}
+                >
+                  <input
+                    type="datetime-local"
+                    className="input"
+                    disabled={busy}
+                    {...register('appointmentAt')}
+                  />
+                </Field>
 
-            <Field
-              label="Dịch vụ yêu cầu chính"
-              error={errors.serviceId?.message}
-              hint="Để trống nếu cần khám & chẩn đoán trước"
-            >
-              <select
-                className="select"
-                disabled={isLoadingServices || busy}
-                {...register('serviceId')}
-              >
-                <option value="">Khám & Chẩn đoán tổng quát</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.serviceName} ({s.serviceType === 'PACKAGE' ? 'Gói BD' : 'Lẻ'})
-                  </option>
-                ))}
-              </select>
-            </Field>
+                <Field
+                  label="Dịch vụ yêu cầu chính"
+                  error={errors.serviceId?.message}
+                  hint="Để trống nếu cần khám trước"
+                >
+                  <select
+                    className="select"
+                    disabled={isLoadingServices || busy}
+                    {...register('serviceId')}
+                  >
+                    <option value="">Khám & Chẩn đoán tổng quát</option>
+                    {services.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.serviceName} ({s.serviceType === 'PACKAGE' ? 'Gói BD' : 'Lẻ'})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
 
-            <div className="full-width-field">
-              <Field
-                label="Mô tả hiện tượng / Yêu cầu cụ thể"
-                error={errors.requestDescription?.message}
-                hint="Mô tả rõ yêu cầu của khách hàng hoặc triệu chứng hư hỏng của xe"
-              >
-                <textarea
-                  className="input min-h-[75px] resize-none"
-                  placeholder="Ví dụ: Xe kêu cọt kẹt khi qua gờ giảm tốc, bảo dưỡng định kỳ mốc 20.000 km..."
+                <Field
+                  label="Mô tả hiện tượng / Yêu cầu cụ thể"
+                  error={errors.requestDescription?.message}
+                >
+                  <textarea
+                    rows={2}
+                    className="input resize-none"
+                    placeholder="Ví dụ: Xe kêu cọt kẹt khi qua gờ giảm tốc..."
+                    disabled={busy}
+                    {...register('requestDescription')}
+                  />
+                </Field>
+              </div>
+
+              <div>
+                <BookingTimeSlotPicker
+                  value={watch('appointmentAt')}
                   disabled={busy}
-                  {...register('requestDescription')}
+                  onChange={(next) =>
+                    setValue('appointmentAt', next, { shouldDirty: true, shouldValidate: true })
+                  }
                 />
-              </Field>
+              </div>
             </div>
 
             <div className="form-actions account-editor-actions">

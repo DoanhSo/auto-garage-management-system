@@ -119,7 +119,7 @@ function ServiceForm({
   return (
     <>
       <form
-        className="editor-form account-editor-form"
+        className="editor-form account-editor-form grid-3col"
         onSubmit={handleSubmit(onSubmit)}
         noValidate
       >
@@ -127,7 +127,7 @@ function ServiceForm({
 
         <div className="form-section-label">THÔNG TIN DỊCH VỤ CƠ BẢN & ĐỊNH MỨC</div>
 
-        <div className="full-width-field">
+        <div className="col-span-2">
           <Field label="Tên dịch vụ / Hạng mục" required error={errors.serviceName?.message}>
             <input
               type="text"
@@ -143,12 +143,11 @@ function ServiceForm({
         <Field
           label="Mã dịch vụ"
           error={errors.serviceCode?.message}
-          hint={existing ? 'Mã dịch vụ cố định' : undefined}
         >
           <input
             type="text"
             className="input"
-            placeholder="SRV-OIL-01 (tự sinh nếu để trống)"
+            placeholder="SRV-OIL-01 (tự sinh)"
             disabled={Boolean(existing) || busy}
             {...register('serviceCode')}
           />
@@ -173,7 +172,7 @@ function ServiceForm({
 
         <Field label="Yêu cầu khoang kỹ thuật" error={errors.requiredBayType?.message}>
           <select className="select" disabled={busy} {...register('requiredBayType')}>
-            <option value="">Khoang tự do (Không yêu cầu đặc biệt)</option>
+            <option value="">Khoang tự do</option>
             {bayTypes.map((b) => (
               <option key={b} value={b}>
                 {b}
@@ -216,7 +215,7 @@ function ServiceForm({
             type="number"
             className="input"
             min="0"
-            placeholder="Số ngày bảo hành kỹ thuật"
+            placeholder="Số ngày bảo hành"
             disabled={busy}
             {...register('warrantyDays')}
           />
@@ -234,7 +233,7 @@ function ServiceForm({
                 className="input"
                 step="1000"
                 min="0"
-                placeholder="Ví dụ: 5000, 10000 km"
+                placeholder="5000, 10000 km"
                 disabled={busy}
                 {...register('intervalKm')}
               />
@@ -245,7 +244,7 @@ function ServiceForm({
                 type="number"
                 className="input"
                 min="0"
-                placeholder="Ví dụ: 3, 6, 12 tháng"
+                placeholder="3, 6, 12 tháng"
                 disabled={busy}
                 {...register('intervalMonths')}
               />
@@ -257,7 +256,7 @@ function ServiceForm({
                 className="input"
                 min="0"
                 step="500"
-                placeholder="Số km tối đa bảo hành"
+                placeholder="Số km bảo hành"
                 disabled={busy}
                 {...register('warrantyKm')}
               />
@@ -268,7 +267,7 @@ function ServiceForm({
                 <input
                   type="text"
                   className="input"
-                  placeholder="Ghi chú chi tiết các bước kiểm tra, bảo dưỡng trong hạng mục dịch vụ này..."
+                  placeholder="Ghi chú chi tiết các bước kiểm tra, bảo dưỡng..."
                   disabled={busy}
                   {...register('description')}
                 />
@@ -283,18 +282,18 @@ function ServiceForm({
                 className="input"
                 min="0"
                 step="500"
-                placeholder="Số km tối đa bảo hành"
+                placeholder="Số km bảo hành"
                 disabled={busy}
                 {...register('warrantyKm')}
               />
             </Field>
 
-            <div className="full-width-field">
+            <div className="col-span-2">
               <Field label="Mô tả chi tiết nội dung công việc" error={errors.description?.message}>
                 <input
                   type="text"
                   className="input"
-                  placeholder="Ghi chú chi tiết các bước kiểm tra, sửa chữa trong hạng mục này..."
+                  placeholder="Ghi chú chi tiết các bước kiểm tra, sửa chữa..."
                   disabled={busy}
                   {...register('description')}
                 />

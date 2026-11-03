@@ -110,7 +110,7 @@ function CustomerForm({
     <>
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="editor-form account-editor-form"
+        className="editor-form account-editor-form grid-3col"
         noValidate
       >
         <FormError message={generalError ? errorMessage(generalError) : undefined} />
@@ -144,7 +144,7 @@ function CustomerForm({
           </select>
         </Field>
 
-        <Field label="Địa chỉ Email" error={errors.email?.message} hint="Không bắt buộc. Xóa nội dung để gỡ email.">
+        <Field label="Địa chỉ Email" error={errors.email?.message}>
           <input
             {...register('email')}
             type="email"
@@ -154,7 +154,7 @@ function CustomerForm({
           />
         </Field>
 
-        <div className="full-width-field">
+        <div className="col-span-2">
           <Field label="Địa chỉ liên hệ / Nơi cư trú" error={errors.address?.message}>
             <input
               {...register('address')}
@@ -169,19 +169,21 @@ function CustomerForm({
         {selectedType === 'BUSINESS' && (
           <>
             <div className="form-section-label">THÔNG TIN DOANH NGHIỆP</div>
-            <Field
-              label="Tên đầy đủ của Công ty / Doanh nghiệp"
-              error={errors.companyName?.message}
-              required
-            >
-              <input
-                {...register('companyName')}
-                type="text"
-                className="input"
-                placeholder="Công ty TNHH Vận tải ABC"
-                disabled={busy}
-              />
-            </Field>
+            <div className="col-span-2">
+              <Field
+                label="Tên đầy đủ của Công ty / Doanh nghiệp"
+                error={errors.companyName?.message}
+                required
+              >
+                <input
+                  {...register('companyName')}
+                  type="text"
+                  className="input"
+                  placeholder="Công ty TNHH Vận tải ABC"
+                  disabled={busy}
+                />
+              </Field>
+            </div>
 
             <Field label="Mã số thuế doanh nghiệp" error={errors.taxCode?.message}>
               <input
@@ -199,7 +201,6 @@ function CustomerForm({
         <Field
           label="Hạn mức nợ tối đa (VND)"
           error={errors.creditLimit?.message}
-          hint="Hạn mức dư nợ tối đa cho phép đối với khách hàng này"
         >
           <input
             {...register('creditLimit')}
@@ -214,7 +215,6 @@ function CustomerForm({
         <Field
           label="Thời hạn thanh toán nợ (Ngày)"
           error={errors.paymentTermDays?.message}
-          hint="Số ngày tối đa được nợ tiền sau khi xuất hóa đơn dịch vụ"
         >
           <input
             {...register('paymentTermDays')}

@@ -71,7 +71,7 @@ export function RescheduleModal({
       open={open}
       onClose={onClose}
       placement="center"
-      size="md"
+      size="lg"
       title={`Dời lịch hẹn #${booking.bookingCode}`}
       description={`Khách hàng: ${booking.customerName} • Xe: ${booking.licensePlate}`}
     >
@@ -84,31 +84,40 @@ export function RescheduleModal({
 
         <div className="form-section-label">THỜI GIAN TIẾP NHẬN MỚI</div>
 
-        <div className="full-width-field">
-          <Field
-            label="Thời gian hẹn mới"
-            required
-            error={errors.newAppointmentAt?.message}
-            hint="Chọn lại ngày và giờ dự kiến tiếp nhận xe vào xưởng"
-          >
-            <input
-              type="datetime-local"
-              className="input"
-              disabled={reschedule.isPending}
-              {...register('newAppointmentAt')}
-            />
-          </Field>
-        </div>
+        <div className="modal-split-columns">
+          <div className="modal-column-stack">
+            <Field
+              label="Thời gian hẹn mới"
+              required
+              error={errors.newAppointmentAt?.message}
+            >
+              <input
+                type="datetime-local"
+                className="input"
+                disabled={reschedule.isPending}
+                {...register('newAppointmentAt')}
+              />
+            </Field>
 
-        <div className="full-width-field">
-          <BookingTimeSlotPicker
-            value={watch('newAppointmentAt')}
-            excludeBookingId={booking.id}
-            disabled={reschedule.isPending}
-            onChange={(next) =>
-              setValue('newAppointmentAt', next, { shouldDirty: true, shouldValidate: true })
-            }
-          />
+            <div className="info-strip">
+              <CalendarClock size={18} />
+              <span>
+                <strong>Khách hàng:</strong> {booking.customerName}<br />
+                <strong>Phương tiện:</strong> {booking.licensePlate}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <BookingTimeSlotPicker
+              value={watch('newAppointmentAt')}
+              excludeBookingId={booking.id}
+              disabled={reschedule.isPending}
+              onChange={(next) =>
+                setValue('newAppointmentAt', next, { shouldDirty: true, shouldValidate: true })
+              }
+            />
+          </div>
         </div>
 
         <div className="form-actions account-editor-actions">
