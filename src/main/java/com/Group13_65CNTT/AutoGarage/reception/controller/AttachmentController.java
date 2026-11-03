@@ -77,7 +77,7 @@ public class AttachmentController {
                 .contentType(MediaType.parseMediaType(content.contentType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
                         .filename(content.originalFilename(), StandardCharsets.UTF_8).build().toString())
-                .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                .cacheControl(CacheControl.noStore())
                 // Chặn đoán MIME và thực thi script nếu tệp (vd. SVG) bị mở trực tiếp.
                 .header("X-Content-Type-Options", "nosniff")
                 .header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; sandbox")

@@ -13,6 +13,17 @@ public final class DatabaseFailures {
 
     private DatabaseFailures() {}
 
+    public static boolean isConstraint(Throwable failure, String name) {
+        Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Throwable current = failure; current != null && visited.add(current); current = current.getCause()) {
+            if (current instanceof org.hibernate.exception.ConstraintViolationException violation
+                    && violation.getConstraintName() != null
+                    && violation.getConstraintName().toLowerCase(java.util.Locale.ROOT)
+                            .contains(name.toLowerCase(java.util.Locale.ROOT))) return true;
+        }
+        return false;
+    }
+
     public static boolean isDuplicateKey(Throwable failure) {
         Set<Throwable> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         for (Throwable current = failure;

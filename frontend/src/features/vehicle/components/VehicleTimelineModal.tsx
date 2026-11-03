@@ -1,6 +1,8 @@
-import { Calendar, CheckCircle2, Clock, Gauge, Lock, Paperclip } from 'lucide-react';
 import { useState } from 'react';
-import { Button, Loading, QueryError, Sheet } from '../../../shared/components/ui';
+import { downloadAttachment } from '../../../shared/api/attachments';
+import { errorMessage } from '../../../shared/api/errors';
+import { Calendar, CheckCircle2, Clock, Gauge, Lock, Paperclip } from 'lucide-react';
+import { Button, FormError, Loading, QueryError, Sheet } from '../../../shared/components/ui';
 import { VehicleWorkHistoryTab } from './VehicleWorkHistoryTab';
 import { useVehicleTimelineQuery } from '../hooks/useVehicles';
 import { money, formatDateTime } from '../../../shared/utils/format';
@@ -15,6 +17,15 @@ export function VehicleTimelineModal({
   onClose: () => void;
 }) {
   const [view, setView] = useState<'repairs' | 'work'>('repairs');
+  const [downloadError, setDownloadError] = useState<string>();
+  const [downloading, setDownloading] = useState<string>();
+  async function download(id: string, filename: string) {
+    setDownloading(id);
+    setDownloadError(undefined);
+    try { await downloadAttachment(id, filename); }
+    catch (error) { setDownloadError(errorMessage(error)); }
+    finally { setDownloading(undefined); }
+  }
   const {
     data: timeline,
     isLoading,
@@ -37,6 +48,7 @@ export function VehicleTimelineModal({
       }
     >
       <div className="editor-form space-y-4">
+        <FormError message={downloadError} />
         <div className="row-actions" role="group" aria-label="Chế độ xem">
           <Button
             variant={view === 'repairs' ? 'primary' : 'secondary'}
@@ -162,16 +174,17 @@ export function VehicleTimelineModal({
                       </span>
                       <div className="flex flex-wrap gap-2">
                         {entry.technicalAttachments.map((att) => (
-                          <a
+                          <Button
                             key={att.id}
-                            href={att.fileUrl}
-                            target="_blank"
-                            rel="noreferrer"
+                            type="button"
+                            variant="ghost"
+                            disabled={downloading !== undefined}
+                            onClick={() => void download(att.id, att.fileName)}
                             className="inline-flex items-center gap-1 text-xs text-primary hover:underline bg-primary/5 px-2 py-1 rounded border border-primary/20"
                           >
                             <Paperclip size={12} />
                             <span>{att.fileName}</span>
-                          </a>
+                          </Button>
                         ))}
                       </div>
                     </div>

@@ -30,6 +30,12 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class VehicleServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleTimelineRepository timelineRepository;
+    @Mock private com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUser;
+    @Spy private com.Group13_65CNTT.AutoGarage.vehicle.mapper.VehicleHistoryMapper historyMapper =
+        org.mapstruct.factory.Mappers.getMapper(com.Group13_65CNTT.AutoGarage.vehicle.mapper.VehicleHistoryMapper.class);
+    @Spy private com.Group13_65CNTT.AutoGarage.reception.mapper.VehicleCheckMapper checkMapper =
+        new com.Group13_65CNTT.AutoGarage.reception.mapper.VehicleCheckMapper();
     @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
 
     @Mock
@@ -49,6 +55,7 @@ class VehicleServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(currentUser.role()).thenReturn(com.Group13_65CNTT.AutoGarage.common.enums.Role.RECEPTIONIST);
         owner = new Customer();
         owner.setId(10L);
         owner.setFullName("Tran Van Chu Xe");
@@ -127,7 +134,7 @@ class VehicleServiceTest {
         existing.setModel("Corolla Cross");
         existing.setOdometer(20000);
 
-        when(vehicleRepository.findById(100L)).thenReturn(Optional.of(existing));
+        when(vehicleRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(existing));
 
         UpdateVehicleRequest updateReq = new UpdateVehicleRequest();
         updateReq.setLicensePlate("51F12345");
@@ -152,7 +159,7 @@ class VehicleServiceTest {
         newOwner.setFullName("Le Thi Chu Moi");
         newOwner.setPhone("0988888888");
 
-        when(vehicleRepository.findById(100L)).thenReturn(Optional.of(existing));
+        when(vehicleRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(existing));
         when(customerRepository.findById(20L)).thenReturn(Optional.of(newOwner));
         when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -176,7 +183,7 @@ class VehicleServiceTest {
         existing.setId(100L);
         existing.setCustomerId(10L);
 
-        when(vehicleRepository.findById(100L)).thenReturn(Optional.of(existing));
+        when(vehicleRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(existing));
         when(customerRepository.findById(10L)).thenReturn(Optional.of(owner));
 
         TransferOwnershipRequest transferReq = new TransferOwnershipRequest();
@@ -218,9 +225,9 @@ class VehicleServiceTest {
 
         when(vehicleRepository.findById(100L)).thenReturn(Optional.of(existing));
 
-        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () ->
-                vehicleService.getVehicleTimeline(100L, 999L, "CUSTOMER"));
-
-        assertTrue(ex.getMessage().contains("không có quyền truy cập"));
+        doThrow(new BusinessException(ResponseCode.FORBIDDEN)).when(customerScope)
+                .requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.VEHICLE, 100L);
+        assertEquals(ResponseCode.FORBIDDEN, assertThrows(BusinessException.class, () ->
+                vehicleService.getVehicleTimeline(100L, 999L, "ADMIN")).getResponseCode());
     }
 }

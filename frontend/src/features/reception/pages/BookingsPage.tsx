@@ -271,7 +271,7 @@ export function BookingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="ĐẶT LỊCH HẸN"
+        eyebrow="TIẾP NHẬN & DỊCH VỤ"
         title="Lịch hẹn & Tiếp nhận xe"
         description="Quản lý lịch hẹn dịch vụ, thực hiện quy trình tiếp nhận xe vào xưởng (Check-in) và lập biên bản kiểm tra tình trạng xe."
         actions={

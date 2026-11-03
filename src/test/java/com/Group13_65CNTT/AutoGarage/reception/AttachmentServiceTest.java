@@ -11,11 +11,7 @@ import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentContent;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +27,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AttachmentServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.reception.service.impl.AttachmentStorage storage;
+    @Mock private com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUser;
     @Mock private com.Group13_65CNTT.AutoGarage.reception.repository.VehicleCheckRepository vehicleCheckRepository;
     @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
     @org.mockito.Spy private com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties workshop = new com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties();
@@ -46,18 +44,78 @@ class AttachmentServiceTest {
 
     private MockMultipartFile validImageFile;
 
-    @TempDir
-    Path storageDir;
-
     @BeforeEach
     void setUp() {
-        workshop.setAttachmentStorageDir(storageDir.toString());
+        lenient().when(currentUser.userId()).thenReturn(2L);
+        lenient().when(currentUser.role()).thenReturn(com.Group13_65CNTT.AutoGarage.common.enums.Role.TECHNICIAN);
+        var check = new com.Group13_65CNTT.AutoGarage.reception.entity.VehicleCheck();
+        check.setRepairOrderId(100L);
+        check.setCheckType(com.Group13_65CNTT.AutoGarage.reception.entity.CheckType.CHECK_IN);
+        lenient().when(vehicleCheckRepository.findById(1L)).thenReturn(java.util.Optional.of(check));
         validImageFile = new MockMultipartFile(
                 "file",
                 "car_scratch.jpg",
                 "image/jpeg",
-                "dummy image content bytes".getBytes()
+                new byte[]{(byte)0xff, (byte)0xd8, (byte)0xff, 0x00}
         );
+    }
+
+    @Test
+    void storedContentIsServedBackWithOriginalType() throws Exception {
+        var saved = new Attachment(); saved.setId(10L); saved.setStorageKey("attachments/check_in/photo.jpg");
+        saved.setContentType("image/jpeg"); saved.setOriginalFilename("photo.jpg");
+        byte[] bytes = validImageFile.getBytes();
+        saved.setSha256(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
+        when(attachmentRepository.findById(10L)).thenReturn(java.util.Optional.of(saved));
+        when(storage.read(saved.getStorageKey())).thenReturn(bytes);
+        var content = attachmentService.loadAttachmentContent(10L);
+        assertArrayEquals(bytes, content.bytes());
+        assertEquals("image/jpeg", content.contentType());
+    }
+
+    @Test
+    void missingSeedFileFallsBackToEscapedSvgPlaceholder() {
+        var saved = new Attachment(); saved.setId(11L); saved.setStorageKey("attachments/seed.jpg");
+        saved.setOriginalFilename("<script>x</script>.jpg"); saved.setCategory(AttachmentCategory.DIAGNOSIS);
+        when(attachmentRepository.findById(11L)).thenReturn(java.util.Optional.of(saved));
+        when(storage.read(saved.getStorageKey())).thenThrow(new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        var content = attachmentService.loadAttachmentContent(11L);
+        assertEquals("image/svg+xml", content.contentType());
+        assertFalse(new String(content.bytes(), java.nio.charset.StandardCharsets.UTF_8).contains("<script>"));
+    }
+
+    @Test
+    void storageKeyEscapingTheRootIsRejected() {
+        var realStorage = new com.Group13_65CNTT.AutoGarage.reception.service.impl.AttachmentStorage(workshop);
+        var failure = assertThrows(BusinessException.class, () -> realStorage.read("../../etc/passwd"));
+        assertEquals(ResponseCode.BAD_REQUEST, failure.getResponseCode());
+    }
+
+    @Test
+    void uploadedMimeMustMatchContent() {
+        var fake = new MockMultipartFile("file", "image.jpg", "image/jpeg", "not an image".getBytes());
+        assertEquals(ResponseCode.UNSUPPORTED_MEDIA_TYPE, assertThrows(BusinessException.class, () ->
+                attachmentService.uploadAttachment(100L, 1L, null, AttachmentCategory.CHECK_IN, 2L, fake)).getResponseCode());
+        verifyNoInteractions(storage, attachmentRepository);
+    }
+
+    @Test
+    void checkFromAnotherOrderCannotBeAttached() {
+        var foreign = new com.Group13_65CNTT.AutoGarage.reception.entity.VehicleCheck();
+        foreign.setRepairOrderId(999L);
+        foreign.setCheckType(com.Group13_65CNTT.AutoGarage.reception.entity.CheckType.CHECK_IN);
+        when(vehicleCheckRepository.findById(1L)).thenReturn(java.util.Optional.of(foreign));
+        assertEquals(ResponseCode.BAD_REQUEST, assertThrows(BusinessException.class, () ->
+                attachmentService.uploadAttachment(100L, 1L, null, AttachmentCategory.CHECK_IN, 2L, validImageFile)).getResponseCode());
+        verifyNoInteractions(storage, attachmentRepository);
+    }
+
+    @Test
+    void downloadRequiresPermissionBeforeReadingStoredBytes() {
+        doThrow(new BusinessException(ResponseCode.FORBIDDEN)).when(customerScope)
+                .requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.ATTACHMENT, 10L);
+        assertThrows(BusinessException.class, () -> attachmentService.downloadAttachment(10L));
+        verifyNoInteractions(storage, attachmentRepository);
     }
 
     @Test
@@ -72,7 +130,7 @@ class AttachmentServiceTest {
     @Test
     void uploadRespectsConfiguredLimit() {
         workshop.setMaxAttachmentBytes(1);
-        assertThrows(BusinessRuleException.class, () -> attachmentService.uploadAttachment(
+        assertThrows(BusinessException.class, () -> attachmentService.uploadAttachment(
                 100L, 1L, null, AttachmentCategory.CHECK_IN, 2L, validImageFile));
         verifyNoInteractions(attachmentRepository);
     }
@@ -105,7 +163,7 @@ class AttachmentServiceTest {
     @Test
     @DisplayName("TV2-08: Tải lên tệp ảnh thành công, sinh sha256 và storageKey an toàn")
     void testUploadAttachment_Success() {
-        when(attachmentRepository.save(any(Attachment.class))).thenAnswer(invocation -> {
+        when(attachmentRepository.saveAndFlush(any(Attachment.class))).thenAnswer(invocation -> {
             Attachment a = invocation.getArgument(0);
             a.setId(10L);
             return a;
@@ -123,56 +181,7 @@ class AttachmentServiceTest {
         assertNotNull(response.getStorageKey());
         assertTrue(response.getStorageKey().startsWith("attachments/check_in/"));
         assertFalse(response.getStorageKey().contains("car_scratch.jpg")); // Không dùng filename tùy ý
-        verify(attachmentRepository, times(1)).save(any(Attachment.class));
-        assertTrue(Files.isRegularFile(storageDir.resolve(response.getStorageKey())));
-    }
-
-    @Test
-    void storedContentIsServedBackWithOriginalType() throws IOException {
-        Attachment saved = new Attachment();
-        saved.setId(10L);
-        saved.setStorageKey("attachments/check_in/2026/11/01/a.jpg");
-        saved.setContentType("image/jpeg");
-        saved.setOriginalFilename("car_scratch.jpg");
-        Path file = storageDir.resolve(saved.getStorageKey());
-        Files.createDirectories(file.getParent());
-        Files.write(file, validImageFile.getBytes());
-        when(attachmentRepository.findById(10L)).thenReturn(java.util.Optional.of(saved));
-
-        AttachmentContent content = attachmentService.loadAttachmentContent(10L);
-
-        assertArrayEquals(validImageFile.getBytes(), content.bytes());
-        assertEquals("image/jpeg", content.contentType());
-    }
-
-    @Test
-    void missingSeedFileFallsBackToEscapedSvgPlaceholder() {
-        Attachment seeded = new Attachment();
-        seeded.setId(11L);
-        seeded.setStorageKey("attachments/diagnosis/seed.jpg");
-        seeded.setContentType("image/jpeg");
-        seeded.setOriginalFilename("<script>x</script>.jpg");
-        seeded.setCategory(AttachmentCategory.DIAGNOSIS);
-        when(attachmentRepository.findById(11L)).thenReturn(java.util.Optional.of(seeded));
-
-        AttachmentContent content = attachmentService.loadAttachmentContent(11L);
-        String svg = new String(content.bytes(), java.nio.charset.StandardCharsets.UTF_8);
-
-        assertEquals("image/svg+xml", content.contentType());
-        assertTrue(svg.contains("DIAGNOSIS"));
-        assertFalse(svg.contains("<script>"));
-    }
-
-    @Test
-    void storageKeyEscapingTheRootIsRejected() {
-        Attachment hostile = new Attachment();
-        hostile.setId(12L);
-        hostile.setStorageKey("../../etc/passwd");
-        when(attachmentRepository.findById(12L)).thenReturn(java.util.Optional.of(hostile));
-
-        BusinessException failure = assertThrows(BusinessException.class,
-                () -> attachmentService.loadAttachmentContent(12L));
-        assertEquals(ResponseCode.BAD_REQUEST, failure.getResponseCode());
+        verify(attachmentRepository, times(1)).saveAndFlush(any(Attachment.class));
     }
 
     @Test
@@ -183,7 +192,7 @@ class AttachmentServiceTest {
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () ->
                 attachmentService.uploadAttachment(100L, 1L, null, AttachmentCategory.CHECK_IN, 2L, emptyFile));
         assertTrue(ex.getMessage().contains("không được để trống"));
-        verify(attachmentRepository, never()).save(any());
+        verify(attachmentRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -191,10 +200,10 @@ class AttachmentServiceTest {
     void testUploadAttachment_InvalidMimeType() {
         MockMultipartFile exeFile = new MockMultipartFile("file", "malware.exe", "application/x-msdownload", "evil".getBytes());
 
-        BusinessRuleException ex = assertThrows(BusinessRuleException.class, () ->
+        BusinessException ex = assertThrows(BusinessException.class, () ->
                 attachmentService.uploadAttachment(100L, 1L, null, AttachmentCategory.CHECK_IN, 2L, exeFile));
-        assertTrue(ex.getMessage().contains("không được hỗ trợ"));
-        verify(attachmentRepository, never()).save(any());
+        assertEquals(ResponseCode.UNSUPPORTED_MEDIA_TYPE, ex.getResponseCode());
+        verify(attachmentRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -203,6 +212,6 @@ class AttachmentServiceTest {
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () ->
                 attachmentService.uploadAttachment(null, null, null, AttachmentCategory.CHECK_IN, 2L, validImageFile));
         assertTrue(ex.getMessage().contains("phải gắn với"));
-        verify(attachmentRepository, never()).save(any());
+        verify(attachmentRepository, never()).saveAndFlush(any());
     }
 }

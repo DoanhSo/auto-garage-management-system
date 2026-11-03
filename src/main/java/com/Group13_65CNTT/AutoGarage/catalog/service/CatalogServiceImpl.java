@@ -1,5 +1,8 @@
 package com.Group13_65CNTT.AutoGarage.catalog.service;
 
+import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
+
 import com.Group13_65CNTT.AutoGarage.catalog.dto.CreateServiceRequest;
 import com.Group13_65CNTT.AutoGarage.catalog.dto.ServiceResponse;
 import com.Group13_65CNTT.AutoGarage.catalog.dto.UpdateServiceRequest;
@@ -20,20 +23,19 @@ import java.util.List;
 import java.util.Random;
 
 @Service
+@lombok.RequiredArgsConstructor
 @Transactional
 public class CatalogServiceImpl implements CatalogService {
 
+    private final com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
     private final ServiceRepository serviceRepository;
     private final ServiceMapper serviceMapper;
     private final Random random = new Random();
 
-    public CatalogServiceImpl(ServiceRepository serviceRepository, ServiceMapper serviceMapper) {
-        this.serviceRepository = serviceRepository;
-        this.serviceMapper = serviceMapper;
-    }
-
     @Override
+    @Audited(action = AuditConstants.ACTION_SERVICE_CREATED, entity = AuditConstants.ENTITY_SERVICE)
     public ServiceResponse createService(CreateServiceRequest request) {
+        customerScope.requireAdmin();
         validateServiceRules(request.getUnitPrice(), request.getStandardMinutes(),
                 request.getIntervalKm(), request.getIntervalMonths(),
                 request.getWarrantyDays(), request.getWarrantyKm());
@@ -80,7 +82,9 @@ public class CatalogServiceImpl implements CatalogService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_SERVICE_UPDATED, entity = AuditConstants.ENTITY_SERVICE, idArgument = 0)
     public ServiceResponse updateService(Long id, UpdateServiceRequest request) {
+        customerScope.requireAdmin();
         ServiceEntity entity = serviceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dịch vụ với ID: " + id));
 
@@ -99,7 +103,9 @@ public class CatalogServiceImpl implements CatalogService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_SERVICE_DEACTIVATED, entity = AuditConstants.ENTITY_SERVICE, idArgument = 0)
     public void deactivateService(Long id) {
+        customerScope.requireAdmin();
         ServiceEntity entity = serviceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dịch vụ với ID: " + id));
         entity.setIsActive(false);

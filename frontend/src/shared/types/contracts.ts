@@ -137,7 +137,7 @@ export interface VehicleHistoryEntry {
   customerComplaint: string | null;
   diagnosis: string | null;
   status: string;
-  orderCustomerId: string;
+  orderCustomerId: string | null;
   isCurrentOwnerRecord: boolean;
   totalAmount: string | null;
   tasksDone: string[];

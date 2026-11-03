@@ -35,13 +35,13 @@ public class VehicleCheckController {
     private final CurrentUserProvider currentUserProvider;
 
     @PostMapping
-    @PreAuthorize(SecurityConstants.HAS_TECHNICAL_ACCESS)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
     @Operation(summary = "Record vehicle check result")
     public ResponseEntity<ApiResponse<VehicleCheckResponse>> recordVehicleCheck(
             @Valid @RequestBody CreateVehicleCheckRequest request,
             HttpServletRequest httpRequest) {
         // QC must use the quality workflow, which checks tasks, timers and QC assignment.
-        if (request.getCheckType() == CheckType.QC) {
+        if (request.getCheckType() != CheckType.CHECK_IN) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
         request.setCheckedBy(currentUserProvider.userId());

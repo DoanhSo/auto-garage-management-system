@@ -113,7 +113,6 @@ export function VehicleCheckModal({
         <Field label="Loại kiểm tra" required error={errors.checkType?.message}>
           <select className="select" disabled={busy} {...register('checkType')}>
             <option value="CHECK_IN">Kiểm tra tiếp nhận</option>
-            <option value="HANDOVER">Kiểm tra trước bàn giao</option>
           </select>
         </Field>
 

@@ -1,5 +1,8 @@
 package com.Group13_65CNTT.AutoGarage.vehicle.service;
 
+import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
+
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
@@ -22,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
+@lombok.RequiredArgsConstructor
 @Transactional
 public class VehicleServiceImpl implements VehicleService {
     private final CustomerScope customerScope;
@@ -30,16 +34,13 @@ public class VehicleServiceImpl implements VehicleService {
     private final CustomerRepository customerRepository;
     private final VehicleMapper vehicleMapper;
 
-    public VehicleServiceImpl(VehicleRepository vehicleRepository,
-                              CustomerRepository customerRepository,
-                              VehicleMapper vehicleMapper, CustomerScope customerScope) {
-        this.customerScope = customerScope;
-        this.vehicleRepository = vehicleRepository;
-        this.customerRepository = customerRepository;
-        this.vehicleMapper = vehicleMapper;
-    }
+    private final com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleTimelineRepository timelineRepository;
+    private final com.Group13_65CNTT.AutoGarage.vehicle.mapper.VehicleHistoryMapper historyMapper;
+    private final com.Group13_65CNTT.AutoGarage.reception.mapper.VehicleCheckMapper checkMapper;
+    private final com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUser;
 
     @Override
+    @Audited(action = AuditConstants.ACTION_VEHICLE_CREATED, entity = AuditConstants.ENTITY_VEHICLE)
     public VehicleResponse createVehicle(CreateVehicleRequest request) {
         customerScope.requireFrontDesk();
         Customer customer = customerRepository.findById(request.getCustomerId())
@@ -102,21 +103,21 @@ public class VehicleServiceImpl implements VehicleService {
     public List<VehicleResponse> searchVehicles(Long customerId, String search, Boolean isActive) {
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
         Long scopedCustomerId = customerScope.customerIdForQuery(customerId);
-        return vehicleRepository.searchVehicles(scopedCustomerId, cleanSearch, isActive)
-                .stream()
-                .map(v -> {
-                    Customer c = customerRepository.findById(v.getCustomerId()).orElse(null);
-                    return vehicleMapper.toResponse(v,
-                            c != null ? c.getFullName() : null,
-                            c != null ? c.getPhone() : null);
-                })
-                .toList();
+        var vehicles = vehicleRepository.searchVehicles(scopedCustomerId, cleanSearch, isActive);
+        var owners = customerRepository.findAllById(vehicles.stream().map(Vehicle::getCustomerId).distinct().toList())
+                .stream().collect(java.util.stream.Collectors.toMap(Customer::getId, java.util.function.Function.identity()));
+        return vehicles.stream().map(vehicle -> {
+            Customer owner = owners.get(vehicle.getCustomerId());
+            return vehicleMapper.toResponse(vehicle, owner == null ? null : owner.getFullName(),
+                    owner == null ? null : owner.getPhone());
+        }).toList();
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_VEHICLE_UPDATED, entity = AuditConstants.ENTITY_VEHICLE, idArgument = 0)
     public VehicleResponse updateVehicle(Long id, UpdateVehicleRequest request) {
         customerScope.requireFrontDesk();
-        Vehicle vehicle = vehicleRepository.findById(id)
+        Vehicle vehicle = vehicleRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + id));
 
         String normalizedPlate = normalizePlate(request.getLicensePlate());
@@ -156,9 +157,10 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_VEHICLE_TRANSFERRED, entity = AuditConstants.ENTITY_VEHICLE, idArgument = 0)
     public VehicleResponse transferOwnership(Long vehicleId, TransferOwnershipRequest request) {
         customerScope.requireFrontDesk();
-        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+        Vehicle vehicle = vehicleRepository.findByIdForUpdate(vehicleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + vehicleId));
 
         Customer newCustomer = customerRepository.findById(request.getNewCustomerId())
@@ -175,9 +177,10 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_VEHICLE_DEACTIVATED, entity = AuditConstants.ENTITY_VEHICLE, idArgument = 0)
     public void deactivateVehicle(Long id) {
         customerScope.requireFrontDesk();
-        Vehicle vehicle = vehicleRepository.findById(id)
+        Vehicle vehicle = vehicleRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + id));
         vehicle.setIsActive(false);
         vehicleRepository.save(vehicle);
@@ -202,11 +205,13 @@ public class VehicleServiceImpl implements VehicleService {
 
     private com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse buildTimeline(Vehicle vehicle, Long requestingCustomerId, String userRole) {
         customerScope.requireResource(AccessResource.VEHICLE, vehicle.getId());
-        if ("CUSTOMER".equalsIgnoreCase(userRole)) {
-            if (requestingCustomerId == null || !requestingCustomerId.equals(vehicle.getCustomerId())) {
-                throw new BusinessRuleException("Bạn không có quyền truy cập lịch sử của phương tiện này (BR02)");
-            }
-        }
+        var actorRole = currentUser.role();
+        boolean frontDesk = actorRole == com.Group13_65CNTT.AutoGarage.common.enums.Role.ADMIN
+                || actorRole == com.Group13_65CNTT.AutoGarage.common.enums.Role.RECEPTIONIST;
+        Long ownCustomerId = actorRole == com.Group13_65CNTT.AutoGarage.common.enums.Role.CUSTOMER
+                ? customerScope.currentCustomerId() : null;
+        Long technicianId = actorRole == com.Group13_65CNTT.AutoGarage.common.enums.Role.TECHNICIAN
+                ? currentUser.userId() : null;
 
         Customer currentOwner = customerRepository.findById(vehicle.getCustomerId()).orElse(null);
 
@@ -219,6 +224,43 @@ public class VehicleServiceImpl implements VehicleService {
         timeline.setCurrentCustomerId(vehicle.getCustomerId());
         timeline.setCurrentCustomerName(currentOwner != null ? currentOwner.getFullName() : null);
 
+        var orders = timelineRepository.orders(vehicle.getId(), technicianId);
+        if (orders.isEmpty()) return timeline;
+        var ids = orders.stream().map(com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrder::getId).toList();
+        var tasks = timelineRepository.completedTasks(ids).stream().collect(java.util.stream.Collectors.groupingBy(
+                com.Group13_65CNTT.AutoGarage.repair.entity.RepairTask::getRepairOrderId));
+        var parts = timelineRepository.parts(ids).stream().collect(java.util.stream.Collectors.groupingBy(
+                com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleTimelineRepository.ReplacedPart::getOrderId));
+        // Files and warranty details retain historical order ownership, even after vehicle transfer.
+        var privateIds = orders.stream().filter(order -> frontDesk || technicianId != null
+                || java.util.Objects.equals(ownCustomerId, order.getCustomerId())).map(
+                com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrder::getId).toList();
+        var attachments = privateIds.isEmpty() ? java.util.List.<com.Group13_65CNTT.AutoGarage.reception.entity.Attachment>of()
+                : timelineRepository.attachments(privateIds);
+        var warranties = privateIds.isEmpty() ? java.util.List.<com.Group13_65CNTT.AutoGarage.vehicle.dto.response.VehicleWarrantyResponse>of()
+                : timelineRepository.warranties(privateIds);
+        var invoices = frontDesk || ownCustomerId != null ? timelineRepository.invoices(ids)
+                : java.util.List.<com.Group13_65CNTT.AutoGarage.billing.entity.Invoice>of();
+        timeline.setHistoryEntries(orders.stream().map(order -> {
+            var entry = historyMapper.toResponse(order);
+            boolean ownRecord = java.util.Objects.equals(ownCustomerId, order.getCustomerId());
+            entry.setCurrentOwnerRecord(java.util.Objects.equals(vehicle.getCustomerId(), order.getCustomerId()));
+            if (frontDesk || ownRecord) {
+                entry.setOrderCustomerId(order.getCustomerId());
+                entry.setCustomerComplaint(order.getCustomerComplaint());
+            }
+            entry.setTasksDone(tasks.getOrDefault(order.getId(), java.util.List.of()).stream()
+                    .map(com.Group13_65CNTT.AutoGarage.repair.entity.RepairTask::getTaskName).toList());
+            entry.setPartsReplaced(parts.getOrDefault(order.getId(), java.util.List.of()).stream()
+                    .map(com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleTimelineRepository.ReplacedPart::getName).toList());
+            entry.setTechnicalAttachments(attachments.stream().filter(a -> order.getId().equals(a.getRepairOrderId()))
+                    .map(checkMapper::toAttachmentResponse).toList());
+            entry.setWarranties(warranties.stream().filter(w -> order.getId().equals(w.repairOrderId())).toList());
+            invoices.stream().filter(invoice -> order.getId().equals(invoice.getRepairOrderId())
+                    && (frontDesk || java.util.Objects.equals(ownCustomerId, invoice.getCustomerId())))
+                    .findFirst().ifPresent(invoice -> entry.setTotalAmount(invoice.getTotalAmount()));
+            return entry;
+        }).toList());
         return timeline;
     }
 

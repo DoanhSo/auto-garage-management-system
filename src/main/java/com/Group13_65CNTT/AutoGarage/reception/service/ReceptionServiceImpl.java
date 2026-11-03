@@ -1,5 +1,8 @@
 package com.Group13_65CNTT.AutoGarage.reception.service;
 
+import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
+
 import com.Group13_65CNTT.AutoGarage.common.security.ActorIds;
 import com.Group13_65CNTT.AutoGarage.customer.entity.Customer;
 import com.Group13_65CNTT.AutoGarage.customer.repository.CustomerRepository;
@@ -15,42 +18,31 @@ import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
 import com.Group13_65CNTT.AutoGarage.vehicle.entity.Vehicle;
 import com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleRepository;
 
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
 @Service
+@lombok.RequiredArgsConstructor
 @Transactional
 public class ReceptionServiceImpl implements ReceptionService {
 
+    private final com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    private final com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderRepository repairOrders;
     private final VehicleRepository vehicleRepository;
     private final CustomerRepository customerRepository;
     private final BookingRepository bookingRepository;
-    private RepairWorkflow repairWorkflow;
-
-    public ReceptionServiceImpl(
-            VehicleRepository vehicleRepository,
-            CustomerRepository customerRepository,
-            BookingRepository bookingRepository,
-            ObjectProvider<RepairWorkflow> repairWorkflowProvider) {
-        this.vehicleRepository = vehicleRepository;
-        this.customerRepository = customerRepository;
-        this.bookingRepository = bookingRepository;
-        this.repairWorkflow =
-                repairWorkflowProvider != null ? repairWorkflowProvider.getIfAvailable() : null;
-    }
-
-    public void setRepairWorkflow(RepairWorkflow repairWorkflow) {
-        this.repairWorkflow = repairWorkflow;
-    }
+    private final RepairWorkflow repairWorkflow;
 
     @Override
+    @Audited(action = AuditConstants.ACTION_VEHICLE_RECEIVED, entity = AuditConstants.ENTITY_REPAIR_ORDER)
     public CheckInVehicleResponse checkInVehicle(CheckInVehicleRequest request) {
+        customerScope.requireFrontDesk();
+        customerScope.requireActor(request.getActorUserId());
         Vehicle vehicle =
                 vehicleRepository
-                        .findById(request.getVehicleId())
+                        .findByIdForUpdate(request.getVehicleId())
                         .orElseThrow(
                                 () ->
                                         new ResourceNotFoundException(
@@ -91,7 +83,7 @@ public class ReceptionServiceImpl implements ReceptionService {
         if (bookingId != null) {
             Booking booking =
                     bookingRepository
-                            .findById(bookingId)
+                            .findByIdForUpdate(bookingId)
                             .orElseThrow(
                                     () ->
                                             new ResourceNotFoundException(
@@ -124,7 +116,6 @@ public class ReceptionServiceImpl implements ReceptionService {
 
         long actor = ActorIds.require(request.getActorUserId());
         long repairOrderId;
-        if (repairWorkflow != null) {
             repairOrderId =
                     repairWorkflow.receive(
                             actor,
@@ -135,14 +126,10 @@ public class ReceptionServiceImpl implements ReceptionService {
             repairWorkflow.recordReceptionDetails(repairOrderId, request.getFuelLevelPercent(), request.getCustomerComplaint());
             repairWorkflow.recordReceptionDispatch(
                     actor, repairOrderId, request.getDiagnosticTechnicianId(), request.getServiceBayId());
-        } else {
-            throw new com.Group13_65CNTT.AutoGarage.common.exception.BusinessException(
-                    com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.SERVICE_UNAVAILABLE);
-        }
 
         // Chỉ đánh dấu đã tiếp nhận sau khi I03 tạo phiếu thành công.
         if (bookingId != null) {
-            Booking booking = bookingRepository.findById(bookingId)
+            Booking booking = bookingRepository.findByIdForUpdate(bookingId)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch hẹn"));
             booking.setStatus(BookingStatus.RECEIVED);
             bookingRepository.save(booking);
@@ -150,6 +137,11 @@ public class ReceptionServiceImpl implements ReceptionService {
 
         CheckInVehicleResponse response = new CheckInVehicleResponse();
         response.setRepairOrderId(repairOrderId);
+        var createdOrder = repairOrders.findById(repairOrderId)
+                .orElseThrow(() -> new com.Group13_65CNTT.AutoGarage.common.exception.BusinessException(
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.RESOURCE_NOT_FOUND));
+        response.setOrderCode(createdOrder.getOrderCode());
+        response.setStatus(createdOrder.getStatus().name());
         response.setBookingId(bookingId);
         response.setCustomerId(customer.getId());
         response.setCustomerName(customer.getFullName());
