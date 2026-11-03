@@ -181,12 +181,17 @@ function BookingForm({
       return;
     }
     if (plateMatch) {
-      setError(
-        'newVehicle.licensePlate',
-        { message: 'Biển số đã có trên hệ thống.' },
-        { shouldFocus: true },
-      );
-      return;
+      if (plateBelongsToCustomer) {
+        selectExistingVehicle(plateMatch.id);
+      } else {
+        const owner = plateMatch.customerName ? ' (' + plateMatch.customerName + ')' : '';
+        setError(
+          'newVehicle.licensePlate',
+          { message: 'Biển số đã đăng ký cho xe của khách khác' + owner + '.' },
+          { shouldFocus: true },
+        );
+        return;
+      }
     }
     pendingFocus.current = 'appointmentAt';
     setStep(2);
