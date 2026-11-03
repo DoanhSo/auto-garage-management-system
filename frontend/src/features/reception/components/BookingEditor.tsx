@@ -3,6 +3,7 @@ import { useForm, type Path } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { ApiError, applyFormError, errorMessage } from '../../../shared/api/errors';
+import { CalendarClock } from 'lucide-react';
 import { Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/components/ui';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
@@ -12,6 +13,7 @@ import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
 import { useServicesQuery } from '../../catalog/hooks/useCatalog';
 import { useCreateBookingMutation } from '../hooks/useReception';
 import { BookingTimeSlotPicker } from './BookingTimeSlotPicker';
+import { PICKER_TIME_SLOTS, formatAppointmentDisplay, getInitialAppointmentSlot, isSlotInPast, todayKey } from '../constants/bookingSlots';
 import {
   bookingDefaults,
   bookingFormSchema,
@@ -86,7 +88,7 @@ function BookingForm({
   } = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema),
     mode: 'onBlur',
-    defaultValues: { ...bookingDefaults(), appointmentAt: initialAppointmentAt ?? '' },
+    defaultValues: { ...bookingDefaults(), appointmentAt: getInitialAppointmentSlot(initialAppointmentAt) },
   });
 
   useEffect(() => {
@@ -197,6 +199,10 @@ function BookingForm({
       setError('appointmentAt', { message: 'Thời gian hẹn không hợp lệ' });
       return;
     }
+    if (appointmentDate.getTime() < Date.now()) {
+      setError('appointmentAt', { message: 'Thời gian hẹn không được ở trong quá khứ' });
+      return;
+    }
     try {
       await create.mutateAsync(bookingPayload(values, appointmentDate.toISOString()));
       notify('Đặt lịch hẹn thành công');
@@ -242,6 +248,13 @@ function BookingForm({
   const customerRegistration = register('customerId', {
     onChange: () => setValue('vehicleId', ''),
   });
+  const currentAppointmentAt = watch('appointmentAt');
+  const selectedBookingDate = currentAppointmentAt ? currentAppointmentAt.slice(0, 10) : todayKey();
+  const selectedBookingTime =
+    currentAppointmentAt && currentAppointmentAt.includes('T')
+      ? currentAppointmentAt.slice(11, 16)
+      : '';
+
   const vehicleRegistration = register('vehicleId', {
     onChange: (event) => {
       if (event.target.value === NEW_VEHICLE_OPTION) {
@@ -510,17 +523,49 @@ function BookingForm({
             <div className="modal-split-columns">
               <div className="modal-column-stack">
                 <Field
-                  label="Thời gian hẹn tiếp nhận"
+                  label="Ngày hẹn tiếp nhận"
                   required
                   error={errors.appointmentAt?.message}
+                  hint="Chọn ngày đưa xe vào gara"
                 >
                   <input
-                    type="datetime-local"
+                    type="date"
                     className="input"
+                    min={todayKey()}
                     disabled={busy}
-                    {...register('appointmentAt')}
+                    value={selectedBookingDate}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      if (!newDate) return;
+                      const time = selectedBookingTime || '08:30';
+                      if (isSlotInPast(newDate, time)) {
+                        const validSlot = PICKER_TIME_SLOTS.find((s) => !isSlotInPast(newDate, s));
+                        setValue(
+                          'appointmentAt',
+                          validSlot ? `${newDate}T${validSlot}` : `${newDate}T08:30`,
+                          { shouldDirty: true, shouldValidate: true },
+                        );
+                      } else {
+                        setValue('appointmentAt', `${newDate}T${time}`, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        });
+                      }
+                    }}
                   />
                 </Field>
+
+                <div className="appointment-selected-card" role="status">
+                  <CalendarClock size={16} />
+                  <span>
+                    Khung giờ đã chọn:{' '}
+                    <strong>
+                      {selectedBookingTime && !isSlotInPast(selectedBookingDate, selectedBookingTime)
+                        ? formatAppointmentDisplay(currentAppointmentAt)
+                        : 'Vui lòng chọn khung giờ bên phải'}
+                    </strong>
+                  </span>
+                </div>
 
                 <Field
                   label="Dịch vụ yêu cầu chính"

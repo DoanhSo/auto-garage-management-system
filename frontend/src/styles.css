@@ -3954,3 +3954,29 @@ select.input {
     gap: 12px;
   }
 }
+
+
+.appointment-selected-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f0f7ff;
+  border: 1px solid #bae0ff;
+  font-size: 13px;
+  color: #003a8c;
+}
+.appointment-selected-card strong {
+  color: #0958d9;
+}
+.timeslot-picker-slot.is-past {
+  opacity: 0.45;
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
+}
+.timeslot-picker-slot.is-past strong,
+.timeslot-picker-slot.is-past span {
+  color: #94a3b8 !important;
+}

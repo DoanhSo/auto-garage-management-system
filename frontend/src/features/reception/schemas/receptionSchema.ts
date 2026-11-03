@@ -74,7 +74,16 @@ export const bookingFormSchema = z
       }
     }
 
-    if (!values.appointmentAt) required(['appointmentAt'], 'Thời gian hẹn là bắt buộc');
+    if (!values.appointmentAt) {
+      required(['appointmentAt'], 'Thời gian hẹn là bắt buộc');
+    } else {
+      const d = new Date(values.appointmentAt);
+      if (isNaN(d.getTime())) {
+        required(['appointmentAt'], 'Thời gian hẹn không hợp lệ');
+      } else if (d.getTime() < Date.now()) {
+        required(['appointmentAt'], 'Thời gian hẹn không được ở trong quá khứ');
+      }
+    }
   });
 
 export type BookingFormValues = z.infer<typeof bookingFormSchema>;
@@ -128,10 +137,27 @@ export function bookingPayload(values: BookingFormValues, appointmentAtIso: stri
   };
 }
 
-export const rescheduleFormSchema = z.object({
-  newAppointmentAt: z.string().min(1, 'Thời gian hẹn mới là bắt buộc'),
-  newBayId: z.string().optional(),
-});
+export const rescheduleFormSchema = z
+  .object({
+    newAppointmentAt: z.string().min(1, 'Thời gian hẹn mới là bắt buộc'),
+    newBayId: z.string().optional(),
+  })
+  .superRefine((values, ctx) => {
+    const d = new Date(values.newAppointmentAt);
+    if (isNaN(d.getTime())) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['newAppointmentAt'],
+        message: 'Thời gian hẹn mới không hợp lệ',
+      });
+    } else if (d.getTime() < Date.now()) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['newAppointmentAt'],
+        message: 'Thời gian hẹn mới không được ở trong quá khứ',
+      });
+    }
+  });
 
 export type RescheduleFormValues = z.infer<typeof rescheduleFormSchema>;
 

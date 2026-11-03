@@ -9,6 +9,7 @@ import { useRescheduleBookingMutation } from '../hooks/useReception';
 import { rescheduleFormSchema, type RescheduleFormValues } from '../schemas/receptionSchema';
 import { CalendarClock } from 'lucide-react';
 import { BookingTimeSlotPicker } from './BookingTimeSlotPicker';
+import { PICKER_TIME_SLOTS, formatAppointmentDisplay, getInitialAppointmentSlot, isSlotInPast, todayKey } from '../constants/bookingSlots';
 
 export function RescheduleModal({
   booking,
@@ -23,7 +24,6 @@ export function RescheduleModal({
   const reschedule = useRescheduleBookingMutation();
 
   const {
-    register,
     handleSubmit,
     setError,
     reset,
@@ -33,7 +33,7 @@ export function RescheduleModal({
   } = useForm<RescheduleFormValues>({
     resolver: zodResolver(rescheduleFormSchema),
     defaultValues: {
-      newAppointmentAt: booking?.appointmentAt ? dateTimeInput(booking.appointmentAt) : '',
+      newAppointmentAt: getInitialAppointmentSlot(booking?.appointmentAt ? dateTimeInput(booking.appointmentAt) : undefined),
     },
   });
 
@@ -45,6 +45,10 @@ export function RescheduleModal({
       const date = new Date(values.newAppointmentAt);
       if (isNaN(date.getTime())) {
         setError('newAppointmentAt', { message: 'Thời gian hẹn mới không hợp lệ' });
+        return;
+      }
+      if (date.getTime() < Date.now()) {
+        setError('newAppointmentAt', { message: 'Thời gian hẹn mới không được ở trong quá khứ' });
         return;
       }
 
@@ -63,6 +67,11 @@ export function RescheduleModal({
       applyFormError(err, setError, Object.keys(values));
     }
   }
+
+  const currentNewAppointmentAt = watch('newAppointmentAt');
+  const selectedRescheduleDate = currentNewAppointmentAt ? currentNewAppointmentAt.slice(0, 10) : todayKey();
+  const selectedRescheduleTime =
+    currentNewAppointmentAt && currentNewAppointmentAt.includes('T') ? currentNewAppointmentAt.slice(11, 16) : '';
 
   const generalError = reschedule.error;
 
@@ -87,17 +96,49 @@ export function RescheduleModal({
         <div className="modal-split-columns">
           <div className="modal-column-stack">
             <Field
-              label="Thời gian hẹn mới"
+              label="Ngày hẹn mới"
               required
               error={errors.newAppointmentAt?.message}
+              hint="Chọn ngày đưa xe vào gara"
             >
               <input
-                type="datetime-local"
+                type="date"
                 className="input"
+                min={todayKey()}
                 disabled={reschedule.isPending}
-                {...register('newAppointmentAt')}
+                value={selectedRescheduleDate}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  if (!newDate) return;
+                  const time = selectedRescheduleTime || '08:30';
+                  if (isSlotInPast(newDate, time)) {
+                    const validSlot = PICKER_TIME_SLOTS.find((s) => !isSlotInPast(newDate, s));
+                    setValue(
+                      'newAppointmentAt',
+                      validSlot ? `${newDate}T${validSlot}` : `${newDate}T08:30`,
+                      { shouldDirty: true, shouldValidate: true },
+                    );
+                  } else {
+                    setValue('newAppointmentAt', `${newDate}T${time}`, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    });
+                  }
+                }}
               />
             </Field>
+
+            <div className="appointment-selected-card" role="status">
+              <CalendarClock size={16} />
+              <span>
+                Khung giờ đã chọn:{' '}
+                <strong>
+                  {selectedRescheduleTime && !isSlotInPast(selectedRescheduleDate, selectedRescheduleTime)
+                    ? formatAppointmentDisplay(currentNewAppointmentAt)
+                    : 'Vui lòng chọn khung giờ bên phải'}
+                </strong>
+              </span>
+            </div>
 
             <div className="info-strip">
               <CalendarClock size={18} />
