@@ -142,9 +142,7 @@ export function CheckInModal({
     }
   }
 
-  const title = booking
-    ? `Tiếp nhận xe hẹn #${booking.bookingCode}`
-    : 'Tiếp nhận xe vào xưởng (Check-in)';
+  const title = booking ? `Tiếp nhận xe hẹn #${booking.bookingCode}` : 'Tiếp nhận xe vào xưởng';
   const description = booking
     ? `Khách hàng: ${booking.customerName} • Xe: ${booking.licensePlate}`
     : 'Ghi nhận hiện trạng xe, số ODO và khởi tạo lệnh sửa chữa mới.';
@@ -157,14 +155,14 @@ export function CheckInModal({
       open={open}
       onClose={onClose}
       placement="center"
-      size="md"
+      size="lg"
       title={title}
       description={description}
     >
       <form
         onSubmit={handleSubmit(onSubmit)}
         noValidate
-        className="editor-form account-editor-form"
+        className="editor-form account-editor-form grid-4col"
       >
         <FormError message={generalError ? errorMessage(generalError) : undefined} />
 
@@ -180,14 +178,11 @@ export function CheckInModal({
           </div>
         )}
 
+        <div className="form-section-label">THÔNG SỐ & ĐIỀU PHỐI</div>
+
         {!booking && !vehicle && (
-          <div className="full-width-field">
-            <Field
-              label="Phương tiện tiếp nhận"
-              required
-              error={errors.vehicleId?.message}
-              hint="Chọn xe cần tiếp nhận vào gara"
-            >
+          <div className="col-span-2">
+            <Field label="Phương tiện tiếp nhận" required error={errors.vehicleId?.message}>
               <Combobox
                 disabled={isLoadingVehicles || checkIn.isPending}
                 placeholder="Gõ biển số hoặc tên chủ xe để tìm…"
@@ -203,8 +198,6 @@ export function CheckInModal({
           </div>
         )}
 
-        <div className="form-section-label">THÔNG SỐ TIẾP NHẬN VÀO XƯỞNG</div>
-
         <Field
           label="Số ODO vào xưởng (km)"
           required
@@ -212,7 +205,7 @@ export function CheckInModal({
           hint={
             activeVehicle
               ? `Tối thiểu ${activeVehicle.odometer.toLocaleString('vi-VN')} km`
-              : 'Ghi nhận số km trên đồng hồ táp-lô'
+              : 'Số km trên đồng hồ táp-lô'
           }
         >
           <input
@@ -225,9 +218,9 @@ export function CheckInModal({
         </Field>
 
         <Field
-          label="Mức nhiên liệu hiện tại (%)"
+          label="Mức nhiên liệu (%)"
           error={errors.fuelLevelPercent?.message}
-          hint="Ước tính từ vạch kim xăng (0–100%)"
+          hint="Ước tính theo kim xăng, 0–100"
         >
           <input
             type="number"
@@ -240,82 +233,82 @@ export function CheckInModal({
           />
         </Field>
 
-        <div className="form-section-label">ĐIỀU PHỐI TIẾP NHẬN</div>
-
-        <Field
-          label="Khoang tiếp nhận"
-          hint={`Khoang có lịch trong ${RECEPTION_BAY_HOLD_HOURS} giờ tới được đánh dấu bận`}
-        >
-          <Combobox
-            disabled={busy}
-            placeholder="Gõ mã khoang để tìm…"
-            value={watch('serviceBayId') ?? ''}
-            onChange={(next) => {
-              setValue('serviceBayId', next);
-              setValue('diagnosticTechnicianId', '');
-            }}
-            options={(bays.data?.content ?? []).map((bay) => ({
-              value: String(bay.id),
-              label: `${bay.bayCode} · ${bay.bayName}`,
-              description: occupiedBayIds.has(String(bay.id)) ? 'Đang bận' : undefined,
-              disabled: occupiedBayIds.has(String(bay.id)),
-            }))}
-          />
-        </Field>
-
-        <Field
-          label="Kỹ thuật viên chẩn đoán"
-          hint={
-            !selectedBayId
-              ? 'Chọn khoang để xem thợ trực khoang đó; thợ cơ động chưa gán khoang luôn có thể điều động'
-              : roster.isLoading
-                ? 'Đang tải thợ trực khoang…'
-                : bayCrew.length === 0
-                  ? 'Khoang này chưa có thợ trực trong ca hiện tại, có thể điều động thợ cơ động'
-                  : 'Chọn thợ trực khoang hoặc điều động thợ cơ động đang trong ca'
-          }
-        >
-          <Combobox
-            disabled={busy}
-            placeholder="Gõ tên thợ để tìm…"
-            value={watch('diagnosticTechnicianId') ?? ''}
-            onChange={(next) => setValue('diagnosticTechnicianId', next)}
-            options={[
-              ...(selectedBayId ? (roster.data ?? []) : []).map((tech) => ({
-                value: String(tech.employeeId),
-                label: tech.fullName,
-                group: 'Thợ trực tại khoang này',
-                disabled: !tech.onShiftNow,
-                description: [
-                  `${tech.shiftType ? `${shiftTypeLabels[tech.shiftType]} ` : 'Ca '}${hhmm(tech.shiftStartsAt)}–${hhmm(tech.shiftEndsAt)}`,
-                  tech.skills.map((skill) => SKILL_LABELS[skill] ?? skill).join(', '),
-                  tech.onShiftNow ? '' : 'ngoài giờ ca',
-                ]
-                  .filter(Boolean)
-                  .join(' · '),
-              })),
-              ...mobileTechs.map((tech) => ({
-                value: String(tech.employeeId),
-                label: tech.fullName,
-                group: 'Thợ đang đi làm (chưa phân khoang - sẵn sàng điều động)',
-                description: [
-                  availabilityLabels[tech.availabilityStatus],
-                  `${tech.activeOrdersCount} xe đang làm`,
-                  tech.skills.map((skill) => SKILL_LABELS[skill] ?? skill).join(', '),
-                ]
-                  .filter(Boolean)
-                  .join(' · '),
-              })),
-            ]}
-          />
-        </Field>
-
-        <div className="full-width-field">
+        <div className="col-span-2">
           <Field
-            label="Hiện tượng / Yêu cầu sửa chữa của khách hàng"
-            error={errors.customerComplaint?.message}
-            hint="Ghi chép chính xác mô tả triệu chứng của khách hàng để kỹ thuật viên chẩn đoán"
+            label="Khoang tiếp nhận"
+            hint={`Khoang có lịch trong ${RECEPTION_BAY_HOLD_HOURS} giờ tới được đánh dấu bận`}
           >
+            <Combobox
+              disabled={busy}
+              placeholder="Gõ mã khoang để tìm…"
+              value={watch('serviceBayId') ?? ''}
+              onChange={(next) => {
+                setValue('serviceBayId', next);
+                setValue('diagnosticTechnicianId', '');
+              }}
+              options={(bays.data?.content ?? []).map((bay) => ({
+                value: String(bay.id),
+                label: `${bay.bayCode} · ${bay.bayName}`,
+                description: occupiedBayIds.has(String(bay.id)) ? 'Đang bận' : undefined,
+                disabled: occupiedBayIds.has(String(bay.id)),
+              }))}
+            />
+          </Field>
+        </div>
+
+        <div className="col-span-2">
+          <Field
+            label="Kỹ thuật viên chẩn đoán"
+            hint={
+              !selectedBayId
+                ? 'Chọn khoang để xem thợ trực; thợ cơ động luôn điều động được'
+                : roster.isLoading
+                  ? 'Đang tải thợ trực khoang…'
+                  : bayCrew.length === 0
+                    ? 'Khoang chưa có thợ trực ca này; có thể điều động thợ cơ động'
+                    : 'Chọn thợ trực khoang hoặc thợ cơ động đang trong ca'
+            }
+          >
+            <Combobox
+              disabled={busy}
+              placeholder="Gõ tên thợ để tìm…"
+              value={watch('diagnosticTechnicianId') ?? ''}
+              onChange={(next) => setValue('diagnosticTechnicianId', next)}
+              options={[
+                ...(selectedBayId ? (roster.data ?? []) : []).map((tech) => ({
+                  value: String(tech.employeeId),
+                  label: tech.fullName,
+                  group: 'Thợ trực tại khoang này',
+                  disabled: !tech.onShiftNow,
+                  description: [
+                    `${tech.shiftType ? `${shiftTypeLabels[tech.shiftType]} ` : 'Ca '}${hhmm(tech.shiftStartsAt)}–${hhmm(tech.shiftEndsAt)}`,
+                    tech.skills.map((skill) => SKILL_LABELS[skill] ?? skill).join(', '),
+                    tech.onShiftNow ? '' : 'ngoài giờ ca',
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
+                })),
+                ...mobileTechs.map((tech) => ({
+                  value: String(tech.employeeId),
+                  label: tech.fullName,
+                  group: 'Thợ đang đi làm (chưa phân khoang - sẵn sàng điều động)',
+                  description: [
+                    availabilityLabels[tech.availabilityStatus],
+                    `${tech.activeOrdersCount} xe đang làm`,
+                    tech.skills.map((skill) => SKILL_LABELS[skill] ?? skill).join(', '),
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
+                })),
+              ]}
+            />
+          </Field>
+        </div>
+
+        <div className="form-section-label">TÌNH TRẠNG XE KHI NHẬN</div>
+
+        <div className="col-span-2">
+          <Field label="Hiện tượng / Yêu cầu của khách" error={errors.customerComplaint?.message}>
             <textarea
               className="input min-h-[85px] resize-none"
               placeholder="Khách báo xe rung giật ở dải tốc độ 60km/h, điều hòa mát kém, có tiếng rít phanh..."
@@ -325,10 +318,10 @@ export function CheckInModal({
           </Field>
         </div>
 
-        <div className="full-width-field">
+        <div className="col-span-2">
           <Field
-            label="Ảnh hiện trạng khi tiếp nhận"
-            hint="Ngoại thất, đồng hồ ODO, vạch nhiên liệu, đèn táp-lô. Ảnh được gắn vào lệnh sau khi tiếp nhận."
+            label="Ảnh hiện trạng"
+            hint="Ngoại thất, ODO, kim xăng, đèn táp-lô; ảnh được gắn vào lệnh sau khi tiếp nhận."
           >
             <AttachmentFilePicker files={photos} onChange={setPhotos} disabled={busy} />
           </Field>

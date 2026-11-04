@@ -22,5 +22,7 @@ public interface PartService {
 
     void deactivatePart(Long id);
 
+    PartResponse activatePart(Long id);
+
     List<PartResponse> getLowStockParts();
 }

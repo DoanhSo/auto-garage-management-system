@@ -47,6 +47,16 @@ export function useUpdateServiceMutation() {
   });
 }
 
+export function useActivateServiceMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => catalogApi.activate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: serviceKeys.all });
+    },
+  });
+}
+
 export function useDeleteServiceMutation() {
   const queryClient = useQueryClient();
   return useMutation({

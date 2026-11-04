@@ -25,5 +25,9 @@ public class WarrantyResponse {
     private Integer warrantyKm;
     private String termsSnapshot;
     private WarrantyStatus status;
+    private String voidReason;
+    private Instant voidedAt;
+    private String adjustmentNote;
+    private Instant adjustedAt;
     private Instant createdAt;
 }

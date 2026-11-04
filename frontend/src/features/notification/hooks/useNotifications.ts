@@ -61,6 +61,20 @@ export function useMarkReadMutation() {
     },
   });
 }
+export function useMarkAllReadMutation() {
+  const { sessionKey } = useAuth();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: notificationsApi.markAllRead,
+    retry: 0,
+    onSuccess: async () => {
+      await client.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[1] === sessionKey && query.queryKey[2] === 'notifications',
+      });
+    },
+  });
+}
 export function useAdminNotificationsQuery(params: {
   status?: string;
   channel?: string;

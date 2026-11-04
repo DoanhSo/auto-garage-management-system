@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import { Plus, SquarePen, UserX, Phone, Mail, Building2, Contact } from 'lucide-react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Plus, SquarePen, UserX, Phone, Mail, Building2, Contact, RotateCcw } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
 import {
@@ -15,7 +15,11 @@ import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { initials } from '../../../shared/utils/format';
 import { errorMessage } from '../../../shared/api/errors';
 import type { Customer } from '../../../shared/types/contracts';
-import { useCustomersQuery, useDeleteCustomerMutation } from '../hooks/useCustomers';
+import {
+  useCustomersQuery,
+  useDeleteCustomerMutation,
+  useActivateCustomerMutation,
+} from '../hooks/useCustomers';
 import { CustomerEditor } from '../components/CustomerEditor';
 import { CustomerFilters } from '../components/CustomerFilters';
 import { CustomerCards } from '../components/CustomerCards';
@@ -71,6 +75,22 @@ export function CustomersPage() {
     setEditorOpen(false);
     setEditingId(null);
   };
+
+  const activateMutation = useActivateCustomerMutation();
+  const activateCustomer = activateMutation.mutateAsync;
+  const activatingId = activateMutation.isPending ? activateMutation.variables : null;
+  // Reopening is reversible, so it runs without a confirmation step.
+  const handleActivate = useCallback(
+    async (customer: Customer) => {
+      try {
+        await activateCustomer(customer.id);
+        notify(`Đã mở lại khách hàng "${customer.fullName}"`);
+      } catch (err: unknown) {
+        notify(errorMessage(err));
+      }
+    },
+    [activateCustomer, notify],
+  );
 
   const handleConfirmDeactivate = async () => {
     if (!deactivatingCustomer) return;
@@ -181,11 +201,22 @@ export function CustomersPage() {
                 Ngừng HĐ
               </Button>
             )}
+            {!row.original.isActive && (
+              <Button
+                variant="ghost"
+                aria-label={`Mở lại khách hàng ${row.original.fullName}`}
+                pending={activatingId === row.original.id}
+                onClick={() => handleActivate(row.original)}
+              >
+                <RotateCcw size={16} />
+                Mở lại
+              </Button>
+            )}
           </div>
         ),
       },
     ],
-    [],
+    [activatingId, handleActivate],
   );
 
   return (
@@ -205,7 +236,8 @@ export function CustomersPage() {
       <div className="info-strip">
         <Contact size={18} />
         <span>
-          Quản lý thông tin liên hệ, phân loại cá nhân hoặc doanh nghiệp và theo dõi hạn mức công nợ khách hàng.
+          Quản lý thông tin liên hệ, phân loại cá nhân hoặc doanh nghiệp và theo dõi hạn mức công nợ
+          khách hàng.
         </span>
       </div>
 
@@ -235,6 +267,8 @@ export function CustomersPage() {
               customers={filteredCustomers}
               onEdit={handleOpenEdit}
               onDeactivate={setDeactivatingCustomer}
+              onActivate={handleActivate}
+              activatingId={activatingId}
             />
           ) : (
             <DataTable<Customer>

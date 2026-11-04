@@ -95,4 +95,14 @@ public class CatalogController {
         catalogService.deactivateService(id);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.DELETED, null, httpRequest.getRequestURI()));
     }
+
+    @PostMapping(ApiPaths.ACTIVATE)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
+    @Operation(summary = "Reactivate service catalog item")
+    public ResponseEntity<ApiResponse<ServiceResponse>> activateService(
+            @PathVariable Long id,
+            HttpServletRequest httpRequest) {
+        ServiceResponse response = catalogService.activateService(id);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
+    }
 }

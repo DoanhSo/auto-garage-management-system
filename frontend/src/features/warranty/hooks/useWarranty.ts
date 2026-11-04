@@ -1,9 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { warrantyApi } from '../api/warrantyApi';
+import { warrantyApi, type WarrantySearchParams } from '../api/warrantyApi';
 import type {
+  WarrantyAdjustInput,
   WarrantyClaimOpenInput,
   WarrantyClaimDecideInput,
+  WarrantyVoidInput,
 } from '../types/warranty';
+
+export function useWarrantySearchQuery(params: WarrantySearchParams) {
+  return useQuery({
+    queryKey: ['warranties', 'search', params],
+    queryFn: () => warrantyApi.searchWarranties(params),
+  });
+}
+
+export function useClaimSearchQuery(params: WarrantySearchParams, enabled = true) {
+  return useQuery({
+    queryKey: ['warranty-claims', 'search', params],
+    queryFn: () => warrantyApi.searchClaims(params),
+    enabled,
+  });
+}
 
 export function useVehicleWarrantiesQuery(vehicleId: string | number | null | undefined) {
   return useQuery({
@@ -49,6 +66,28 @@ export function useDecideClaimMutation() {
       queryClient.invalidateQueries({ queryKey: ['warranty-claims'] });
       queryClient.invalidateQueries({ queryKey: ['warranties'] });
       queryClient.invalidateQueries({ queryKey: ['repair-orders'] });
+    },
+  });
+}
+
+export function useVoidWarrantyMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: WarrantyVoidInput }) =>
+      warrantyApi.voidWarranty(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['warranties'] });
+    },
+  });
+}
+
+export function useAdjustWarrantyMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: WarrantyAdjustInput }) =>
+      warrantyApi.adjustWarranty(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['warranties'] });
     },
   });
 }

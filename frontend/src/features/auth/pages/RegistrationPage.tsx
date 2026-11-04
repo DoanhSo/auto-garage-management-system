@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
+import { homePathForRole } from '../../../app/access';
 import { authApi } from '../api/authApi';
 import { registrationSchema, passwordRequirement } from '../schemas/authSchemas';
 import { useUiPolicy } from '../../../shared/config/policy';
@@ -38,10 +39,7 @@ function ReadyRegistration({ policy }: { policy: UiPolicy }) {
     resolver: zodResolver(registrationSchema(policy)),
     mode: 'onBlur',
   });
-  if (auth.user)
-    return (
-      <Navigate to={auth.user.role === 'ADMIN' ? '/admin/reports' : '/notifications'} replace />
-    );
+  if (auth.user) return <Navigate to={homePathForRole(auth.user.role)} replace />;
   const submit = handleSubmit(async (values) => {
     if (created) return;
     let registrationCompleted = false;

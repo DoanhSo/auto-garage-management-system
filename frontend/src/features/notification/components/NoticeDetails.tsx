@@ -1,10 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { Check } from 'lucide-react';
-import { Button, FormError, Loading, QueryError } from '../../../shared/components/ui';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Check } from 'lucide-react';
+import { Badge, Button, FormError, Loading, QueryError } from '../../../shared/components/ui';
 import { dateTime } from '../../../shared/utils/format';
 import type { Notice } from '../../../shared/types/contracts';
 import { useMarkReadMutation, useNotificationQuery } from '../hooks/useNotifications';
-import { notificationMessage } from '../utils/message';
+import { parseNotification } from '../utils/notificationParser';
+import { NotificationIcon, toneBadge } from './NotificationCard';
 
 export function NoticeContent({
   notice,
@@ -15,18 +17,41 @@ export function NoticeContent({
   zone: string;
   management?: boolean;
 }) {
+  const parsed = parseNotification(notice, zone);
   return (
     <article className="notification-reader">
-      <div className="notification-meta">
-        <time dateTime={notice.createdAt}>{dateTime(notice.createdAt, zone)}</time>
-        {management && (
-          <span>
-            Người nhận: {notice.userId ? `#${notice.userId}` : 'Chưa xác định'} · {notice.channel}
-          </span>
-        )}
+      <div className="notification-reader-head">
+        <NotificationIcon parsed={parsed} size={20} />
+        <div className="notification-meta">
+          <Badge variant={toneBadge[parsed.tone]}>{parsed.categoryLabel}</Badge>
+          <time dateTime={notice.createdAt} title={parsed.timeFormatted}>
+            {dateTime(notice.createdAt, zone)}
+          </time>
+          {management && (
+            <span>
+              Người nhận: {notice.userId ? `#${notice.userId}` : 'Chưa xác định'} · {notice.channel}
+            </span>
+          )}
+        </div>
       </div>
-      <h2>{notice.subject || 'Thông báo từ gara'}</h2>
-      <p className="notice-body">{notificationMessage(notice.payloadJson)}</p>
+      <h2>{parsed.title}</h2>
+      <p className="notice-body">{parsed.fullMessage}</p>
+      {parsed.metadata.length > 0 && (
+        <dl className="notification-meta-grid">
+          {parsed.metadata.map((item) => (
+            <div key={item.label}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {parsed.linkUrl && parsed.linkText && !management && (
+        <Link to={parsed.linkUrl} className="button button-primary notification-reader-cta">
+          {parsed.linkText}
+          <ArrowRight size={15} aria-hidden />
+        </Link>
+      )}
     </article>
   );
 }

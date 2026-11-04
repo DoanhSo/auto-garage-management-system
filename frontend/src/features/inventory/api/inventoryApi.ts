@@ -37,8 +37,7 @@ export const inventoryApi = {
         }),
     ),
 
-  getSupplier: (id: string | number) =>
-    request<Supplier>(`/inventory/suppliers/${id}`),
+  getSupplier: (id: string | number) => request<Supplier>(`/inventory/suppliers/${id}`),
 
   createSupplier: (data: SupplierCreateInput) =>
     request<Supplier>('/inventory/suppliers', {
@@ -50,6 +49,11 @@ export const inventoryApi = {
     request<Supplier>(`/inventory/suppliers/${id}`, {
       method: 'PUT',
       body: data,
+    }),
+
+  activateSupplier: (id: string | number) =>
+    request<Supplier>(`/inventory/suppliers/${id}/activate`, {
+      method: 'POST',
     }),
 
   deactivateSupplier: (id: string | number) =>
@@ -80,11 +84,9 @@ export const inventoryApi = {
         }),
     ),
 
-  getPart: (id: string | number) =>
-    request<Part>(`/inventory/parts/${id}`),
+  getPart: (id: string | number) => request<Part>(`/inventory/parts/${id}`),
 
-  getLowStockParts: () =>
-    request<Part[]>('/inventory/parts/low-stock'),
+  getLowStockParts: () => request<Part[]>('/inventory/parts/low-stock'),
 
   createPart: (data: PartCreateInput) =>
     request<Part>('/inventory/parts', {
@@ -96,6 +98,11 @@ export const inventoryApi = {
     request<Part>(`/inventory/parts/${id}`, {
       method: 'PUT',
       body: data,
+    }),
+
+  activatePart: (id: string | number) =>
+    request<Part>(`/inventory/parts/${id}/activate`, {
+      method: 'POST',
     }),
 
   deactivatePart: (id: string | number) =>
@@ -130,8 +137,7 @@ export const inventoryApi = {
         }),
     ),
 
-  getDocument: (id: string | number) =>
-    request<InventoryDocument>(`/inventory/documents/${id}`),
+  getDocument: (id: string | number) => request<InventoryDocument>(`/inventory/documents/${id}`),
 
   createDocument: (data: InventoryDocumentCreateInput) =>
     request<InventoryDocument>('/inventory/documents', {
@@ -152,8 +158,7 @@ export const inventoryApi = {
 
   getTransactionsForPart: (partId: string | number, page = 0, size = 20) =>
     request<Page<InventoryTransaction>>(
-      `/inventory/documents/transactions/part/${partId}` +
-        queryString({ page, size }),
+      `/inventory/documents/transactions/part/${partId}` + queryString({ page, size }),
     ),
 
   // Reconciliation

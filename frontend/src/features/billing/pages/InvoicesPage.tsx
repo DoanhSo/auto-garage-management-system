@@ -27,6 +27,8 @@ import {
   QueryError,
 } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
+import { MetricGrid } from '../../../shared/components/MetricGrid';
+import { formatDate, formatDateTime, money } from '../../../shared/utils/format';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { errorMessage } from '../../../shared/api/errors';
@@ -264,14 +266,18 @@ export function InvoicesPage() {
         header: 'Số tiền & Công nợ',
         cell: ({ row }) => {
           const inv = row.original;
-          const balance = Number(inv.balanceAmount ?? inv.totalAmount ?? 0);
+          // A voided invoice is kept as a record but never counts as debt.
+          const balance =
+            inv.status === 'VOID' ? 0 : Number(inv.balanceAmount ?? inv.totalAmount ?? 0);
           return (
             <div style={{ fontSize: '13px' }}>
               <div style={{ fontWeight: 700, color: '#172338' }}>
                 {Number(inv.totalAmount).toLocaleString('vi-VN')} đ
               </div>
               <div style={{ fontSize: '11px', marginTop: '2px' }}>
-                {balance > 0 ? (
+                {inv.status === 'VOID' ? (
+                  <span className="muted">Không tính công nợ</span>
+                ) : balance > 0 ? (
                   <span style={{ color: '#b42335', fontWeight: 600 }}>
                     Còn nợ: {balance.toLocaleString('vi-VN')} đ
                   </span>
@@ -382,7 +388,8 @@ export function InvoicesPage() {
         <Receipt size={18} />
         <span>
           Hóa đơn dịch vụ ghi nhận cố định thông tin khách hàng, phương tiện và chi tiết phụ tùng,
-          tiền công tại thời điểm phát hành. Mỗi lệnh sửa chữa chỉ xuất tối đa một hóa đơn.
+          tiền công tại thời điểm phát hành. Mỗi lệnh sửa chữa chỉ có một hóa đơn còn hiệu lực; hủy
+          hóa đơn chưa thu tiền thì lập lại được.
         </span>
       </div>
 
@@ -648,7 +655,10 @@ export function InvoicesPage() {
             </select>
           </Field>
 
-          <Field label="Thuế giá trị gia tăng (VAT đ)">
+          <Field
+            label="Thuế bổ sung (đ)"
+            hint="Thuế của từng dòng báo giá đã nằm trong tạm tính. Chỉ nhập phần thuế cộng thêm, thường để 0."
+          >
             <input
               name="taxAmount"
               type="number"
@@ -764,121 +774,132 @@ export function InvoicesPage() {
       <Modal
         open={!!viewingInvoice}
         onOpenChange={(open) => !open && setViewingInvoice(null)}
-        title={`Hóa đơn dịch vụ #${viewingInvoice?.invoiceCode}`}
-        description="Chi tiết snapshot khách hàng, xe và danh mục phụ tùng & tiền công."
-        size="xl"
+        title={`Hóa đơn dịch vụ #${viewingInvoice?.invoiceCode ?? ''}`}
+        description="Thông tin khách, xe và các hạng mục được chốt tại thời điểm phát hành."
+        size="lg"
       >
         {viewingInvoice && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '4px 0' }}>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                gap: '12px 16px',
-                background: '#f8fafc',
-                padding: '14px 18px',
-                borderRadius: '8px',
-              }}
-            >
-              <div>
-                <span className="muted" style={{ fontSize: '12px' }}>
-                  Khách hàng:
-                </span>
-                <div style={{ fontWeight: 650, fontSize: '14px' }}>
-                  {viewingInvoice.customerSnapshot?.fullName}
-                </div>
-                <div className="muted" style={{ fontSize: '12px' }}>
-                  SĐT: {viewingInvoice.customerSnapshot?.phone || '—'}
-                </div>
-              </div>
-              <div>
-                <span className="muted" style={{ fontSize: '12px' }}>
-                  Xe sửa chữa:
-                </span>
-                <div style={{ fontWeight: 650, fontSize: '14px', color: '#245bdb' }}>
-                  {viewingInvoice.vehicleSnapshot?.plateNumber}
-                </div>
-                <div className="muted" style={{ fontSize: '12px' }}>
-                  {viewingInvoice.vehicleSnapshot?.make} {viewingInvoice.vehicleSnapshot?.model}
-                </div>
-              </div>
-              <div>
-                <span className="muted" style={{ fontSize: '12px' }}>
-                  Trạng thái thanh toán:
-                </span>
-                <div style={{ marginTop: '2px' }}>{renderStatusBadge(viewingInvoice.status)}</div>
-              </div>
-              <div>
-                <span className="muted" style={{ fontSize: '12px' }}>
-                  Ngày phát hành:
-                </span>
-                <div style={{ fontWeight: 550, fontSize: '13px' }}>
-                  {new Date(viewingInvoice.issuedAt).toLocaleString('vi-VN')}
-                </div>
-              </div>
-            </div>
+          <div className="dialog-body">
+            {viewingInvoice.status === 'VOID' && (
+              <p className="info-strip">
+                Đã hủy
+                {viewingInvoice.voidedAt ? ` lúc ${formatDateTime(viewingInvoice.voidedAt)}` : ''}
+                {viewingInvoice.voidedByName ? ` bởi ${viewingInvoice.voidedByName}` : ''}
+                {viewingInvoice.voidReason ? `: ${viewingInvoice.voidReason}` : ''}. Hóa đơn không
+                tính vào công nợ.
+              </p>
+            )}
 
-            {/* Bảng chi tiết dòng hóa đơn */}
-            <div
-              style={{
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                maxHeight: '200px',
-                overflowY: 'auto',
-              }}
-            >
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead
-                  style={{
-                    background: '#f8fafc',
-                    borderBottom: '1px solid var(--border)',
-                    color: '#526278',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 1,
-                  }}
-                >
+            <MetricGrid
+              label="Tổng hợp hóa đơn"
+              items={[
+                { label: 'Tổng cộng', value: money(viewingInvoice.totalAmount) },
+                {
+                  label: 'Đã thu',
+                  value: money(viewingInvoice.paidAmount ?? 0),
+                  tone: 'success',
+                },
+                viewingInvoice.status === 'VOID'
+                  ? { label: 'Còn phải thu', value: 'Không tính', tone: 'warning' }
+                  : {
+                      label: 'Còn phải thu',
+                      value: money(viewingInvoice.balanceAmount ?? viewingInvoice.totalAmount),
+                      tone:
+                        Number(viewingInvoice.balanceAmount ?? viewingInvoice.totalAmount) > 0
+                          ? 'danger'
+                          : 'success',
+                    },
+              ]}
+            />
+
+            <dl className="detail-list detail-grid">
+              <div className="detail-field">
+                <dt>Khách hàng</dt>
+                <dd>
+                  {viewingInvoice.customerSnapshot?.fullName || 'Khách vãng lai'}
+                  {viewingInvoice.customerSnapshot?.phone
+                    ? ` · ${viewingInvoice.customerSnapshot.phone}`
+                    : ''}
+                </dd>
+              </div>
+              <div className="detail-field">
+                <dt>Xe sửa chữa</dt>
+                <dd>
+                  {viewingInvoice.vehicleSnapshot?.plateNumber || '—'}
+                  {viewingInvoice.vehicleSnapshot?.make || viewingInvoice.vehicleSnapshot?.model
+                    ? ` · ${[viewingInvoice.vehicleSnapshot?.make, viewingInvoice.vehicleSnapshot?.model].filter(Boolean).join(' ')}`
+                    : ''}
+                </dd>
+              </div>
+              <div className="detail-field">
+                <dt>Tạm tính</dt>
+                <dd>
+                  {money(viewingInvoice.subtotal)}
+                  {Number(viewingInvoice.taxAmount) > 0
+                    ? ` · thuế bổ sung +${money(viewingInvoice.taxAmount)}`
+                    : ''}
+                  {Number(viewingInvoice.discountAmount) > 0
+                    ? ` · giảm −${money(viewingInvoice.discountAmount)}`
+                    : ''}
+                </dd>
+              </div>
+              <div className="detail-field">
+                <dt>Trạng thái</dt>
+                <dd>{renderStatusBadge(viewingInvoice.status)}</dd>
+              </div>
+              <div className="detail-field">
+                <dt>Phát hành</dt>
+                <dd>
+                  {formatDateTime(viewingInvoice.issuedAt)}
+                  {viewingInvoice.issuedByName ? ` · ${viewingInvoice.issuedByName}` : ''}
+                  {viewingInvoice.dueDate
+                    ? ` · hạn thanh toán ${formatDate(viewingInvoice.dueDate)}`
+                    : ''}
+                </dd>
+              </div>
+            </dl>
+
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
                   <tr>
-                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Hạng mục</th>
-                    <th style={{ padding: '8px 12px', width: '80px', textAlign: 'center' }}>
-                      Loại
-                    </th>
-                    <th style={{ padding: '8px 12px', width: '70px', textAlign: 'right' }}>SL</th>
-                    <th style={{ padding: '8px 12px', width: '120px', textAlign: 'right' }}>
-                      Đơn giá (đ)
-                    </th>
-                    <th style={{ padding: '8px 12px', width: '130px', textAlign: 'right' }}>
-                      Thành tiền
-                    </th>
+                    <th>Hạng mục</th>
+                    <th>Loại</th>
+                    <th className="text-right">SL</th>
+                    <th className="text-right">Đơn giá</th>
+                    <th className="text-right">Thành tiền</th>
                   </tr>
                 </thead>
                 <tbody>
                   {viewingInvoice.items?.map((item) => (
-                    <tr key={item.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={{ padding: '8px 12px' }}>
-                        <div style={{ fontWeight: 550 }}>{item.itemName}</div>
-                        {item.warrantyDays > 0 && (
-                          <div className="muted" style={{ fontSize: '11px' }}>
-                            Bảo hành: {item.warrantyDays} ngày / {item.warrantyKm} km
+                    <tr key={item.id}>
+                      <td>
+                        <strong>{item.itemName}</strong>
+                        {(item.warrantyDays > 0 || item.warrantyKm > 0) && (
+                          <div className="muted">
+                            Bảo hành:{' '}
+                            {[
+                              item.warrantyDays > 0 ? `${item.warrantyDays} ngày` : null,
+                              item.warrantyKm > 0
+                                ? `${item.warrantyKm.toLocaleString('vi-VN')} km`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' / ')}
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <td>
                         <Badge variant={item.itemType === 'SERVICE' ? 'primary' : 'secondary'}>
                           {item.itemType === 'SERVICE' ? 'Công' : 'Vật tư'}
                         </Badge>
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600 }}>
-                        {item.quantity} {item.unit || ''}
+                      <td className="text-right">
+                        {Number(item.quantity).toLocaleString('vi-VN')} {item.unit || ''}
                       </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                        {Number(item.unitPrice).toLocaleString('vi-VN')} đ
-                      </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700 }}>
-                        {Number(item.lineTotal).toLocaleString('vi-VN')} đ
+                      <td className="text-right money">{money(item.unitPrice)}</td>
+                      <td className="text-right money">
+                        <strong>{money(item.lineTotal)}</strong>
                       </td>
                     </tr>
                   ))}
@@ -886,57 +907,7 @@ export function InvoicesPage() {
               </table>
             </div>
 
-            {/* Tổng hợp tài chính */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '0 8px',
-                fontSize: '13px',
-              }}
-            >
-              <div style={{ display: 'flex', gap: '16px' }}>
-                <span>
-                  Tạm tính:{' '}
-                  <strong>{Number(viewingInvoice.subtotal).toLocaleString('vi-VN')} đ</strong>
-                </span>
-                {Number(viewingInvoice.taxAmount) > 0 && (
-                  <span>
-                    VAT:{' '}
-                    <strong>+{Number(viewingInvoice.taxAmount).toLocaleString('vi-VN')} đ</strong>
-                  </span>
-                )}
-                {Number(viewingInvoice.discountAmount) > 0 && (
-                  <span style={{ color: '#059669' }}>
-                    Giảm:{' '}
-                    <strong>
-                      -{Number(viewingInvoice.discountAmount).toLocaleString('vi-VN')} đ
-                    </strong>
-                  </span>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                <span style={{ fontSize: '16px', fontWeight: 700, color: '#245bdb' }}>
-                  Tổng cộng: {Number(viewingInvoice.totalAmount).toLocaleString('vi-VN')} đ
-                </span>
-                {Number(viewingInvoice.balanceAmount) > 0 && (
-                  <span style={{ fontSize: '13px', color: '#b42335', fontWeight: 600 }}>
-                    (Còn nợ: {Number(viewingInvoice.balanceAmount).toLocaleString('vi-VN')} đ)
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '8px',
-                paddingTop: '10px',
-                borderTop: '1px solid var(--border)',
-              }}
-            >
+            <div className="modal-form-actions">
               <Button variant="secondary" onClick={() => setViewingInvoice(null)}>
                 Đóng
               </Button>
@@ -950,7 +921,7 @@ export function InvoicesPage() {
         open={!!voidingInvoice}
         onOpenChange={(open) => !open && setVoidingInvoice(null)}
         title={`Hủy hóa đơn #${voidingInvoice?.invoiceCode}`}
-        description="Nhập lý do hủy hóa đơn. Thao tác hủy là bất biến."
+        description="Hóa đơn bị hủy vẫn được lưu để tra cứu. Phiếu sửa chữa quay về trạng thái Đã sửa xong để lập hóa đơn mới. Chỉ hủy được khi chưa thu tiền và xe chưa bàn giao."
       >
         <div className="modal-form">
           <Field label="Lý do hủy hóa đơn" required className="full-width">

@@ -1,13 +1,11 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarPlus, Clock, Hammer, LogIn, LogOut, UserCheck, Wrench } from 'lucide-react';
+import { Clock, Hammer, LogIn, LogOut, UserCheck, Wrench } from 'lucide-react';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { errorMessage } from '../../../shared/api/errors';
 import { FRONT_DESK_ROLES } from '../../../app/access';
 import { Badge, Button, Empty, Loading, QueryError } from '../../../shared/components/ui';
 import { PendingShiftRegistrations } from './PendingShiftRegistrations';
-import { ShiftRegistrationModal } from './ShiftRegistrationModal';
 import {
   useOnShiftTechniciansQuery,
   useSchedulingEmployeesQuery,
@@ -114,7 +112,6 @@ export function LiveDispatchBoard({
 }) {
   const notify = useToast();
   const { user } = useAuth();
-  const [registering, setRegistering] = useState(false);
   const roster = useOnShiftTechniciansQuery();
   const attendance = useShiftAttendanceMutation();
   const isFrontDesk = !!user && FRONT_DESK_ROLES.includes(user.role);
@@ -152,15 +149,7 @@ export function LiveDispatchBoard({
 
   return (
     <div className="dispatch-board-panel stack">
-      {user?.role === 'TECHNICIAN' && (
-        <div className="row-actions">
-          <Button variant="secondary" onClick={() => setRegistering(true)}>
-            <CalendarPlus size={16} /> Đăng ký ca làm
-          </Button>
-        </div>
-      )}
       {isFrontDesk && <PendingShiftRegistrations canReview={user?.role === 'ADMIN'} />}
-      <ShiftRegistrationModal open={registering} onClose={() => setRegistering(false)} />
 
       <section aria-label="Kỹ thuật viên đang trực ca">
         <h2 className="section-title">

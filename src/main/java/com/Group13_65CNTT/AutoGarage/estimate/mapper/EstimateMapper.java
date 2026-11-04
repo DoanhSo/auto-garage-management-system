@@ -30,6 +30,15 @@ public interface EstimateMapper {
     @Mapping(target = "items", ignore = true)
     EstimateResponse toResponse(Estimate entity);
 
+    /** An estimate still awaiting the customer past its validity date can no longer be decided. */
+    @org.mapstruct.AfterMapping
+    default void markTimeExpired(Estimate entity, @org.mapstruct.MappingTarget EstimateResponse response) {
+        boolean awaiting = entity.getStatus() == com.Group13_65CNTT.AutoGarage.estimate.entity.EstimateStatus.SENT;
+        if (awaiting && entity.getValidUntil() != null && !java.time.Instant.now().isBefore(entity.getValidUntil())) {
+            response.setStatus(com.Group13_65CNTT.AutoGarage.estimate.entity.EstimateStatus.EXPIRED);
+        }
+    }
+
     default EstimateResponse toResponseWithItems(Estimate entity, List<EstimateItemResponse> items) {
         EstimateResponse res = toResponse(entity);
         if (res != null) {

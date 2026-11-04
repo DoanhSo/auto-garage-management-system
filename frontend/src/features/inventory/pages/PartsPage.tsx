@@ -35,6 +35,7 @@ import {
   useSuppliersQuery,
   useCreatePartMutation,
   useUpdatePartMutation,
+  useActivatePartMutation,
   useDeactivatePartMutation,
 } from '../hooks/useInventory';
 import type { Part, PartCreateInput, PartUpdateInput } from '../types/inventory';
@@ -90,6 +91,9 @@ export function PartsPage() {
   const createMutation = useCreatePartMutation();
   const updateMutation = useUpdatePartMutation();
   const deactivateMutation = useDeactivatePartMutation();
+  const activateMutation = useActivatePartMutation();
+  const activatePart = activateMutation.mutateAsync;
+  const activatingId = activateMutation.isPending ? String(activateMutation.variables) : null;
 
   const filterCount =
     (query.trim() ? 1 : 0) +
@@ -185,6 +189,19 @@ export function PartsPage() {
       notify(errorMessage(err) ?? 'Thao tác không thành công.');
     }
   };
+
+  // Reopening is reversible, so it runs without a confirmation step.
+  const handleActivate = useCallback(
+    async (part: Part) => {
+      try {
+        await activatePart(part.id);
+        notify(`Đã kinh doanh lại phụ tùng ${part.partName}.`);
+      } catch (err: unknown) {
+        notify(errorMessage(err) ?? 'Thao tác không thành công.');
+      }
+    },
+    [activatePart, notify],
+  );
 
   const openEdit = useCallback((part: Part) => {
     setEditing(part);
@@ -324,13 +341,24 @@ export function PartsPage() {
                       <span>Ngừng</span>
                     </Button>
                   )}
+                  {isAdmin && !row.original.isActive && (
+                    <Button
+                      variant="ghost"
+                      aria-label={`Kinh doanh lại ${row.original.partName}`}
+                      pending={activatingId === String(row.original.id)}
+                      onClick={() => handleActivate(row.original)}
+                    >
+                      <RotateCcw size={16} />
+                      <span>Mở lại</span>
+                    </Button>
+                  )}
                 </div>
               ),
             },
           ]
         : []),
     ],
-    [openEdit, canManage, isAdmin],
+    [openEdit, canManage, isAdmin, activatingId, handleActivate],
   );
 
   const totalElements = onlyLowStock ? lowStockParts?.length || 0 : data?.totalElements || 0;
@@ -568,6 +596,16 @@ export function PartsPage() {
                           <Trash2 size={15} /> Ngừng
                         </Button>
                       )}
+                      {isAdmin && !p.isActive && (
+                        <Button
+                          variant="ghost"
+                          aria-label={`Kinh doanh lại ${p.partName}`}
+                          pending={activatingId === String(p.id)}
+                          onClick={() => handleActivate(p)}
+                        >
+                          <RotateCcw size={15} /> Mở lại
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -614,7 +652,7 @@ export function PartsPage() {
         </div>
       </section>
 
-      {/* Modal Thêm phụ tùng 3 cột */}
+      {/* Modal Thêm phụ tùng 4 cột */}
       <Modal
         open={creating}
         onOpenChange={setCreating}
@@ -622,10 +660,10 @@ export function PartsPage() {
         description="Khai báo mã phụ tùng, đơn giá, định mức dự trữ và điều kiện bảo hành."
         size="lg"
       >
-        <form onSubmit={handleCreate} className="modal-form">
-          <div className="form-section-label">THÔNG TIN ĐỊNH DANH & QUẢN LÝ KHO</div>
+        <form onSubmit={handleCreate} className="modal-form grid-4col">
+          <div className="form-section-label">ĐỊNH DANH & KHO</div>
 
-          <div className="full-width">
+          <div className="col-span-2">
             <Field label="Tên phụ tùng" required>
               <input
                 name="partName"
@@ -645,24 +683,26 @@ export function PartsPage() {
             <input name="unit" className="input" placeholder="Ví dụ: Can, Cái, Bộ..." required />
           </Field>
 
-          <Field label="Nhà cung cấp ưu tiên">
-            <select name="preferredSupplierId" className="input">
-              <option value="">Chọn nhà cung cấp</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.supplierName} ({s.supplierCode})
-                </option>
-              ))}
-            </select>
-          </Field>
+          <div className="col-span-2">
+            <Field label="Nhà cung cấp ưu tiên">
+              <select name="preferredSupplierId" className="input">
+                <option value="">Chọn nhà cung cấp</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.supplierName} ({s.supplierCode})
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
 
           <Field label="Mức tồn tối thiểu">
             <input name="reorderLevel" type="number" min="0" defaultValue="5" className="input" />
           </Field>
 
-          <div className="form-section-label">GIÁ BÁN & CHÍNH SÁCH BẢO HÀNH</div>
+          <div className="form-section-label">GIÁ & BẢO HÀNH</div>
 
-          <Field label="Giá nhập dự kiến (VNĐ)">
+          <Field label="Giá nhập (₫)">
             <input
               name="purchasePrice"
               type="number"
@@ -673,7 +713,7 @@ export function PartsPage() {
             />
           </Field>
 
-          <Field label="Giá bán niêm yết (VNĐ)" required>
+          <Field label="Giá bán (₫)" required>
             <input
               name="sellingPrice"
               type="number"
@@ -685,15 +725,15 @@ export function PartsPage() {
             />
           </Field>
 
-          <Field label="Thời hạn bảo hành (ngày)">
+          <Field label="Bảo hành (ngày)">
             <input name="warrantyDays" type="number" min="0" defaultValue="90" className="input" />
           </Field>
 
-          <Field label="Số km bảo hành (km)">
+          <Field label="Bảo hành (km)">
             <input name="warrantyKm" type="number" min="0" defaultValue="5000" className="input" />
           </Field>
 
-          <div className="full-width">
+          <div className="col-span-2">
             <Field label="Điều khoản bảo hành">
               <input
                 name="warrantyTerms"
@@ -703,8 +743,8 @@ export function PartsPage() {
             </Field>
           </div>
 
-          <div className="full-width">
-            <Field label="Mô tả kỹ thuật / ứng dụng xe">
+          <div className="col-span-2">
+            <Field label="Mô tả kỹ thuật">
               <input
                 name="description"
                 className="input"
@@ -728,7 +768,7 @@ export function PartsPage() {
         </form>
       </Modal>
 
-      {/* Modal Sửa phụ tùng 3 cột */}
+      {/* Modal Sửa phụ tùng 4 cột */}
       <Modal
         open={!!editing}
         onOpenChange={(open) => !open && setEditing(null)}
@@ -737,10 +777,10 @@ export function PartsPage() {
         size="lg"
       >
         {editing && (
-          <form onSubmit={handleUpdate} className="modal-form">
-            <div className="form-section-label">THÔNG TIN ĐỊNH DANH & QUẢN LÝ KHO</div>
+          <form onSubmit={handleUpdate} className="modal-form grid-4col">
+            <div className="form-section-label">ĐỊNH DANH & KHO</div>
 
-            <div className="full-width">
+            <div className="col-span-2">
               <Field label="Tên phụ tùng" required>
                 <input
                   name="partName"
@@ -766,20 +806,22 @@ export function PartsPage() {
               <input name="unit" className="input" defaultValue={editing.unit} required />
             </Field>
 
-            <Field label="Nhà cung cấp ưu tiên">
-              <select
-                name="preferredSupplierId"
-                className="input"
-                defaultValue={editing.preferredSupplierId || ''}
-              >
-                <option value="">Chọn nhà cung cấp</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.supplierName} ({s.supplierCode})
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <div className="col-span-2">
+              <Field label="Nhà cung cấp ưu tiên">
+                <select
+                  name="preferredSupplierId"
+                  className="input"
+                  defaultValue={editing.preferredSupplierId || ''}
+                >
+                  <option value="">Chọn nhà cung cấp</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.supplierName} ({s.supplierCode})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
 
             <Field label="Mức tồn tối thiểu">
               <input
@@ -791,9 +833,16 @@ export function PartsPage() {
               />
             </Field>
 
-            <div className="form-section-label">GIÁ BÁN & CHÍNH SÁCH BẢO HÀNH</div>
+            <Field label="Trạng thái kinh doanh">
+              <select name="isActive" className="input" defaultValue={String(editing.isActive)}>
+                <option value="true">Đang kinh doanh</option>
+                <option value="false">Ngừng kinh doanh</option>
+              </select>
+            </Field>
 
-            <Field label="Giá nhập tham chiếu (VNĐ)">
+            <div className="form-section-label">GIÁ & BẢO HÀNH</div>
+
+            <Field label="Giá nhập (₫)">
               <input
                 name="purchasePrice"
                 type="number"
@@ -804,7 +853,7 @@ export function PartsPage() {
               />
             </Field>
 
-            <Field label="Giá bán niêm yết (VNĐ)" required>
+            <Field label="Giá bán (₫)" required>
               <input
                 name="sellingPrice"
                 type="number"
@@ -816,7 +865,7 @@ export function PartsPage() {
               />
             </Field>
 
-            <Field label="Thời hạn bảo hành (ngày)">
+            <Field label="Bảo hành (ngày)">
               <input
                 name="warrantyDays"
                 type="number"
@@ -826,7 +875,7 @@ export function PartsPage() {
               />
             </Field>
 
-            <Field label="Số km bảo hành (km)">
+            <Field label="Bảo hành (km)">
               <input
                 name="warrantyKm"
                 type="number"
@@ -836,23 +885,18 @@ export function PartsPage() {
               />
             </Field>
 
-            <Field label="Điều khoản bảo hành">
-              <input
-                name="warrantyTerms"
-                className="input"
-                defaultValue={editing.warrantyTerms || ''}
-                placeholder="VD: Bảo hành 1 đổi 1..."
-              />
-            </Field>
+            <div className="col-span-2">
+              <Field label="Điều khoản bảo hành">
+                <input
+                  name="warrantyTerms"
+                  className="input"
+                  defaultValue={editing.warrantyTerms || ''}
+                  placeholder="VD: Bảo hành 1 đổi 1..."
+                />
+              </Field>
+            </div>
 
-            <Field label="Trạng thái kinh doanh">
-              <select name="isActive" className="input" defaultValue={String(editing.isActive)}>
-                <option value="true">Đang kinh doanh (Hoạt động)</option>
-                <option value="false">Ngừng kinh doanh</option>
-              </select>
-            </Field>
-
-            <div className="full-width">
+            <div className="col-span-2">
               <Field label="Mô tả kỹ thuật">
                 <input
                   name="description"

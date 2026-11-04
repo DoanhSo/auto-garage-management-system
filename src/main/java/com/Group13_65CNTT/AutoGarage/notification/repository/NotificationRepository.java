@@ -37,6 +37,13 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             @Param("keyword") String keyword,
             Pageable pageable);
 
+    /** Marks every unread web notice of one user read in a single statement. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+            "UPDATE Notification n SET n.readAt = :now, n.updatedBy = :userId WHERE n.userId ="
+                    + " :userId AND n.channel = 'WEB' AND n.readAt IS NULL")
+    int markAllRead(@Param("userId") long userId, @Param("now") Instant now);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT n FROM Notification n WHERE n.id = :id")
     Optional<Notification> findLockedById(@Param("id") Long id);

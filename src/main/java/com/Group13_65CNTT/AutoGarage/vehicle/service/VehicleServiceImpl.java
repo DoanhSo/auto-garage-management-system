@@ -187,6 +187,22 @@ public class VehicleServiceImpl implements VehicleService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_VEHICLE_ACTIVATED, entity = AuditConstants.ENTITY_VEHICLE, idArgument = 0)
+    public VehicleResponse activateVehicle(Long id) {
+        customerScope.requireFrontDesk();
+        Vehicle vehicle = vehicleRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + id));
+        Customer owner = customerRepository.findById(vehicle.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy chủ xe của phương tiện này"));
+        if (!Boolean.TRUE.equals(owner.getIsActive())) {
+            throw new BusinessRuleException("Chủ xe đang ngừng theo dõi. Hãy mở lại khách hàng trước khi mở lại xe.");
+        }
+        vehicle.setIsActive(true);
+        Vehicle saved = vehicleRepository.save(vehicle);
+        return vehicleMapper.toResponse(saved, owner.getFullName(), owner.getPhone());
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse getVehicleTimeline(Long vehicleId, Long requestingCustomerId, String userRole) {
         Vehicle vehicle = vehicleRepository.findById(vehicleId)

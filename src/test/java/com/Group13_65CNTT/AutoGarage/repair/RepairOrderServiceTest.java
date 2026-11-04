@@ -76,6 +76,10 @@ class RepairOrderServiceTest {
     @Mock
     private WarrantyRepository warrantyRepository;
     @Mock
+    private com.Group13_65CNTT.AutoGarage.estimate.repository.EstimateRepository estimateRepository;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.estimate.repository.EstimateItemRepository estimateItemRepository;
+    @Mock
     private BayScheduling bayScheduling;
 
     @Mock
@@ -337,5 +341,106 @@ class RepairOrderServiceTest {
         assertThat(repairService.searchRepairOrders(null, null, 0, 10, "createdAt", "desc").getContent()).hasSize(1);
 
         verify(customerScope, never()).currentCustomerId();
+    }
+
+    @Test
+    @DisplayName("Chẩn đoán đã chốt khi phiếu chờ khách duyệt báo giá")
+    void updateDiagnosis_AfterEstimate_Rejected() {
+        mockOrder.setStatus(RepairOrderStatus.WAITING_APPROVAL);
+        when(repairOrderRepository.findById(100L)).thenReturn(Optional.of(mockOrder));
+
+        assertThatThrownBy(() -> repairService.updateDiagnosis(2L, 100L,
+                DiagnosisUpdateRequest.builder().diagnosis("Sửa lại").build()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Chẩn đoán đã chốt");
+        verify(repairOrderRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Thông tin tiếp nhận không sửa được sau khi bắt đầu chẩn đoán")
+    void updateRepairOrder_ReceptionAfterNew_Rejected() {
+        mockOrder.setStatus(RepairOrderStatus.DIAGNOSING);
+        when(repairOrderRepository.findById(100L)).thenReturn(Optional.of(mockOrder));
+
+        assertThatThrownBy(() -> repairService.updateRepairOrder(2L, 100L,
+                com.Group13_65CNTT.AutoGarage.repair.dto.request.RepairOrderUpdateRequest.builder()
+                        .customerComplaint("Đổi lời khai").build()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Thông tin tiếp nhận");
+        verify(repairOrderRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Không chuyển tay sang chờ duyệt khi chưa có báo giá")
+    void transitionStatus_ToWaitingApprovalManually_Rejected() {
+        mockOrder.setStatus(RepairOrderStatus.DIAGNOSING);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+
+        assertThatThrownBy(() -> repairService.transitionStatus(2L, 100L, RepairOrderStatus.WAITING_APPROVAL, null))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("lập báo giá");
+    }
+
+    @Test
+    @DisplayName("Không chuyển sang chờ QC khi còn công việc chưa xong")
+    void transitionStatus_ToWaitingQcWithOpenTask_Rejected() {
+        mockOrder.setStatus(RepairOrderStatus.IN_PROGRESS);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        when(repairTaskRepository.existsByRepairOrderIdAndStatusNot(100L, TaskStatus.COMPLETED)).thenReturn(true);
+
+        assertThatThrownBy(() -> repairService.transitionStatus(2L, 100L, RepairOrderStatus.WAITING_QC, null))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("chưa hoàn thành");
+        assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.IN_PROGRESS);
+    }
+
+    @Test
+    @DisplayName("Không mở lại chẩn đoán khi báo giá còn chờ khách")
+    void transitionStatus_ReopenWhileAwaitingCustomer_Rejected() {
+        mockOrder.setStatus(RepairOrderStatus.WAITING_APPROVAL);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        var sent = com.Group13_65CNTT.AutoGarage.estimate.entity.Estimate.builder().id(1L)
+                .status(com.Group13_65CNTT.AutoGarage.estimate.entity.EstimateStatus.SENT)
+                .validUntil(java.time.Instant.now().plusSeconds(3600)).build();
+        when(estimateRepository.findByRepairOrderIdAndStatusIn(eq(100L), anyCollection())).thenReturn(List.of(sent));
+
+        assertThatThrownBy(() -> repairService.transitionStatus(2L, 100L, RepairOrderStatus.DIAGNOSING, null))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("từ chối toàn bộ");
+        assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.WAITING_APPROVAL);
+    }
+
+    @Test
+    @DisplayName("Mở lại chẩn đoán khi khách từ chối hết, hủy các bản nháp")
+    void transitionStatus_ReopenAfterFullRejection_CancelsDrafts() {
+        mockOrder.setStatus(RepairOrderStatus.WAITING_APPROVAL);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        var draft = com.Group13_65CNTT.AutoGarage.estimate.entity.Estimate.builder().id(2L)
+                .status(com.Group13_65CNTT.AutoGarage.estimate.entity.EstimateStatus.DRAFT).build();
+        when(estimateRepository.findByRepairOrderIdAndStatusIn(eq(100L), anyCollection()))
+                .thenReturn(List.of())
+                .thenReturn(List.of(draft));
+        when(repairOrderRepository.save(mockOrder)).thenReturn(mockOrder);
+
+        repairService.transitionStatus(2L, 100L, RepairOrderStatus.DIAGNOSING, null);
+
+        assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.DIAGNOSING);
+        assertThat(draft.getStatus()).isEqualTo(com.Group13_65CNTT.AutoGarage.estimate.entity.EstimateStatus.CANCELLED);
+    }
+
+    @Test
+    @DisplayName("Hủy phiếu thì hủy các báo giá còn mở")
+    void transitionStatus_Cancel_CancelsOpenEstimates() {
+        mockOrder.setStatus(RepairOrderStatus.WAITING_APPROVAL);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        var sent = com.Group13_65CNTT.AutoGarage.estimate.entity.Estimate.builder().id(1L)
+                .status(com.Group13_65CNTT.AutoGarage.estimate.entity.EstimateStatus.SENT).build();
+        when(estimateRepository.findByRepairOrderIdAndStatusIn(eq(100L), anyCollection())).thenReturn(List.of(sent));
+        when(repairOrderRepository.save(mockOrder)).thenReturn(mockOrder);
+
+        repairService.transitionStatus(2L, 100L, RepairOrderStatus.CANCELLED, "Khách không sửa");
+
+        assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.CANCELLED);
+        assertThat(sent.getStatus()).isEqualTo(com.Group13_65CNTT.AutoGarage.estimate.entity.EstimateStatus.CANCELLED);
     }
 }

@@ -230,4 +230,41 @@ class VehicleServiceTest {
         assertEquals(ResponseCode.FORBIDDEN, assertThrows(BusinessException.class, () ->
                 vehicleService.getVehicleTimeline(100L, 999L, "ADMIN")).getResponseCode());
     }
+
+    @Test
+    void activateVehicle_reopensVehicleOfActiveOwner() {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(5L);
+        vehicle.setCustomerId(9L);
+        vehicle.setIsActive(false);
+        Customer owner = new Customer();
+        owner.setId(9L);
+        owner.setFullName("Nguyen Van An");
+        owner.setIsActive(true);
+        when(vehicleRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(vehicle));
+        when(customerRepository.findById(9L)).thenReturn(Optional.of(owner));
+        when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        VehicleResponse response = vehicleService.activateVehicle(5L);
+
+        assertTrue(vehicle.getIsActive());
+        assertEquals("Nguyen Van An", response.getCustomerName());
+    }
+
+    @Test
+    void activateVehicle_rejectsWhenOwnerIsInactive() {
+        Vehicle vehicle = new Vehicle();
+        vehicle.setId(5L);
+        vehicle.setCustomerId(9L);
+        vehicle.setIsActive(false);
+        Customer owner = new Customer();
+        owner.setId(9L);
+        owner.setIsActive(false);
+        when(vehicleRepository.findByIdForUpdate(5L)).thenReturn(Optional.of(vehicle));
+        when(customerRepository.findById(9L)).thenReturn(Optional.of(owner));
+
+        assertThrows(BusinessRuleException.class, () -> vehicleService.activateVehicle(5L));
+        assertFalse(vehicle.getIsActive());
+        verify(vehicleRepository, never()).save(any());
+    }
 }

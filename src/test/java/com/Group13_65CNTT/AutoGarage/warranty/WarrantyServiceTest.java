@@ -45,6 +45,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -261,5 +262,67 @@ class WarrantyServiceTest {
 
         assertThatThrownBy(() -> warrantyService.getClaimById(999L))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("voidWarranty: Hủy sổ, lưu lý do và người hủy")
+    void voidWarranty_recordsReasonAndActor() {
+        when(warrantyRepository.findById(100L)).thenReturn(Optional.of(mockWarranty));
+        when(warrantyClaimRepository.existsByWarrantyIdAndStatusIn(eq(100L), any())).thenReturn(false);
+        when(warrantyRepository.save(mockWarranty)).thenReturn(mockWarranty);
+
+        warrantyService.voidWarranty(1L, 100L,
+                com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyVoidRequest.builder()
+                        .reason("  Khách tự tháo lắp  ").build());
+
+        assertThat(mockWarranty.getStatus()).isEqualTo(WarrantyStatus.VOID);
+        assertThat(mockWarranty.getVoidReason()).isEqualTo("Khách tự tháo lắp");
+        assertThat(mockWarranty.getVoidedBy()).isEqualTo(1L);
+        verify(objectAccess).requireRole(1L, "ADMIN");
+    }
+
+    @Test
+    @DisplayName("voidWarranty: Không hủy khi còn khiếu nại đang xử lý")
+    void voidWarranty_blockedByUnresolvedClaim() {
+        when(warrantyRepository.findById(100L)).thenReturn(Optional.of(mockWarranty));
+        when(warrantyClaimRepository.existsByWarrantyIdAndStatusIn(eq(100L), any())).thenReturn(true);
+
+        assertThatThrownBy(() -> warrantyService.voidWarranty(1L, 100L,
+                com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyVoidRequest.builder()
+                        .reason("Sai thông tin").build()))
+                .isInstanceOf(BusinessRuleException.class);
+        assertThat(mockWarranty.getStatus()).isEqualTo(WarrantyStatus.ACTIVE);
+        verify(warrantyRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("adjustWarranty: Gia hạn tính lại hạn ngày và hạn km từ mốc bàn giao")
+    void adjustWarranty_recomputesLimitsFromHandover() {
+        when(warrantyRepository.findById(100L)).thenReturn(Optional.of(mockWarranty));
+        when(warrantyRepository.save(mockWarranty)).thenReturn(mockWarranty);
+
+        warrantyService.adjustWarranty(1L, 100L,
+                com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyAdjustRequest.builder()
+                        .warrantyDays(180).warrantyKm(0).termsSnapshot("Gia hạn chăm sóc khách")
+                        .reason("Khách thân thiết").build());
+
+        assertThat(mockWarranty.getExpiresAt())
+                .isEqualTo(mockWarranty.getStartsAt().plus(180, ChronoUnit.DAYS));
+        assertThat(mockWarranty.getEndOdometer()).isNull();
+        assertThat(mockWarranty.getWarrantyKm()).isZero();
+        assertThat(mockWarranty.getStatus()).isEqualTo(WarrantyStatus.ACTIVE);
+        assertThat(mockWarranty.getAdjustmentNote()).isEqualTo("Khách thân thiết");
+    }
+
+    @Test
+    @DisplayName("adjustWarranty: Phải giữ ít nhất một giới hạn ngày hoặc km")
+    void adjustWarranty_rejectsUnlimitedBook() {
+        when(warrantyRepository.findById(100L)).thenReturn(Optional.of(mockWarranty));
+
+        assertThatThrownBy(() -> warrantyService.adjustWarranty(1L, 100L,
+                com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyAdjustRequest.builder()
+                        .warrantyDays(0).warrantyKm(0).reason("Thử").build()))
+                .isInstanceOf(BusinessRuleException.class);
+        verify(warrantyRepository, never()).save(any());
     }
 }

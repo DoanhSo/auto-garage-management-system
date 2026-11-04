@@ -27,6 +27,8 @@ public interface EstimateRepository extends JpaRepository<Estimate, Long> {
 
     boolean existsByEstimateCode(String estimateCode);
 
+    List<Estimate> findByRepairOrderIdAndStatusIn(Long repairOrderId, java.util.Collection<EstimateStatus> statuses);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM Estimate e WHERE e.id = :id")
     Optional<Estimate> findByIdForUpdate(@Param("id") Long id);

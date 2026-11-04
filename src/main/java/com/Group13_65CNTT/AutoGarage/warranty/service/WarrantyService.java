@@ -35,4 +35,19 @@ public interface WarrantyService {
     WarrantyClaimResponse getClaimById(Long claimId);
 
     Page<WarrantyClaimResponse> getClaimsByWarrantyId(Long warrantyId, int page, int size);
+
+    WarrantyResponse voidWarranty(Long actorUserId, Long warrantyId,
+            com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyVoidRequest request);
+
+    WarrantyResponse adjustWarranty(Long actorUserId, Long warrantyId,
+            com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyAdjustRequest request);
+
+    Page<WarrantyClaimResponse> searchClaims(
+            Long vehicleId,
+            Long customerId,
+            com.Group13_65CNTT.AutoGarage.warranty.entity.ClaimStatus status,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir);
 }

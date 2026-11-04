@@ -10,6 +10,7 @@ afterEach(() => {
   server.resetHandlers();
   configureSession(null, () => {});
   markLogoutPending(false);
+  localStorage.clear();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });

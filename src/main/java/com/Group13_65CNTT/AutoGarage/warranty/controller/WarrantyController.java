@@ -118,6 +118,47 @@ public class WarrantyController {
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
     }
 
+    @PostMapping(ApiPaths.WARRANTY_VOID)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
+    @Operation(summary = "Hủy sổ bảo hành (giữ lại lịch sử, bắt buộc lý do)")
+    public ResponseEntity<ApiResponse<WarrantyResponse>> voidWarranty(
+            @PathVariable Long id,
+            @Valid @RequestBody com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyVoidRequest request,
+            HttpServletRequest httpRequest) {
+        Long actorId = currentUserProvider.userId();
+        WarrantyResponse response = warrantyService.voidWarranty(actorId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
+    }
+
+    @PostMapping(ApiPaths.WARRANTY_ADJUST)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
+    @Operation(summary = "Điều chỉnh số ngày, số km hoặc điều khoản của sổ bảo hành")
+    public ResponseEntity<ApiResponse<WarrantyResponse>> adjustWarranty(
+            @PathVariable Long id,
+            @Valid @RequestBody com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyAdjustRequest request,
+            HttpServletRequest httpRequest) {
+        Long actorId = currentUserProvider.userId();
+        WarrantyResponse response = warrantyService.adjustWarranty(actorId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
+    }
+
+    @GetMapping(ApiPaths.WARRANTY_CLAIMS)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
+    @Operation(summary = "Tìm kiếm hồ sơ khiếu nại bảo hành trên mọi sổ (phân trang)")
+    public ResponseEntity<ApiResponse<Page<WarrantyClaimResponse>>> searchClaims(
+            @RequestParam(required = false) Long vehicleId,
+            @RequestParam(required = false) Long customerId,
+            @RequestParam(required = false) com.Group13_65CNTT.AutoGarage.warranty.entity.ClaimStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "requestedAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            HttpServletRequest httpRequest) {
+        Page<WarrantyClaimResponse> response = warrantyService.searchClaims(
+                vehicleId, customerId, status, page, size, sortBy, sortDir);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
+    }
+
     @GetMapping("/claims/{claimId}")
     @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Lấy chi tiết yêu cầu bảo hành theo ID")

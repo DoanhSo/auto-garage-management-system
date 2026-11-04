@@ -184,29 +184,37 @@ export function EmployeeEditor({
     <Sheet
       open={open}
       placement="center"
+      size="lg"
       title={employee ? `Sửa hồ sơ ${employee.employeeCode}` : 'Thêm kỹ thuật viên'}
       description="Hồ sơ năng lực dùng để xếp ca và giao việc sửa chữa."
       onClose={onClose}
     >
-      <form onSubmit={handleSubmit} noValidate className="editor-form account-editor-form">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="editor-form account-editor-form grid-4col"
+      >
         <FormError message={mutationError ? errorMessage(mutationError) : undefined} />
-        <Field label="Tài khoản nhân viên" required>
-          <select
-            className="select"
-            value={userId}
-            disabled={!!employee || busy}
-            onChange={(e) => setUserId(e.target.value)}
-          >
-            <option value="">-- Chọn tài khoản --</option>
-            {candidates
-              .filter((u) => !takenUserIds.has(String(u.id)) || String(u.id) === userId)
-              .map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.fullName} ({u.username})
-                </option>
-              ))}
-          </select>
-        </Field>
+        <div className="form-section-label">HỒ SƠ & TÀI KHOẢN NHẬN LƯƠNG</div>
+        <div className="col-span-2">
+          <Field label="Tài khoản nhân viên" required>
+            <select
+              className="select"
+              value={userId}
+              disabled={!!employee || busy}
+              onChange={(e) => setUserId(e.target.value)}
+            >
+              <option value="">-- Chọn tài khoản --</option>
+              {candidates
+                .filter((u) => !takenUserIds.has(String(u.id)) || String(u.id) === userId)
+                .map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.fullName} ({u.username})
+                  </option>
+                ))}
+            </select>
+          </Field>
+        </div>
         <Field label="Mã kỹ thuật viên" required>
           <input
             className="input"
@@ -217,7 +225,7 @@ export function EmployeeEditor({
             onChange={(e) => setCode(e.target.value)}
           />
         </Field>
-        <Field label="Ngày tham gia công ty">
+        <Field label="Ngày vào làm">
           <input
             type="date"
             className="input"
@@ -227,15 +235,17 @@ export function EmployeeEditor({
             onChange={(e) => setJoinedAt(e.target.value)}
           />
         </Field>
-        <Field label="Ngân hàng nhận lương">
-          <Combobox
-            value={bankName}
-            onChange={setBankName}
-            disabled={busy}
-            placeholder="Gõ để tìm ngân hàng…"
-            options={BANK_NAMES.map((name) => ({ value: name, label: name }))}
-          />
-        </Field>
+        <div className="col-span-2">
+          <Field label="Ngân hàng nhận lương">
+            <Combobox
+              value={bankName}
+              onChange={setBankName}
+              disabled={busy}
+              placeholder="Gõ để tìm ngân hàng…"
+              options={BANK_NAMES.map((name) => ({ value: name, label: name }))}
+            />
+          </Field>
+        </div>
         <Field label="Số tài khoản">
           <input
             className="input"
@@ -246,19 +256,21 @@ export function EmployeeEditor({
             onChange={(e) => setBankAccountNumber(e.target.value)}
           />
         </Field>
-        <Field label="Tên chủ tài khoản" hint="Viết hoa, không dấu">
+        <Field label="Tên chủ tài khoản">
           <input
             className="input"
             maxLength={100}
+            placeholder="Viết hoa, không dấu"
             value={bankAccountHolder}
             disabled={busy}
             onChange={(e) => setBankAccountHolder(e.target.value)}
           />
         </Field>
-        <div className="full-width-field">
+        <div className="form-section-label">LƯƠNG, HOA HỒNG & CHUYÊN MÔN</div>
+        <div className="col-span-2">
           <Field
             label="Vai trò / cấp bậc"
-            hint="Chọn mẫu để tự điền khung lương, hệ số, đơn giá giờ công và hoa hồng; vẫn chỉnh tay được."
+            hint="Chọn mẫu để tự điền lương và hoa hồng; vẫn chỉnh tay được."
           >
             <select
               className="select"
@@ -275,7 +287,7 @@ export function EmployeeEditor({
             </select>
           </Field>
         </div>
-        <Field label="Hệ số lương" hint="Từ 0.5 đến 3.0, bước 0.05">
+        <Field label="Hệ số lương" hint="0.5–3.0, bước 0.05">
           <input
             type="number"
             min="0.5"
@@ -285,38 +297,6 @@ export function EmployeeEditor({
             value={coefficient}
             disabled={busy}
             onChange={(e) => changeCoefficient(e.target.value)}
-          />
-        </Field>
-        <Field label="Đơn giá giờ công (đ)" required hint={`Lương cơ bản ÷ ${208} giờ công chuẩn`}>
-          <div className="row-actions">
-            <input
-              type="number"
-              min="0"
-              step="500"
-              className="input grow"
-              value={hourlyCost}
-              disabled={busy}
-              onChange={(e) => setHourlyCost(e.target.value)}
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy}
-              onClick={() => setHourlyCost(String(hourlyCostFromSalary(Number(baseSalary) || 0)))}
-            >
-              Tự quy đổi
-            </Button>
-          </div>
-        </Field>
-        <Field label="Lương cơ bản áp dụng (đ/tháng)">
-          <input
-            type="number"
-            min="0"
-            step="100000"
-            className="input"
-            value={baseSalary}
-            disabled={busy}
-            onChange={(e) => setBaseSalary(e.target.value)}
           />
         </Field>
         <Field label="Hệ số tăng ca">
@@ -331,7 +311,45 @@ export function EmployeeEditor({
             <option value="2">2.0x</option>
           </select>
         </Field>
-        <Field label="Tỷ lệ hoa hồng tiền công (%)">
+        <Field label="Lương cơ bản (đ/tháng)">
+          <input
+            type="number"
+            min="0"
+            step="100000"
+            className="input"
+            value={baseSalary}
+            disabled={busy}
+            onChange={(e) => setBaseSalary(e.target.value)}
+          />
+        </Field>
+        <div className="col-span-2">
+          <Field
+            label="Đơn giá giờ công (đ)"
+            required
+            hint={`Lương cơ bản ÷ ${208} giờ công chuẩn`}
+          >
+            <div className="row-actions">
+              <input
+                type="number"
+                min="0"
+                step="500"
+                className="input grow"
+                value={hourlyCost}
+                disabled={busy}
+                onChange={(e) => setHourlyCost(e.target.value)}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => setHourlyCost(String(hourlyCostFromSalary(Number(baseSalary) || 0)))}
+              >
+                Tự quy đổi
+              </Button>
+            </div>
+          </Field>
+        </div>
+        <Field label="Hoa hồng tiền công (%)">
           <input
             type="number"
             min="0"
@@ -343,13 +361,7 @@ export function EmployeeEditor({
             onChange={(e) => setCommissionRate(e.target.value)}
           />
         </Field>
-        <Field label="Quyền kiểm định xuất xưởng">
-          <label className="row-actions">
-            <input type="checkbox" checked={canQc} onChange={(e) => setCanQc(e.target.checked)} />
-            Được phép kiểm định chất lượng (QC)
-          </label>
-        </Field>
-        <div className="full-width-field">
+        <div className="col-span-3">
           <Field label="Chuyên môn kỹ thuật">
             <div className="row-actions">
               {Object.entries(SKILL_LABELS).map(([key, label]) => (
@@ -365,6 +377,12 @@ export function EmployeeEditor({
             </div>
           </Field>
         </div>
+        <Field label="Kiểm định xuất xưởng">
+          <label className="row-actions">
+            <input type="checkbox" checked={canQc} onChange={(e) => setCanQc(e.target.checked)} />
+            Được kiểm định (QC)
+          </label>
+        </Field>
         <div className="form-actions account-editor-actions">
           <Button onClick={onClose}>Hủy</Button>
           <Button variant="primary" type="submit" pending={busy}>

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import { errorMessage } from '../../../shared/api/errors';
 import {
   Badge,
@@ -27,7 +28,8 @@ import {
 import { DataTable, Pagination } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { useUiPolicy } from '../../../shared/config/policy';
-import { money } from '../../../shared/utils/format';
+import { useUrlTab } from '../../../shared/hooks/useUrlTab';
+import { formatDate, money } from '../../../shared/utils/format';
 import {
   useServiceBaysQuery,
   useDeleteServiceBayMutation,
@@ -43,11 +45,13 @@ import { BayMaintenanceModal } from '../components/BayMaintenanceModal';
 import { BayReservationsModal } from '../components/BayReservationsModal';
 import { EmployeeEditor } from '../components/EmployeeEditor';
 import { LiveDispatchBoard } from '../components/LiveDispatchBoard';
+import { ShiftRegistrationModal } from '../components/ShiftRegistrationModal';
 import type { BayReservation, Employee, ServiceBay, Shift } from '../types/scheduling';
 import { bayTypeLabels, parseSkills, SKILL_LABELS, shiftStatusLabels } from '../types/scheduling';
 import type { UiPolicy } from '../../../shared/types/contracts';
 
-type Tab = 'dispatch' | 'bays' | 'shifts' | 'employees';
+const TABS = ['dispatch', 'bays', 'shifts', 'employees'] as const;
+type Tab = (typeof TABS)[number];
 type BayFilter = 'ALL' | 'FREE' | 'BUSY' | 'INACTIVE';
 
 const hhmm = (iso: string) =>
@@ -82,8 +86,14 @@ function liveShiftState(shift: Shift, now: number) {
 
 function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const notify = useToast();
-  const [activeTab, setActiveTab] = useState<Tab>('dispatch');
-  const [page, setPage] = useState(0);
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const isTechnician = user?.role === 'TECHNICIAN';
+  const [activeTab, setActiveTab] = useUrlTab<Tab>('tab', TABS);
+  // Paging belongs to one tab; switching tabs from the sidebar tree starts again at page 1.
+  const [paging, setPaging] = useState<{ tab: Tab; page: number }>({ tab: activeTab, page: 0 });
+  const page = paging.tab === activeTab ? paging.page : 0;
+  const setPage = (next: number) => setPaging({ tab: activeTab, page: next });
   const [size, setSize] = useState(policy.paginationDefaultSize);
 
   const [bayFilter, setBayFilter] = useState<BayFilter>('ALL');
@@ -99,6 +109,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const [reservationsBay, setReservationsBay] = useState<ServiceBay | null>(null);
 
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
   const [shiftPresetEmployee, setShiftPresetEmployee] = useState<string | number | null>(null);
   const [shiftPresetBay, setShiftPresetBay] = useState<string | number | null>(null);
   const [cancelingShiftId, setCancelingShiftId] = useState<number | string | null>(null);
@@ -426,10 +437,43 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
       },
       { id: 'skills', header: 'Chuyên môn & QC', cell: ({ row }) => skillBadges(row.original) },
       {
-        accessorKey: 'hourlyCost',
-        header: 'Giá giờ công',
+        id: 'joinedAt',
+        header: 'Ngày vào làm',
         cell: ({ row }) => (
-          <strong>{row.original.hourlyCost != null ? money(row.original.hourlyCost) : '—'}</strong>
+          <span>{row.original.joinedAt ? formatDate(row.original.joinedAt) : '—'}</span>
+        ),
+      },
+      {
+        id: 'bank',
+        header: 'Ngân hàng & STK',
+        cell: ({ row }) =>
+          row.original.bankAccountNumber ? (
+            <div className="account-cell">
+              <div>
+                <strong>{row.original.bankName ?? '—'}</strong>
+                <span>{row.original.bankAccountNumber}</span>
+              </div>
+            </div>
+          ) : (
+            <span className="muted">Chưa cập nhật STK</span>
+          ),
+      },
+      {
+        accessorKey: 'hourlyCost',
+        header: 'Giá giờ công & hệ số',
+        cell: ({ row }) => (
+          <div className="account-cell">
+            <div>
+              <strong>
+                {row.original.hourlyCost != null ? money(row.original.hourlyCost) : '—'}
+              </strong>
+              <span>
+                {row.original.salaryCoefficient != null
+                  ? `Hệ số ${Number(row.original.salaryCoefficient).toFixed(2)}x`
+                  : '—'}
+              </span>
+            </div>
+          </div>
         ),
       },
       {
@@ -528,39 +572,42 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
     setPage(0);
   };
 
-  const primaryAction =
-    activeTab === 'dispatch' ? null : activeTab === 'bays' ? (
-      <Button
-        variant="primary"
-        onClick={() => {
-          setEditingBay(null);
-          setBayModalOpen(true);
-        }}
-      >
-        <Plus size={16} /> Thêm khoang
-      </Button>
-    ) : activeTab === 'shifts' ? (
-      <Button
-        variant="primary"
-        onClick={() => {
-          setShiftPresetEmployee(null);
-          setShiftPresetBay(null);
-          setShiftModalOpen(true);
-        }}
-      >
-        <Plus size={16} /> Xếp ca làm việc
-      </Button>
-    ) : (
-      <Button
-        variant="primary"
-        onClick={() => {
-          setEditingEmployee(null);
-          setEmployeeModalOpen(true);
-        }}
-      >
-        <Plus size={16} /> Thêm kỹ thuật viên
-      </Button>
-    );
+  const primaryAction = isTechnician ? (
+    <Button variant="primary" onClick={() => setRegisterModalOpen(true)}>
+      <CalendarClock size={16} /> Đăng ký ca làm việc
+    </Button>
+  ) : !isAdmin ? null : activeTab === 'dispatch' ? null : activeTab === 'bays' ? (
+    <Button
+      variant="primary"
+      onClick={() => {
+        setEditingBay(null);
+        setBayModalOpen(true);
+      }}
+    >
+      <Plus size={16} /> Thêm khoang
+    </Button>
+  ) : activeTab === 'shifts' ? (
+    <Button
+      variant="primary"
+      onClick={() => {
+        setShiftPresetEmployee(null);
+        setShiftPresetBay(null);
+        setShiftModalOpen(true);
+      }}
+    >
+      <Plus size={16} /> Xếp ca làm việc
+    </Button>
+  ) : (
+    <Button
+      variant="primary"
+      onClick={() => {
+        setEditingEmployee(null);
+        setEmployeeModalOpen(true);
+      }}
+    >
+      <Plus size={16} /> Thêm kỹ thuật viên
+    </Button>
+  );
 
   const filtersFor = (tab: Tab) =>
     tab === 'bays' ? (
@@ -662,7 +709,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         title="Khoang sửa chữa & lịch ca làm việc"
         description="Điều phối cầu nâng, đội ngũ kỹ thuật viên và ca trực của xưởng dịch vụ."
         actions={
-          <div className="row-actions">
+          <>
             <Button
               variant="secondary"
               onClick={() => {
@@ -674,7 +721,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
               <RefreshCw size={15} /> Làm mới
             </Button>
             {primaryAction}
-          </div>
+          </>
         }
       />
 
@@ -839,6 +886,11 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         initialServiceBayId={shiftPresetBay}
         onClose={() => setShiftModalOpen(false)}
         onSaved={() => shiftsQuery.refetch()}
+      />
+
+      <ShiftRegistrationModal
+        open={registerModalOpen}
+        onClose={() => setRegisterModalOpen(false)}
       />
 
       <EmployeeEditor

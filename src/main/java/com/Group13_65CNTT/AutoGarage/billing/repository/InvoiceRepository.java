@@ -19,13 +19,20 @@ import java.util.Optional;
 public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     Optional<Invoice> findByInvoiceCode(String invoiceCode);
 
-    Optional<Invoice> findByRepairOrderId(Long repairOrderId);
+    /** The live invoice of an order; voided ones stay as records but never count. */
+    @Query("SELECT i FROM Invoice i WHERE i.repairOrderId = :repairOrderId "
+            + "AND i.status <> com.Group13_65CNTT.AutoGarage.billing.entity.InvoiceStatus.VOID")
+    Optional<Invoice> findActiveByRepairOrderId(@Param("repairOrderId") Long repairOrderId);
+
+    /** Most recent invoice of an order, voided or not, for display when no live one exists. */
+    Optional<Invoice> findFirstByRepairOrderIdOrderByIdDesc(Long repairOrderId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT i FROM Invoice i WHERE i.repairOrderId = :repairOrderId")
-    Optional<Invoice> findByRepairOrderIdWithLock(@Param("repairOrderId") Long repairOrderId);
+    @Query("SELECT i FROM Invoice i WHERE i.repairOrderId = :repairOrderId "
+            + "AND i.status <> com.Group13_65CNTT.AutoGarage.billing.entity.InvoiceStatus.VOID")
+    Optional<Invoice> findActiveByRepairOrderIdWithLock(@Param("repairOrderId") Long repairOrderId);
 
-    boolean existsByRepairOrderId(Long repairOrderId);
+    boolean existsByRepairOrderIdAndStatusNot(Long repairOrderId, InvoiceStatus status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Invoice i WHERE i.id = :id")

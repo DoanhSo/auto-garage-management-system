@@ -3,11 +3,20 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { errorMessage } from '../../../shared/api/errors';
 import { money } from '../../../shared/utils/format';
-import { Badge, Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/components/ui';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  Field,
+  FormError,
+  Sheet,
+} from '../../../shared/components/ui';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { useRepairOrdersQuery } from '../../repair/hooks/useRepair';
 import { useCreateEstimateMutation } from '../hooks/useEstimate';
-import type { EstimateKind, EstimateItemCreateInput, ItemType } from '../types/estimate';
+import { useEstimatesQuery } from '../hooks/useEstimates';
+import { newEstimateMode } from '../../repair/utils/stageLocks';
+import type { EstimateItemCreateInput, ItemType } from '../types/estimate';
 import { EstimateLinePicker, type PickedCatalogLine } from './EstimateLinePicker';
 
 const DEFAULT_VALID_DAYS = 7;
@@ -37,18 +46,30 @@ export function EstimateEditor({
   const [discard, setDiscard] = useState(false);
 
   const [repairOrderId, setRepairOrderId] = useState<string>('');
-  const [estimateKind, setEstimateKind] = useState<EstimateKind>('INITIAL');
   const [notes, setNotes] = useState('');
   const [validDays, setValidDays] = useState(DEFAULT_VALID_DAYS);
   const [items, setItems] = useState<EstimateItemCreateInput[]>([emptyItem('SERVICE')]);
 
   const { data: ordersData } = useRepairOrdersQuery({ size: 100 });
-  const orders = ordersData?.content ?? [];
+  // Only orders that can still take a new estimate (before QC); the kind follows the order's stage.
+  const orders = (ordersData?.content ?? []).filter((o) =>
+    [
+      'NEW',
+      'DIAGNOSING',
+      'WAITING_APPROVAL',
+      'APPROVED',
+      'IN_PROGRESS',
+      'WAITING_PARTS',
+      'QC_FAILED',
+    ].includes(o.status),
+  );
+  const selectedOrder = orders.find((o) => String(o.id) === repairOrderId);
+  const { data: orderEstimates = [] } = useEstimatesQuery(repairOrderId || null);
+  const mode = selectedOrder ? newEstimateMode(selectedOrder.status, orderEstimates) : null;
 
   useEffect(() => {
     if (open) {
       setRepairOrderId('');
-      setEstimateKind('INITIAL');
       setNotes('');
       setValidDays(DEFAULT_VALID_DAYS);
       setItems([emptyItem('SERVICE')]);
@@ -81,6 +102,10 @@ export function EstimateEditor({
       notify('Vui lòng chọn Lệnh sửa chữa');
       return;
     }
+    if (!mode) {
+      notify('Phiếu này không còn lập được báo giá ở giai đoạn hiện tại.');
+      return;
+    }
     const missing = items.findIndex((item) =>
       item.itemType === 'SERVICE' ? !item.serviceId : !item.partId,
     );
@@ -92,7 +117,8 @@ export function EstimateEditor({
     try {
       await createMutation.mutateAsync({
         repairOrderId: Number(repairOrderId),
-        estimateKind,
+        estimateKind: mode.kind,
+        parentEstimateId: mode.kind === 'SUPPLEMENTAL' ? Number(mode.parentEstimateId) : null,
         notes: notes.trim() || undefined,
         validUntil: new Date(Date.now() + Number(validDays) * MS_PER_DAY).toISOString(),
         items: items.map((item) => ({
@@ -126,7 +152,9 @@ export function EstimateEditor({
         onClose={handleClose}
       >
         <form onSubmit={handleSubmit} noValidate className="editor-form account-editor-form">
-          <FormError message={createMutation.error ? errorMessage(createMutation.error) : undefined} />
+          <FormError
+            message={createMutation.error ? errorMessage(createMutation.error) : undefined}
+          />
 
           <div className="form-section-label">THÔNG TIN CHUNG BÁO GIÁ</div>
 
@@ -147,16 +175,28 @@ export function EstimateEditor({
             </select>
           </Field>
 
-          <Field label="Loại báo giá" required>
-            <select
-              className="select"
-              value={estimateKind}
-              onChange={(e) => setEstimateKind(e.target.value as EstimateKind)}
-              disabled={busy}
-            >
-              <option value="INITIAL">Báo giá ban đầu</option>
-              <option value="SUPPLEMENTAL">Báo giá phát sinh thêm</option>
-            </select>
+          <Field
+            label="Loại báo giá"
+            hint={
+              mode?.kind === 'SUPPLEMENTAL'
+                ? 'Khách đã duyệt báo giá trước, hạng mục mới được lập thành báo giá phát sinh.'
+                : undefined
+            }
+          >
+            <input
+              className="input"
+              readOnly
+              tabIndex={-1}
+              value={
+                !selectedOrder
+                  ? 'Chọn phiếu để xác định'
+                  : mode?.kind === 'SUPPLEMENTAL'
+                    ? 'Báo giá phát sinh thêm'
+                    : mode
+                      ? 'Báo giá ban đầu'
+                      : 'Phiếu không còn lập được báo giá'
+              }
+            />
           </Field>
 
           <Field label="Hiệu lực báo giá (số ngày)">

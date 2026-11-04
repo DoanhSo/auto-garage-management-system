@@ -60,7 +60,9 @@ export function DecideClaimModal({
       onClose={onClose}
     >
       <form onSubmit={handleSubmit} noValidate className="editor-form account-editor-form">
-        <FormError message={decideMutation.error ? errorMessage(decideMutation.error) : undefined} />
+        <FormError
+          message={decideMutation.error ? errorMessage(decideMutation.error) : undefined}
+        />
 
         <dl className="full-width-field detail-list">
           <ReadOnlyField label="Nội dung khách khiếu nại">{claim.description}</ReadOnlyField>
@@ -76,8 +78,12 @@ export function DecideClaimModal({
               value={status}
               onChange={(e) => setStatus(e.target.value as 'APPROVED' | 'REJECTED')}
             >
-              <option value="APPROVED">Chấp thuận — tự động mở phiếu sửa chữa bảo hành miễn phí</option>
-              <option value="REJECTED">Từ chối — lỗi không thuộc phạm vi bảo hành hoặc quá hạn</option>
+              <option value="APPROVED">
+                Chấp thuận — tự động mở phiếu sửa chữa bảo hành miễn phí
+              </option>
+              <option value="REJECTED">
+                Từ chối — lỗi không thuộc phạm vi bảo hành hoặc quá hạn
+              </option>
             </select>
           </Field>
         </div>

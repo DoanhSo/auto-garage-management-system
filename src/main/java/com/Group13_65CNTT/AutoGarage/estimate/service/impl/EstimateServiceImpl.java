@@ -27,6 +27,7 @@ import com.Group13_65CNTT.AutoGarage.repair.entity.TaskStatus;
 import com.Group13_65CNTT.AutoGarage.repair.entity.TaskType;
 import com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderRepository;
 import com.Group13_65CNTT.AutoGarage.repair.repository.RepairTaskRepository;
+import com.Group13_65CNTT.AutoGarage.repair.service.RepairStageRules;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.EstimateApproval;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.InventoryOperations;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.NotificationAudit;
@@ -93,6 +94,9 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
 
         // Xử lý kiểm tra Kind và ParentEstimateId
         if (request.getEstimateKind() == EstimateKind.SUPPLEMENTAL) {
+            if (!RepairStageRules.SUPPLEMENTAL_ALLOWED.contains(order.getStatus())) {
+                throw new BusinessRuleException("Báo giá phát sinh chỉ lập khi phiếu đang thi công hoặc QC chưa đạt");
+            }
             if (request.getParentEstimateId() == null) {
                 throw new BusinessRuleException("Báo giá phát sinh (SUPPLEMENTAL) bắt buộc phải có ID báo giá gốc (parentEstimateId)");
             }
@@ -101,10 +105,25 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
             if (!parent.getRepairOrderId().equals(order.getId())) {
                 throw new BusinessRuleException("Báo giá gốc không thuộc cùng phiếu sửa chữa");
             }
+            if (parent.getStatus() != EstimateStatus.APPROVED && parent.getStatus() != EstimateStatus.PARTIALLY_APPROVED) {
+                throw new BusinessRuleException("Báo giá gốc phải đã được khách duyệt");
+            }
         } else {
             if (request.getParentEstimateId() != null) {
                 throw new BusinessRuleException("Báo giá ban đầu (INITIAL) không được có parentEstimateId");
             }
+            if (!RepairStageRules.INITIAL_ESTIMATE_ALLOWED.contains(order.getStatus())
+                    || estimateItemRepository.existsLineByRepairOrderIdAndStatus(order.getId(), ApprovalStatus.APPROVED)) {
+                throw new BusinessRuleException("Phiếu đã có hạng mục được duyệt, chỉ lập được báo giá phát sinh");
+            }
+            if (order.getDiagnosis() == null || order.getDiagnosis().isBlank()) {
+                throw new BusinessRuleException("Cần ghi kết luận chẩn đoán trước khi lập báo giá");
+            }
+            // A new initial version replaces older ones the customer has not acted on.
+            List<Estimate> superseded = estimateRepository.findByRepairOrderIdAndStatusIn(order.getId(),
+                    java.util.EnumSet.of(EstimateStatus.DRAFT, EstimateStatus.SENT));
+            superseded.forEach(old -> old.setStatus(EstimateStatus.CANCELLED));
+            estimateRepository.saveAll(superseded);
         }
 
         // Tăng version_no tuần tự dưới khóa phiếu
@@ -345,6 +364,11 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
 
         if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
             throw new BusinessRuleException("Không thể phê duyệt báo giá của phiếu sửa chữa đã kết thúc");
+        }
+        // After QC has started, newly approved work would leave the order unbillable.
+        if (order.getStatus() != RepairOrderStatus.WAITING_APPROVAL
+                && !RepairStageRules.SUPPLEMENTAL_ALLOWED.contains(order.getStatus())) {
+            throw new BusinessRuleException("Phiếu đang ở giai đoạn " + order.getStatus() + ", không thể duyệt thêm hạng mục");
         }
 
         Instant now = Instant.now();

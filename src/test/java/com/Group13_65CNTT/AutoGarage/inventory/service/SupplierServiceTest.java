@@ -110,4 +110,19 @@ class SupplierServiceTest {
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).getSupplierCode()).isEqualTo("SUP-01");
     }
+
+    @Test
+    void activateSupplier_reopensInactiveSupplier() {
+        Supplier supplier = new Supplier();
+        supplier.setId(6L);
+        supplier.setIsActive(false);
+        when(supplierRepository.findById(6L)).thenReturn(Optional.of(supplier));
+        when(supplierRepository.save(supplier)).thenReturn(supplier);
+        when(supplierMapper.toResponse(supplier)).thenReturn(new SupplierResponse());
+
+        service.activateSupplier(6L);
+
+        assertThat(supplier.getIsActive()).isTrue();
+        verify(supplierRepository).save(supplier);
+    }
 }

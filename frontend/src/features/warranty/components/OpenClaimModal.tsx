@@ -4,6 +4,7 @@ import { Button, ConfirmDialog, Field, FormError, Sheet } from '../../../shared/
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { useOpenClaimMutation } from '../hooks/useWarranty';
 import type { Warranty } from '../types/warranty';
+import { formatDate } from '../../../shared/utils/format';
 
 export function OpenClaimModal({
   warranty,
@@ -70,13 +71,30 @@ export function OpenClaimModal({
         open={open}
         placement="center"
         title={`Mở yêu cầu bảo hành #${warranty.warrantyCode}`}
-        description={`Hạn bảo hành đến: ${warranty.expiresAt.slice(0, 10)} hoặc ${warranty.endOdometer?.toLocaleString('vi-VN')} km`}
+        description={`Hạn bảo hành: ${
+          [
+            warranty.expiresAt ? `đến ${formatDate(warranty.expiresAt)}` : null,
+            warranty.endOdometer != null
+              ? `tối đa ${warranty.endOdometer.toLocaleString('vi-VN')} km`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' hoặc ') || 'không giới hạn'
+        }`}
         onClose={handleClose}
       >
         <form onSubmit={handleSubmit} noValidate className="editor-form account-editor-form">
           <FormError message={openClaimMutation.error?.message} />
 
-          <Field label="Số ODO hiện tại khi khiếu nại (km)" required hint={`Mức tối đa được bảo hành: ${warranty.endOdometer?.toLocaleString('vi-VN')} km`}>
+          <Field
+            label="Số ODO hiện tại khi khiếu nại (km)"
+            required
+            hint={
+              warranty.endOdometer != null
+                ? `Mức tối đa được bảo hành: ${warranty.endOdometer.toLocaleString('vi-VN')} km`
+                : 'Sổ này không giới hạn số km'
+            }
+          >
             <input
               type="number"
               className="input"
@@ -99,7 +117,8 @@ export function OpenClaimModal({
           <div className="full-width-field">
             <Field label="Mô tả chi tiết lỗi phát sinh cần bảo hành" required>
               <textarea
-                className="input" rows={4}
+                className="input"
+                rows={4}
                 placeholder="Ví dụ: Phụ tùng thay thế phát ra tiếng kêu lạ, dầu nhớt bị rò rỉ sau khi nhận xe..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}

@@ -1,4 +1,13 @@
-import { Wrench, Clock, ShieldCheck, RotateCw, SquarePen, Trash2, Box } from 'lucide-react';
+import {
+  Wrench,
+  Clock,
+  ShieldCheck,
+  RotateCw,
+  RotateCcw,
+  SquarePen,
+  Trash2,
+  Box,
+} from 'lucide-react';
 import type { Service } from '../../../shared/types/contracts';
 import { Button, Empty, StatusBadge } from '../../../shared/components/ui';
 import { money } from '../../../shared/utils/format';
@@ -8,11 +17,15 @@ export function ServiceCards({
   services,
   onEdit,
   onDeactivate,
+  onActivate,
+  activatingId,
 }: {
   canManage?: boolean;
   services: Service[];
   onEdit: (id: string, trigger: HTMLElement) => void;
   onDeactivate: (service: Service) => void;
+  onActivate: (service: Service) => void;
+  activatingId?: string | null;
 }) {
   if (!services.length) {
     return (
@@ -71,8 +84,7 @@ export function ServiceCards({
                 <div className="info-row">
                   <RotateCw size={14} aria-hidden />
                   <span>
-                    Chu kỳ:{' '}
-                    {s.intervalKm ? `${s.intervalKm.toLocaleString('vi-VN')} km` : ''}
+                    Chu kỳ: {s.intervalKm ? `${s.intervalKm.toLocaleString('vi-VN')} km` : ''}
                     {s.intervalKm && s.intervalMonths ? ' hoặc ' : ''}
                     {s.intervalMonths ? `${s.intervalMonths} tháng` : ''}
                   </span>
@@ -119,6 +131,18 @@ export function ServiceCards({
                   >
                     <Trash2 size={16} />
                     Ngừng áp dụng
+                  </Button>
+                )}
+
+                {canManage && !s.isActive && (
+                  <Button
+                    variant="ghost"
+                    aria-label={`Áp dụng lại dịch vụ ${s.serviceName}`}
+                    pending={activatingId === s.id}
+                    onClick={() => onActivate(s)}
+                  >
+                    <RotateCcw size={16} />
+                    Áp dụng lại
                   </Button>
                 )}
               </div>

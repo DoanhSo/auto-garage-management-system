@@ -1,6 +1,6 @@
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { FRONT_DESK_ROLES } from '../../../app/access';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Plus,
   SquarePen,
@@ -11,6 +11,7 @@ import {
   Gauge,
   User,
   Car,
+  RotateCcw,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
@@ -27,7 +28,11 @@ import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { errorMessage } from '../../../shared/api/errors';
 import { formatDate } from '../../../shared/utils/format';
 import type { Vehicle } from '../../../shared/types/contracts';
-import { useVehiclesQuery, useDeleteVehicleMutation } from '../hooks/useVehicles';
+import {
+  useVehiclesQuery,
+  useDeleteVehicleMutation,
+  useActivateVehicleMutation,
+} from '../hooks/useVehicles';
 import { VehicleEditor } from '../components/VehicleEditor';
 import { VehicleFilters } from '../components/VehicleFilters';
 import { VehicleCards } from '../components/VehicleCards';
@@ -87,6 +92,22 @@ export function VehiclesPage() {
     setTimelineVehicleId(id);
     setTimelineOpen(true);
   };
+
+  const activateMutation = useActivateVehicleMutation();
+  const activateVehicle = activateMutation.mutateAsync;
+  const activatingId = activateMutation.isPending ? activateMutation.variables : null;
+  // Reopening is reversible, so it runs without a confirmation step.
+  const handleActivate = useCallback(
+    async (vehicle: Vehicle) => {
+      try {
+        await activateVehicle(vehicle.id);
+        notify(`Đã mở lại phương tiện "${vehicle.licensePlate}"`);
+      } catch (err: unknown) {
+        notify(errorMessage(err));
+      }
+    },
+    [activateVehicle, notify],
+  );
 
   const handleConfirmDeactivate = async () => {
     if (!deactivatingVehicle) return;
@@ -241,12 +262,24 @@ export function VehiclesPage() {
                   Ngừng HĐ
                 </Button>
               )}
+
+              {canManage && !vehicle.isActive && (
+                <Button
+                  variant="ghost"
+                  aria-label={`Mở lại xe ${vehicle.licensePlate}`}
+                  pending={activatingId === vehicle.id}
+                  onClick={() => handleActivate(vehicle)}
+                >
+                  <RotateCcw size={16} />
+                  Mở lại
+                </Button>
+              )}
             </div>
           );
         },
       },
     ],
-    [canManage],
+    [canManage, activatingId, handleActivate],
   );
 
   return (
@@ -297,6 +330,8 @@ export function VehiclesPage() {
             onTransfer={handleOpenTransfer}
             onTimeline={handleOpenTimeline}
             onDeactivate={setDeactivatingVehicle}
+            onActivate={handleActivate}
+            activatingId={activatingId}
           />
         ) : (
           <DataTable<Vehicle>

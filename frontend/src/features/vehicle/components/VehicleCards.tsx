@@ -1,4 +1,13 @@
-import { Calendar, Gauge, History, ArrowRightLeft, SquarePen, Trash2, Fuel } from 'lucide-react';
+import {
+  Calendar,
+  Gauge,
+  History,
+  ArrowRightLeft,
+  SquarePen,
+  Trash2,
+  Fuel,
+  RotateCcw,
+} from 'lucide-react';
 import type { Vehicle } from '../../../shared/types/contracts';
 import { Button, Empty, StatusBadge } from '../../../shared/components/ui';
 import { formatDate } from '../../../shared/utils/format';
@@ -10,6 +19,8 @@ export function VehicleCards({
   onTransfer,
   onTimeline,
   onDeactivate,
+  onActivate,
+  activatingId,
 }: {
   canManage?: boolean;
   vehicles: Vehicle[];
@@ -17,6 +28,8 @@ export function VehicleCards({
   onTransfer: (vehicle: Vehicle) => void;
   onTimeline: (id: string) => void;
   onDeactivate: (vehicle: Vehicle) => void;
+  onActivate: (vehicle: Vehicle) => void;
+  activatingId?: string | null;
 }) {
   if (!vehicles.length) {
     return (
@@ -128,6 +141,18 @@ export function VehicleCards({
                   >
                     <Trash2 size={16} />
                     Ngừng HĐ
+                  </Button>
+                )}
+
+                {canManage && !v.isActive && (
+                  <Button
+                    variant="ghost"
+                    aria-label={`Mở lại xe ${v.licensePlate}`}
+                    pending={activatingId === v.id}
+                    onClick={() => onActivate(v)}
+                  >
+                    <RotateCcw size={16} />
+                    Mở lại
                   </Button>
                 )}
               </div>

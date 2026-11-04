@@ -1,6 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.payroll.service.impl;
 
 import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
@@ -119,7 +120,7 @@ public class PayrollServiceImpl implements PayrollService {
 
     @Override
     @Transactional
-    @Audited(action = "CREATE_PAYROLL_PERIOD", entity = "PayrollPeriod")
+    @Audited(action = AuditConstants.ACTION_CREATE_PAYROLL_PERIOD, entity = AuditConstants.ENTITY_PAYROLL_PERIOD)
     public PayrollPeriodResponse createPeriod(long actorUserId, PayrollPeriodCreateRequest request) {
         YearMonth month;
         try {
@@ -169,7 +170,7 @@ public class PayrollServiceImpl implements PayrollService {
 
     @Override
     @Transactional
-    @Audited(action = "CALCULATE_PAYROLL", entity = "PayrollPeriod")
+    @Audited(action = AuditConstants.ACTION_CALCULATE_PAYROLL, entity = AuditConstants.ENTITY_PAYROLL_PERIOD)
     public PayrollPeriodDetailResponse calculatePeriod(long actorUserId, Long periodId) {
         PayrollPeriod period = lockEditable(periodId);
         Instant from = period.getFromDate().atStartOfDay(PayrollConstants.ZONE).toInstant();
@@ -239,7 +240,7 @@ public class PayrollServiceImpl implements PayrollService {
 
     @Override
     @Transactional
-    @Audited(action = "ADJUST_PAYROLL_ITEM", entity = "PayrollItem")
+    @Audited(action = AuditConstants.ACTION_ADJUST_PAYROLL_ITEM, entity = AuditConstants.ENTITY_PAYROLL_ITEM)
     public PayrollItemResponse adjustItem(
             long actorUserId, Long periodId, Long itemId, PayrollItemAdjustRequest request) {
         PayrollPeriod period = lockEditable(periodId);
@@ -266,7 +267,7 @@ public class PayrollServiceImpl implements PayrollService {
 
     @Override
     @Transactional
-    @Audited(action = "APPROVE_PAYROLL", entity = "PayrollPeriod")
+    @Audited(action = AuditConstants.ACTION_APPROVE_PAYROLL, entity = AuditConstants.ENTITY_PAYROLL_PERIOD)
     public PayrollPeriodResponse approvePeriod(long actorUserId, Long periodId) {
         PayrollPeriod period = lockPeriod(periodId);
         if (period.getStatus() != PayrollPeriodStatus.CALCULATED) {
@@ -286,7 +287,7 @@ public class PayrollServiceImpl implements PayrollService {
 
     @Override
     @Transactional
-    @Audited(action = "DISBURSE_PAYROLL", entity = "PayrollPeriod")
+    @Audited(action = AuditConstants.ACTION_DISBURSE_PAYROLL, entity = AuditConstants.ENTITY_PAYROLL_PERIOD)
     public PayrollPeriodResponse disbursePeriod(long actorUserId, Long periodId) {
         PayrollPeriod period = lockPeriod(periodId);
         if (period.getStatus() != PayrollPeriodStatus.APPROVED) {
@@ -366,7 +367,7 @@ public class PayrollServiceImpl implements PayrollService {
 
     @Override
     @Transactional
-    @Audited(action = "CALCULATE_ORDER_COMMISSION", entity = "OrderCommission")
+    @Audited(action = AuditConstants.ACTION_CALCULATE_ORDER_COMMISSION, entity = AuditConstants.ENTITY_REPAIR_ORDER, idArgument = 1)
     public List<OrderCommissionResponse> calculateOrderCommissions(long actorUserId, Long repairOrderId) {
         RepairOrder order = repairOrderRepository.findById(repairOrderId)
                 .orElseThrow(() -> new ResourceNotFoundException(ResponseCode.RESOURCE_NOT_FOUND));
@@ -387,7 +388,7 @@ public class PayrollServiceImpl implements PayrollService {
 
     @Override
     @Transactional
-    @Audited(action = "UPDATE_COMMISSION_STATUS", entity = "OrderCommission")
+    @Audited(action = AuditConstants.ACTION_UPDATE_COMMISSION_STATUS, entity = AuditConstants.ENTITY_ORDER_COMMISSION)
     public OrderCommissionResponse updateCommissionStatus(
             long actorUserId, Long commissionId, CommissionStatusUpdateRequest request) {
         if (request.getStatus() != CommissionStatus.APPROVED && request.getStatus() != CommissionStatus.CANCELLED) {
