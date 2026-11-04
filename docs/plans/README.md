@@ -14,3 +14,4 @@
 |---|---|---|---|
 | 2026-11 | [Audit Log](2026-11-audit-log.md) | partial | Backend chưa gắn `@Audited` cho booking/repair/inventory; lọc theo phân hệ ở backend |
 | 2026-11 | [Thông báo](2026-11-notifications.md) | partial | Backend chưa phát PAYROLL/REPAIR/STOCK; thiếu biển số xe; tab nhóm lọc phía client |
+| 2026-11 | [Đăng ký ca làm việc](2026-11-shift-registration-ui.md) | converged | Tab Kỹ thuật viên vẫn hiện nút thao tác quản trị trong bảng (backend chặn 403); chưa xác minh UI bằng trình duyệt |

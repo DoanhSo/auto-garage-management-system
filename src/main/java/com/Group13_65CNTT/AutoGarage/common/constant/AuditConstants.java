@@ -10,7 +10,6 @@ public final class AuditConstants {
     public static final String ENTITY_PAYROLL_PERIOD = "PayrollPeriod";
     public static final String ENTITY_PAYROLL_ITEM = "PayrollItem";
     public static final String ENTITY_ORDER_COMMISSION = "OrderCommission";
-    public static final String ENTITY_REPAIR_ORDER = "RepairOrder";
     public static final String ENTITY_ESTIMATE = "Estimate";
     public static final String ENTITY_INVOICE = "Invoice";
 

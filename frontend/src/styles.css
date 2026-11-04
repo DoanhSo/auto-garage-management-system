@@ -1169,6 +1169,26 @@ select.input {
 .grid-3col .field.col-span-3 {
   grid-column: 1 / -1;
 }
+.centered-dialog .modal-form.grid-4col {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px 18px;
+}
+.modal-form.grid-4col > .col-span-2 {
+  grid-column: span 2;
+}
+@media (max-width: 860px) {
+  .centered-dialog .modal-form.grid-4col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .centered-dialog .modal-form.grid-4col {
+    grid-template-columns: 1fr;
+  }
+  .modal-form.grid-4col > .col-span-2 {
+    grid-column: auto;
+  }
+}
 @media (max-width: 860px) {
   .centered-dialog .account-editor-form.grid-3col,
   .centered-dialog .modal-form.grid-3col,
@@ -2311,13 +2331,20 @@ select.input {
   display: none;
 }
 .app-layout.sidebar-collapsed .sidebar-brand-row {
-  flex-direction: column;
-  gap: 12px;
-  padding: 18px 10px 16px;
+  position: relative;
+  justify-content: center;
+  padding: 18px 0;
 }
 .app-layout.sidebar-collapsed .main-navigation {
-  padding: 0 10px;
+  padding: 0 14px;
   align-items: center;
+  scrollbar-width: none;
+}
+.app-layout.sidebar-collapsed .main-navigation::-webkit-scrollbar {
+  display: none;
+}
+.app-layout.sidebar-collapsed .home-link {
+  align-self: center;
 }
 .app-layout.sidebar-collapsed .nav-item {
   justify-content: center;
@@ -2787,7 +2814,9 @@ select.input {
 .sidebar .main-navigation {
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: thin;
   padding-bottom: 20px;
 }
 .sidebar-collapse-btn {
@@ -2796,6 +2825,24 @@ select.input {
 .sidebar-collapse-btn:hover {
   color: #172338;
   background: #f4f5f7;
+}
+/* Collapsed rail: the expand control sits on the sidebar edge, level with the logo. */
+.app-layout.sidebar-collapsed .sidebar-collapse-btn {
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px #1523391f;
+  z-index: 1;
+}
+.app-layout.sidebar-collapsed .sidebar-collapse-btn:hover {
+  background: #f4f5f7;
+  color: #172338;
 }
 .app-header {
   background: #fff;
@@ -3009,7 +3056,9 @@ select.input {
   color: #0f172a;
   border: 2px solid #0f172a;
   border-radius: 6px;
-  box-shadow: inset 0 0 0 1px #f8fafc, inset 0 0 0 2px #94a3b8;
+  box-shadow:
+    inset 0 0 0 1px #f8fafc,
+    inset 0 0 0 2px #94a3b8;
   font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   font-size: 13px;
   font-weight: 700;
@@ -4440,5 +4489,165 @@ button.notification-card-title:hover {
   }
   .notification-read-state {
     margin-left: 0;
+  }
+}
+/* Shift registration modal */
+.shift-quick-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.shift-quick-dates > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.shift-quick-chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #35465e;
+  font-size: 12px;
+  line-height: 1;
+  padding: 7px 11px;
+  cursor: pointer;
+  transition:
+    background 160ms ease-out,
+    border-color 160ms ease-out,
+    color 160ms ease-out;
+}
+.shift-quick-chip:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.shift-quick-chip[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: #eef3ff;
+  color: var(--primary);
+  font-weight: 600;
+}
+.shift-quick-chip:focus-visible {
+  outline: 3px solid #93b4ff;
+  outline-offset: 1px;
+}
+.shift-quick-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.shift-type-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.shift-type-pill {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  padding: 10px 10px 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 160ms ease-out,
+    box-shadow 160ms ease-out,
+    background 160ms ease-out;
+}
+.shift-type-pill:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+.shift-type-pill:focus-within {
+  outline: 3px solid #93b4ff;
+  outline-offset: 1px;
+}
+.shift-type-pill.is-selected {
+  border-color: var(--primary);
+  background: #eef3ff;
+  box-shadow: 0 0 0 3px #245bdb16;
+}
+.shift-type-pill strong {
+  font-size: 12px;
+  color: #172338;
+}
+.shift-type-pill span {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.shift-type-pill small {
+  font-size: 11px;
+  color: var(--primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.shift-type-pill input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.shift-recent-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #f8fafc;
+}
+.shift-recent-section .section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+}
+.shift-recent-section .section-title small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+.shift-recent-section .data-table {
+  background: #fff;
+}
+.shift-recent-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (max-width: 860px) {
+  .shift-type-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .shift-type-grid {
+    grid-template-columns: 1fr;
+  }
+  .shift-recent-section {
+    padding: 10px;
+  }
+  .shift-recent-section .data-table {
+    table-layout: fixed;
+  }
+  .shift-recent-section .data-table th,
+  .shift-recent-section .data-table td {
+    padding: 8px 6px;
+  }
+  .shift-recent-section .data-table th:nth-child(1),
+  .shift-recent-section .data-table td:nth-child(1) {
+    width: 38%;
+  }
+  .shift-recent-section .data-table th:nth-child(3),
+  .shift-recent-section .data-table td:nth-child(3) {
+    width: 26%;
   }
 }

@@ -36,7 +36,7 @@
 - Dùng chung phong cách minimalism và design token; không để mỗi màn hình có một cách thiết kế hoặc một bộ component khác nhau.
 - Tái sử dụng component trong `frontend/src/shared/components`, CSS/token dùng chung trong `frontend/src/styles.css`. Khi cần biến thể, mở rộng component chung; không sao chép form, button, field, table hoặc dialog rồi chỉnh riêng theo màn.
 - Form thêm/sửa dùng `Modal` hoặc `Sheet placement="center"`; xác nhận xóa dùng `ConfirmDialog`/`ConfirmModal`. Dialog nằm giữa cả hai chiều, không dùng drawer hay form cố định sát cạnh trái/phải.
-- Desktop chia field thành hai cột bằng nhau, căn thẳng hàng; mobile một cột. Trường nội dung dài, lỗi chung và hàng nút chiếm trọn hàng. Cùng một đối tượng dùng cùng thứ tự/nhóm trường ở form thêm và sửa.
+- Desktop chia field thành hai cột bằng nhau, căn thẳng hàng; mobile một cột. Ngoại lệ: form nhiều trường ngắn trong dialog rộng được dùng lưới 4 cột `grid-4col` theo `docs/UI_DESIGN_GUIDELINES.md`. Trường nội dung dài, lỗi chung và hàng nút chiếm trọn hàng. Cùng một đối tượng dùng cùng thứ tự/nhóm trường ở form thêm và sửa.
 - Form thông thường phải vừa khung nhìn và thấy được hàng nút, không mặc định cuộn nội bộ/cuộn ngang. Form dài chia thành bước hoặc nhóm hợp lý; không dùng chiều cao cố định, cắt nội dung hay thu nhỏ chữ để ép vừa. Khi zoom/mở bàn phím, cho phép cuộn tối thiểu cần thiết để mọi trường và nút vẫn truy cập được; không cuộn lồng nhiều lớp.
 - Giữ thống nhất label, validation, loading, lỗi API, xác nhận xóa và vị trí nút Hủy/Lưu. Khi sửa layout dùng chung, kiểm tra các màn bị ảnh hưởng trên desktop/mobile, bàn phím và lỗi validation; không coi việc thêm quy chuẩn là đã sửa xong UI hiện tại.
 

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import { errorMessage } from '../../../shared/api/errors';
 import {
   Badge,
@@ -44,6 +45,7 @@ import { BayMaintenanceModal } from '../components/BayMaintenanceModal';
 import { BayReservationsModal } from '../components/BayReservationsModal';
 import { EmployeeEditor } from '../components/EmployeeEditor';
 import { LiveDispatchBoard } from '../components/LiveDispatchBoard';
+import { ShiftRegistrationModal } from '../components/ShiftRegistrationModal';
 import type { BayReservation, Employee, ServiceBay, Shift } from '../types/scheduling';
 import { bayTypeLabels, parseSkills, SKILL_LABELS, shiftStatusLabels } from '../types/scheduling';
 import type { UiPolicy } from '../../../shared/types/contracts';
@@ -84,6 +86,9 @@ function liveShiftState(shift: Shift, now: number) {
 
 function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const notify = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+  const isTechnician = user?.role === 'TECHNICIAN';
   const [activeTab, setActiveTab] = useUrlTab<Tab>('tab', TABS);
   // Paging belongs to one tab; switching tabs from the sidebar tree starts again at page 1.
   const [paging, setPaging] = useState<{ tab: Tab; page: number }>({ tab: activeTab, page: 0 });
@@ -104,6 +109,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const [reservationsBay, setReservationsBay] = useState<ServiceBay | null>(null);
 
   const [shiftModalOpen, setShiftModalOpen] = useState(false);
+  const [registerModalOpen, setRegisterModalOpen] = useState(false);
   const [shiftPresetEmployee, setShiftPresetEmployee] = useState<string | number | null>(null);
   const [shiftPresetBay, setShiftPresetBay] = useState<string | number | null>(null);
   const [cancelingShiftId, setCancelingShiftId] = useState<number | string | null>(null);
@@ -566,39 +572,42 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
     setPage(0);
   };
 
-  const primaryAction =
-    activeTab === 'dispatch' ? null : activeTab === 'bays' ? (
-      <Button
-        variant="primary"
-        onClick={() => {
-          setEditingBay(null);
-          setBayModalOpen(true);
-        }}
-      >
-        <Plus size={16} /> Thêm khoang
-      </Button>
-    ) : activeTab === 'shifts' ? (
-      <Button
-        variant="primary"
-        onClick={() => {
-          setShiftPresetEmployee(null);
-          setShiftPresetBay(null);
-          setShiftModalOpen(true);
-        }}
-      >
-        <Plus size={16} /> Xếp ca làm việc
-      </Button>
-    ) : (
-      <Button
-        variant="primary"
-        onClick={() => {
-          setEditingEmployee(null);
-          setEmployeeModalOpen(true);
-        }}
-      >
-        <Plus size={16} /> Thêm kỹ thuật viên
-      </Button>
-    );
+  const primaryAction = isTechnician ? (
+    <Button variant="primary" onClick={() => setRegisterModalOpen(true)}>
+      <CalendarClock size={16} /> Đăng ký ca làm việc
+    </Button>
+  ) : !isAdmin ? null : activeTab === 'dispatch' ? null : activeTab === 'bays' ? (
+    <Button
+      variant="primary"
+      onClick={() => {
+        setEditingBay(null);
+        setBayModalOpen(true);
+      }}
+    >
+      <Plus size={16} /> Thêm khoang
+    </Button>
+  ) : activeTab === 'shifts' ? (
+    <Button
+      variant="primary"
+      onClick={() => {
+        setShiftPresetEmployee(null);
+        setShiftPresetBay(null);
+        setShiftModalOpen(true);
+      }}
+    >
+      <Plus size={16} /> Xếp ca làm việc
+    </Button>
+  ) : (
+    <Button
+      variant="primary"
+      onClick={() => {
+        setEditingEmployee(null);
+        setEmployeeModalOpen(true);
+      }}
+    >
+      <Plus size={16} /> Thêm kỹ thuật viên
+    </Button>
+  );
 
   const filtersFor = (tab: Tab) =>
     tab === 'bays' ? (
@@ -877,6 +886,11 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         initialServiceBayId={shiftPresetBay}
         onClose={() => setShiftModalOpen(false)}
         onSaved={() => shiftsQuery.refetch()}
+      />
+
+      <ShiftRegistrationModal
+        open={registerModalOpen}
+        onClose={() => setRegisterModalOpen(false)}
       />
 
       <EmployeeEditor

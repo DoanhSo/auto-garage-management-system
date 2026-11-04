@@ -79,6 +79,12 @@ quy chuẩn bắt buộc cho code mới và phần UI được chỉnh sửa; t�
 - Desktop dùng CSS Grid hai cột bằng nhau: `repeat(2, minmax(0, 1fr))`. Các trường ngắn chia đều theo hàng, label/input và khoảng cách thẳng hàng.
 - Trên màn hình hẹp chuyển một cột theo breakpoint chung. Không ép hai cột khiến label, input hoặc thông báo lỗi bị chật/tràn.
 - Textarea, nội dung dài, nhóm động, thông báo lỗi chung và hàng nút có thể chiếm cả hàng. Không kéo rộng mọi field hoặc thêm field rỗng chỉ để lấp cột.
+- **Ngoại lệ lưới 4 cột (`.modal-form.grid-4col`)** cho form nhiều trường ngắn trong dialog rộng (`size="lg"`/`"xl"`), khi hai cột làm mỗi ô quá dài (trên ~400px cho số, mã, đơn vị) và đẩy form phải cuộn. Ví dụ đang áp dụng: Thêm/Sửa phụ tùng (`features/inventory/pages/PartsPage.tsx`).
+  - Bốn cột bằng nhau `repeat(4, minmax(0, 1fr))`. Trường ngắn (mã, đơn vị, số lượng, giá, số ngày/km, trạng thái) chiếm 1 cột; trường dài (tên, chọn đối tượng có tên dài, điều khoản, mô tả) bọc trong `.col-span-2`. Nhãn nhóm, `FormError` và hàng nút vẫn chiếm trọn hàng.
+  - Tự chuyển 2 cột ở ≤860px và 1 cột ở ≤640px; không tự viết breakpoint riêng.
+  - Nhãn phải đủ ngắn để nằm trên một dòng trong ô 1/4 (ví dụ "Giá bán (₫)", "Bảo hành (km)"); không thu nhỏ chữ để ép vừa.
+  - Form thêm và sửa cùng đối tượng dùng cùng lưới và thứ tự. Ô chỉ có ở form sửa (như trạng thái) được để trống ở form thêm, không chèn phần tử giả.
+  - Không dùng cho form ít trường hoặc dialog `sm`/`md`; khi đó giữ lưới 2 cột.
 - Nhóm và sắp xếp trường theo nghiệp vụ, đọc từ trái sang phải rồi xuống hàng. Form thêm và sửa cùng đối tượng giữ thứ tự, tên trường và nhóm trường nhất quán.
 - Label nằm trên control, có dấu bắt buộc thống nhất và hint khi cần; không dùng placeholder thay label. Trạng thái readonly, disabled và lỗi phải phân biệt rõ.
 
@@ -112,7 +118,7 @@ quy chuẩn bắt buộc cho code mới và phần UI được chỉnh sửa; t�
   - [ ] **Form & Dialog:** Label trường đặt phía trên control, dùng từ ngữ đời thường, không dùng thuật ngữ kỹ thuật khó hiểu; thông báo lỗi và thành công giải thích rõ ràng.
   - [ ] Form thêm/sửa dùng `Modal` hoặc `Sheet` với `placement="center"`; dialog căn giữa khi đủ không gian.
   - [ ] Form xóa dùng `ConfirmDialog`/`ConfirmModal` dạng `danger`, nêu đúng đối tượng và hệ quả.
-  - [ ] Desktop đủ rộng hiển thị hai cột cân đối; màn hình hẹp chuyển một cột đúng breakpoint chung.
+  - [ ] Desktop đủ rộng hiển thị hai cột cân đối (hoặc lưới 4 cột `grid-4col` cho form nhiều trường ngắn trong dialog rộng); màn hình hẹp chuyển một cột đúng breakpoint chung.
   - [ ] Field thẳng hàng, không có field rỗng để lấp layout; field dài được phép span toàn hàng.
   - [ ] Không tràn ngang form; không có cuộn dọc lồng nhau; khi thiếu chiều cao mọi field và nút vẫn truy cập được.
   - [ ] Trật tự field và thuật ngữ nhất quán giữa Thêm và Sửa.

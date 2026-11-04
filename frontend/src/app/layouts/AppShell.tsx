@@ -501,7 +501,7 @@ export function AppShell() {
             aria-label={collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'}
             title={collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'}
           >
-            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={17} />}
           </button>
         </div>
         {nav()}

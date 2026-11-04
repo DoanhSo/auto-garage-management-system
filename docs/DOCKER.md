@@ -67,6 +67,31 @@ tai khoan va mat khau cu. Voi realm da co, `keycloak-setup` van cap nhat redirec
 URI, web origin, user profile va token mapper khi khong tao admin tu dong.
 Sau cap nhat, mo `http://localhost:3000/login` va Ctrl+F5 de nap giao dien moi.
 
+### Tag source build (checkout hien tai)
+
+Stack source tai `AutoGarage/.env` dung tag `workflow-YYYYMMDD.N` tuong ung ban source
+dang lam, khac tag phat hanh `2026.10.27.4` cua bundle. Tag hien tai:
+**`workflow-20261104.1`** (bo sung giao dien dang ky ca lam viec cho ky thuat vien).
+Khi chi doi frontend:
+
+```powershell
+npm --prefix frontend run test
+npm --prefix frontend run build
+docker build -t autogarage-frontend:workflow-20261104.1 .\frontend
+```
+
+Khi backend khong doi, giu nguyen image cu bang cach gan them tag moi:
+
+```powershell
+docker tag autogarage-backend:workflow-20261028.1 autogarage-backend:workflow-20261104.1
+```
+
+Doi `AUTOGARAGE_IMAGE_TAG` trong `.env` sang tag moi roi chay lai
+`docker compose --env-file .env up -d --no-build --wait`. Compose chi tao lai
+`backend`/`frontend`; `mysql`, `keycloak`, `keycloak-postgres` giu nguyen nen du lieu,
+tai khoan va phien dang nhap khong bi mat. Giu lai tag cu de rollback bang cach doi
+`AUTOGARAGE_IMAGE_TAG` ve gia tri truoc do.
+
 Ban `2026.10.27.4` ho tro khoi phuc phien qua cookie HttpOnly. Dang nhap lai mot
 lan sau khi nang cap tu ban chi giu token trong memory; nhung lan refresh sau
 giu nguyen trang khi phien Keycloak con hop le. Compose HTTP local dat
