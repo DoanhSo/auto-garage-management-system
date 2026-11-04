@@ -151,7 +151,7 @@ export function LiveDispatchBoard({
   const floating = technicians.filter((tech) => !tech.serviceBayId);
 
   return (
-    <div className="stack">
+    <div className="dispatch-board-panel stack">
       {user?.role === 'TECHNICIAN' && (
         <div className="row-actions">
           <Button variant="secondary" onClick={() => setRegistering(true)}>
@@ -323,7 +323,7 @@ export function LiveDispatchBoard({
           })}
         </div>
         {floating.length > 0 && (
-          <p className="muted">
+          <p className="muted dispatch-floating-note">
             {floating.length} kỹ thuật viên đang trực chưa gán khoang cố định:{' '}
             {floating.map((tech) => tech.fullName).join(', ')}.
           </p>

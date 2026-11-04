@@ -315,6 +315,10 @@ select.input {
 .info-strip svg {
   color: #526278;
 }
+.metric-grid + .info-strip {
+  margin-top: 0;
+  margin-bottom: 22px;
+}
 .badge {
   display: inline-flex;
   align-items: center;
@@ -1636,6 +1640,7 @@ select.input {
 .metric-grid {
   display: grid;
   gap: 16px;
+  margin-bottom: 20px;
 }
 .period-metrics {
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3684,6 +3689,11 @@ select.input {
   font-size: 24px;
   color: var(--primary);
 }
+.dispatch-board-panel {
+  padding: 24px 22px;
+  display: grid;
+  gap: 24px;
+}
 .dispatch-roster,
 .dispatch-grid {
   display: grid;
@@ -3712,6 +3722,11 @@ select.input {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+.dispatch-floating-note {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--muted);
 }
 .timeline {
   display: grid;
@@ -3845,6 +3860,9 @@ select.input {
 }
 
 @media (max-width: 640px) {
+  .dispatch-board-panel {
+    padding: 16px;
+  }
   .horizontal-summary-bar {
     grid-template-columns: 1fr;
   }
