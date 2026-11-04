@@ -35,15 +35,20 @@ export function ServiceBayEditor({
       setDescription(bay?.description ?? '');
       setIsActive(bay?.isActive ?? true);
       setDiscard(false);
+    } else {
+      setBayCode('');
+      setBayName('');
+      setDescription('');
+      setDiscard(false);
     }
   }, [bay, open]);
 
   const isDirty = bay
     ? bayCode !== bay.bayCode || bayName !== bay.bayName || description !== (bay.description ?? '')
-    : !!bayCode || !!bayName;
+    : !!bayCode.trim() || !!bayName.trim() || !!description.trim();
 
   const busy = createMutation.isPending || updateMutation.isPending;
-  const blocker = useUnsavedChangesGuard(isDirty && !busy);
+  const blocker = useUnsavedChangesGuard(open && isDirty && !busy);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -178,7 +183,7 @@ export function ServiceBayEditor({
       </Sheet>
 
       <ConfirmDialog
-        open={discard || blocker.state === 'blocked'}
+        open={open && (discard || blocker.state === 'blocked')}
         title="Bỏ thay đổi chưa lưu?"
         description="Thông tin khoang đang nhập sẽ bị hủy."
         onCancel={() => {

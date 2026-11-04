@@ -860,46 +860,68 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         )}
       </section>
 
-      <ServiceBayEditor
-        bay={editingBay}
-        open={bayModalOpen}
-        onClose={() => setBayModalOpen(false)}
-        onSaved={() => baysQuery.refetch()}
-      />
+      {bayModalOpen && (
+        <ServiceBayEditor
+          bay={editingBay}
+          open={bayModalOpen}
+          onClose={() => {
+            setBayModalOpen(false);
+            setEditingBay(null);
+          }}
+          onSaved={() => baysQuery.refetch()}
+        />
+      )}
 
-      <BayMaintenanceModal
-        bay={maintenanceBay}
-        open={!!maintenanceBay}
-        onClose={() => setMaintenanceBay(null)}
-        onSaved={() => reservationsQuery.refetch()}
-      />
+      {maintenanceBay && (
+        <BayMaintenanceModal
+          bay={maintenanceBay}
+          open={!!maintenanceBay}
+          onClose={() => setMaintenanceBay(null)}
+          onSaved={() => reservationsQuery.refetch()}
+        />
+      )}
 
-      <BayReservationsModal
-        bay={reservationsBay}
-        open={!!reservationsBay}
-        onClose={() => setReservationsBay(null)}
-      />
+      {reservationsBay && (
+        <BayReservationsModal
+          bay={reservationsBay}
+          open={!!reservationsBay}
+          onClose={() => setReservationsBay(null)}
+        />
+      )}
 
-      <ShiftEditor
-        open={shiftModalOpen}
-        initialEmployeeId={shiftPresetEmployee}
-        initialServiceBayId={shiftPresetBay}
-        onClose={() => setShiftModalOpen(false)}
-        onSaved={() => shiftsQuery.refetch()}
-      />
+      {shiftModalOpen && (
+        <ShiftEditor
+          open={shiftModalOpen}
+          initialEmployeeId={shiftPresetEmployee}
+          initialServiceBayId={shiftPresetBay}
+          onClose={() => {
+            setShiftModalOpen(false);
+            setShiftPresetEmployee(null);
+            setShiftPresetBay(null);
+          }}
+          onSaved={() => shiftsQuery.refetch()}
+        />
+      )}
 
-      <ShiftRegistrationModal
-        open={registerModalOpen}
-        onClose={() => setRegisterModalOpen(false)}
-      />
+      {registerModalOpen && (
+        <ShiftRegistrationModal
+          open={registerModalOpen}
+          onClose={() => setRegisterModalOpen(false)}
+        />
+      )}
 
-      <EmployeeEditor
-        employee={editingEmployee}
-        takenUserIds={takenUserIds}
-        open={employeeModalOpen}
-        onClose={() => setEmployeeModalOpen(false)}
-        onSaved={() => employeesQuery.refetch()}
-      />
+      {employeeModalOpen && (
+        <EmployeeEditor
+          employee={editingEmployee}
+          takenUserIds={takenUserIds}
+          open={employeeModalOpen}
+          onClose={() => {
+            setEmployeeModalOpen(false);
+            setEditingEmployee(null);
+          }}
+          onSaved={() => employeesQuery.refetch()}
+        />
+      )}
 
       <ConfirmDialog
         open={!!deletingBayId}
