@@ -109,7 +109,7 @@ public class BillingServiceImpl implements BillingService {
             }
         }
 
-        if (invoiceRepository.existsByRepairOrderId(request.getRepairOrderId())) {
+        if (invoiceRepository.existsByRepairOrderIdAndStatusNot(request.getRepairOrderId(), InvoiceStatus.VOID)) {
             log.warn("Invoice already issued for repair order {}", request.getRepairOrderId());
             throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
         }
@@ -343,7 +343,8 @@ public class BillingServiceImpl implements BillingService {
 
     @Override
     public InvoiceResponse getInvoiceByOrderId(Long repairOrderId) {
-        Invoice invoice = invoiceRepository.findByRepairOrderId(repairOrderId)
+        Invoice invoice = invoiceRepository.findActiveByRepairOrderId(repairOrderId)
+                .or(() -> invoiceRepository.findFirstByRepairOrderIdOrderByIdDesc(repairOrderId))
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
         requireOwnInvoiceForCustomer(invoice);
         return enrichInvoiceResponse(invoice);
@@ -384,7 +385,17 @@ public class BillingServiceImpl implements BillingService {
         BigDecimal paid = paymentRepository.calculatePaidAmountForInvoice(invoiceId);
         if (paid.compareTo(BigDecimal.ZERO) > 0) {
             log.warn("Cannot void invoice {} that has received payments of {}", invoiceId, paid);
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new BusinessException(ResponseCode.BAD_REQUEST, "Hóa đơn đã thu tiền, không thể hủy");
+        }
+
+        // The order goes back to "completed" so it can be invoiced again; once the car is
+        // handed over the invoice backs the warranty books and must stay.
+        List<Map<String, Object>> orderRows = jdbcTemplate.queryForList(
+                "SELECT status FROM repair_orders WHERE id = ? FOR UPDATE", invoice.getRepairOrderId());
+        String orderStatus = orderRows.isEmpty() ? null : (String) orderRows.get(0).get("status");
+        if (!"INVOICED".equals(orderStatus)) {
+            throw new BusinessException(ResponseCode.BAD_REQUEST,
+                    "Chỉ hủy được hóa đơn khi xe chưa bàn giao (phiếu đang ở trạng thái đã lập hóa đơn)");
         }
 
         invoice.setStatus(InvoiceStatus.VOID);
@@ -392,6 +403,8 @@ public class BillingServiceImpl implements BillingService {
         invoice.setVoidedBy(actorUserId);
         invoice.setVoidedAt(Instant.now());
         invoiceRepository.save(invoice);
+        jdbcTemplate.update("UPDATE repair_orders SET status = 'COMPLETED' WHERE id = ? AND status = 'INVOICED'",
+                invoice.getRepairOrderId());
         log.info("Invoice {} voided by actor {}", invoiceId, actorUserId);
     }
 
@@ -586,8 +599,9 @@ public class BillingServiceImpl implements BillingService {
     @Override
     @Transactional
     public void requireHandoverAllowed(long actorUserId, long repairOrderId) {
-        Invoice invoice = invoiceRepository.findByRepairOrderIdWithLock(repairOrderId)
-                .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        Invoice invoice = invoiceRepository.findActiveByRepairOrderIdWithLock(repairOrderId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.BAD_REQUEST,
+                        "Phiếu chưa có hóa đơn còn hiệu lực, hãy lập hóa đơn trước khi bàn giao"));
 
         if (invoice.getStatus() == InvoiceStatus.VOID) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);

@@ -151,4 +151,20 @@ class CustomerServiceTest {
         assertEquals(BigDecimal.valueOf(5000000), updated.getCreditLimit());
         assertEquals(15, updated.getPaymentTermDays());
     }
+
+    @Test
+    void activateCustomer_reopensInactiveCustomer() {
+        Customer customer = new Customer();
+        customer.setId(3L);
+        customer.setFullName("Tran Thi B");
+        customer.setIsActive(false);
+        when(customerRepository.findById(3L)).thenReturn(Optional.of(customer));
+        when(customerRepository.save(any(Customer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CustomerResponse response = customerService.activateCustomer(3L);
+
+        assertTrue(customer.getIsActive());
+        assertEquals(3L, response.getId());
+        verify(customerScope).requireFrontDesk();
+    }
 }

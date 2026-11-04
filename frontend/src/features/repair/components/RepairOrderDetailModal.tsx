@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   ArrowRight,
   ClipboardList,
+  Lock,
+  RotateCcw,
 } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -25,7 +27,15 @@ import {
   useSchedulingEmployeesQuery,
 } from '../../scheduling/hooks/useScheduling';
 import { errorMessage } from '../../../shared/api/errors';
-import { Button, Empty, Loading, QueryError, Sheet } from '../../../shared/components/ui';
+import {
+  Badge,
+  Button,
+  ConfirmDialog,
+  Empty,
+  Loading,
+  QueryError,
+  Sheet,
+} from '../../../shared/components/ui';
 import { formatDateTime, money } from '../../../shared/utils/format';
 import type { RepairOrderStatus, RepairTask } from '../types/repairTypes';
 import {
@@ -48,6 +58,14 @@ import { CreateTaskModal } from './CreateTaskModal';
 import { AssignTaskModal } from './AssignTaskModal';
 import { TaskWorkPanel } from './TaskWorkPanel';
 import { CreateEstimateModal } from './CreateEstimateModal';
+import {
+  allowedAttachmentCategories,
+  canDecideOn,
+  canReopenDiagnosis,
+  diagnosisLockReason,
+  newEstimateMode,
+} from '../utils/stageLocks';
+import { estimateStatusLabels } from '../../estimate/types/estimate';
 import { PerformQCModal } from './PerformQCModal';
 import { HandoverModal } from './HandoverModal';
 import { VehicleLabel } from './VehicleLabel';
@@ -84,6 +102,7 @@ export function RepairOrderDetailModal({
   // Sub-modals
   const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [createEstimateOpen, setCreateEstimateOpen] = useState(false);
+  const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [performQCOpen, setPerformQCOpen] = useState(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
 
@@ -147,6 +166,13 @@ export function RepairOrderDetailModal({
   const [hasEditedDiagnosis, setHasEditedDiagnosis] = useState(false);
 
   const currentDiagnosis = hasEditedDiagnosis ? diagnosisText : order?.diagnosis || '';
+  const diagnosisLock = order ? diagnosisLockReason(order.status) : null;
+  const canEditDiagnosis = canTechnical && !diagnosisLock;
+  const reopenable = !!order && canTechnical && canReopenDiagnosis(order.status, allEstimates);
+  const estimateMode = order && canTechnical ? newEstimateMode(order.status, allEstimates) : null;
+  const uploadCategories = order
+    ? allowedAttachmentCategories(order.status, ['DIAGNOSIS', 'CHECK_IN'])
+    : [];
 
   const handleSaveDiagnosis = async () => {
     if (!order) return;
@@ -277,6 +303,11 @@ export function RepairOrderDetailModal({
                 {canTechnical && order.status === 'DIAGNOSING' && (
                   <Button variant="primary" onClick={() => setActiveTab('estimate')}>
                     Lập báo giá dịch vụ
+                  </Button>
+                )}
+                {reopenable && (
+                  <Button variant="ghost" onClick={() => setReopenConfirmOpen(true)}>
+                    <RotateCcw size={15} /> Mở lại chẩn đoán
                   </Button>
                 )}
                 {canTechnical && order.status === 'APPROVED' && (
@@ -417,7 +448,7 @@ export function RepairOrderDetailModal({
                           <span className="flex items-center gap-1.5">
                             <ClipboardList size={14} /> Biên bản kiểm tra tiếp nhận
                           </span>
-                          {(canTechnical || canFrontDesk) && (
+                          {(canTechnical || canFrontDesk) && order.status === 'NEW' && (
                             <Button variant="ghost" onClick={() => setVehicleCheckOpen(true)}>
                               <Plus size={14} /> Lập biên bản
                             </Button>
@@ -451,11 +482,17 @@ export function RepairOrderDetailModal({
                       <div className="flex items-center gap-2 text-sm font-semibold border-b pb-2">
                         <Wrench size={16} className="text-primary" />
                         <span>Kết luận chẩn đoán kỹ thuật</span>
+                        {diagnosisLock && (
+                          <Badge variant="secondary">
+                            <Lock size={11} /> Đã chốt
+                          </Badge>
+                        )}
                       </div>
+                      {diagnosisLock && <p className="info-strip">{diagnosisLock}</p>}
                       <textarea
                         className="input w-full"
                         rows={7}
-                        readOnly={!canTechnical}
+                        readOnly={!canEditDiagnosis}
                         placeholder="Ghi nhận hiện tượng hư hỏng, nguyên nhân kỹ thuật và phương án sửa chữa đề xuất..."
                         value={currentDiagnosis}
                         onChange={(e) => {
@@ -464,7 +501,7 @@ export function RepairOrderDetailModal({
                         }}
                       />
                     </div>
-                    {canTechnical && (
+                    {canEditDiagnosis && (
                       <div className="flex justify-end pt-2 border-t">
                         <Button
                           variant="primary"
@@ -484,6 +521,7 @@ export function RepairOrderDetailModal({
                   diagnosis={currentDiagnosis}
                   checkIn={checkInSummary}
                   canUpload={canTechnical || canFrontDesk}
+                  uploadCategories={uploadCategories}
                 />
               </div>
             )}
@@ -495,9 +533,12 @@ export function RepairOrderDetailModal({
                   <span className="text-sm font-semibold">
                     Danh sách bản báo giá ({estimates.length})
                   </span>
-                  {canTechnical && estimates.length > 0 && (
+                  {estimateMode && estimates.length > 0 && (
                     <Button variant="primary" onClick={() => setCreateEstimateOpen(true)}>
-                      <Plus size={15} /> Lập báo giá mới
+                      <Plus size={15} />{' '}
+                      {estimateMode.kind === 'SUPPLEMENTAL'
+                        ? 'Lập báo giá phát sinh'
+                        : 'Lập phiên bản báo giá mới'}
                     </Button>
                   )}
                 </div>
@@ -513,7 +554,7 @@ export function RepairOrderDetailModal({
                         : 'Lập báo giá dịch vụ và phụ tùng để gửi khách hàng duyệt trước khi thi công.'
                     }
                     action={
-                      canTechnical ? (
+                      estimateMode ? (
                         <Button variant="primary" onClick={() => setCreateEstimateOpen(true)}>
                           <Plus size={15} /> Lập bản báo giá đầu tiên
                         </Button>
@@ -539,11 +580,7 @@ export function RepairOrderDetailModal({
                                     : 'badge-neutral'
                               }`}
                             >
-                              {est.status === 'APPROVED'
-                                ? 'Đã duyệt'
-                                : est.status === 'SENT'
-                                  ? 'Đã gửi'
-                                  : 'Bản nháp'}
+                              {estimateStatusLabels[est.status] ?? est.status}
                             </span>
                           </div>
                           <div className="flex items-center gap-3">
@@ -630,9 +667,7 @@ export function RepairOrderDetailModal({
                                   </td>
                                   <td className="text-right">
                                     {canDecideEstimate &&
-                                      (isCustomer
-                                        ? est.status === 'SENT'
-                                        : est.status !== 'APPROVED') &&
+                                      canDecideOn(est) &&
                                       item.approvalStatus === 'PENDING' && (
                                         <div className="flex justify-end gap-1">
                                           <button
@@ -1029,6 +1064,20 @@ export function RepairOrderDetailModal({
         orderId={order?.id || ''}
         open={createEstimateOpen}
         onClose={() => setCreateEstimateOpen(false)}
+        parentEstimateId={
+          estimateMode?.kind === 'SUPPLEMENTAL' ? estimateMode.parentEstimateId : null
+        }
+      />
+      <ConfirmDialog
+        open={reopenConfirmOpen}
+        title="Mở lại chẩn đoán?"
+        description="Khách đã từ chối toàn bộ báo giá. Phiếu quay về bước chẩn đoán và các bản nháp báo giá còn lại sẽ bị hủy."
+        confirmLabel="Mở lại chẩn đoán"
+        onConfirm={() => {
+          setReopenConfirmOpen(false);
+          void handleTransitionStatus('DIAGNOSING');
+        }}
+        onCancel={() => setReopenConfirmOpen(false)}
       />
       <PerformQCModal
         orderId={order?.id || ''}

@@ -137,6 +137,16 @@ public class CustomerServiceImpl implements CustomerService {
         customerRepository.save(customer);
     }
 
+    @Override
+    @Audited(action = AuditConstants.ACTION_CUSTOMER_ACTIVATED, entity = AuditConstants.ENTITY_CUSTOMER, idArgument = 0)
+    public CustomerResponse activateCustomer(Long id) {
+        customerScope.requireFrontDesk();
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng với ID: " + id));
+        customer.setIsActive(true);
+        return customerMapper.toResponse(customerRepository.save(customer));
+    }
+
     private Customer saveCustomer(Customer customer) {
         try {
             return customerRepository.saveAndFlush(customer);

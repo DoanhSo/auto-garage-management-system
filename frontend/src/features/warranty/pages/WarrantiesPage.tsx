@@ -1,22 +1,36 @@
 import { useMemo, useState } from 'react';
-import { useQueries } from '@tanstack/react-query';
-import { ShieldCheck, RefreshCw, AlertCircle, FileText, Clock, ShieldAlert } from 'lucide-react';
+import {
+  ShieldCheck,
+  RefreshCw,
+  AlertCircle,
+  FileText,
+  Clock,
+  ShieldAlert,
+  SquarePen,
+  Ban,
+} from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { Badge, Button, PageHeader, Loading, QueryError } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { formatDate, formatDateTime } from '../../../shared/utils/format';
+import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
 import { useCustomersQuery } from '../../customer/hooks/useCustomers';
-import { warrantyApi } from '../api/warrantyApi';
-import { useVehicleWarrantiesQuery, useCustomerWarrantiesQuery } from '../hooks/useWarranty';
+import {
+  useClaimSearchQuery,
+  useWarrantyClaimsQuery,
+  useWarrantySearchQuery,
+} from '../hooks/useWarranty';
 import { OpenClaimModal } from '../components/OpenClaimModal';
 import { DecideClaimModal } from '../components/DecideClaimModal';
+import { AdjustWarrantyModal } from '../components/AdjustWarrantyModal';
+import { VoidWarrantyModal } from '../components/VoidWarrantyModal';
 import type { Warranty, WarrantyClaim, ClaimStatus } from '../types/warranty';
 import { warrantyStatusLabels, claimStatusLabels } from '../types/warranty';
 
-type LookupMode = 'vehicle' | 'customer';
+type LookupMode = 'all' | 'vehicle' | 'customer';
 const ALL_BOOKS = 'ALL';
 
 const claimVariant = (status: ClaimStatus) =>
@@ -29,34 +43,52 @@ const claimVariant = (status: ClaimStatus) =>
 const daysLeft = (expiresAt: string) =>
   Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000);
 
+const km = (value: number) => `${value.toLocaleString('vi-VN')} km`;
+
+const WARRANTY_TABS = ['warranties', 'claims'] as const;
+
 export function WarrantiesPage() {
   const { user } = useAuth();
   // Chỉ lễ tân/admin xem được danh mục khách hàng và mở khiếu nại; thẩm định dành riêng admin.
   const canLookupCustomers = user?.role === 'ADMIN' || user?.role === 'RECEPTIONIST';
   const canOpenClaim = canLookupCustomers;
   const canDecideClaim = user?.role === 'ADMIN';
-  const [mode, setMode] = useState<LookupMode>('vehicle');
+  const [mode, setMode] = useState<LookupMode>('all');
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedWarrantyId, setSelectedWarrantyId] = useState(ALL_BOOKS);
   const [keyword, setKeyword] = useState('');
-  const [activeTab, setActiveTab] = useState<'warranties' | 'claims'>('warranties');
+  const [activeTab, setActiveTab] = useUrlTab('tab', WARRANTY_TABS);
 
   const [openClaimWarranty, setOpenClaimWarranty] = useState<Warranty | null>(null);
   const [decidingClaim, setDecidingClaim] = useState<WarrantyClaim | null>(null);
+  const [adjustingWarranty, setAdjustingWarranty] = useState<Warranty | null>(null);
+  const [voidingWarranty, setVoidingWarranty] = useState<Warranty | null>(null);
+  const canManageBooks = user?.role === 'ADMIN';
 
-  const { data: vehicles = [] } = useVehiclesQuery({ isActive: true });
-  const { data: customers = [] } = useCustomersQuery({ isActive: true }, canLookupCustomers);
+  // Inactive vehicles/customers keep their books, so lookups list them too.
+  const { data: vehicles = [] } = useVehiclesQuery();
+  const { data: customers = [] } = useCustomersQuery(undefined, canLookupCustomers);
 
   const activeVehicleId = selectedVehicleId || (vehicles[0]?.id ? String(vehicles[0].id) : '');
   const activeCustomerId = selectedCustomerId || (customers[0]?.id ? String(customers[0].id) : '');
 
-  const vehicleQuery = useVehicleWarrantiesQuery(mode === 'vehicle' ? activeVehicleId : '');
-  const customerQuery = useCustomerWarrantiesQuery(mode === 'customer' ? activeCustomerId : '');
-  const warrantiesQuery = mode === 'vehicle' ? vehicleQuery : customerQuery;
+  const lookup = useMemo(
+    () =>
+      mode === 'vehicle'
+        ? { vehicleId: activeVehicleId }
+        : mode === 'customer'
+          ? { customerId: activeCustomerId }
+          : {},
+    [mode, activeVehicleId, activeCustomerId],
+  );
+  const warrantiesQuery = useWarrantySearchQuery(lookup);
 
   const vehicleMap = useMemo(() => new Map(vehicles.map((v) => [String(v.id), v])), [vehicles]);
-  const customerMap = useMemo(() => new Map(customers.map((c) => [String(c.id), c] as const)), [customers]);
+  const customerMap = useMemo(
+    () => new Map(customers.map((c) => [String(c.id), c] as const)),
+    [customers],
+  );
 
   const allWarranties = useMemo(
     () => warrantiesQuery.data?.content ?? [],
@@ -68,40 +100,21 @@ export function WarrantiesPage() {
     if (!term) return allWarranties;
     return allWarranties.filter((w) => {
       const plate = vehicleMap.get(String(w.vehicleId))?.licensePlate ?? '';
-      return [w.warrantyCode, plate, w.termsSnapshot ?? '']
-        .join(' ')
-        .toLowerCase()
-        .includes(term);
+      return [w.warrantyCode, plate, w.termsSnapshot ?? ''].join(' ').toLowerCase().includes(term);
     });
   }, [allWarranties, keyword, vehicleMap]);
 
-  const warrantyById = useMemo(() => new Map(allWarranties.map((w) => [String(w.id), w])), [allWarranties]);
-
-  // Khiếu nại của một sổ cụ thể hoặc gộp tất cả sổ đang tra cứu.
-  const claimWarrantyIds = useMemo(
-    () =>
-      selectedWarrantyId === ALL_BOOKS || !warrantyById.has(selectedWarrantyId)
-        ? allWarranties.map((w) => String(w.id))
-        : [selectedWarrantyId],
-    [selectedWarrantyId, warrantyById, allWarranties],
+  const warrantyById = useMemo(
+    () => new Map(allWarranties.map((w) => [String(w.id), w])),
+    [allWarranties],
   );
 
-  const claimQueries = useQueries({
-    queries: claimWarrantyIds.map((id) => ({
-      queryKey: ['warranty-claims', id],
-      queryFn: () => warrantyApi.getClaimsByWarranty(id),
-    })),
-  });
-  const claimsLoading = claimQueries.some((q) => q.isLoading);
-  const claimsError = claimQueries.find((q) => q.isError);
-  const claimsFetching = claimQueries.some((q) => q.isFetching);
-  const claims = useMemo(
-    () =>
-      claimQueries
-        .flatMap((q) => q.data?.content ?? [])
-        .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt)),
-    [claimQueries],
-  );
+  // Khiếu nại của một sổ cụ thể, hoặc của mọi sổ trong phạm vi tra cứu bằng một lần gọi.
+  const singleBook = selectedWarrantyId !== ALL_BOOKS && warrantyById.has(selectedWarrantyId);
+  const bookClaimsQuery = useWarrantyClaimsQuery(singleBook ? selectedWarrantyId : null);
+  const scopeClaimsQuery = useClaimSearchQuery(lookup, !singleBook);
+  const claimsQuery = singleBook ? bookClaimsQuery : scopeClaimsQuery;
+  const claims = useMemo(() => claimsQuery.data?.content ?? [], [claimsQuery.data?.content]);
 
   const activeCount = allWarranties.filter((w) => w.status === 'ACTIVE').length;
   const expiredCount = allWarranties.filter((w) => w.status === 'EXPIRED').length;
@@ -146,17 +159,28 @@ export function WarrantiesPage() {
         id: 'time',
         header: 'Hiệu lực thời gian',
         cell: ({ row }) => {
-          const left = daysLeft(row.original.expiresAt);
+          const { startsAt, expiresAt, warrantyDays, status } = row.original;
+          if (!expiresAt) {
+            return (
+              <div className="account-cell">
+                <div>
+                  <strong>Từ {formatDate(startsAt)}</strong>
+                  <span>Không giới hạn thời gian</span>
+                </div>
+              </div>
+            );
+          }
+          const left = daysLeft(expiresAt);
           return (
             <div className="account-cell">
               <div>
                 <strong>
-                  {formatDate(row.original.startsAt)} → {formatDate(row.original.expiresAt)}
+                  {formatDate(startsAt)} → {formatDate(expiresAt)}
                 </strong>
                 <span>
-                  {row.original.warrantyDays} ngày ·{' '}
-                  {row.original.status !== 'ACTIVE'
-                    ? warrantyStatusLabels[row.original.status]
+                  {warrantyDays} ngày ·{' '}
+                  {status !== 'ACTIVE'
+                    ? warrantyStatusLabels[status]
                     : left > 0
                       ? `còn ${left} ngày`
                       : 'đã quá hạn'}
@@ -169,17 +193,21 @@ export function WarrantiesPage() {
       {
         id: 'odo',
         header: 'Định mức ODO',
-        cell: ({ row }) => (
-          <div className="account-cell">
-            <div>
-              <strong>
-                {row.original.startOdometer.toLocaleString('vi-VN')} →{' '}
-                {row.original.endOdometer.toLocaleString('vi-VN')} km
-              </strong>
-              <span>+{row.original.warrantyKm.toLocaleString('vi-VN')} km</span>
+        cell: ({ row }) => {
+          const { startOdometer, endOdometer, warrantyKm } = row.original;
+          return (
+            <div className="account-cell">
+              <div>
+                <strong>
+                  {endOdometer != null
+                    ? `${startOdometer.toLocaleString('vi-VN')} → ${km(endOdometer)}`
+                    : `Từ ${km(startOdometer)}`}
+                </strong>
+                <span>{endOdometer != null ? `+${km(warrantyKm)}` : 'Không giới hạn số km'}</span>
+              </div>
             </div>
-          </div>
-        ),
+          );
+        },
       },
       {
         accessorKey: 'termsSnapshot',
@@ -193,11 +221,25 @@ export function WarrantiesPage() {
       {
         accessorKey: 'status',
         header: 'Trạng thái',
-        cell: ({ row }) => (
-          <Badge variant={row.original.status === 'ACTIVE' ? 'success' : 'secondary'}>
-            {warrantyStatusLabels[row.original.status] || row.original.status}
-          </Badge>
-        ),
+        cell: ({ row }) => {
+          const { status, voidReason, adjustmentNote, adjustedAt } = row.original;
+          const note =
+            status === 'VOID' ? voidReason : adjustedAt ? `Đã điều chỉnh: ${adjustmentNote}` : null;
+          return (
+            <div className="account-cell">
+              <div>
+                <Badge
+                  variant={
+                    status === 'ACTIVE' ? 'success' : status === 'VOID' ? 'danger' : 'secondary'
+                  }
+                >
+                  {warrantyStatusLabels[status] || status}
+                </Badge>
+                {note && <span className="clamp-2">{note}</span>}
+              </div>
+            </div>
+          );
+        },
       },
       {
         id: 'actions',
@@ -218,11 +260,30 @@ export function WarrantiesPage() {
                 <AlertCircle size={14} /> Mở khiếu nại
               </Button>
             )}
+            {canManageBooks && row.original.status !== 'VOID' && (
+              <>
+                <Button
+                  variant="ghost"
+                  aria-label={`Điều chỉnh sổ ${row.original.warrantyCode}`}
+                  onClick={() => setAdjustingWarranty(row.original)}
+                >
+                  <SquarePen size={14} /> Điều chỉnh
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="delete-action"
+                  aria-label={`Hủy sổ ${row.original.warrantyCode}`}
+                  onClick={() => setVoidingWarranty(row.original)}
+                >
+                  <Ban size={14} /> Hủy sổ
+                </Button>
+              </>
+            )}
           </div>
         ),
       },
     ],
-    [vehicleMap, customerMap, canOpenClaim],
+    [vehicleMap, customerMap, canOpenClaim, canManageBooks, setActiveTab],
   );
 
   const claimColumns = useMemo<ColumnDef<WarrantyClaim>[]>(
@@ -235,7 +296,9 @@ export function WarrantiesPage() {
             <div>
               <strong>#{row.original.claimCode}</strong>
               <span>
-                Sổ #{warrantyById.get(String(row.original.warrantyId))?.warrantyCode ?? row.original.warrantyId}
+                Sổ #
+                {warrantyById.get(String(row.original.warrantyId))?.warrantyCode ??
+                  row.original.warrantyId}
               </span>
             </div>
           </div>
@@ -252,7 +315,7 @@ export function WarrantiesPage() {
                 <strong>{formatDateTime(row.original.requestedAt)}</strong>
                 <span>
                   {row.original.currentOdometer.toLocaleString('vi-VN')} km
-                  {w && ` / hạn ${w.endOdometer.toLocaleString('vi-VN')} km`}
+                  {w?.endOdometer != null && ` / hạn ${km(w.endOdometer)}`}
                 </span>
               </div>
             </div>
@@ -317,7 +380,7 @@ export function WarrantiesPage() {
 
   const refreshAll = () => {
     void warrantiesQuery.refetch();
-    claimQueries.forEach((q) => void q.refetch());
+    void claimsQuery.refetch();
   };
 
   return (
@@ -325,7 +388,7 @@ export function WarrantiesPage() {
       <PageHeader
         eyebrow="DỊCH VỤ & XƯỞNG"
         title="Sổ bảo hành & khiếu nại dịch vụ"
-        description="Tra cứu sổ bảo hành điện tử theo phương tiện hoặc khách hàng, tiếp nhận và thẩm định hồ sơ khiếu nại."
+        description="Xem toàn bộ sổ bảo hành hoặc tra cứu theo phương tiện, khách hàng; tiếp nhận và thẩm định hồ sơ khiếu nại."
         actions={
           <Button variant="secondary" onClick={refreshAll} pending={warrantiesQuery.isFetching}>
             <RefreshCw size={15} /> Làm mới
@@ -337,11 +400,16 @@ export function WarrantiesPage() {
         label="Tổng quan bảo hành"
         items={[
           {
-            label: 'Sổ đang tra cứu',
+            label: mode === 'all' ? 'Tổng số sổ bảo hành' : 'Sổ đang tra cứu',
             value: allWarranties.length,
             icon: <ShieldCheck size={18} />,
           },
-          { label: 'Còn hiệu lực', value: activeCount, tone: 'success', icon: <ShieldCheck size={18} /> },
+          {
+            label: 'Còn hiệu lực',
+            value: activeCount,
+            tone: 'success',
+            icon: <ShieldCheck size={18} />,
+          },
           { label: 'Đã hết hạn', value: expiredCount, tone: 'danger', icon: <Clock size={18} /> },
           {
             label: 'Khiếu nại đang xử lý',
@@ -355,24 +423,23 @@ export function WarrantiesPage() {
       <section className="panel table-panel">
         <div className="user-filters" role="search" aria-label="Tra cứu bảo hành">
           <div className="user-filter-grid">
-            {canLookupCustomers && (
-              <div className="user-filter-field">
-                <label htmlFor="warranty-mode">Tra cứu theo</label>
-                <select
-                  id="warranty-mode"
-                  className="select"
-                  value={mode}
-                  onChange={(e) => {
-                    setMode(e.target.value as LookupMode);
-                    setSelectedWarrantyId(ALL_BOOKS);
-                  }}
-                >
-                  <option value="vehicle">Phương tiện</option>
-                  <option value="customer">Khách hàng</option>
-                </select>
-              </div>
-            )}
-            {mode === 'vehicle' ? (
+            <div className="user-filter-field">
+              <label htmlFor="warranty-mode">Tra cứu theo</label>
+              <select
+                id="warranty-mode"
+                className="select"
+                value={mode}
+                onChange={(e) => {
+                  setMode(e.target.value as LookupMode);
+                  setSelectedWarrantyId(ALL_BOOKS);
+                }}
+              >
+                <option value="all">Tất cả sổ bảo hành</option>
+                <option value="vehicle">Phương tiện</option>
+                {canLookupCustomers && <option value="customer">Khách hàng</option>}
+              </select>
+            </div>
+            {mode === 'all' ? null : mode === 'vehicle' ? (
               <div className="user-filter-field">
                 <label htmlFor="warranty-vehicle">Phương tiện</label>
                 <select
@@ -386,7 +453,7 @@ export function WarrantiesPage() {
                 >
                   {vehicles.map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.licensePlate} ({v.brand} {v.model})
+                      {v.licensePlate} ({v.brand} {v.model}){v.isActive ? '' : ' · ngừng theo dõi'}
                     </option>
                   ))}
                 </select>
@@ -406,6 +473,7 @@ export function WarrantiesPage() {
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.fullName} · {c.phone}
+                      {c.isActive ? '' : ' · ngừng theo dõi'}
                     </option>
                   ))}
                 </select>
@@ -475,12 +543,10 @@ export function WarrantiesPage() {
               busy={warrantiesQuery.isFetching}
             />
           )
-        ) : allWarranties.length === 0 ? (
-          <p className="empty-state">Chưa có sổ bảo hành nào để xem khiếu nại.</p>
-        ) : claimsLoading ? (
+        ) : claimsQuery.isLoading ? (
           <Loading label="Đang tải danh sách khiếu nại…" />
-        ) : claimsError ? (
-          <QueryError error={claimsError.error} retry={refreshAll} />
+        ) : claimsQuery.isError ? (
+          <QueryError error={claimsQuery.error} retry={refreshAll} />
         ) : claims.length === 0 ? (
           <p className="empty-state">Chưa có hồ sơ khiếu nại nào.</p>
         ) : (
@@ -488,7 +554,7 @@ export function WarrantiesPage() {
             caption="Danh sách khiếu nại bảo hành"
             columns={claimColumns}
             data={claims}
-            busy={claimsFetching}
+            busy={claimsQuery.isFetching}
           />
         )}
       </section>
@@ -499,6 +565,13 @@ export function WarrantiesPage() {
         onClose={() => setOpenClaimWarranty(null)}
         onSaved={refreshAll}
       />
+
+      <AdjustWarrantyModal
+        warranty={adjustingWarranty}
+        onClose={() => setAdjustingWarranty(null)}
+      />
+
+      <VoidWarrantyModal warranty={voidingWarranty} onClose={() => setVoidingWarranty(null)} />
 
       <DecideClaimModal
         claim={decidingClaim}

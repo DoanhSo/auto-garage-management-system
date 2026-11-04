@@ -155,8 +155,8 @@ function ServiceForm({
 
         <Field label="Phân loại dịch vụ" required error={errors.serviceType?.message}>
           <select className="select" disabled={busy} {...register('serviceType')}>
-            <option value="SINGLE">Dịch vụ đơn lẻ (Single)</option>
-            <option value="PACKAGE">Gói bảo dưỡng định kỳ (Package)</option>
+            <option value="SINGLE">Dịch vụ đơn lẻ</option>
+            <option value="PACKAGE">Gói bảo dưỡng định kỳ</option>
           </select>
         </Field>
 

@@ -17,12 +17,14 @@ public final class ApiPaths {
     public static final String USERS_BASE = "/api/v1/admin/users";
     public static final String USERS_WILDCARD = USERS_BASE + "/**";
     public static final String BY_ID = "/{id}";
+    public static final String ACTIVATE = "/{id}/activate";
 
     public static final String NOTIFICATIONS_BASE = "/api/v1/notifications";
     public static final String NOTIFICATIONS_WILDCARD = NOTIFICATIONS_BASE + "/**";
     public static final String NOTIFICATIONS_ADMIN = "/admin";
     public static final String NOTIFICATIONS_BROADCAST = "/broadcast";
     public static final String NOTIFICATION_READ = "/{id}/read";
+    public static final String NOTIFICATION_READ_ALL = "/read-all";
 
     public static final String AUDIT_BASE = "/api/v1/admin/audit-events";
     public static final String AUDIT_WILDCARD = AUDIT_BASE + "/**";
@@ -67,6 +69,9 @@ public final class ApiPaths {
     public static final String QUALITY_CHECKS_WILDCARD = QUALITY_CHECKS_BASE + "/**";
     public static final String WARRANTIES_BASE = "/api/v1/warranties";
     public static final String WARRANTIES_WILDCARD = WARRANTIES_BASE + "/**";
+    public static final String WARRANTY_CLAIMS = "/claims";
+    public static final String WARRANTY_VOID = "/{id}/void";
+    public static final String WARRANTY_ADJUST = "/{id}/adjust";
 
     public static final String INVENTORY_WILDCARD = "/api/v1/inventory/**";
     public static final String BILLING_WILDCARD = "/api/v1/billing/**";

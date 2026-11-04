@@ -23,14 +23,29 @@ export interface Warranty {
   vehicleId: string;
   customerId: string;
   startsAt: string;
-  expiresAt: string;
+  expiresAt?: string | null;
   startOdometer: number;
-  endOdometer: number;
+  endOdometer?: number | null;
   warrantyDays: number;
   warrantyKm: number;
   termsSnapshot?: string | null;
   status: WarrantyStatus;
+  voidReason?: string | null;
+  voidedAt?: string | null;
+  adjustmentNote?: string | null;
+  adjustedAt?: string | null;
   createdAt: string;
+}
+
+export interface WarrantyVoidInput {
+  reason: string;
+}
+
+export interface WarrantyAdjustInput {
+  warrantyDays: number;
+  warrantyKm: number;
+  termsSnapshot: string;
+  reason: string;
 }
 
 export interface WarrantyClaim {

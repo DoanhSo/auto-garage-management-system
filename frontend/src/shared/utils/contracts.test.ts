@@ -10,6 +10,8 @@ import {
 } from '../../features/auth/schemas/authSchemas';
 import { userFormSchema } from '../../features/identity/schemas/userSchema';
 import { safeAuditDetails } from '../../features/audit/pages/AuditPage';
+import { formatAuditEntity, getAuditActionMeta } from '../../features/audit/constants/auditCatalog';
+import { auditSchema } from '../types/schemas';
 import { notificationMessage } from '../../features/notification/pages/NotificationsPage';
 import { policy } from '../../test/fixtures';
 describe('Exact transport and reporting', () => {
@@ -132,6 +134,27 @@ describe('Safe rendering and navigation', () => {
       ),
     ).not.toContain('hidden');
     expect(safeAuditDetails('{"id":9223372036854775807}')).toContain('9223372036854775807');
+  });
+  it('keeps audit actor and entity labels and describes payroll actions in Vietnamese', () => {
+    const event = auditSchema.parse({
+      id: '1',
+      actorUserId: '12',
+      actorFullName: 'Lê Hoàng Minh',
+      actorUsername: 'minh',
+      actorRole: 'ADMIN',
+      action: 'CREATE_PAYROLL_PERIOD',
+      entityType: 'PayrollPeriod',
+      entityId: '3',
+      entityLabel: '11/2026',
+      afterJson: null,
+      createdAt: '2026-11-02T00:00:00Z',
+    });
+    expect(event.actorFullName).toBe('Lê Hoàng Minh');
+    expect(formatAuditEntity(event.entityType, event.entityId, event.entityLabel)).toBe(
+      'Kỳ lương: 11/2026',
+    );
+    expect(getAuditActionMeta('CREATE_PAYROLL_PERIOD').label).toBe('Khởi tạo kỳ tính lương');
+    expect(getAuditActionMeta('UNKNOWN_ACTION').label).toBe('UNKNOWN_ACTION');
   });
   it('only extracts notification text and safely handles malformed JSON', () => {
     expect(notificationMessage('{"message":"<script>text</script>"}')).toBe(

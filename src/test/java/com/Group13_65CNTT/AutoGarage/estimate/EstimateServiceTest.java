@@ -87,6 +87,7 @@ class EstimateServiceTest {
                 .id(100L)
                 .orderCode("RO-20261023-00001")
                 .status(RepairOrderStatus.DIAGNOSING)
+                .diagnosis("Má phanh trước mòn quá giới hạn")
                 .build();
 
         mockService = new ServiceEntity();
@@ -145,6 +146,8 @@ class EstimateServiceTest {
                 .build();
 
         when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        Estimate olderSent = Estimate.builder().id(9L).repairOrderId(100L).status(EstimateStatus.SENT).build();
+        when(estimateRepository.findByRepairOrderIdAndStatusIn(eq(100L), anyCollection())).thenReturn(List.of(olderSent));
         when(estimateRepository.findTopByRepairOrderIdOrderByVersionNoDesc(100L)).thenReturn(Optional.empty());
         when(serviceRepository.findById(10L)).thenReturn(Optional.of(mockService));
         when(partRepository.findById(20L)).thenReturn(Optional.of(mockPart));
@@ -171,13 +174,77 @@ class EstimateServiceTest {
         assertThat(response.getId()).isEqualTo(1L);
         assertThat(response.getVersionNo()).isEqualTo(1);
         assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.WAITING_APPROVAL);
+        assertThat(olderSent.getStatus()).isEqualTo(EstimateStatus.CANCELLED);
         verify(repairOrderRepository).save(mockOrder);
+    }
+
+    @Test
+    @DisplayName("Không lập báo giá ban đầu khi chưa có kết luận chẩn đoán")
+    void createEstimate_InitialWithoutDiagnosis_Rejected() {
+        mockOrder.setDiagnosis("  ");
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+
+        assertThatThrownBy(() -> estimateService.createEstimate(1L, EstimateCreateRequest.builder()
+                .repairOrderId(100L).estimateKind(EstimateKind.INITIAL).items(List.of()).build()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("kết luận chẩn đoán");
+    }
+
+    @Test
+    @DisplayName("Đã có hạng mục được duyệt thì chỉ lập được báo giá phát sinh")
+    void createEstimate_InitialAfterApproval_Rejected() {
+        mockOrder.setStatus(RepairOrderStatus.WAITING_APPROVAL);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        when(estimateItemRepository.existsLineByRepairOrderIdAndStatus(100L, ApprovalStatus.APPROVED)).thenReturn(true);
+
+        assertThatThrownBy(() -> estimateService.createEstimate(1L, EstimateCreateRequest.builder()
+                .repairOrderId(100L).estimateKind(EstimateKind.INITIAL).items(List.of()).build()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("chỉ lập được báo giá phát sinh");
+    }
+
+    @Test
+    @DisplayName("Phiếu đang thi công không lập được báo giá ban đầu")
+    void createEstimate_InitialWhileInProgress_Rejected() {
+        mockOrder.setStatus(RepairOrderStatus.IN_PROGRESS);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+
+        assertThatThrownBy(() -> estimateService.createEstimate(1L, EstimateCreateRequest.builder()
+                .repairOrderId(100L).estimateKind(EstimateKind.INITIAL).items(List.of()).build()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("chỉ lập được báo giá phát sinh");
+    }
+
+    @Test
+    @DisplayName("Không lập báo giá phát sinh khi phiếu đã chờ QC")
+    void createEstimate_SupplementalWhileWaitingQc_Rejected() {
+        mockOrder.setStatus(RepairOrderStatus.WAITING_QC);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+
+        assertThatThrownBy(() -> estimateService.createEstimate(1L, EstimateCreateRequest.builder()
+                .repairOrderId(100L).estimateKind(EstimateKind.SUPPLEMENTAL).parentEstimateId(1L).items(List.of()).build()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("đang thi công");
+    }
+
+    @Test
+    @DisplayName("Báo giá gốc chưa được duyệt thì không lập báo giá phát sinh")
+    void createEstimate_SupplementalOnUnapprovedParent_Rejected() {
+        mockOrder.setStatus(RepairOrderStatus.IN_PROGRESS);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        when(estimateRepository.findById(1L)).thenReturn(Optional.of(mockEstimate));
+
+        assertThatThrownBy(() -> estimateService.createEstimate(1L, EstimateCreateRequest.builder()
+                .repairOrderId(100L).estimateKind(EstimateKind.SUPPLEMENTAL).parentEstimateId(1L).items(List.of()).build()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Báo giá gốc phải đã được khách duyệt");
     }
 
     @Test
     @DisplayName("Lập báo giá phát sinh (SUPPLEMENTAL) thành công và tăng version_no")
     void createEstimate_Supplemental_Success() {
-        Estimate parent = Estimate.builder().id(1L).repairOrderId(100L).versionNo(1).build();
+        mockOrder.setStatus(RepairOrderStatus.IN_PROGRESS);
+        Estimate parent = Estimate.builder().id(1L).repairOrderId(100L).versionNo(1).status(EstimateStatus.APPROVED).build();
 
         EstimateItemCreateRequest svcItem = EstimateItemCreateRequest.builder()
                 .itemType(ItemType.SERVICE)
@@ -222,6 +289,7 @@ class EstimateServiceTest {
                 .items(List.of())
                 .build();
 
+        mockOrder.setStatus(RepairOrderStatus.IN_PROGRESS);
         when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
 
         assertThatThrownBy(() -> estimateService.createEstimate(1L, request))

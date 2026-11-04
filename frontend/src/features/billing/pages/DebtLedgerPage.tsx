@@ -30,6 +30,7 @@ import { useAuth } from '../../../app/providers/AuthProvider';
 import { DataTable } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
+import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import { formatDate, money } from '../../../shared/utils/format';
 import {
   csvDate,
@@ -91,10 +92,14 @@ function CreditBadge({ state }: { state: CreditState }) {
 const limitText = (limit: string) =>
   Number(limit || 0) > 0 ? money(limit) : '0 đ · Thanh toán ngay';
 
+const DEBT_TABS = ['customer', 'supplier'] as const;
+
 export function DebtLedgerPage() {
   const { user } = useAuth();
   // Thủ kho chỉ quản lý công nợ nhà cung cấp nên mở sẵn tab đó.
-  const [activeTab, setActiveTab] = useState<'customer' | 'supplier'>(
+  const [activeTab, setActiveTab] = useUrlTab(
+    'tab',
+    DEBT_TABS,
     user?.role === 'WAREHOUSE_STAFF' ? 'supplier' : 'customer',
   );
   const [hasBalanceOnly, setHasBalanceOnly] = useState(false);
@@ -224,7 +229,8 @@ export function DebtLedgerPage() {
         header: 'Đã thanh toán',
         cell: ({ row }) => {
           const invoiced = Number(row.original.totalInvoiced || 0);
-          const pct = invoiced > 0 ? Math.round((Number(row.original.totalPaid) / invoiced) * 100) : 0;
+          const pct =
+            invoiced > 0 ? Math.round((Number(row.original.totalPaid) / invoiced) * 100) : 0;
           return (
             <div className="account-cell">
               <div>
@@ -408,7 +414,7 @@ export function DebtLedgerPage() {
         title="Sổ nợ & Tín dụng"
         description="Theo dõi hạn mức tín dụng khách hàng (phải thu) và công nợ nhà cung cấp phụ tùng (phải trả)."
         actions={
-          <div className="row-actions">
+          <>
             <Button
               variant="secondary"
               onClick={() => {
@@ -422,7 +428,7 @@ export function DebtLedgerPage() {
             <Button variant="secondary" onClick={exportCsv}>
               <Download size={15} /> Xuất CSV sổ nợ
             </Button>
-          </div>
+          </>
         }
       />
 
@@ -623,12 +629,17 @@ export function DebtLedgerPage() {
         }
       >
         {detailCustomer && (
-          <>
-            <p>
-              <CreditBadge state={creditState(detailCustomer)} /> Dư nợ{' '}
-              <strong>{money(detailCustomer.balanceAmount)}</strong>
-              {detailCustomer.overdueCount > 0 &&
-                ` · quá hạn ${detailCustomer.overdueCount} HĐ (${money(detailCustomer.overdueAmount)})`}
+          <div className="dialog-body">
+            <p className="dialog-summary">
+              <CreditBadge state={creditState(detailCustomer)} />
+              <span>
+                Dư nợ <strong>{money(detailCustomer.balanceAmount)}</strong>
+              </span>
+              {detailCustomer.overdueCount > 0 && (
+                <span>
+                  Quá hạn {detailCustomer.overdueCount} HĐ ({money(detailCustomer.overdueAmount)})
+                </span>
+              )}
             </p>
             {detailCustomer.invoices.length === 0 ? (
               <p className="empty-state">Khách hàng chưa có hóa đơn nào.</p>
@@ -681,38 +692,37 @@ export function DebtLedgerPage() {
                 Thu nợ tại Sổ quỹ
               </Link>
             </div>
-          </>
+          </div>
         )}
       </Modal>
 
       <Modal
         open={!!detailSupplier}
         onOpenChange={(open) => !open && setDetailSupplier(null)}
+        size="lg"
         title={`Công nợ · ${detailSupplier?.supplierName ?? ''}`}
         description={detailSupplier?.supplierCode}
       >
         {detailSupplier && (
-          <>
-            <dl className="detail-list">
-              <div>
-                <dt>Tổng hàng nhập</dt>
-                <dd>{money(detailSupplier.totalPurchased)}</dd>
-              </div>
-              <div>
-                <dt>Gara đã trả</dt>
-                <dd>{money(detailSupplier.totalPaid)}</dd>
-              </div>
-              <div>
-                <dt>Gara còn nợ</dt>
-                <dd>
-                  <strong>{money(detailSupplier.balanceAmount)}</strong>
-                </dd>
-              </div>
-              <div>
+          <div className="dialog-body">
+            <MetricGrid
+              label="Tổng hợp công nợ nhà cung cấp"
+              items={[
+                { label: 'Tổng hàng nhập', value: money(detailSupplier.totalPurchased) },
+                { label: 'Gara đã trả', value: money(detailSupplier.totalPaid), tone: 'success' },
+                {
+                  label: 'Gara còn nợ',
+                  value: money(detailSupplier.balanceAmount),
+                  tone: Number(detailSupplier.balanceAmount) > 0 ? 'danger' : 'success',
+                },
+              ]}
+            />
+            <dl className="detail-list detail-grid">
+              <div className="detail-field">
                 <dt>Kỳ hạn công nợ</dt>
                 <dd>{detailSupplier.paymentTermDays} ngày</dd>
               </div>
-              <div>
+              <div className="detail-field">
                 <dt>Liên hệ</dt>
                 <dd>{detailSupplier.phone || '—'}</dd>
               </div>
@@ -728,7 +738,7 @@ export function DebtLedgerPage() {
                 Chi trả tại Sổ quỹ
               </Link>
             </div>
-          </>
+          </div>
         )}
       </Modal>
     </>

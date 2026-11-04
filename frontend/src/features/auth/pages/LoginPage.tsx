@@ -11,6 +11,10 @@ import { Button, Field, FormError, PasswordInput } from '../../../shared/compone
 import { errorMessage } from '../../../shared/api/errors';
 import { safeReturnTo } from '../../../shared/utils/format';
 import { AuthLayout } from '../components/AuthLayout';
+import { DemoAccountSelector } from '../components/DemoAccountSelector';
+import { ForgotPasswordModal } from '../components/ForgotPasswordModal';
+import { homePathForRole } from '../../../app/access';
+import { rememberMeStorage } from '../api/rememberMe';
 
 export function LoginPage() {
   const auth = useAuth();
@@ -24,18 +28,22 @@ export function LoginPage() {
   const callbackHandled = useRef(false);
   const [callbackReturnTo, setCallbackReturnTo] = useState<string | undefined>();
   const [pageError, setPageError] = useState('');
+  const [savedIdentifier] = useState(rememberMeStorage.get);
   const [rememberMe, setRememberMe] = useState(true);
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   const {
     register,
     handleSubmit,
     resetField,
     setError,
+    setValue,
+    setFocus,
     formState: { errors },
   } = useForm<{ identifier: string; password: string }>({
     resolver: zodResolver(loginSchema),
     mode: 'onBlur',
-    defaultValues: { identifier: '', password: '' },
+    defaultValues: { identifier: savedIdentifier, password: '' },
   });
 
   const { reset } = mutation;
@@ -65,7 +73,7 @@ export function LoginPage() {
   if (auth.user) {
     const target = safeReturnTo(
       (location.state as { returnTo?: unknown } | null)?.returnTo ?? callbackReturnTo,
-      auth.user.role === 'ADMIN' ? '/admin/reports' : '/notifications',
+      homePathForRole(auth.user.role),
     );
     // '/' là trang chủ công khai; sau đăng nhập đưa người dùng vào không gian làm việc theo vai trò.
     return <Navigate to={target === '/' ? '/workspace' : target} replace />;
@@ -75,6 +83,8 @@ export function LoginPage() {
     if (mutation.isPending) return;
     try {
       await mutation.mutateAsync(values);
+      if (rememberMe) rememberMeStorage.set(values.identifier);
+      else rememberMeStorage.clear();
       resetField('password');
     } catch (error) {
       setError('root.server', { message: errorMessage(error) });
@@ -102,7 +112,8 @@ export function LoginPage() {
       <div className="auth-role-hint">
         <UserCheck size={16} aria-hidden />
         <span>
-          Cổng dịch vụ dành cho <strong>Khách hàng</strong> và <strong>Nhân viên</strong> xưởng ô tô.
+          Cổng dịch vụ dành cho <strong>Khách hàng</strong> và <strong>Nhân viên</strong> xưởng ô
+          tô.
         </span>
       </div>
 
@@ -137,13 +148,9 @@ export function LoginPage() {
             />
             <span>Ghi nhớ đăng nhập</span>
           </label>
-          <a
-            href="tel:0963943872"
-            className="auth-forgot-link"
-            title="Liên hệ hotline nếu bạn quên thông tin tài khoản"
-          >
+          <button type="button" className="auth-forgot-link" onClick={() => setForgotOpen(true)}>
             Quên mật khẩu?
-          </a>
+          </button>
         </div>
 
         <FormError message={errors.root?.server?.message} />
@@ -159,6 +166,16 @@ export function LoginPage() {
         </Button>
       </form>
 
+      {import.meta.env.DEV && (
+        <DemoAccountSelector
+          disabled={mutation.isPending}
+          onSelect={(account) => {
+            setValue('identifier', account.identifier, { shouldValidate: true });
+            setFocus('password');
+          }}
+        />
+      )}
+
       <div className="auth-divider" aria-hidden>
         hoặc
       </div>
@@ -170,6 +187,7 @@ export function LoginPage() {
         <ShieldCheck size={14} aria-hidden />
         <span>Tài khoản nhân viên gara do quản trị viên cấp quyền trực tiếp.</span>
       </div>
+      <ForgotPasswordModal open={forgotOpen} onOpenChange={setForgotOpen} />
     </AuthLayout>
   );
 }

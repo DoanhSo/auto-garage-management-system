@@ -69,6 +69,11 @@ export const vehicleApi = {
     return vehicleSchema.parse(raw);
   },
 
+  activate: async (id: string): Promise<Vehicle> => {
+    const raw = await request<unknown>(`/vehicles/${id}/activate`, { method: 'POST' });
+    return vehicleSchema.parse(raw);
+  },
+
   remove: (id: string): Promise<null> => {
     return request<null>(`/vehicles/${id}`, {
       method: 'DELETE',

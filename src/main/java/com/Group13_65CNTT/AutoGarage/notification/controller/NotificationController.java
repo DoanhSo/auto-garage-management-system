@@ -127,6 +127,14 @@ public class NotificationController {
                 ResponseCode.UPDATED, notificationService.markRead(id), http.getRequestURI());
     }
 
+    @PostMapping(ApiPaths.NOTIFICATION_READ_ALL)
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
+    @Operation(summary = "Mark all unread web notifications read for current user")
+    public ApiResponse<Integer> markAllRead(HttpServletRequest http) {
+        return ApiResponse.success(
+                ResponseCode.UPDATED, notificationService.markAllRead(), http.getRequestURI());
+    }
+
     @DeleteMapping(ApiPaths.BY_ID)
     @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
     @Operation(summary = "Delete / revoke notification")

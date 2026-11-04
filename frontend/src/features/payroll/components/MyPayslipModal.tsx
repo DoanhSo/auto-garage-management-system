@@ -38,7 +38,7 @@ export function MyPayslipModal({
       onOpenChange={(open) => !open && onClose()}
     >
       {payslip && item && (
-        <div className="stack">
+        <div className="dialog-body">
           <dl className="summary-list" aria-label="Tóm tắt phiếu lương">
             <div>
               <dt>Lương cứng · {item.shiftCount} ca trực khoang</dt>

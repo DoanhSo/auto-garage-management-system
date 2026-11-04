@@ -67,17 +67,23 @@ export function DiagnosisAttachmentGallery({
   diagnosis,
   checkIn,
   canUpload,
+  uploadCategories = ['DIAGNOSIS', 'CHECK_IN'],
 }: {
   repairOrderId: string;
   customerComplaint?: string | null;
   diagnosis?: string | null;
   checkIn?: CheckInSummary | null;
   canUpload: boolean;
+  /** Categories still open at the order's current stage; uploading is hidden when empty. */
+  uploadCategories?: AttachmentCategory[];
 }) {
   const notify = useToast();
   const attachments = useOrderAttachmentsQuery(repairOrderId);
   const upload = useUploadOrderAttachmentMutation();
-  const [category, setCategory] = useState<AttachmentCategory>('DIAGNOSIS');
+  const [chosenCategory, setCategory] = useState<AttachmentCategory>('DIAGNOSIS');
+  const category = uploadCategories.includes(chosenCategory)
+    ? chosenCategory
+    : (uploadCategories[0] ?? chosenCategory);
   const [files, setFiles] = useState<File[]>([]);
   const [viewing, setViewing] = useState<Attachment | null>(null);
 
@@ -112,7 +118,7 @@ export function DiagnosisAttachmentGallery({
         </span>
       </div>
 
-      {canUpload && (
+      {canUpload && uploadCategories.length > 0 && (
         <div className="diagnosis-gallery-upload">
           <select
             className="select"
@@ -121,8 +127,12 @@ export function DiagnosisAttachmentGallery({
             disabled={upload.isPending}
             onChange={(e) => setCategory(e.target.value as AttachmentCategory)}
           >
-            <option value="DIAGNOSIS">Ảnh chẩn đoán lỗi</option>
-            <option value="CHECK_IN">Ảnh hiện trạng tiếp nhận</option>
+            {uploadCategories.includes('DIAGNOSIS') && (
+              <option value="DIAGNOSIS">Ảnh chẩn đoán lỗi</option>
+            )}
+            {uploadCategories.includes('CHECK_IN') && (
+              <option value="CHECK_IN">Ảnh hiện trạng tiếp nhận</option>
+            )}
           </select>
           <AttachmentFilePicker
             files={files}

@@ -4,9 +4,7 @@ import {
   createBrowserRouter,
   Link,
   Navigate,
-  Outlet,
   RouterProvider,
-  useLocation,
   useRouteError,
 } from 'react-router-dom';
 import { AuthProvider, useAuth } from './providers/AuthProvider';
@@ -14,7 +12,7 @@ import { ToastProvider } from './providers/ToastProvider';
 import { AppShell } from './layouts/AppShell';
 import { Button, Loading } from '../shared/components/ui';
 import { retryQuery } from '../shared/api/errors';
-import type { Role } from '../shared/types/contracts';
+import { RequireAdmin, RequireAuth, RequireRoles } from './guards/AuthGuard';
 import {
   STAFF_ROLES,
   WAREHOUSE_ROLES,
@@ -24,6 +22,8 @@ import {
   REPAIR_VIEW_ROLES,
   INVOICE_VIEW_ROLES,
   PAYROLL_VIEW_ROLES,
+  ESTIMATE_VIEW_ROLES,
+  WARRANTY_ROLES,
   homePathForRole,
 } from './access';
 
@@ -148,25 +148,6 @@ const WarrantiesPage = lazy(() =>
   })),
 );
 
-export function RequireAuth() {
-  const { user } = useAuth();
-  const location = useLocation();
-  return user ? (
-    <Outlet />
-  ) : (
-    <Navigate to="/login" replace state={{ returnTo: location.pathname + location.search }} />
-  );
-}
-
-export function RequireRoles({ allowedRoles }: { allowedRoles: readonly Role[] }) {
-  const { user } = useAuth();
-  return user && allowedRoles.includes(user.role) ? <Outlet /> : <Navigate to="/403" replace />;
-}
-
-export function RequireAdmin() {
-  return <RequireRoles allowedRoles={['ADMIN']} />;
-}
-
 function Home() {
   const { user } = useAuth();
   return <Navigate to={homePathForRole(user?.role)} replace />;
@@ -260,12 +241,18 @@ const router = createBrowserRouter([
                 element: <RequireRoles allowedRoles={STAFF_ROLES} />,
                 children: [
                   { path: 'repairs', element: <RepairOrdersPage /> },
-                  { path: 'estimates', element: <EstimatesPage /> },
                   { path: 'scheduling', element: <SchedulingPage /> },
-                  { path: 'warranties', element: <WarrantiesPage /> },
                   { path: 'inventory/parts', element: <PartsPage /> },
                   { path: 'inventory/documents', element: <InventoryDocumentsPage /> },
                 ],
+              },
+              {
+                element: <RequireRoles allowedRoles={ESTIMATE_VIEW_ROLES} />,
+                children: [{ path: 'estimates', element: <EstimatesPage /> }],
+              },
+              {
+                element: <RequireRoles allowedRoles={WARRANTY_ROLES} />,
+                children: [{ path: 'warranties', element: <WarrantiesPage /> }],
               },
               {
                 element: <RequireRoles allowedRoles={FINANCE_ROLES} />,

@@ -108,6 +108,28 @@ describe('Notification permissions and actions', () => {
     expect(await within(screen.getByRole('dialog')).findByText('Đã đọc')).toBeVisible();
     expect(calls).toBe(1);
   });
+  it('marks every unread notice read from the inbox header', async () => {
+    let unread = true;
+    const readAll = vi.fn();
+    server.use(
+      http.get('/api/v1/notifications', () =>
+        HttpResponse.json(
+          envelope(page(unread ? [notice] : [{ ...notice, readAt: '2026-10-22T02:00:00Z' }])),
+        ),
+      ),
+      http.post('/api/v1/notifications/read-all', () => {
+        readAll();
+        unread = false;
+        return HttpResponse.json(envelope(1, 1002));
+      }),
+    );
+    const user = app();
+    await user.click(await screen.findByRole('button', { name: 'Đọc tất cả' }));
+    await waitFor(() => expect(readAll).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /Đánh dấu đã đọc #3/ })).not.toBeInTheDocument(),
+    );
+  });
   it('validates the broadcast and sends the selected roles and plain text', async () => {
     const send = vi.fn();
     server.use(

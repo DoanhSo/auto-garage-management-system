@@ -94,4 +94,15 @@ public class SupplierServiceImpl implements SupplierService {
         supplierRepository.save(supplier);
         log.info("Deactivated supplier id: {}", id);
     }
+
+    @Override
+    @Transactional
+    public SupplierResponse activateSupplier(Long id) {
+        Supplier supplier = supplierRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        supplier.setIsActive(true);
+        Supplier saved = supplierRepository.save(supplier);
+        log.info("Reactivated supplier id: {}", id);
+        return supplierMapper.toResponse(saved);
+    }
 }

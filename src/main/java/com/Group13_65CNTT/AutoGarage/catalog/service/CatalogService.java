@@ -20,4 +20,6 @@ public interface CatalogService {
     ServiceResponse updateService(Long id, UpdateServiceRequest request);
 
     void deactivateService(Long id);
+
+    ServiceResponse activateService(Long id);
 }

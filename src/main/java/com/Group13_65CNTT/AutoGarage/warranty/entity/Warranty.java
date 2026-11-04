@@ -58,6 +58,24 @@ public class Warranty {
     @Builder.Default
     private WarrantyStatus status = WarrantyStatus.ACTIVE;
 
+    @Column(name = "void_reason", length = 500)
+    private String voidReason;
+
+    @Column(name = "voided_by")
+    private Long voidedBy;
+
+    @Column(name = "voided_at")
+    private Instant voidedAt;
+
+    @Column(name = "adjustment_note", length = 500)
+    private String adjustmentNote;
+
+    @Column(name = "adjusted_by")
+    private Long adjustedBy;
+
+    @Column(name = "adjusted_at")
+    private Instant adjustedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

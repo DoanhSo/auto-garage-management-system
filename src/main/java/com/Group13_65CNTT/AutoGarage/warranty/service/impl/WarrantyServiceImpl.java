@@ -336,6 +336,88 @@ public class WarrantyServiceImpl implements WarrantyService, WarrantyOperations 
         return warrantyClaimRepository.findByWarrantyId(warrantyId, pageable).map(warrantyClaimMapper::toResponse);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Page<WarrantyClaimResponse> searchClaims(
+            Long vehicleId,
+            Long customerId,
+            ClaimStatus status,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir) {
+        Long scopedCustomerId = scopedCustomerId(customerId);
+        Pageable pageable = pagination.page(page, size, sortBy, sortDir,
+                Set.of("id", "claimCode", "requestedAt", "status", "createdAt"));
+        return warrantyClaimRepository.searchClaims(vehicleId, scopedCustomerId, status, pageable)
+                .map(warrantyClaimMapper::toResponse);
+    }
+
+    /** Claims still being handled keep their book alive; it can be voided once they are settled. */
+    private static final Set<ClaimStatus> UNRESOLVED_CLAIMS =
+            Set.of(ClaimStatus.OPEN, ClaimStatus.APPROVED, ClaimStatus.IN_PROGRESS);
+
+    @Override
+    @Transactional
+    @com.Group13_65CNTT.AutoGarage.audit.annotation.Audited(
+            action = com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants.ACTION_WARRANTY_VOIDED,
+            entity = com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants.ENTITY_WARRANTY,
+            idArgument = 1)
+    public WarrantyResponse voidWarranty(Long actorUserId, Long warrantyId,
+            com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyVoidRequest request) {
+        objectAccess.requireRole(actorUserId, Role.ADMIN.name());
+        Warranty warranty = warrantyRepository.findById(warrantyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sổ bảo hành với ID: " + warrantyId));
+        if (warranty.getStatus() == WarrantyStatus.VOID) {
+            throw new BusinessRuleException("Sổ bảo hành này đã bị hủy trước đó");
+        }
+        if (warrantyClaimRepository.existsByWarrantyIdAndStatusIn(warrantyId, UNRESOLVED_CLAIMS)) {
+            throw new BusinessRuleException("Sổ còn khiếu nại đang xử lý. Hãy hoàn tất hoặc từ chối khiếu nại trước khi hủy sổ.");
+        }
+        warranty.setStatus(WarrantyStatus.VOID);
+        warranty.setVoidReason(request.getReason().trim());
+        warranty.setVoidedBy(actorUserId);
+        warranty.setVoidedAt(Instant.now());
+        return warrantyMapper.toResponse(warrantyRepository.save(warranty));
+    }
+
+    @Override
+    @Transactional
+    @com.Group13_65CNTT.AutoGarage.audit.annotation.Audited(
+            action = com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants.ACTION_WARRANTY_ADJUSTED,
+            entity = com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants.ENTITY_WARRANTY,
+            idArgument = 1)
+    public WarrantyResponse adjustWarranty(Long actorUserId, Long warrantyId,
+            com.Group13_65CNTT.AutoGarage.warranty.dto.request.WarrantyAdjustRequest request) {
+        objectAccess.requireRole(actorUserId, Role.ADMIN.name());
+        Warranty warranty = warrantyRepository.findById(warrantyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sổ bảo hành với ID: " + warrantyId));
+        if (warranty.getStatus() == WarrantyStatus.VOID) {
+            throw new BusinessRuleException("Sổ bảo hành đã bị hủy, không thể điều chỉnh");
+        }
+        int days = request.getWarrantyDays();
+        int km = request.getWarrantyKm();
+        if (days == 0 && km == 0) {
+            throw new BusinessRuleException("Sổ bảo hành phải giới hạn theo số ngày hoặc số km");
+        }
+        // Limits are always measured from the original hand-over, so the terms stay comparable.
+        Instant expiresAt = days > 0 ? warranty.getStartsAt().plus(days, ChronoUnit.DAYS) : null;
+        warranty.setWarrantyDays(days);
+        warranty.setWarrantyKm(km);
+        warranty.setExpiresAt(expiresAt);
+        warranty.setEndOdometer(km > 0 ? warranty.getStartOdometer() + km : null);
+        if (request.getTermsSnapshot() != null) {
+            warranty.setTermsSnapshot(request.getTermsSnapshot().isBlank() ? null : request.getTermsSnapshot().trim());
+        }
+        warranty.setStatus(expiresAt != null && !Instant.now().isBefore(expiresAt)
+                ? WarrantyStatus.EXPIRED
+                : WarrantyStatus.ACTIVE);
+        warranty.setAdjustmentNote(request.getReason().trim());
+        warranty.setAdjustedBy(actorUserId);
+        warranty.setAdjustedAt(Instant.now());
+        return warrantyMapper.toResponse(warrantyRepository.save(warranty));
+    }
+
     // =========================================================================
     // Helper Methods
     // =========================================================================

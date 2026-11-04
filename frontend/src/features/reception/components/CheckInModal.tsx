@@ -141,9 +141,7 @@ export function CheckInModal({
     }
   }
 
-  const title = booking
-    ? `Tiếp nhận xe hẹn #${booking.bookingCode}`
-    : 'Tiếp nhận xe vào xưởng (Check-in)';
+  const title = booking ? `Tiếp nhận xe hẹn #${booking.bookingCode}` : 'Tiếp nhận xe vào xưởng';
   const description = booking
     ? `Khách hàng: ${booking.customerName} • Xe: ${booking.licensePlate}`
     : 'Ghi nhận hiện trạng xe, số ODO và khởi tạo lệnh sửa chữa mới.';
@@ -163,7 +161,7 @@ export function CheckInModal({
       <form
         onSubmit={handleSubmit(onSubmit)}
         noValidate
-        className="editor-form account-editor-form"
+        className="editor-form account-editor-form grid-4col"
       >
         <FormError message={generalError ? errorMessage(generalError) : undefined} />
 

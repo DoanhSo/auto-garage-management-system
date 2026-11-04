@@ -107,4 +107,29 @@ class PartServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getStockQuantity()).isEqualTo(new BigDecimal("2"));
     }
+
+    @Test
+    void activatePart_reopensInactivePart() {
+        Part part = new Part();
+        part.setId(4L);
+        part.setIsActive(false);
+        when(partRepository.findById(4L)).thenReturn(Optional.of(part));
+        when(partRepository.save(part)).thenReturn(part);
+        when(partMapper.toResponse(part)).thenReturn(new PartResponse());
+
+        service.activatePart(4L);
+
+        assertThat(part.getIsActive()).isTrue();
+        verify(partRepository).save(part);
+    }
+
+    @Test
+    void activatePart_unknownIdIsNotFound() {
+        when(partRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.activatePart(99L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("responseCode")
+                .isEqualTo(ResponseCode.RESOURCE_NOT_FOUND);
+    }
 }

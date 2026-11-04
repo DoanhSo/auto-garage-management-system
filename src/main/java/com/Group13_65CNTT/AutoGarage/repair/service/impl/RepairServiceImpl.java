@@ -37,6 +37,12 @@ import com.Group13_65CNTT.AutoGarage.repair.repository.LaborSessionRepository;
 import com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderRepository;
 import com.Group13_65CNTT.AutoGarage.repair.repository.RepairTaskRepository;
 import com.Group13_65CNTT.AutoGarage.repair.service.RepairService;
+import com.Group13_65CNTT.AutoGarage.repair.service.RepairStageRules;
+import com.Group13_65CNTT.AutoGarage.estimate.entity.ApprovalStatus;
+import com.Group13_65CNTT.AutoGarage.estimate.entity.Estimate;
+import com.Group13_65CNTT.AutoGarage.estimate.entity.EstimateStatus;
+import com.Group13_65CNTT.AutoGarage.estimate.repository.EstimateItemRepository;
+import com.Group13_65CNTT.AutoGarage.estimate.repository.EstimateRepository;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.BayScheduling;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.BillingOperations;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.InventoryOperations;
@@ -92,6 +98,8 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
     private final VehicleCheckRepository vehicleCheckRepository;
     private final WarrantyClaimRepository warrantyClaimRepository;
     private final WarrantyRepository warrantyRepository;
+    private final EstimateRepository estimateRepository;
+    private final EstimateItemRepository estimateItemRepository;
 
     private final BayScheduling bayScheduling;
     private final com.Group13_65CNTT.AutoGarage.repair.service.WorkLogRecorder workLogRecorder;
@@ -421,7 +429,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
 
         // Tạo chính sách bảo hành I07 nếu đã có hóa đơn phát hành cho phiếu
         if (warrantyOperations != null && invoiceRepository != null) {
-            invoiceRepository.findByRepairOrderId(repairOrderId).ifPresent(inv -> {
+            invoiceRepository.findActiveByRepairOrderId(repairOrderId).ifPresent(inv -> {
                 warrantyOperations.createFromInvoice(actorUserId, inv.getId(), odometerOut);
             });
         }
@@ -497,8 +505,15 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         RepairOrder order = repairOrderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + id));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
+        if (RepairStageRules.TERMINAL.contains(order.getStatus())) {
             throw new BusinessRuleException("Phiếu sửa chữa đã đóng hoặc bị hủy, không thể chỉnh sửa");
+        }
+        boolean changesReception = request.getFuelLevelPercent() != null || request.getCustomerComplaint() != null;
+        if (changesReception && !RepairStageRules.RECEPTION_EDITABLE.contains(order.getStatus())) {
+            throw new BusinessRuleException("Thông tin tiếp nhận chỉ sửa được khi phiếu vừa tiếp nhận");
+        }
+        if (request.getLeadTechnicianId() != null && !RepairStageRules.ASSIGNMENT_EDITABLE.contains(order.getStatus())) {
+            throw new BusinessRuleException("Phiếu đã qua kiểm tra chất lượng, không thể đổi kỹ thuật viên trưởng");
         }
 
         if (request.getLeadTechnicianId() != null) {
@@ -521,12 +536,13 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         RepairOrder order = repairOrderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + id));
 
-        if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED || order.getStatus() == RepairOrderStatus.INVOICED) {
-            throw new BusinessRuleException("Phiếu sửa chữa đã đóng hoặc bị hủy, không thể cập nhật chẩn đoán");
+        if (!RepairStageRules.DIAGNOSIS_EDITABLE.contains(order.getStatus())) {
+            throw new BusinessRuleException("Chẩn đoán đã chốt khi lập báo giá. Hãy dùng báo giá phát sinh hoặc mở lại chẩn đoán khi khách từ chối toàn bộ");
         }
 
+        boolean firstDiagnosis = order.getDiagnosis() == null || order.getDiagnosis().isBlank();
         order.setDiagnosis(request.getDiagnosis());
-        if (order.getDiagnosticTechnicianId() != null) {
+        if (firstDiagnosis && order.getDiagnosticTechnicianId() != null) {
             workLogRecorder.finish(order.getId(), order.getDiagnosticTechnicianId(), AssignmentStage.DIAGNOSIS,
                     Instant.now(), WorkResultStatus.COMPLETED, request.getDiagnosis());
         }
@@ -560,7 +576,19 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
             throw new BusinessRuleException("Trạng thái này phải được cập nhật qua nghiệp vụ duyệt báo giá, QC, hóa đơn hoặc bàn giao tương ứng");
         }
 
+        if (newStatus == RepairOrderStatus.WAITING_QC) {
+            if (repairTaskRepository.existsByRepairOrderIdAndStatusNot(id, TaskStatus.COMPLETED)
+                    || laborSessionRepository.countOpenSessionsByRepairOrderId(id) > 0) {
+                throw new BusinessRuleException("Còn công việc chưa hoàn thành hoặc đồng hồ đang chạy, chưa thể chuyển sang chờ QC");
+            }
+        }
+
+        if (current == RepairOrderStatus.WAITING_APPROVAL && newStatus == RepairOrderStatus.DIAGNOSING) {
+            reopenDiagnosis(id);
+        }
+
         if (newStatus == RepairOrderStatus.CANCELLED) {
+            cancelOpenEstimates(id);
             List<RepairTask> tasks = repairTaskRepository.findByRepairOrderId(id);
             if (laborSessionRepository.countOpenSessionsByRepairOrderId(id) > 0
                     || tasks.stream().anyMatch(task -> task.getStartedAt() != null || task.getStatus() == TaskStatus.COMPLETED)) {
@@ -624,6 +652,9 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         if (request.getStatus() != null && request.getStatus() != task.getStatus()) {
             throw new BusinessRuleException("Thay đổi trạng thái công việc phải qua luồng thực hiện hoặc hoàn thành công việc");
         }
+        if (task.getStatus() == TaskStatus.COMPLETED) {
+            throw new BusinessRuleException("Công việc đã hoàn thành, không thể chỉnh sửa");
+        }
         if (task.getEstimateItemId() != null && (request.getQuantity() != null || request.getUnitPrice() != null)) {
             throw new BusinessRuleException("Số lượng và đơn giá đã duyệt chỉ được điều chỉnh bằng báo giá phát sinh");
         }
@@ -668,18 +699,17 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
         }
 
         switch (from) {
-            case NEW -> {
-                if (to != RepairOrderStatus.DIAGNOSING && to != RepairOrderStatus.WAITING_APPROVAL) {
-                    throwInvalidTransition(from, to);
+            case NEW, DIAGNOSING -> {
+                if (to == RepairOrderStatus.WAITING_APPROVAL) {
+                    throw new BusinessRuleException("Chỉ chuyển sang chờ duyệt bằng cách lập báo giá");
                 }
-            }
-            case DIAGNOSING -> {
-                if (to != RepairOrderStatus.WAITING_APPROVAL) {
+                if (from == RepairOrderStatus.DIAGNOSING || to != RepairOrderStatus.DIAGNOSING) {
                     throwInvalidTransition(from, to);
                 }
             }
             case WAITING_APPROVAL -> {
-                if (to != RepairOrderStatus.APPROVED) {
+                // APPROVED is reached only through estimate approval; DIAGNOSING reopens the diagnosis.
+                if (to != RepairOrderStatus.APPROVED && to != RepairOrderStatus.DIAGNOSING) {
                     throwInvalidTransition(from, to);
                 }
             }
@@ -720,6 +750,35 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
             }
             default -> throwInvalidTransition(from, to);
         }
+    }
+
+    /**
+     * The only way back to an earlier stage: allowed when the customer has turned down every line,
+     * so no estimate is approved or still awaiting a decision. Leftover drafts are cancelled.
+     */
+    private void reopenDiagnosis(Long repairOrderId) {
+        if (estimateItemRepository.existsLineByRepairOrderIdAndStatus(repairOrderId, ApprovalStatus.APPROVED)) {
+            throw new BusinessRuleException("Phiếu đã có hạng mục được duyệt, không thể mở lại chẩn đoán");
+        }
+        Instant now = Instant.now();
+        boolean awaitingCustomer = estimateRepository.findByRepairOrderIdAndStatusIn(repairOrderId,
+                        EnumSet.of(EstimateStatus.SENT, EstimateStatus.PARTIALLY_APPROVED)).stream()
+                .anyMatch(estimate -> estimate.getValidUntil() == null || now.isBefore(estimate.getValidUntil()));
+        if (awaitingCustomer) {
+            throw new BusinessRuleException("Chỉ mở lại chẩn đoán khi khách đã từ chối toàn bộ báo giá");
+        }
+        cancelOpenEstimates(repairOrderId);
+    }
+
+    /** Estimates that can no longer be decided once the order goes back or is cancelled. */
+    private void cancelOpenEstimates(Long repairOrderId) {
+        List<Estimate> open = estimateRepository.findByRepairOrderIdAndStatusIn(repairOrderId,
+                EnumSet.of(EstimateStatus.DRAFT, EstimateStatus.SENT, EstimateStatus.PARTIALLY_APPROVED));
+        if (open.isEmpty()) {
+            return;
+        }
+        open.forEach(estimate -> estimate.setStatus(EstimateStatus.CANCELLED));
+        estimateRepository.saveAll(open);
     }
 
     private void throwInvalidTransition(RepairOrderStatus from, RepairOrderStatus to) {

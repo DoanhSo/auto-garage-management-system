@@ -25,6 +25,7 @@ import {
   QueryError,
 } from '../../../shared/components/ui';
 import { csvMoney, csvSections, downloadCsv } from '../../../shared/utils/csvExport';
+import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import { formatDate, money } from '../../../shared/utils/format';
 import { useSchedulingEmployeesQuery } from '../../scheduling/hooks/useScheduling';
 import { SKILL_LABELS, parseSkills } from '../../scheduling/types/scheduling';
@@ -36,13 +37,18 @@ import {
   usePayrollPeriodByMonthQuery,
 } from '../hooks/usePayroll';
 import {
+  PAYROLL_TABS,
   payrollItemStatusLabels,
   payrollStatusLabels,
+  payrollTabLabels,
   periodStatusVariant,
   type PayrollItem,
 } from '../types/payroll';
+import { EmployeePayrollDirectory } from './EmployeePayrollDirectory';
 import { EmployeeWorkSummaryModal } from './EmployeeWorkSummaryModal';
 import { PayrollAdjustModal } from './PayrollAdjustModal';
+import { SalaryCoefficientManager } from './SalaryCoefficientManager';
+import { ShiftBonusPolicyPanel } from './ShiftBonusPolicyPanel';
 
 type ItemRow = PayrollItem & { id: string };
 
@@ -53,6 +59,7 @@ const monthKey = (year: number, month: number) => `${year}-${pad(month)}`;
 
 export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
   const notify = useToast();
+  const [tab, setTab] = useUrlTab('tab', PAYROLL_TABS);
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -298,96 +305,120 @@ export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Tài chính & công nợ"
-        title="Bảng lương & Năng suất nhân viên"
-        description="Theo dõi ca trực, năng suất sửa chữa và thu nhập chi tiết của từng nhân viên theo tháng."
+        eyebrow="Tài chính & Nhân sự"
+        title="Bảng lương & Quản trị nhân sự"
+        description="Theo dõi ca trực, năng suất, hồ sơ nhân viên và chính sách lương thưởng theo tháng."
       />
 
-      <section className="panel" aria-label="Chọn kỳ lương">
-        <div className="row-actions">
-          <Button variant="secondary" aria-label="Tháng trước" onClick={() => shiftMonth(-1)}>
-            <ChevronLeft size={16} />
-          </Button>
-          <select
-            className="select"
-            aria-label="Tháng"
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-          >
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>
-                Tháng {pad(m)}
-              </option>
-            ))}
-          </select>
-          <select
-            className="select"
-            aria-label="Năm"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                Năm {y}
-              </option>
-            ))}
-          </select>
-          <Button variant="secondary" aria-label="Tháng sau" onClick={() => shiftMonth(1)}>
-            <ChevronRight size={16} />
-          </Button>
-          <Button
-            variant="ghost"
-            disabled={isCurrentMonth}
-            onClick={() => {
-              setYear(now.getFullYear());
-              setMonth(now.getMonth() + 1);
-            }}
-          >
-            Tháng hiện tại
-          </Button>
-          <span className="grow" />
-          {period && (
-            <Badge variant={periodStatusVariant[period.status]}>
-              {payrollStatusLabels[period.status]}
-            </Badge>
-          )}
-          {period && editable && (
-            <Button
-              variant="secondary"
-              pending={calculate.isPending}
-              disabled={busy}
-              onClick={() =>
-                void run(
-                  () => calculate.mutateAsync(period.id),
-                  `Đã tính lương ${pad(month)}/${year}`,
-                )
-              }
+      <div className="tabs" role="group" aria-label="Màn hình bảng lương">
+        {PAYROLL_TABS.map((key) => (
+          <button key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(key)}>
+            {payrollTabLabels[key]}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'employees' && <EmployeePayrollDirectory canCreate={canApprove} />}
+      {tab === 'coefficients' && <SalaryCoefficientManager />}
+
+      {(tab === 'monthly' || tab === 'bonus') && (
+        <section className="panel" aria-label="Chọn kỳ lương">
+          <div className="payroll-toolbar-row">
+            <Button variant="secondary" aria-label="Tháng trước" onClick={() => shiftMonth(-1)}>
+              <ChevronLeft size={16} />
+            </Button>
+            <select
+              className="select"
+              aria-label="Tháng"
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
             >
-              <RefreshCw size={16} /> {period.status === 'DRAFT' ? 'Tính lương' : 'Tính lại lương'}
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>
+                  Tháng {pad(m)}
+                </option>
+              ))}
+            </select>
+            <select
+              className="select"
+              aria-label="Năm"
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  Năm {y}
+                </option>
+              ))}
+            </select>
+            <Button variant="secondary" aria-label="Tháng sau" onClick={() => shiftMonth(1)}>
+              <ChevronRight size={16} />
             </Button>
-          )}
-          {period && canApprove && period.status === 'CALCULATED' && (
-            <Button variant="secondary" disabled={busy} onClick={() => setConfirm('approve')}>
-              <Calculator size={16} /> Phê duyệt
+            <Button
+              variant="ghost"
+              disabled={isCurrentMonth}
+              onClick={() => {
+                setYear(now.getFullYear());
+                setMonth(now.getMonth() + 1);
+              }}
+            >
+              Tháng hiện tại
             </Button>
-          )}
-          {period && canApprove && period.status === 'APPROVED' && (
-            <Button variant="primary" disabled={busy} onClick={() => setConfirm('disburse')}>
-              <Wallet size={16} /> Chi trả lương
-            </Button>
-          )}
-          {period && (
-            <Button variant="secondary" disabled={items.length === 0} onClick={exportCsv}>
-              <Download size={16} /> Xuất CSV
-            </Button>
-          )}
-        </div>
-      </section>
+            <span className="grow" />
+            {tab === 'monthly' && period && (
+              <Badge variant={periodStatusVariant[period.status]}>
+                {payrollStatusLabels[period.status]}
+              </Badge>
+            )}
+            {tab === 'monthly' && period && editable && (
+              <Button
+                variant="secondary"
+                pending={calculate.isPending}
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    () => calculate.mutateAsync(period.id),
+                    `Đã tính lương ${pad(month)}/${year}`,
+                  )
+                }
+              >
+                <RefreshCw size={16} />{' '}
+                {period.status === 'DRAFT' ? 'Tính lương' : 'Tính lại lương'}
+              </Button>
+            )}
+            {tab === 'monthly' && period && canApprove && period.status === 'CALCULATED' && (
+              <Button variant="secondary" disabled={busy} onClick={() => setConfirm('approve')}>
+                <Calculator size={16} /> Phê duyệt
+              </Button>
+            )}
+            {tab === 'monthly' && period && canApprove && period.status === 'APPROVED' && (
+              <Button variant="primary" disabled={busy} onClick={() => setConfirm('disburse')}>
+                <Wallet size={16} /> Chi trả lương
+              </Button>
+            )}
+            {tab === 'monthly' && period && (
+              <Button variant="secondary" disabled={items.length === 0} onClick={exportCsv}>
+                <Download size={16} /> Xuất CSV
+              </Button>
+            )}
+          </div>
+        </section>
+      )}
 
-      {query.isLoading && <Loading />}
-      {query.isError && <QueryError error={query.error} retry={() => void query.refetch()} />}
+      {tab === 'bonus' && query.isSuccess && (
+        <ShiftBonusPolicyPanel
+          items={period ? items : null}
+          monthLabel={`tháng ${pad(month)}/${year}`}
+          onOpenSummary={setSummaryItem}
+        />
+      )}
 
-      {query.isSuccess && !period && (
+      {tab === 'monthly' && query.isLoading && <Loading />}
+      {tab !== 'employees' && tab !== 'coefficients' && query.isError && (
+        <QueryError error={query.error} retry={() => void query.refetch()} />
+      )}
+
+      {tab === 'monthly' && query.isSuccess && !period && (
         <section className="panel stack" aria-label="Chưa có kỳ lương">
           <p className="description">
             Chưa có kỳ tính lương cho tháng {pad(month)}/{year}. Khởi tạo kỳ để hệ thống tổng hợp ca
@@ -410,7 +441,7 @@ export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
         </section>
       )}
 
-      {period && (
+      {tab === 'monthly' && period && (
         <>
           <MetricGrid
             label={`Thống kê năng suất tháng ${pad(month)}/${year}`}
@@ -441,7 +472,7 @@ export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
           />
 
           <section className="panel table-panel">
-            <div className="row-actions" role="search" aria-label="Lọc nhân viên">
+            <div className="payroll-filter-row" role="search" aria-label="Lọc nhân viên">
               <input
                 className="input"
                 aria-label="Tìm nhân viên"
@@ -463,7 +494,7 @@ export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
                 ))}
                 <option value="QC">QC</option>
               </select>
-              <span className="description">
+              <span className="description toolbar-end">
                 Kỳ công {formatDate(period.fromDate)} – {formatDate(period.toDate)}
               </span>
             </div>

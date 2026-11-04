@@ -144,7 +144,11 @@ function CustomerForm({
           </select>
         </Field>
 
-        <Field label="Địa chỉ Email" error={errors.email?.message}>
+        <Field
+          label="Địa chỉ Email"
+          error={errors.email?.message}
+          hint="Không bắt buộc. Xóa nội dung để gỡ email."
+        >
           <input
             {...register('email')}
             type="email"

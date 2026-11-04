@@ -22,9 +22,13 @@ export function VehicleTimelineModal({
   async function download(id: string, filename: string) {
     setDownloading(id);
     setDownloadError(undefined);
-    try { await downloadAttachment(id, filename); }
-    catch (error) { setDownloadError(errorMessage(error)); }
-    finally { setDownloading(undefined); }
+    try {
+      await downloadAttachment(id, filename);
+    } catch (error) {
+      setDownloadError(errorMessage(error));
+    } finally {
+      setDownloading(undefined);
+    }
   }
   const {
     data: timeline,

@@ -112,6 +112,16 @@ public class CatalogServiceImpl implements CatalogService {
         serviceRepository.save(entity);
     }
 
+    @Override
+    @Audited(action = AuditConstants.ACTION_SERVICE_ACTIVATED, entity = AuditConstants.ENTITY_SERVICE, idArgument = 0)
+    public ServiceResponse activateService(Long id) {
+        customerScope.requireAdmin();
+        ServiceEntity entity = serviceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dịch vụ với ID: " + id));
+        entity.setIsActive(true);
+        return serviceMapper.toResponse(serviceRepository.save(entity));
+    }
+
     private void validateServiceRules(BigDecimal unitPrice, Integer standardMinutes,
                                       Integer intervalKm, Integer intervalMonths,
                                       Integer warrantyDays, Integer warrantyKm) {

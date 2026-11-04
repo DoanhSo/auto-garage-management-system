@@ -54,6 +54,11 @@ export const catalogApi = {
     return serviceSchema.parse(raw);
   },
 
+  activate: async (id: string): Promise<Service> => {
+    const raw = await request<unknown>(`/services/${id}/activate`, { method: 'POST' });
+    return serviceSchema.parse(raw);
+  },
+
   remove: (id: string): Promise<null> => {
     return request<null>(`/services/${id}`, {
       method: 'DELETE',

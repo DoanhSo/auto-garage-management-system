@@ -35,6 +35,11 @@ class AttachmentServiceTest {
 
     @Mock
     private AttachmentRepository attachmentRepository;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderRepository repairOrderRepository;
+    private final com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrder order =
+            com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrder.builder().id(100L)
+                    .status(com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrderStatus.NEW).build();
 
     @Spy
     private VehicleCheckMapper vehicleCheckMapper = new VehicleCheckMapper();
@@ -52,6 +57,7 @@ class AttachmentServiceTest {
         check.setRepairOrderId(100L);
         check.setCheckType(com.Group13_65CNTT.AutoGarage.reception.entity.CheckType.CHECK_IN);
         lenient().when(vehicleCheckRepository.findById(1L)).thenReturn(java.util.Optional.of(check));
+        lenient().when(repairOrderRepository.findById(100L)).thenReturn(java.util.Optional.of(order));
         validImageFile = new MockMultipartFile(
                 "file",
                 "car_scratch.jpg",
@@ -89,6 +95,26 @@ class AttachmentServiceTest {
         var realStorage = new com.Group13_65CNTT.AutoGarage.reception.service.impl.AttachmentStorage(workshop);
         var failure = assertThrows(BusinessException.class, () -> realStorage.read("../../etc/passwd"));
         assertEquals(ResponseCode.BAD_REQUEST, failure.getResponseCode());
+    }
+
+    @Test
+    void checkInPhotoIsRejectedOnceDiagnosisStarted() {
+        order.setStatus(com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrderStatus.DIAGNOSING);
+        var error = assertThrows(com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException.class, () ->
+                attachmentService.uploadAttachment(100L, null, null, AttachmentCategory.CHECK_IN, 2L, validImageFile));
+        org.assertj.core.api.Assertions.assertThat(error.getMessage()).contains("tiếp nhận xe");
+        verifyNoInteractions(storage);
+    }
+
+    @Test
+    void diagnosisPhotoIsAcceptedWhileDiagnosing() {
+        order.setStatus(com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrderStatus.DIAGNOSING);
+        var fake = new MockMultipartFile("file", "x.jpg", "image/jpeg", "not-an-image".getBytes());
+        // Passes the stage window and fails only on the content check that follows it.
+        var error = assertThrows(BusinessException.class, () ->
+                attachmentService.uploadAttachment(100L, null, null, AttachmentCategory.DIAGNOSIS, 2L, fake));
+        assertFalse(error instanceof com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException);
+        verify(repairOrderRepository).findById(100L);
     }
 
     @Test

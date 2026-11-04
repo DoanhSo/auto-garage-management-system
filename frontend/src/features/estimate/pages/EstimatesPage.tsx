@@ -35,7 +35,11 @@ const statusVariant: Record<string, BadgeVariant> = {
   REJECTED: 'danger',
 };
 
-function ReadyEstimates({ policy }: { policy: NonNullable<ReturnType<typeof useUiPolicy>['data']> }) {
+function ReadyEstimates({
+  policy,
+}: {
+  policy: NonNullable<ReturnType<typeof useUiPolicy>['data']>;
+}) {
   const notify = useToast();
   const [status, setStatus] = useState<EstimateStatus | 'ALL'>('ALL');
   const [kind, setKind] = useState<'ALL' | 'INITIAL' | 'SUPPLEMENTAL'>('ALL');
@@ -55,7 +59,12 @@ function ReadyEstimates({ policy }: { policy: NonNullable<ReturnType<typeof useU
   const { data, isLoading, isError, error, refetch, isFetching } = useEstimatesQuery(queryParams);
   const pageEstimates = useMemo(() => data?.content ?? [], [data?.content]);
 
-  const { data: orders } = useRepairOrdersQuery({ page: 0, size: 100, sortBy: 'id', sortDir: 'desc' });
+  const { data: orders } = useRepairOrdersQuery({
+    page: 0,
+    size: 100,
+    sortBy: 'id',
+    sortDir: 'desc',
+  });
   const { data: vehicles = [] } = useVehiclesQuery();
   const orderMap = useMemo(
     () => new Map((orders?.content ?? []).map((o) => [String(o.id), o] as const)),
@@ -69,7 +78,9 @@ function ReadyEstimates({ policy }: { policy: NonNullable<ReturnType<typeof useU
   const selectedOrder = selectedEstimate
     ? orderMap.get(String(selectedEstimate.repairOrderId))
     : undefined;
-  const selectedOrderVehicle = selectedOrder ? vehicleMap.get(String(selectedOrder.vehicleId)) : null;
+  const selectedOrderVehicle = selectedOrder
+    ? vehicleMap.get(String(selectedOrder.vehicleId))
+    : null;
 
   const estimates = useMemo(() => {
     const term = keyword.trim().toLowerCase();
@@ -177,7 +188,8 @@ function ReadyEstimates({ policy }: { policy: NonNullable<ReturnType<typeof useU
               <strong>{money(row.original.totalAmount)}</strong>
               {Number(row.original.discountAmount) > 0 && (
                 <span>
-                  Tạm tính {money(row.original.subtotal)} − giảm {money(row.original.discountAmount)}
+                  Tạm tính {money(row.original.subtotal)} − giảm{' '}
+                  {money(row.original.discountAmount)}
                 </span>
               )}
             </div>
@@ -228,14 +240,14 @@ function ReadyEstimates({ policy }: { policy: NonNullable<ReturnType<typeof useU
         title="Báo giá dịch vụ & phụ tùng"
         description="Quản lý các bản dự toán chi phí sửa chữa, gửi khách hàng và phê duyệt từng hạng mục."
         actions={
-          <div className="row-actions">
+          <>
             <Button variant="secondary" onClick={() => refetch()} pending={isFetching}>
               <RefreshCw size={15} /> Làm mới
             </Button>
             <Button variant="primary" onClick={() => setCreateOpen(true)}>
-              <Plus size={16} /> Lập báo giá mới
+              <Plus size={18} /> Lập báo giá mới
             </Button>
-          </div>
+          </>
         }
       />
 
@@ -243,7 +255,12 @@ function ReadyEstimates({ policy }: { policy: NonNullable<ReturnType<typeof useU
         label="Tổng quan báo giá"
         items={[
           { label: 'Tổng báo giá', value: data?.totalElements ?? 0, icon: <FileText size={18} /> },
-          { label: 'Bản nháp / chờ gửi', value: draftCount, tone: 'warning', icon: <Clock size={18} /> },
+          {
+            label: 'Bản nháp / chờ gửi',
+            value: draftCount,
+            tone: 'warning',
+            icon: <Clock size={18} />,
+          },
           { label: 'Chờ khách duyệt', value: sentCount, tone: 'info', icon: <Send size={18} /> },
           {
             label: 'Đã duyệt',
