@@ -55,6 +55,20 @@ public class AuditLogAspect {
                             user.isActive());
         } else if (result instanceof NotificationResponse notification) {
             entityId = notification.getId();
+        } else if (result instanceof com.Group13_65CNTT.AutoGarage.customer.dto.CustomerResponse response) {
+            entityId = response.getId();
+        } else if (result instanceof com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleResponse response) {
+            entityId = response.getId();
+        } else if (result instanceof com.Group13_65CNTT.AutoGarage.catalog.dto.ServiceResponse response) {
+            entityId = response.getId();
+        } else if (result instanceof com.Group13_65CNTT.AutoGarage.reception.dto.BookingResponse response) {
+            entityId = response.getId();
+        } else if (result instanceof com.Group13_65CNTT.AutoGarage.reception.dto.CheckInVehicleResponse response) {
+            entityId = response.getRepairOrderId();
+        } else if (result instanceof com.Group13_65CNTT.AutoGarage.reception.dto.VehicleCheckResponse response) {
+            entityId = response.getId();
+        } else if (result instanceof com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentResponse response) {
+            entityId = response.getId();
         } else if (audited.idArgument() >= 0) {
             entityId = ((Number) invocation.getArgs()[audited.idArgument()]).longValue();
         }

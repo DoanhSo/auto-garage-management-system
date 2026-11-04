@@ -13,6 +13,21 @@ import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+    @Query("SELECT b.vehicleId FROM Booking b WHERE b.id = :id")
+    Optional<Long> findVehicleIdById(@Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Booking b WHERE b.id = :id")
+    Optional<Booking> findByIdForUpdate(@Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Booking b WHERE b.vehicleId = :vehicleId " +
+            "AND b.status IN ('PENDING', 'CONFIRMED') " +
+            "AND b.appointmentAt < :endAt AND b.expectedEndAt > :startAt " +
+            "AND (:excludedId IS NULL OR b.id <> :excludedId)")
+    List<Booking> findOverlappingForUpdate(@Param("vehicleId") Long vehicleId,
+            @Param("startAt") Instant startAt, @Param("endAt") Instant endAt,
+            @Param("excludedId") Long excludedId);
 
     Optional<Booking> findByBookingCode(String bookingCode);
 

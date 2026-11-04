@@ -1,5 +1,8 @@
 package com.Group13_65CNTT.AutoGarage.reception.service;
 
+import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
+
 import com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
@@ -33,7 +36,6 @@ import com.Group13_65CNTT.AutoGarage.vehicle.entity.Vehicle;
 import com.Group13_65CNTT.AutoGarage.vehicle.repository.VehicleRepository;
 import com.Group13_65CNTT.AutoGarage.vehicle.service.VehicleService;
 
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,8 +47,10 @@ import java.util.List;
 import java.util.Random;
 
 @Service
+@lombok.RequiredArgsConstructor
 @Transactional
 public class BookingServiceImpl implements BookingService {
+    private final com.Group13_65CNTT.AutoGarage.scheduling.repository.BayReservationRepository reservations;
     private final WorkshopProperties workshop;
     private final CustomerScope customerScope;
 
@@ -58,38 +62,13 @@ public class BookingServiceImpl implements BookingService {
     private final CustomerService customerService;
     private final VehicleService vehicleService;
     private final Random random = new Random();
-    private BayScheduling bayScheduling;
-
-    public BookingServiceImpl(
-            BookingRepository bookingRepository,
-            CustomerRepository customerRepository,
-            VehicleRepository vehicleRepository,
-            ServiceRepository serviceRepository,
-            BookingMapper bookingMapper,
-            ObjectProvider<BayScheduling> baySchedulingProvider,
-            CustomerScope customerScope,
-            WorkshopProperties workshop,
-            CustomerService customerService,
-            VehicleService vehicleService) {
-        this.customerService = customerService;
-        this.vehicleService = vehicleService;
-        this.workshop = workshop;
-        this.customerScope = customerScope;
-        this.bookingRepository = bookingRepository;
-        this.customerRepository = customerRepository;
-        this.vehicleRepository = vehicleRepository;
-        this.serviceRepository = serviceRepository;
-        this.bookingMapper = bookingMapper;
-        this.bayScheduling =
-                baySchedulingProvider != null ? baySchedulingProvider.getIfAvailable() : null;
-    }
-
-    public void setBayScheduling(BayScheduling bayScheduling) {
-        this.bayScheduling = bayScheduling;
-    }
+    private final BayScheduling bayScheduling;
 
     @Override
+    @Audited(action = AuditConstants.ACTION_BOOKING_CREATED, entity = AuditConstants.ENTITY_BOOKING)
     public BookingResponse createBooking(CreateBookingRequest request, Long actorUserId) {
+        customerScope.requireActor(actorUserId);
+        customerScope.requireBookingAccess();
         validateBookingSources(request);
         if (request.getNewCustomer() != null || request.getNewVehicle() != null) {
             customerScope.requireFrontDesk();
@@ -107,8 +86,8 @@ public class BookingServiceImpl implements BookingService {
         Instant expectedEndAt =
                 request.getAppointmentAt().plus(Duration.ofMinutes(durationMinutes));
 
-        if (bookingRepository.hasOverlappingBookingForVehicle(
-                vehicle.getId(), request.getAppointmentAt(), expectedEndAt, null)) {
+        if (!bookingRepository.findOverlappingForUpdate(
+                vehicle.getId(), request.getAppointmentAt(), expectedEndAt, null).isEmpty()) {
             throw new ConflictException(
                     "Phương tiện "
                             + vehicle.getLicensePlate()
@@ -124,7 +103,7 @@ public class BookingServiceImpl implements BookingService {
         Booking saved = bookingRepository.save(booking);
 
         Long reservedBayId = null;
-        if (request.getBayId() != null && bayScheduling != null) {
+        if (request.getBayId() != null) {
             long actorId = ActorIds.require(actorUserId);
             bayScheduling.reserveBooking(
                     actorId,
@@ -241,7 +220,7 @@ public class BookingServiceImpl implements BookingService {
 
     private Vehicle findVehicle(Long vehicleId) {
         return vehicleRepository
-                .findById(vehicleId)
+                .findByIdForUpdate(vehicleId)
                 .orElseThrow(
                         () ->
                                 new ResourceNotFoundException(
@@ -257,15 +236,11 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_BOOKING_CONFIRMED, entity = AuditConstants.ENTITY_BOOKING, idArgument = 0)
     public BookingResponse confirmBooking(Long id, Long actorUserId) {
+        customerScope.requireActor(actorUserId);
         customerScope.requireFrontDesk();
-        Booking booking =
-                bookingRepository
-                        .findById(id)
-                        .orElseThrow(
-                                () ->
-                                        new ResourceNotFoundException(
-                                                "Không tìm thấy lịch hẹn với ID: " + id));
+        Booking booking = lockBooking(id);
 
         if (booking.getStatus() != BookingStatus.PENDING) {
             throw new BusinessRuleException(
@@ -279,15 +254,12 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_BOOKING_RESCHEDULED, entity = AuditConstants.ENTITY_BOOKING, idArgument = 0)
     public BookingResponse rescheduleBooking(Long id, RescheduleBookingRequest request) {
+        customerScope.requireBookingAccess();
+        customerScope.requireActor(request.getActorUserId());
         customerScope.requireResource(AccessResource.BOOKING, id);
-        Booking booking =
-                bookingRepository
-                        .findById(id)
-                        .orElseThrow(
-                                () ->
-                                        new ResourceNotFoundException(
-                                                "Không tìm thấy lịch hẹn với ID: " + id));
+        Booking booking = lockBooking(id);
 
         if (booking.getStatus() == BookingStatus.CANCELLED
                 || booking.getStatus() == BookingStatus.RECEIVED
@@ -315,16 +287,16 @@ public class BookingServiceImpl implements BookingService {
         Instant newExpectedEndAt =
                 request.getNewAppointmentAt().plus(Duration.ofMinutes(durationMinutes));
 
-        if (bookingRepository.hasOverlappingBookingForVehicle(
+        if (!bookingRepository.findOverlappingForUpdate(
                 booking.getVehicleId(),
                 request.getNewAppointmentAt(),
                 newExpectedEndAt,
-                booking.getId())) {
+                booking.getId()).isEmpty()) {
             throw new ConflictException("Phương tiện đã có lịch hẹn khác trong khung giờ hẹn mới");
         }
 
         long actor = ActorIds.require(request.getActorUserId());
-        if (bayScheduling != null) {
+        {
             bayScheduling.releaseForBooking(actor, booking.getId());
             if (request.getNewBayId() != null) {
                 bayScheduling.reserveBooking(
@@ -343,26 +315,26 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_BOOKING_CANCELLED, entity = AuditConstants.ENTITY_BOOKING, idArgument = 0)
     public BookingResponse cancelBooking(Long id, CancelBookingRequest request) {
+        customerScope.requireBookingAccess();
+        customerScope.requireActor(request.getActorUserId());
         customerScope.requireResource(AccessResource.BOOKING, id);
-        Booking booking =
-                bookingRepository
-                        .findById(id)
-                        .orElseThrow(
-                                () ->
-                                        new ResourceNotFoundException(
-                                                "Không tìm thấy lịch hẹn với ID: " + id));
+        Booking booking = lockBooking(id);
 
         if (booking.getStatus() == BookingStatus.RECEIVED) {
             throw new BusinessRuleException(
                     "Phương tiện đã được tiếp nhận vào xưởng, không thể hủy lịch hẹn");
+        }
+        if (booking.getStatus() == BookingStatus.NO_SHOW) {
+            throw new BusinessRuleException("Không thể hủy lịch đã được đánh dấu vắng mặt");
         }
         if (booking.getStatus() == BookingStatus.CANCELLED) {
             throw new BusinessRuleException("Lịch hẹn này đã được hủy trước đó");
         }
 
         long actor = ActorIds.require(request.getActorUserId());
-        if (bayScheduling != null) {
+        {
             bayScheduling.releaseForBooking(actor, booking.getId());
         }
 
@@ -373,15 +345,11 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_BOOKING_NO_SHOW, entity = AuditConstants.ENTITY_BOOKING, idArgument = 0)
     public BookingResponse markNoShow(Long id, Long actorUserId) {
+        customerScope.requireActor(actorUserId);
         customerScope.requireFrontDesk();
-        Booking booking =
-                bookingRepository
-                        .findById(id)
-                        .orElseThrow(
-                                () ->
-                                        new ResourceNotFoundException(
-                                                "Không tìm thấy lịch hẹn với ID: " + id));
+        Booking booking = lockBooking(id);
 
         if (booking.getStatus() != BookingStatus.PENDING
                 && booking.getStatus() != BookingStatus.CONFIRMED) {
@@ -390,8 +358,12 @@ public class BookingServiceImpl implements BookingService {
                             + booking.getStatus());
         }
 
+        if (booking.getAppointmentAt().isAfter(Instant.now())) {
+            throw new BusinessRuleException("Chưa đến giờ hẹn, không thể đánh dấu vắng mặt");
+        }
+
         long actor = ActorIds.require(actorUserId);
-        if (bayScheduling != null) {
+        {
             bayScheduling.releaseForBooking(actor, booking.getId());
         }
 
@@ -438,11 +410,41 @@ public class BookingServiceImpl implements BookingService {
             Instant fromTime,
             Instant toTime) {
         Long scopedCustomerId = customerScope.customerIdForQuery(customerId);
-        return bookingRepository
-                .searchBookings(scopedCustomerId, vehicleId, status, fromTime, toTime)
-                .stream()
-                .map(this::loadResponse)
-                .toList();
+        return loadResponses(bookingRepository.searchBookings(scopedCustomerId, vehicleId, status, fromTime, toTime));
+    }
+
+    private List<BookingResponse> loadResponses(List<Booking> bookings) {
+        if (bookings.isEmpty()) return List.of();
+        var customers = customerRepository.findAllById(bookings.stream().map(Booking::getCustomerId).distinct().toList())
+                .stream().collect(java.util.stream.Collectors.toMap(Customer::getId, java.util.function.Function.identity()));
+        var vehicles = vehicleRepository.findAllById(bookings.stream().map(Booking::getVehicleId).distinct().toList())
+                .stream().collect(java.util.stream.Collectors.toMap(Vehicle::getId, java.util.function.Function.identity()));
+        var services = serviceRepository.findAllById(bookings.stream().map(Booking::getServiceId)
+                .filter(java.util.Objects::nonNull).distinct().toList()).stream().collect(java.util.stream.Collectors.toMap(
+                        ServiceEntity::getId, java.util.function.Function.identity()));
+        var bays = reservedBays(bookings.stream().map(Booking::getId).toList());
+        return bookings.stream().map(booking -> bookingMapper.toResponse(booking, customers.get(booking.getCustomerId()),
+                vehicles.get(booking.getVehicleId()), services.get(booking.getServiceId()), bays.get(booking.getId()))).toList();
+    }
+
+    private java.util.Map<Long, Long> reservedBays(List<Long> ids) {
+        var now = Instant.now();
+        return reservations.findByBookingIdInAndStatusIn(ids, java.util.Set.of(
+                com.Group13_65CNTT.AutoGarage.scheduling.entity.ReservationStatus.HELD,
+                com.Group13_65CNTT.AutoGarage.scheduling.entity.ReservationStatus.IN_USE)).stream()
+                .filter(reservation -> reservation.getExpiresAt() == null || reservation.getExpiresAt().isAfter(now))
+                .collect(java.util.stream.Collectors.toMap(
+                        com.Group13_65CNTT.AutoGarage.scheduling.entity.BayReservation::getBookingId,
+                        com.Group13_65CNTT.AutoGarage.scheduling.entity.BayReservation::getBayId, (first, second) -> first));
+    }
+
+
+    private Booking lockBooking(Long id) {
+        Long vehicleId = bookingRepository.findVehicleIdById(id)
+                .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        findVehicle(vehicleId);
+        return bookingRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
     }
 
     private BookingResponse loadResponse(Booking booking) {
@@ -452,7 +454,7 @@ public class BookingServiceImpl implements BookingService {
                 booking.getServiceId() != null
                         ? serviceRepository.findById(booking.getServiceId()).orElse(null)
                         : null;
-        return bookingMapper.toResponse(booking, customer, vehicle, service, null);
+        return bookingMapper.toResponse(booking, customer, vehicle, service, reservedBays(List.of(booking.getId())).get(booking.getId()));
     }
 
     private String generateBookingCode() {

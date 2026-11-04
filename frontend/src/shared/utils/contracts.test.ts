@@ -1,3 +1,4 @@
+import { vehicleCheckSchema, vehicleTimelineSchema } from '../types/schemas';
 import { describe, expect, it } from 'vitest';
 import { decodeJson, encodeJson, numericVersion } from '../api/json';
 import { dateRange, reportFileName, dateTimeInput } from './dates';
@@ -160,5 +161,27 @@ describe('Safe rendering and navigation', () => {
       '<script>text</script>',
     );
     expect(notificationMessage('{')).toContain('Thông báo từ gara');
+  });
+});
+
+describe('Reception response contracts', () => {
+  const file = { id: '7', repairOrderId: '8', category: 'CHECK_IN',
+    originalFilename: 'vehicle.jpg', sizeBytes: 4, contentType: 'image/jpeg',
+    uploadedAt: '2026-11-03T00:00:00Z' };
+  it('reads the recorded checklist and attachment names returned by the server', () => {
+    const result = vehicleCheckSchema.parse({ id: '6', repairOrderId: '8', checkType: 'CHECK_IN',
+      attemptNo: 1, result: 'RECORDED', checklistJson: '{}', schemaVersion: 1,
+      checkedBy: '2', checkedAt: '2026-11-03T00:00:00Z', attachments: [file] });
+    expect(result.attachments[0]).toMatchObject({ fileName: 'vehicle.jpg', fileUrl: '/attachments/7/content' });
+  });
+  it('accepts technical history with the previous owner and financial details hidden', () => {
+    const result = vehicleTimelineSchema.parse({ vehicleId: '1', licensePlate: '51H12345',
+      brand: 'Toyota', model: 'Vios', currentOdometer: 1000, currentCustomerId: '3', currentCustomerName: 'Buyer',
+      historyEntries: [{ repairOrderId: '8', orderCode: 'RO-8', receivedAt: '2026-11-03T00:00:00Z',
+        completedAt: null, odometerIn: 1000, customerComplaint: null, diagnosis: 'Brake inspection',
+        status: 'COMPLETED', orderCustomerId: null, currentOwnerRecord: false, totalAmount: null,
+        tasksDone: ['Brake service'], partsReplaced: [], technicalAttachments: [] }] });
+    expect(result.historyEntries[0].isCurrentOwnerRecord).toBe(false);
+    expect(result.historyEntries[0].totalAmount).toBeNull();
   });
 });

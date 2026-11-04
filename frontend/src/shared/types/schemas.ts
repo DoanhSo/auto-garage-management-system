@@ -140,14 +140,29 @@ export const vehicleSchema = z.object({
   version: z.string().regex(/^\d+$/),
 });
 
-export const technicalAttachmentSchema = z.object({
+const attachmentResponseSchema = z.object({
   id: idSchema,
-  fileName: z.string(),
-  fileUrl: z.string(),
-  category: z.string(),
-  fileSize: z.number().optional(),
-  contentType: z.string().optional(),
-});
+  repairOrderId: idSchema.nullable().optional(),
+  vehicleCheckId: idSchema.nullable().optional(),
+  warrantyClaimId: idSchema.nullable().optional(),
+  originalFilename: z.string(),
+  sizeBytes: z.number(),
+  contentType: z.string(),
+  uploadedAt: z.string(),
+  category: z.enum(['CHECK_IN', 'DIAGNOSIS', 'QC', 'HANDOVER', 'WARRANTY']),
+}).transform((value) => ({
+  id: value.id,
+  repairOrderId: value.repairOrderId,
+  vehicleCheckId: value.vehicleCheckId,
+  warrantyClaimId: value.warrantyClaimId,
+  fileName: value.originalFilename,
+  fileSize: value.sizeBytes,
+  fileUrl: `/attachments/${value.id}/content`,
+  contentType: value.contentType,
+  createdAt: value.uploadedAt,
+  category: value.category,
+}));
+export const technicalAttachmentSchema = attachmentResponseSchema;
 
 export const vehicleHistoryEntrySchema = z.object({
   repairOrderId: idSchema,
@@ -158,13 +173,16 @@ export const vehicleHistoryEntrySchema = z.object({
   customerComplaint: z.string().nullable(),
   diagnosis: z.string().nullable(),
   status: z.string(),
-  orderCustomerId: idSchema,
-  isCurrentOwnerRecord: z.boolean(),
+  orderCustomerId: idSchema.nullable(),
+  isCurrentOwnerRecord: z.boolean().optional(),
+  currentOwnerRecord: z.boolean().optional(),
   totalAmount: decimal.nullable(),
   tasksDone: z.array(z.string()),
   partsReplaced: z.array(z.string()),
   technicalAttachments: z.array(technicalAttachmentSchema),
-});
+}).transform(({ currentOwnerRecord, isCurrentOwnerRecord, ...entry }) => ({
+  ...entry, isCurrentOwnerRecord: currentOwnerRecord ?? isCurrentOwnerRecord ?? false,
+}));
 
 export const vehicleTimelineSchema = z.object({
   vehicleId: idSchema,
@@ -236,7 +254,7 @@ export const bookingSchema = z.object({
   version: z.string().regex(/^\d+$/),
 });
 
-// Khớp CheckInVehicleResponse: backend không trả orderCode/status nên dùng ID lệnh làm mã hiển thị.
+// Nhận mã phiếu từ backend, hỗ trợ phản hồi cũ chưa có orderCode/status.
 export const checkInVehicleResultSchema = z
   .object({
     repairOrderId: idSchema,
@@ -299,6 +317,7 @@ export const attachmentSchema = z
     fileSize: value.sizeBytes == null ? undefined : Number(value.sizeBytes),
     contentType: value.contentType ?? undefined,
     contentPath: `/attachments/${value.id}/content`,
+    fileUrl: `/attachments/${value.id}/content`,
     sha256: value.sha256 ?? null,
     uploadedBy: value.uploadedBy ?? null,
     createdAt: value.uploadedAt,

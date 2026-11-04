@@ -27,6 +27,8 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class VehicleCheckServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderRepository repairOrders;
+    @Spy private tools.jackson.databind.ObjectMapper json = tools.jackson.databind.json.JsonMapper.builder().build();
     @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
 
     @Mock
@@ -45,6 +47,8 @@ class VehicleCheckServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(repairOrders.findByIdForUpdate(100L)).thenReturn(Optional.of(
+                com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrder.builder().id(100L).build()));
         checkInReq = new CreateVehicleCheckRequest();
         checkInReq.setRepairOrderId(100L);
         checkInReq.setCheckType(CheckType.CHECK_IN);
@@ -55,6 +59,24 @@ class VehicleCheckServiceTest {
     }
 
     @Test
+    void handoverMustUseTheRepairWorkflow() {
+        checkInReq.setCheckType(CheckType.HANDOVER);
+        assertEquals(com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.BAD_REQUEST,
+                assertThrows(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class,
+                        () -> vehicleCheckService.recordVehicleCheck(checkInReq)).getResponseCode());
+        verify(vehicleCheckRepository, never()).save(any());
+    }
+
+    @Test
+    void unsupportedChecklistVersionIsRejected() {
+        checkInReq.setSchemaVersion(2);
+        assertEquals(com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.BAD_REQUEST,
+                assertThrows(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class,
+                        () -> vehicleCheckService.recordVehicleCheck(checkInReq)).getResponseCode());
+        verify(vehicleCheckRepository, never()).save(any());
+    }
+
+    @Test
     void forbiddenCheckReadDoesNotLoadAttachments() {
         VehicleCheck check = new VehicleCheck();
         check.setId(1L);
@@ -62,7 +84,7 @@ class VehicleCheckServiceTest {
         when(vehicleCheckRepository.findById(1L)).thenReturn(Optional.of(check));
         doThrow(new com.Group13_65CNTT.AutoGarage.common.exception.BusinessException(
                 com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.FORBIDDEN))
-                .when(customerScope).requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.REPAIR_ORDER, 100L);
+                .when(customerScope).requireEvidenceAccess(100L);
 
         assertThrows(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class,
                 () -> vehicleCheckService.getVehicleCheckById(1L));

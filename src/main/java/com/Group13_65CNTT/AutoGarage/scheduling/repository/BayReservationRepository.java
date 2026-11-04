@@ -28,8 +28,11 @@ public interface BayReservationRepository extends JpaRepository<BayReservation, 
 
     List<BayReservation> findByBookingIdAndStatusIn(Long bookingId, Collection<ReservationStatus> statuses);
 
+    List<BayReservation> findByBookingIdInAndStatusIn(Collection<Long> bookingIds, Collection<ReservationStatus> statuses);
+
     List<BayReservation> findByRepairOrderIdAndStatusIn(Long repairOrderId, Collection<ReservationStatus> statuses);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM BayReservation r WHERE r.bayId = :bayId AND r.status IN :statuses " +
            "AND r.startsAt < :endsAt AND r.endsAt > :startsAt")
     List<BayReservation> findOverlappingReservations(

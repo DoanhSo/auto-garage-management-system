@@ -1,5 +1,8 @@
 package com.Group13_65CNTT.AutoGarage.customer.service;
 
+import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
+
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
@@ -25,6 +28,7 @@ import java.util.List;
 import java.util.Random;
 
 @Service
+@lombok.RequiredArgsConstructor
 @Transactional
 public class CustomerServiceImpl implements CustomerService {
     private final CustomerScope customerScope;
@@ -33,13 +37,8 @@ public class CustomerServiceImpl implements CustomerService {
     private final CustomerMapper customerMapper;
     private final Random random = new Random();
 
-    public CustomerServiceImpl(CustomerRepository customerRepository, CustomerMapper customerMapper, CustomerScope customerScope) {
-        this.customerScope = customerScope;
-        this.customerRepository = customerRepository;
-        this.customerMapper = customerMapper;
-    }
-
     @Override
+    @Audited(action = AuditConstants.ACTION_CUSTOMER_CREATED, entity = AuditConstants.ENTITY_CUSTOMER)
     public CustomerResponse createCustomer(CreateCustomerRequest request) {
         customerScope.requireFrontDesk();
         validateCreditAndTerm(request.getCreditLimit(), request.getPaymentTermDays());
@@ -102,6 +101,7 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_CUSTOMER_UPDATED, entity = AuditConstants.ENTITY_CUSTOMER, idArgument = 0)
     public CustomerResponse updateCustomer(Long id, UpdateCustomerRequest request) {
         customerScope.requireFrontDesk();
         Customer customer = customerRepository.findById(id)
@@ -128,6 +128,7 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    @Audited(action = AuditConstants.ACTION_CUSTOMER_DEACTIVATED, entity = AuditConstants.ENTITY_CUSTOMER, idArgument = 0)
     public void deactivateCustomer(Long id) {
         customerScope.requireFrontDesk();
         Customer customer = customerRepository.findById(id)
@@ -141,7 +142,8 @@ public class CustomerServiceImpl implements CustomerService {
             return customerRepository.saveAndFlush(customer);
         } catch (DataIntegrityViolationException ex) {
             if (DatabaseFailures.isDuplicateKey(ex)) {
-                throw new BusinessException(ResponseCode.CUSTOMER_PHONE_DUPLICATE, ex);
+                throw new BusinessException(DatabaseFailures.isConstraint(ex, "uq_customers_phone")
+                        ? ResponseCode.CUSTOMER_PHONE_DUPLICATE : ResponseCode.DUPLICATE_RESOURCE, ex);
             }
             throw ex;
         }

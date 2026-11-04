@@ -64,6 +64,8 @@ import java.util.Set;
 @Slf4j
 @RequiredArgsConstructor
 public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
+    private final com.Group13_65CNTT.AutoGarage.reception.repository.BookingRepository bookings;
+    private final com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository services;
     private final WorkshopProperties workshop;
 
     private final EmployeeRepository employeeRepository;
@@ -515,6 +517,8 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
     @Override
     @Transactional
     public long reserveBooking(long actorUserId, long bookingId, long bayId, Instant startsAt, Instant endsAt) {
+        var booking = bookings.findById(bookingId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
         if (!endsAt.isAfter(startsAt)) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
@@ -524,6 +528,15 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
         if (!Boolean.TRUE.equals(bay.getIsActive())) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
+        }
+
+        if (booking.getServiceId() != null) {
+            var service = services.findById(booking.getServiceId())
+                    .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+            if (!Boolean.TRUE.equals(service.getIsActive()) || (service.getRequiredBayType() != null
+                    && !service.getRequiredBayType().equalsIgnoreCase(bay.getBayType()))) {
+                throw new BusinessException(ResponseCode.BAD_REQUEST, "Khoang không phù hợp với dịch vụ đã chọn");
+            }
         }
 
         List<BayReservation> activeOverlaps = checkBayAvailability(bayId, startsAt, endsAt);

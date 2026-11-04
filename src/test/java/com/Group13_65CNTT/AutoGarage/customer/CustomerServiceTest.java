@@ -93,7 +93,8 @@ class CustomerServiceTest {
         when(customerRepository.existsByPhone("0987654321")).thenReturn(false);
         when(customerRepository.existsByCustomerCode(any())).thenReturn(false);
         DataIntegrityViolationException dbFailure = new DataIntegrityViolationException(
-                "duplicate", new SQLIntegrityConstraintViolationException("Duplicate entry", "23000", 1062));
+                "duplicate", new org.hibernate.exception.ConstraintViolationException("duplicate",
+                        new SQLIntegrityConstraintViolationException("Duplicate entry", "23000", 1062), "uq_customers_phone"));
         when(customerRepository.saveAndFlush(any(Customer.class))).thenThrow(dbFailure);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> customerService.createCustomer(validRequest));

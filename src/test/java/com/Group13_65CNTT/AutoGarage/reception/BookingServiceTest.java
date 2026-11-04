@@ -48,6 +48,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class BookingServiceTest {
+    @Mock private com.Group13_65CNTT.AutoGarage.scheduling.repository.BayReservationRepository reservations;
     @org.mockito.Spy private com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties workshop = new com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties();
     @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
 
@@ -88,7 +89,9 @@ class BookingServiceTest {
 
     @BeforeEach
     void setUp() {
-        bookingService.setBayScheduling(bayScheduling);
+        lenient().when(vehicleRepository.findById(10L)).thenAnswer(inv -> Optional.of(vehicle));
+        lenient().when(vehicleRepository.findByIdForUpdate(10L)).thenAnswer(inv -> Optional.of(vehicle));
+        lenient().when(bookingRepository.findVehicleIdById(anyLong())).thenReturn(Optional.of(10L));
 
         customer = new Customer();
         customer.setId(1L);
@@ -134,7 +137,7 @@ class BookingServiceTest {
         workshop.setDefaultServiceMinutes(45);
         service.setStandardMinutes(null);
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
             Booking booking = invocation.getArgument(0);
@@ -150,10 +153,10 @@ class BookingServiceTest {
     @DisplayName("TV2-05: Đặt lịch hẹn thành công, tính toán expectedEndAt và giữ khoang qua I02")
     void testCreateBooking_Success() {
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
-        when(bookingRepository.hasOverlappingBookingForVehicle(eq(10L), eq(futureTime), any(Instant.class), isNull()))
-                .thenReturn(false);
+        when(bookingRepository.findOverlappingForUpdate(eq(10L), eq(futureTime), any(Instant.class), isNull()))
+                .thenReturn(java.util.List.of());
         when(bookingRepository.existsByBookingCode(any())).thenReturn(false);
 
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
@@ -181,7 +184,7 @@ class BookingServiceTest {
         createReq.setAppointmentAt(Instant.now().minus(Duration.ofHours(2)));
 
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
@@ -193,10 +196,10 @@ class BookingServiceTest {
     @DisplayName("TV2-05: Từ chối khi xe đã có lịch khác trùng khung giờ")
     void testCreateBooking_DuplicateVehicleBooking() {
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
-        when(bookingRepository.hasOverlappingBookingForVehicle(eq(10L), eq(futureTime), any(Instant.class), isNull()))
-                .thenReturn(true);
+        when(bookingRepository.findOverlappingForUpdate(eq(10L), eq(futureTime), any(Instant.class), isNull()))
+                .thenReturn(java.util.List.of(new Booking()));
 
         ConflictException ex = assertThrows(ConflictException.class, () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
         assertTrue(ex.getMessage().contains("đã có lịch hẹn khác"));
@@ -248,7 +251,7 @@ class BookingServiceTest {
         createReq.setServiceId(null);
         createReq.setBayId(null);
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> {
             Booking b = invocation.getArgument(0);
             b.setId(502L);
@@ -314,7 +317,7 @@ class BookingServiceTest {
     void testCreateBooking_VehicleOwnerMismatch() {
         vehicle.setCustomerId(99L);
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
@@ -331,8 +334,8 @@ class BookingServiceTest {
         createReq.setNewVehicle(newVehicleRequest());
         stubCreatedCustomerAndVehicle();
         when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
-        when(bookingRepository.hasOverlappingBookingForVehicle(eq(10L), eq(futureTime), any(Instant.class), isNull()))
-                .thenReturn(true);
+        when(bookingRepository.findOverlappingForUpdate(eq(10L), eq(futureTime), any(Instant.class), isNull()))
+                .thenReturn(java.util.List.of(new Booking()));
 
         assertThrows(ConflictException.class, () -> bookingService.createBooking(createReq, ACTOR_USER_ID));
         verify(bookingRepository, never()).save(any());
@@ -363,7 +366,7 @@ class BookingServiceTest {
         when(customerService.createCustomer(any(CreateCustomerRequest.class))).thenReturn(createdCustomer);
         when(vehicleService.createVehicle(any(CreateVehicleRequest.class))).thenReturn(createdVehicle);
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
     }
 
     private NewBookingCustomerRequest newCustomerRequest() {
@@ -394,10 +397,10 @@ class BookingServiceTest {
         booking.setAppointmentAt(futureTime);
         booking.setExpectedEndAt(futureTime.plus(Duration.ofMinutes(90)));
 
-        when(bookingRepository.findById(500L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdForUpdate(500L)).thenReturn(Optional.of(booking));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
 
         BookingResponse response = bookingService.confirmBooking(500L, 1L);
@@ -424,13 +427,13 @@ class BookingServiceTest {
         rescheduleReq.setNewBayId(8L);
         rescheduleReq.setActorUserId(2L);
 
-        when(bookingRepository.findById(500L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdForUpdate(500L)).thenReturn(Optional.of(booking));
         when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
-        when(bookingRepository.hasOverlappingBookingForVehicle(eq(10L), eq(newTime), any(Instant.class), eq(500L)))
-                .thenReturn(false);
+        when(bookingRepository.findOverlappingForUpdate(eq(10L), eq(newTime), any(Instant.class), eq(500L)))
+                .thenReturn(java.util.List.of());
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
 
         BookingResponse response = bookingService.rescheduleBooking(500L, rescheduleReq);
 
@@ -458,10 +461,10 @@ class BookingServiceTest {
         cancelReq.setCancellationReason("Khach ban cong tac");
         cancelReq.setActorUserId(1L);
 
-        when(bookingRepository.findById(500L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdForUpdate(500L)).thenReturn(Optional.of(booking));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
-        when(vehicleRepository.findById(10L)).thenReturn(Optional.of(vehicle));
+        when(vehicleRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(vehicle));
         when(serviceRepository.findById(100L)).thenReturn(Optional.of(service));
 
         BookingResponse response = bookingService.cancelBooking(500L, cancelReq);
@@ -482,7 +485,7 @@ class BookingServiceTest {
         CancelBookingRequest cancelReq = new CancelBookingRequest();
         cancelReq.setCancellationReason("Huy muon");
 
-        when(bookingRepository.findById(500L)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findByIdForUpdate(500L)).thenReturn(Optional.of(booking));
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> bookingService.cancelBooking(500L, cancelReq));
         assertTrue(ex.getMessage().contains("tiếp nhận"));

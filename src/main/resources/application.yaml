@@ -76,6 +76,7 @@ security:
 
 garage:
   workshop:
+    attachment-directory: ${WORKSHOP_ATTACHMENT_DIRECTORY:data/attachments}
     default-service-minutes: ${WORKSHOP_DEFAULT_SERVICE_MINUTES:60}
     max-attachment-bytes: ${WORKSHOP_MAX_ATTACHMENT_BYTES:15728640}
     max-upload-request-bytes: ${WORKSHOP_MAX_UPLOAD_REQUEST_BYTES:16777216}

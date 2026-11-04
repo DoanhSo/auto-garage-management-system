@@ -1,10 +1,12 @@
 package com.Group13_65CNTT.AutoGarage.reception.service;
 
+import com.Group13_65CNTT.AutoGarage.audit.annotation.Audited;
+import com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants;
+
 import com.Group13_65CNTT.AutoGarage.common.config.WorkshopProperties;
 import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
 import com.Group13_65CNTT.AutoGarage.reception.repository.VehicleCheckRepository;
-import com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentContent;
 import com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentResponse;
 import com.Group13_65CNTT.AutoGarage.reception.entity.Attachment;
 import com.Group13_65CNTT.AutoGarage.reception.entity.AttachmentCategory;
@@ -20,67 +22,52 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Set;
+import com.Group13_65CNTT.AutoGarage.reception.entity.AttachmentFormat;
+import com.Group13_65CNTT.AutoGarage.reception.service.impl.AttachmentStorage;
+import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
+import com.Group13_65CNTT.AutoGarage.common.enums.Role;
+import com.Group13_65CNTT.AutoGarage.reception.dto.response.AttachmentDownloadResponse;
+import lombok.RequiredArgsConstructor;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 @Transactional
 public class AttachmentServiceImpl implements AttachmentService {
     private final WorkshopProperties workshop;
-
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
-            "image/jpeg",
-            "image/png",
-            "image/webp",
-            "image/heic",
-            "application/pdf"
-    );
-
-    private static final String PLACEHOLDER_CONTENT_TYPE = "image/svg+xml";
 
     private final AttachmentRepository attachmentRepository;
     private final VehicleCheckMapper vehicleCheckMapper;
     private final VehicleCheckRepository vehicleCheckRepository;
     private final CustomerScope customerScope;
 
-    public AttachmentServiceImpl(AttachmentRepository attachmentRepository,
-                                 VehicleCheckMapper vehicleCheckMapper, WorkshopProperties workshop,
-                                 VehicleCheckRepository vehicleCheckRepository, CustomerScope customerScope) {
-        this.workshop = workshop;
-        this.attachmentRepository = attachmentRepository;
-        this.vehicleCheckMapper = vehicleCheckMapper;
-        this.vehicleCheckRepository = vehicleCheckRepository;
-        this.customerScope = customerScope;
-    }
+    private final AttachmentStorage storage;
+    private final CurrentUserProvider currentUser;
 
     @Override
+    @Audited(action = AuditConstants.ACTION_ATTACHMENT_UPLOADED, entity = AuditConstants.ENTITY_ATTACHMENT)
     public AttachmentResponse uploadAttachment(Long repairOrderId, Long vehicleCheckId, Long warrantyClaimId,
                                                AttachmentCategory category, Long uploadedBy, MultipartFile file) {
         if (uploadedBy == null || uploadedBy <= 0) {
             throw new BusinessException(ResponseCode.UNAUTHORIZED);
         }
+        if (currentUser.userId() != uploadedBy) throw new BusinessException(ResponseCode.FORBIDDEN);
+        if (currentUser.role() != Role.ADMIN && currentUser.role() != Role.RECEPTIONIST
+                && currentUser.role() != Role.TECHNICIAN) throw new BusinessException(ResponseCode.FORBIDDEN);
         if (file == null || file.isEmpty()) {
             throw new BusinessRuleException("Tệp tải lên không được để trống");
         }
 
         if (file.getSize() > workshop.getMaxAttachmentBytes()) {
-            throw new BusinessRuleException("Kích thước tệp vượt quá giới hạn cho phép");
+            throw new BusinessException(ResponseCode.UPLOAD_TOO_LARGE);
         }
 
-        String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
-            throw new BusinessRuleException("Định dạng tệp (" + contentType + ") không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WEBP, HEIC, PDF");
-        }
+        AttachmentFormat format = AttachmentFormat.forContentType(file.getContentType());
+        String contentType = format.getContentType();
 
         if (category == null) {
             throw new BusinessRuleException("Danh mục tệp đính kèm (category) không được để trống");
@@ -102,8 +89,21 @@ public class AttachmentServiceImpl implements AttachmentService {
             throw new BusinessRuleException("Tệp gắn với biên bản kiểm tra phải thuộc về một phiếu sửa chữa");
         }
 
-        String sha256 = calculateSha256(file);
-        String storageKey = generateSafeStorageKey(category, file.getOriginalFilename());
+        customerScope.requireResource(repairOrderId != null ? AccessResource.REPAIR_ORDER : AccessResource.WARRANTY_CLAIM,
+                repairOrderId != null ? repairOrderId : warrantyClaimId);
+        if (vehicleCheckId != null) {
+            var check = vehicleCheckRepository.findById(vehicleCheckId)
+                    .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+            if (!java.util.Objects.equals(repairOrderId, check.getRepairOrderId())
+                    || !category.name().equals(check.getCheckType().name())) {
+                throw new BusinessException(ResponseCode.BAD_REQUEST);
+            }
+        }
+        byte[] content = readContent(file);
+        if (!format.matches(content)) throw new BusinessException(ResponseCode.UNSUPPORTED_MEDIA_TYPE);
+        String sha256 = calculateSha256(content);
+        String storageKey = "attachments/" + category.name().toLowerCase(java.util.Locale.ROOT)
+                + "/" + UUID.randomUUID() + format.getExtension();
 
         Attachment attachment = new Attachment();
         attachment.setRepairOrderId(repairOrderId);
@@ -112,54 +112,38 @@ public class AttachmentServiceImpl implements AttachmentService {
         attachment.setStorageKey(storageKey);
         attachment.setOriginalFilename(file.getOriginalFilename() != null ? file.getOriginalFilename() : "unnamed_file");
         attachment.setContentType(contentType);
-        attachment.setSizeBytes(file.getSize());
+        attachment.setSizeBytes((long) content.length);
         attachment.setSha256(sha256);
         attachment.setCategory(category);
         attachment.setUploadedBy(uploadedBy);
 
-        Attachment saved = attachmentRepository.save(attachment);
-        // Ghi file sau khi lưu metadata; lỗi ghi sẽ rollback bản ghi trong cùng transaction.
-        storeContent(storageKey, file);
-        return vehicleCheckMapper.toAttachmentResponse(saved);
+        // Register rollback cleanup before the row/audit commit; metadata is never committed without bytes.
+        storage.store(storageKey, content);
+        try {
+            Attachment saved = attachmentRepository.saveAndFlush(attachment);
+            return vehicleCheckMapper.toAttachmentResponse(saved);
+        } catch (org.springframework.dao.DataAccessException failure) {
+            storage.remove(storageKey);
+            throw failure;
+        }
     }
 
     @Override
     @Transactional(readOnly = true)
-    public AttachmentContent loadAttachmentContent(Long id) {
-        customerScope.requireResource(AccessResource.ATTACHMENT, id);
-        Attachment attachment = attachmentRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tệp đính kèm với ID: " + id));
-        Path target = resolveStoragePath(attachment.getStorageKey());
-        if (Files.isRegularFile(target)) {
-            try {
-                return new AttachmentContent(Files.readAllBytes(target), attachment.getContentType(),
-                        attachment.getOriginalFilename());
-            } catch (IOException e) {
-                throw new BusinessException(ResponseCode.INTERNAL_SERVER_ERROR, e);
-            }
+    public com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentContent loadAttachmentContent(Long id) {
+        try {
+            var download = downloadAttachment(id);
+            return new com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentContent(
+                    download.content(), download.contentType(), download.filename());
+        } catch (BusinessException failure) {
+            if (failure.getResponseCode() != ResponseCode.RESOURCE_NOT_FOUND) throw failure;
+            // Retain develop's clearly labelled preview for seed records without an original file.
+            customerScope.requireResource(AccessResource.ATTACHMENT, id);
+            var attachment = attachmentRepository.findById(id).orElseThrow(() -> failure);
+            return new com.Group13_65CNTT.AutoGarage.reception.dto.AttachmentContent(
+                    placeholderSvg(attachment).getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                    "image/svg+xml", attachment.getOriginalFilename());
         }
-        // Bản ghi seed không có file vật lý: trả ảnh minh họa thay vì 404.
-        return new AttachmentContent(placeholderSvg(attachment).getBytes(StandardCharsets.UTF_8),
-                PLACEHOLDER_CONTENT_TYPE, attachment.getOriginalFilename());
-    }
-
-    private void storeContent(String storageKey, MultipartFile file) {
-        Path target = resolveStoragePath(storageKey);
-        try (InputStream is = file.getInputStream()) {
-            Files.createDirectories(target.getParent());
-            Files.copy(is, target, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            throw new BusinessException(ResponseCode.INTERNAL_SERVER_ERROR, e);
-        }
-    }
-
-    private Path resolveStoragePath(String storageKey) {
-        Path root = Path.of(workshop.getAttachmentStorageDir()).toAbsolutePath().normalize();
-        Path target = root.resolve(storageKey).normalize();
-        if (!target.startsWith(root)) {
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
-        }
-        return target;
     }
 
     private static String placeholderSvg(Attachment attachment) {
@@ -196,7 +180,7 @@ public class AttachmentServiceImpl implements AttachmentService {
     @Override
     @Transactional(readOnly = true)
     public List<AttachmentResponse> getAttachmentsByRepairOrder(Long repairOrderId) {
-        customerScope.requireResource(AccessResource.REPAIR_ORDER, repairOrderId);
+        customerScope.requireEvidenceAccess(repairOrderId);
         return attachmentRepository.findAllByRepairOrderId(repairOrderId)
                 .stream()
                 .map(vehicleCheckMapper::toAttachmentResponse)
@@ -208,33 +192,41 @@ public class AttachmentServiceImpl implements AttachmentService {
     public List<AttachmentResponse> getAttachmentsByVehicleCheck(Long vehicleCheckId) {
         var check = vehicleCheckRepository.findById(vehicleCheckId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
-        customerScope.requireResource(AccessResource.REPAIR_ORDER, check.getRepairOrderId());
+        customerScope.requireEvidenceAccess(check.getRepairOrderId());
         return attachmentRepository.findAllByVehicleCheckId(vehicleCheckId)
                 .stream()
                 .map(vehicleCheckMapper::toAttachmentResponse)
                 .toList();
     }
 
-    private String calculateSha256(MultipartFile file) {
-        try (InputStream is = file.getInputStream()) {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = is.read(buffer)) != -1) {
-                digest.update(buffer, 0, read);
-            }
-            return HexFormat.of().formatHex(digest.digest());
-        } catch (IOException | NoSuchAlgorithmException e) {
-            throw new BusinessException(ResponseCode.INTERNAL_SERVER_ERROR, e);
+    @Override
+    @Transactional(readOnly = true)
+    public AttachmentDownloadResponse downloadAttachment(Long id) {
+        customerScope.requireResource(AccessResource.ATTACHMENT, id);
+        Attachment attachment = attachmentRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        byte[] content = storage.read(attachment.getStorageKey());
+        if (!calculateSha256(content).equals(attachment.getSha256())) {
+            throw new BusinessException(ResponseCode.INTERNAL_SERVER_ERROR);
+        }
+        return new AttachmentDownloadResponse(attachment.getOriginalFilename(), attachment.getContentType(), content);
+    }
+
+    private byte[] readContent(MultipartFile file) {
+        try (InputStream stream = file.getInputStream()) {
+            byte[] content = stream.readNBytes(Math.toIntExact(workshop.getMaxAttachmentBytes() + 1));
+            if (content.length > workshop.getMaxAttachmentBytes()) throw new BusinessException(ResponseCode.UPLOAD_TOO_LARGE);
+            return content;
+        } catch (IOException failure) {
+            throw new BusinessException(ResponseCode.INTERNAL_SERVER_ERROR, failure);
         }
     }
 
-    private String generateSafeStorageKey(AttachmentCategory category, String originalFilename) {
-        String datePrefix = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
-        String extension = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
+    private String calculateSha256(byte[] content) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
+        } catch (NoSuchAlgorithmException failure) {
+            throw new BusinessException(ResponseCode.INTERNAL_SERVER_ERROR, failure);
         }
-        return "attachments/" + category.name().toLowerCase() + "/" + datePrefix + "/" + UUID.randomUUID() + extension;
     }
 }
