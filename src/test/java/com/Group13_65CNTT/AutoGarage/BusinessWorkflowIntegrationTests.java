@@ -101,6 +101,8 @@ class BusinessWorkflowIntegrationTests extends IntegrationTestSupport {
         assertThat(jdbc.queryForObject("SELECT customer_complaint FROM repair_orders WHERE id=?", String.class, orderId)).isEqualTo("Brake noise");
         long diagnosis = jdbc.queryForObject("SELECT id FROM repair_tasks WHERE repair_order_id=?", Long.class, orderId);
         labor.completeTask(ADMIN, diagnosis, null);
+        jdbc.update("UPDATE repair_orders SET diagnosis='Brake pads worn' WHERE id=?", orderId);
+        sync();
 
         var estimate = estimates.createEstimate(ADMIN, EstimateCreateRequest.builder().repairOrderId(orderId)
                 .items(List.of(
@@ -174,6 +176,8 @@ class BusinessWorkflowIntegrationTests extends IntegrationTestSupport {
     @Test
     void technicianCannotOperateAnotherTechniciansTimer() {
         long order = repair.receive(ADMIN, null, 980001L, 980001L, 1100);
+        jdbc.update("UPDATE repair_orders SET diagnosis='Inspection complete' WHERE id=?", order);
+        sync();
         sync();
         long task = jdbc.queryForObject("SELECT id FROM repair_tasks WHERE repair_order_id=?", Long.class, order);
         jdbc.update("INSERT INTO users(id,identity_id,username,full_name,role) VALUES(980004,'workflow-other','workflow.other','Other Technician','TECHNICIAN')");
@@ -207,6 +211,8 @@ class BusinessWorkflowIntegrationTests extends IntegrationTestSupport {
     @Test
     void anotherCustomerCannotReadAnEstimateByGuessingItsId() {
         long order = repair.receive(ADMIN, null, 980001L, 980001L, 1100);
+        jdbc.update("UPDATE repair_orders SET diagnosis='Inspection complete' WHERE id=?", order);
+        sync();
         var estimate = estimates.createEstimate(ADMIN, EstimateCreateRequest.builder().repairOrderId(order)
                 .items(List.of(EstimateItemCreateRequest.builder().itemType(ItemType.SERVICE).serviceId(980001L)
                         .quantity(BigDecimal.ONE).build())).build());
@@ -220,6 +226,8 @@ class BusinessWorkflowIntegrationTests extends IntegrationTestSupport {
     @Test
     void estimateDraftCannotBeApproved() {
         long order = repair.receive(ADMIN, null, 980001L, 980001L, 1100);
+        jdbc.update("UPDATE repair_orders SET diagnosis='Inspection complete' WHERE id=?", order);
+        sync();
         var estimate = estimates.createEstimate(ADMIN, EstimateCreateRequest.builder().repairOrderId(order)
                 .items(List.of(EstimateItemCreateRequest.builder().itemType(ItemType.SERVICE).serviceId(980001L)
                         .quantity(BigDecimal.ONE).build())).build());
