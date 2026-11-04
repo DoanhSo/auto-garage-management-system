@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
@@ -39,16 +39,22 @@ function CustomerForm({
   const update = useUpdateCustomerMutation();
   const [discard, setDiscard] = useState(false);
 
+  const formValues = useMemo(() => customerDefaults(existing), [existing]);
+
   const {
     register,
     handleSubmit,
     watch,
     setError,
+    reset,
     formState: { errors, isDirty },
   } = useForm<CustomerFormValues>({
     resolver: zodResolver(customerFormSchema),
     mode: 'onBlur',
-    defaultValues: customerDefaults(existing),
+    values: formValues,
+    resetOptions: {
+      keepDirtyValues: true,
+    },
   });
 
   const selectedType = watch('customerType');
@@ -67,7 +73,7 @@ function CustomerForm({
     if (busy) return;
     try {
       if (existing) {
-        await update.mutateAsync({
+        const result = await update.mutateAsync({
           id: existing.id,
           values: {
             fullName: values.fullName.trim(),
@@ -82,6 +88,7 @@ function CustomerForm({
             paymentTermDays: values.paymentTermDays,
           },
         });
+        reset(customerDefaults(result));
         notify('Cập nhật hồ sơ khách hàng thành công');
       } else {
         await create.mutateAsync({
@@ -282,7 +289,7 @@ export function CustomerEditor({
   onRestoreFocus?: () => void;
 }) {
   const isEditing = Boolean(customerId);
-  const detailQuery = useCustomerQuery(customerId);
+  const detailQuery = useCustomerQuery(customerId, open);
   const [closeHandler, setCloseHandler] = useState<(() => void) | null>(null);
   const registerCloseHandler = useCallback(
     (handler: () => void) => setCloseHandler(() => handler),
@@ -307,12 +314,19 @@ export function CustomerEditor({
       placement="center"
       size="lg"
     >
-      {isEditing && detailQuery.isLoading && <Loading label="Đang lấy phiên bản mới nhất…" />}
-      {isEditing && detailQuery.isError && (
+      {open && isEditing && (detailQuery.isLoading || (detailQuery.isFetching && !detailQuery.data)) && (
+        <Loading label="Đang lấy phiên bản mới nhất…" />
+      )}
+      {open && isEditing && detailQuery.isError && (
         <QueryError error={detailQuery.error} retry={() => detailQuery.refetch()} />
       )}
-      {(!isEditing || detailQuery.data) && (
+      {open && (!isEditing || detailQuery.data) && (
         <CustomerForm
+          key={
+            isEditing
+              ? `${detailQuery.data?.id}-${detailQuery.data?.version ?? detailQuery.data?.updatedAt ?? 'edit'}`
+              : 'new'
+          }
           existing={detailQuery.data}
           onSaved={onClose}
           onRequestClose={registerCloseHandler}
