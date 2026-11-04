@@ -85,6 +85,16 @@ export function useTransferOwnershipMutation() {
   });
 }
 
+export function useActivateVehicleMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => vehicleApi.activate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: vehicleKeys.all });
+    },
+  });
+}
+
 export function useDeleteVehicleMutation() {
   const queryClient = useQueryClient();
   return useMutation({

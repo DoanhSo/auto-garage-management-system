@@ -1169,23 +1169,38 @@ select.input {
 .grid-3col .field.col-span-3 {
   grid-column: 1 / -1;
 }
-.centered-dialog .modal-form.grid-4col {
+.centered-dialog .modal-form.grid-4col,
+.centered-dialog .account-editor-form.grid-4col {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px 18px;
 }
-.modal-form.grid-4col > .col-span-2 {
+.modal-form.grid-4col > .col-span-2,
+.account-editor-form.grid-4col > .col-span-2 {
   grid-column: span 2;
 }
+.modal-form.grid-4col > .col-span-3,
+.account-editor-form.grid-4col > .col-span-3 {
+  grid-column: span 3;
+}
 @media (max-width: 860px) {
-  .centered-dialog .modal-form.grid-4col {
+  .centered-dialog .modal-form.grid-4col,
+  .centered-dialog .account-editor-form.grid-4col {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .modal-form.grid-4col > .col-span-3,
+  .account-editor-form.grid-4col > .col-span-3 {
+    grid-column: 1 / -1;
   }
 }
 @media (max-width: 640px) {
-  .centered-dialog .modal-form.grid-4col {
+  .centered-dialog .modal-form.grid-4col,
+  .centered-dialog .account-editor-form.grid-4col {
     grid-template-columns: 1fr;
   }
-  .modal-form.grid-4col > .col-span-2 {
+  .modal-form.grid-4col > .col-span-2,
+  .modal-form.grid-4col > .col-span-3,
+  .account-editor-form.grid-4col > .col-span-2,
+  .account-editor-form.grid-4col > .col-span-3 {
     grid-column: auto;
   }
 }
@@ -1359,6 +1374,51 @@ select.input {
 .editor-form {
   padding: 24px 26px;
   flex: 1;
+}
+/* Read-only dialog content (ledgers, summaries): same gutters as forms, stacked sections. */
+.dialog-body {
+  display: grid;
+  gap: 16px;
+  padding: 20px 24px 22px;
+  min-width: 0;
+}
+.dialog-body .table-scroll {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: auto;
+}
+.dialog-body .data-table tr:last-child td {
+  border-bottom: none;
+}
+.dialog-body .modal-form-actions {
+  margin-top: 0;
+}
+.dialog-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 13px;
+  color: #35465e;
+}
+.dialog-summary strong {
+  font-size: 15px;
+  color: #172338;
+}
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 24px;
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .dialog-body {
+    padding: 14px;
+  }
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
 }
 .sticky-actions {
   position: sticky;
@@ -2533,12 +2593,9 @@ select.input {
   line-height: 1.85;
   overflow-wrap: anywhere;
 }
-.notification-compose {
-  gap: 20px;
-}
 .notification-audience {
   margin: 0;
-  padding: 0 0 18px;
+  padding: 0 0 12px;
   border: 0;
   border-bottom: 1px solid var(--border);
   min-width: 0;
@@ -2567,27 +2624,18 @@ select.input {
   font-weight: 550;
 }
 .notification-role-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px 16px;
-  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
 }
 .notification-audience p {
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   color: #64748b;
   font-size: 12px;
 }
 .notification-compose textarea {
   resize: vertical;
   min-height: 110px;
-}
-.notification-compose > .field {
-  margin-top: 16px;
-}
-.notification-compose .form-actions {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
 }
 @media (max-width: 640px) {
   .notification-toolbar {
@@ -2607,7 +2655,7 @@ select.input {
     padding: 0 0 10px;
   }
   .notification-role-options {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 16px;
   }
   .notification-page .data-table th:first-child {
     width: auto;
@@ -4456,13 +4504,9 @@ button.notification-card-title:hover {
 .notification-popover-footer:hover {
   background: #f5f7fb;
 }
-.notification-compose .form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
 .broadcast-preview-box {
   display: grid;
+  align-content: start;
   gap: 8px;
   padding: 12px;
   border: 1px dashed var(--border);
@@ -4483,8 +4527,7 @@ button.notification-card-title:hover {
   .notification-card-item {
     padding: 12px;
   }
-  .notification-meta-grid,
-  .notification-compose .form-grid {
+  .notification-meta-grid {
     grid-template-columns: 1fr;
   }
   .notification-read-state {

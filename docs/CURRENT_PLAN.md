@@ -1,185 +1,164 @@
-# Kế Hoạch Thiết Kế Lại Giao Diện Đăng Ký Ca Làm Việc Của Nhân Viên
+# Kế Hoạch Chốt Dữ Liệu Theo Giai Đoạn Của Phiếu Sửa Chữa
 
-> **Mã plan**: `shift-registration-ui`
+> **Mã plan**: `repair-lifecycle-lock`
 > **Chế độ**: `PLAN:` (tuân thủ `AGENTS.md`, `docs/CODING_GUIDELINES.md`, `docs/UI_DESIGN_GUIDELINES.md`).
+> **Đặc tả luồng**: [`docs/REPAIR_ORDER_LIFECYCLE.md`](REPAIR_ORDER_LIFECYCLE.md). Các mục 🔒 trong tài liệu đó là phạm vi của plan này.
+
+Đường dẫn Java dưới đây tính từ `src/main/java/com/Group13_65CNTT/AutoGarage/`. Đường dẫn frontend tính từ `frontend/src/`.
 
 ---
 
 ## 1. Mục Tiêu & Phạm Vi
 
 ### 1.1. Hiện trạng
-Qua khảo sát mã nguồn và hình ảnh thực tế của hộp thoại **Đăng ký ca làm việc**, hiện trạng đang gặp 5 vấn đề về bố cục và trải nghiệm người dùng:
 
-1. **Vỡ bố cục khối "Ca của tôi gần đây" nằm dưới hàng nút hành động và dính sát mép trái** (`frontend/src/features/scheduling/components/ShiftRegistrationModal.tsx:148-180`):
-   - Thẻ `<section aria-label="Ca đã đăng ký" className="stack">` được đặt **bên ngoài** `<form className="editor-form account-editor-form">`, là con trực tiếp của `.sheet.centered-dialog`.
-   - Trong `frontend/src/styles.css:1138-1150`, padding `24px` chỉ được gán cho `.sheet-header` và `.account-editor-form`, không gán cho thẻ `<section>` bên ngoài. Hậu quả là tiêu đề **"Ca của tôi gần đây"** và dòng **"Bạn chưa có ca nào."** bị dính sát mép trái của modal (`padding: 0`) và nằm lơ lửng bên dưới hai nút `Đóng` / `Gửi đăng ký ca`, vi phạm quy chuẩn tại `docs/UI_DESIGN_GUIDELINES.md:97` (*"Hàng nút cuối form chiếm trọn hàng; Hủy ở trước, Tạo/Lưu thay đổi ở sau"*).
-2. **Kích thước modal quá rộng và lạm dụng `.full-width-field` gây mất cân đối** (`ShiftRegistrationModal.tsx:78-137`):
-   - Modal đang dùng `size="lg"` (`1000px`) cho một biểu mẫu chỉ có 4 trường nhập liệu.
-   - Trường `Khoang mong muốn` (`ShiftRegistrationModal.tsx:113-126`) bị đặt trong `.full-width-field` kéo dài suốt chiều ngang 1000px thay vì xếp cân đối trên lưới 2 cột chuẩn `repeat(2, minmax(0, 1fr))` (`docs/UI_DESIGN_GUIDELINES.md:79-81`).
-3. **Chọn ngày và khung ca đơn điệu, thiếu tóm tắt xác nhận ca trực** (`ShiftRegistrationModal.tsx:86-112`):
-   - Chọn khung ca chỉ là thẻ `<select>` đơn thuần, người dùng phải mở dropdown mới biết có những ca nào và không thấy tổng số giờ công của ca.
-   - Chưa có nút chọn nhanh ngày thường dùng (`Ngày mai`, `Ngày kia`, `Thứ Hai tới`).
-   - Thiếu dải tóm tắt xác nhận (`info-strip`) và 안내 giới hạn giờ làm (tối đa 12 giờ/ngày, 60 giờ/tuần, nghỉ tối thiểu 8 giờ giữa 2 ca) như đã có ở modal phân ca của quản trị viên (`ShiftEditor.tsx:229-245`).
-4. **Danh sách "Ca của tôi gần đây" thiếu thông tin nghiệp vụ** (`ShiftRegistrationModal.tsx:150-179`):
-   - Cột `Thời gian` chỉ hiển thị `formatDateTime(shift.startsAt)`, thiếu giờ kết thúc ca (`endsAt`) nên nhân viên không biết ca kéo dài từ mấy giờ đến mấy giờ.
-   - Thiếu cột hiển thị **Khoang trực** (mã khoang hoặc `Thợ cơ động`).
-   - Trạng thái rỗng chỉ hiển thị thẻ `<p className="description">Bạn chưa có ca nào.</p>` đơn sơ.
-5. **Thiếu nút "Đăng ký ca làm việc" trên Header trang Lịch ca làm việc cho Kỹ thuật viên** (`frontend/src/features/scheduling/pages/SchedulingPage.tsx:569-601`):
-   - Trong `SchedulingPage.tsx`, biến `primaryAction` chưa phân nhánh theo role `TECHNICIAN`. Khi kỹ thuật viên mở tab `Lịch ca làm việc` (`shifts`), giao diện hiển thị nút `+ Xếp ca làm việc` của Admin (mở `ShiftEditor` gọi API yêu cầu quyền `ADMIN` gây lỗi 403), trong khi nút `Đăng ký ca làm` lại chỉ nằm khuất bên trong tab `Điều phối xưởng` (`LiveDispatchBoard.tsx:155-161`).
+Luồng tiếp nhận → chẩn đoán → báo giá → thi công vẫn cho sửa dữ liệu của giai đoạn đã qua:
+
+1. **Chẩn đoán sửa được tới tận `COMPLETED`.**
+   - `repair/service/impl/RepairServiceImpl.java:524` chỉ chặn khi phiếu `CLOSED` / `CANCELLED` / `INVOICED`.
+   - Mỗi lần lưu lại gọi `workLogRecorder.finish` (dòng 528).
+   - Giao diện luôn cho sửa: `features/repair/components/RepairOrderDetailModal.tsx:455-476`.
+2. **Nhiên liệu và lời khách kể sửa được qua `PUT /repair-orders/{id}`** tới `COMPLETED` (`RepairServiceImpl.java:500`), dù `recordReceptionDetails` chỉ cho phép khi `NEW`.
+3. **Báo giá ban đầu lập được ở mọi trạng thái** trước `INVOICED` (`estimate/service/impl/EstimateServiceImpl.java:90`).
+   - Có thể có hai báo giá ban đầu cùng chờ duyệt. Duyệt cả hai thì công việc bị nhân đôi.
+   - Bản cũ không bị thay thế.
+4. **Báo giá phát sinh lập và duyệt được khi phiếu đã `WAITING_QC` / `COMPLETED`.** Công việc `PENDING` mới sinh ra làm phiếu đã QC đạt không lập được hóa đơn (`EstimateServiceImpl.java:346`).
+5. **Chuyển trạng thái tay có lỗ hổng** (`RepairServiceImpl.java:670-694`):
+   - `NEW` / `DIAGNOSING → WAITING_APPROVAL` đi được mà không cần báo giá.
+   - `IN_PROGRESS → WAITING_QC` đi được khi còn công việc chưa xong.
+   - Không có đường hợp lệ để chẩn đoán lại khi khách từ chối toàn bộ báo giá.
+6. **Ảnh đính kèm tải lên được theo mọi loại ở mọi giai đoạn** (`reception/service/AttachmentServiceImpl.java:70-90`).
+7. **Giao diện lệch với backend:**
+   - Nhân viên thấy nút duyệt trên báo giá `DRAFT` (`RepairOrderDetailModal.tsx:632-635`), bấm vào thì backend trả lỗi.
+   - Nút "Lập báo giá mới" luôn tạo loại `INITIAL`.
+8. **Hủy hóa đơn làm phiếu kẹt ở `INVOICED`**:
+   - `voidInvoice` không đưa phiếu về lại (`billing/service/impl/BillingServiceImpl.java:390`).
+   - `existsByRepairOrderId` vẫn đếm hóa đơn `VOID`, nên không phát hành lại được (dòng 113).
+9. **`EstimateStatus.EXPIRED` / `CANCELLED` không bao giờ được đặt.** Báo giá quá hạn hoặc thuộc phiếu đã hủy vẫn hiện "Đã gửi".
 
 ### 1.2. Mục tiêu
-1. **Chuẩn hóa cấu trúc Dialog & Lưới 2 cột**:
-   - Đổi kích thước hộp thoại về chuẩn cân đối, đưa toàn bộ nội dung (bao gồm cả khu vực "Ca của tôi gần đây") nằm gọn trong luồng bố cục có đệm lề chuẩn `24px`, và đặt hàng nút hành động (`Đóng` / `Gửi đăng ký ca`) ở vị trí **cuối cùng** của hộp thoại.
-   - Xếp `Ngày làm việc` (cột 1) và `Khoang mong muốn` (cột 2) thẳng hàng trên cùng một dòng lưới 2 cột (`repeat(2, minmax(0, 1fr))`).
-2. **Trực quan hóa thao tác chọn Ngày & Khung ca**:
-   - Bổ sung nhóm chip chọn nhanh ngày (`Hôm nay`, `Ngày mai`, `Ngày kia`) kết hợp với ô chọn ngày `type="date"`.
-   - Thiết kế bộ chọn **Khung ca mong muốn** dạng thẻ chọn trực quan (Shift Option Cards) cho 5 loại ca (`Ca sáng`, `Ca chiều`, `Cả ngày`, `Tăng ca`, `Ca đêm`), hiển thị rõ nhãn ca, khung giờ (`08:00–17:00`) và số giờ công (`9,0 giờ`), đồng thời giữ khả năng điều hướng bàn phím / ngữ nghĩa radio chuẩn accessibility.
-3. **Bổ sung Dải tóm tắt ca đăng ký (`info-strip`)**:
-   - Hiển thị tóm tắt trực tiếp: **Ngày làm việc** $\rightarrow$ **Khung ca & Giờ (`HH:mm–HH:mm` · số giờ)** $\rightarrow$ **Vị trí (`Mã khoang` hoặc `Thợ cơ động`)**, kèm ghi chú quy tắc giới hạn giờ làm việc của xưởng.
-4. **Nâng cấp bảng "Ca của tôi gần đây"**:
-   - Hiển thị tối đa 5 ca gần nhất của nhân viên với đầy đủ 4 cột: **Ngày & Khung giờ** (`dd/MM/yyyy · HH:mm–HH:mm`), **Loại ca**, **Vị trí khoang** (`Mã khoang` hoặc `Thợ cơ động`), và **Trạng thái** (`Chờ duyệt`, `Đang hoạt động`, `Bị từ chối` kèm lý do từ chối nổi bật).
-   - Thiết kế trạng thái rỗng gọn gàng, đúng lề khi nhân viên chưa có lịch sử đăng ký ca.
-5. **Đồng bộ nút "Đăng ký ca làm việc" trên `SchedulingPage`**:
-   - Với tài khoản `TECHNICIAN`, hiển thị nút chính **"`+` Đăng ký ca làm việc"** ngay trên `PageHeader` của trang `/scheduling` (mở `ShiftRegistrationModal`), ẩn các nút tạo khoang/xếp ca/thêm nhân viên vốn chỉ dành cho `ADMIN`.
+
+- Mỗi loại dữ liệu chỉ sửa được trong giai đoạn của nó, đúng theo ma trận ở mục 3 của `REPAIR_ORDER_LIFECYCLE.md`. Backend chặn, giao diện hiện "Đã chốt" và giải thích lý do.
+- Sau khi khách duyệt, mọi thay đổi chỉ đi qua báo giá phát sinh gắn với báo giá gốc.
+- Có đúng một lối quay lại hợp lệ là **"Mở lại chẩn đoán"**, khi khách từ chối hết.
+- Hủy hóa đơn chưa thu tiền thì phiếu quay về `COMPLETED` và phát hành lại được.
 
 ### 1.3. Ngoài phạm vi
-- Không thay đổi cơ sở dữ liệu hay các endpoint Backend (`POST /api/v1/shifts/register`, `GET /api/v1/shifts/my`).
-- Không thay đổi luồng phê duyệt/từ chối ca của Quản trị viên trong `PendingShiftRegistrations.tsx`.
 
----
+- Không đổi tập trạng thái `RepairOrderStatus` / `EstimateStatus`, không thêm cột mới, nên không cần migration.
+- Không làm job nền tự đổi báo giá sang `EXPIRED`. Chỉ hiển thị `EXPIRED` qua mapper, giống cách sổ bảo hành đang làm.
+- Không đổi luồng bảo hành, công nợ, lương hay kho, ngoài lời gọi `releaseForOrder` có sẵn.
+- Không viết lại `RepairOrderDetailModal` thành nhiều file. Chỉ sửa các vùng nêu trong mục 3.
 
 ## 2. Tiêu Chí Chấp Nhận (Acceptance Criteria)
 
-- **AC-1 (Bố cục chuẩn & Hàng nút ở đáy modal)**: Khi mở hộp thoại "Đăng ký ca làm việc", trường `Ngày làm việc` và `Khoang mong muốn` nằm trên 2 cột cân đối (desktop), tự thu về 1 cột trên mobile. Khu vực `Ca của tôi gần đây` nằm **phía trên** hàng nút `Đóng` / `Gửi đăng ký ca`, căn lề thẳng hàng `24px` với các trường form, không bị tràn hoặc dính mép trái. _Kiểm chứng_: Unit test RTL & kiểm tra DOM/CSS.
-- **AC-2 (Chọn nhanh ngày & Khung ca trực quan)**: Người dùng chọn được khung ca (`Ca sáng`, `Ca chiều`, `Cả ngày`, `Tăng ca`, `Ca đêm`) và thấy rõ khung giờ (`07:30–11:30`, `08:00–17:00`...) cùng số giờ công; có thể bấm nút chọn nhanh ngày (`Ngày mai`, `Ngày kia`). Khi bấm `Gửi đăng ký ca`, payload gửi đúng `startsAt`, `endsAt`, `shiftType`, `serviceBayId`, `notes`. _Kiểm chứng_: Unit test trong `ShiftRegistrationModal.test.tsx`.
-- **AC-3 (Dải tóm tắt `info-strip` cập nhật tức thì)**: Khi người dùng đổi ngày, đổi khung ca hoặc chọn khoang sửa chữa, dải `info-strip` hiển thị chính xác khung giờ, thời lượng (ví dụ `9,0 giờ`) và tên khoang (hoặc `Thợ cơ động`). _Kiểm chứng_: Unit test trong `ShiftRegistrationModal.test.tsx`.
-- **AC-4 (Bảng "Ca của tôi gần đây" đầy đủ cột & trạng thái)**: Khi có dữ liệu ca từ `useMyShiftsQuery`, bảng hiển thị đầy đủ: Ngày & khung giờ bắt đầu–kết thúc, Loại ca, Khoang trực (mã khoang hoặc `Thợ cơ động`), Badge trạng thái và lý do từ chối (nếu `status === 'REJECTED'`). Khi danh sách rỗng, hiển thị khối trạng thái rỗng rõ ràng. _Kiểm chứng_: Unit test trong `ShiftRegistrationModal.test.tsx`.
-- **AC-5 (Phân quyền nút hành động trên `SchedulingPage`)**: Khi đăng nhập với vai trò `TECHNICIAN`, `PageHeader` của `SchedulingPage` hiển thị nút `Đăng ký ca làm việc` để mở `ShiftRegistrationModal`, và không hiển thị các nút quản trị (`Thêm khoang`, `Xếp ca làm việc`, `Thêm kỹ thuật viên`). _Kiểm chứng_: Unit test RTL / kiểm tra code `SchedulingPage.tsx`.
-- **AC-6 (Không hồi quy test & build)**: Toàn bộ test suite Vitest và lệnh `npm run build` chạy thành công 100%. _Kiểm chứng_: `npm --prefix AutoGarage/frontend run test` và `npm --prefix AutoGarage/frontend run build`.
-
----
+- **AC-1 (Chốt chẩn đoán)**: Phiếu ở `WAITING_APPROVAL` trở đi mà gọi `PATCH /repair-orders/{id}/diagnosis` thì nhận lỗi "Chẩn đoán đã chốt…". Ở `NEW` / `DIAGNOSING` thì lưu được, và nhật ký `DIAGNOSIS` chỉ hoàn tất ở lần lưu đầu. _Kiểm chứng_: `RepairOrderServiceTest`.
+- **AC-2 (Chốt tiếp nhận)**: `PUT /repair-orders/{id}` có `fuelLevelPercent` / `customerComplaint` khi phiếu khác `NEW` thì bị từ chối. `leadTechnicianId` vẫn đổi được tới trước `COMPLETED`. Trường `diagnosis` trong request này bị bỏ qua như hiện nay. _Kiểm chứng_: `RepairOrderServiceTest`.
+- **AC-3 (Báo giá ban đầu)**:
+  - Lập báo giá `INITIAL` khi phiếu đã `APPROVED` trở đi, hoặc khi đã có dòng được duyệt, thì bị từ chối.
+  - Lập `INITIAL` khi chưa có kết luận chẩn đoán thì bị từ chối.
+  - Lập phiên bản `INITIAL` mới thì các bản `DRAFT` / `SENT` cũ không có dòng nào được duyệt chuyển `CANCELLED`.
+  - _Kiểm chứng_: `EstimateServiceTest`.
+- **AC-4 (Báo giá phát sinh)**:
+  - Báo giá `SUPPLEMENTAL` chỉ lập và chỉ duyệt được khi phiếu `APPROVED` / `IN_PROGRESS` / `WAITING_PARTS` / `QC_FAILED`.
+  - Báo giá gốc phải là `APPROVED` hoặc `PARTIALLY_APPROVED`.
+  - Duyệt khi phiếu `WAITING_QC` / `COMPLETED` thì bị từ chối.
+  - _Kiểm chứng_: `EstimateServiceTest`, `EstimateApprovalServiceTest`.
+- **AC-5 (Chuyển trạng thái)**:
+  - `PATCH /status` sang `WAITING_APPROVAL` bị từ chối; chỉ lập báo giá mới đưa phiếu sang đó.
+  - `IN_PROGRESS → WAITING_QC` bị từ chối khi còn công việc chưa `COMPLETED` hoặc còn đồng hồ chạy.
+  - `WAITING_APPROVAL → DIAGNOSING` chỉ được khi mọi báo giá là `REJECTED` / `CANCELLED`, hoặc là `DRAFT` (bản `DRAFT` khi đó chuyển `CANCELLED`).
+  - _Kiểm chứng_: `RepairOrderServiceTest`.
+- **AC-6 (Hủy phiếu)**: Hủy phiếu thì mọi báo giá `DRAFT` / `SENT` / `PARTIALLY_APPROVED` còn dòng chờ chuyển `CANCELLED`. _Kiểm chứng_: `RepairOrderServiceTest`.
+- **AC-7 (Ảnh theo giai đoạn)**: Mỗi loại ảnh chỉ tải lên được ở giai đoạn của nó; ngoài giai đoạn đó thì bị từ chối kèm thông báo tiếng Việt. _Kiểm chứng_: `AttachmentServiceTest`.
+  - `CHECK_IN`: chỉ khi `NEW`.
+  - `DIAGNOSIS`: chỉ khi `NEW` / `DIAGNOSING`.
+  - `QC`: chỉ khi `WAITING_QC` / `QC_FAILED` / `COMPLETED`.
+  - `HANDOVER`: chỉ khi `COMPLETED` / `INVOICED` / `CLOSED`.
+- **AC-8 (Báo giá quá hạn)**: Báo giá `SENT` / `PARTIALLY_APPROVED` đã quá `validUntil` được trả về với `status = EXPIRED`. Dữ liệu trong DB không đổi. _Kiểm chứng_: `EstimateMapperTest` (mới).
+- **AC-9 (Hủy hóa đơn)**:
+  - Hủy hóa đơn chưa thu tiền thì phiếu `INVOICED → COMPLETED`.
+  - Sau đó phát hành hóa đơn mới cho phiếu đó được.
+  - Hủy khi phiếu đã `CLOSED` thì bị từ chối.
+  - _Kiểm chứng_: `BillingServiceTest`.
+- **AC-10 (Giao diện)**: _Kiểm chứng_: `RepairOrderDetailModal.test.tsx` cùng thao tác trên trình duyệt (không lưu dữ liệu thật).
+  - Ô chẩn đoán chuyển chỉ đọc kèm nhãn "Đã chốt" và lý do khi phiếu đã qua `DIAGNOSING`.
+  - Nút "Mở lại chẩn đoán" chỉ hiện khi điều kiện ở AC-5 thỏa.
+  - Nút duyệt dòng chỉ hiện cho báo giá `SENT` / `PARTIALLY_APPROVED`.
+  - Sau khi duyệt, nút "Lập báo giá mới" đổi thành "Lập báo giá phát sinh" và tự gửi `estimateKind: SUPPLEMENTAL` cùng `parentEstimateId`.
+  - Danh sách loại ảnh chỉ gồm các loại còn mở.
+- **AC-11 (Không hồi quy)**: `./mvnw test`, `npm --prefix frontend run lint`, `test` và `build` đều xanh. _Kiểm chứng_: chạy lệnh.
 
 ## 3. Danh Sách File Mục Tiêu
 
 | File | Vùng dòng | Thay đổi |
 |---|---|---|
-| `frontend/src/features/scheduling/components/ShiftRegistrationModal.tsx` | 1–183 | Tái cấu trúc bố cục form 2 cột, thêm chọn nhanh ngày, thẻ chọn khung ca kèm giờ & thời lượng, dải `info-strip` tóm tắt, đưa khối "Ca của tôi gần đây" vào trong form trước hàng nút cuối và bổ sung cột Khoang trực + khung giờ đầy đủ. |
-| `frontend/src/features/scheduling/pages/SchedulingPage.tsx` | 85–125, 569–605, 700–718, 874–908 | Lấy `user` từ `useAuth()`, kiểm tra role `ADMIN` cho các nút thêm/sửa/xóa quản trị; hiển thị nút `Đăng ký ca làm việc` trên `PageHeader` cho `TECHNICIAN` và gắn `<ShiftRegistrationModal />`. |
-| `frontend/src/features/scheduling/components/LiveDispatchBoard.tsx` | 153–164 | Giữ nút mở nhanh hoặc đồng bộ với modal đăng ký ca để tránh lặp nút dư thừa khi đã có trên `PageHeader`. |
-| `frontend/src/styles.css` | Cuối file (hoặc vùng scheduling styles ~3600–3750) | Bổ sung class CSS chuẩn design token cho `.shift-type-selector`, `.shift-type-card`, `.shift-quick-dates`, `.shift-recent-panel`, `.shift-recent-empty`. |
-| `frontend/src/features/scheduling/components/ShiftRegistrationModal.test.tsx` | File mới | Viết unit test kiểm chứng toàn diện AC-1, AC-2, AC-3, AC-4 (render bố cục, chọn khung ca, chọn khoang, gửi form, hiển thị danh sách ca gần đây và lý do từ chối). |
-
----
+| `repair/workflow/RepairStageRules.java` (**mới**) | | Lớp tĩnh gom quy tắc giai đoạn: `RECEPTION_EDITABLE`, `DIAGNOSIS_EDITABLE`, `INITIAL_ESTIMATE_ALLOWED`, `SUPPLEMENTAL_ALLOWED`, `TERMINAL`, cùng `attachmentWindow(AttachmentCategory)`. Đặt cạnh `RepairWorkflow` nếu package đó đã có, nếu chưa thì để trong `repair/service` |
+| `repair/service/impl/RepairServiceImpl.java` | 496–537, 541–578, 662–723 | Áp dụng AC-1, AC-2, AC-5, AC-6; thêm nhánh `WAITING_APPROVAL → DIAGNOSING`; chặn `→ WAITING_APPROVAL` ở cả `NEW` và `DIAGNOSING` |
+| `estimate/repository/EstimateRepository.java` | | Thêm `findByRepairOrderIdAndStatusIn(Long, Collection<EstimateStatus>)` |
+| `estimate/repository/EstimateItemRepository.java` | | Thêm `existsApprovedByRepairOrderId(Long)` (JPQL join qua `Estimate`) |
+| `estimate/service/impl/EstimateServiceImpl.java` | 82–110, 339–353 | Áp dụng AC-3, AC-4 |
+| `estimate/mapper/EstimateMapper.java` | | `@AfterMapping` để hiển thị `EXPIRED` (AC-8) |
+| `reception/service/AttachmentServiceImpl.java` | 70–90 | Áp dụng AC-7, nạp trạng thái phiếu qua repository có sẵn |
+| `billing/service/impl/BillingServiceImpl.java` | 110–114, 372–395 | Áp dụng AC-9: kiểm tra trùng chỉ với hóa đơn khác `VOID`; khi hủy thì cập nhật phiếu về `COMPLETED` trong cùng transaction |
+| `billing/repository/InvoiceRepository.java` | 25 | Thêm `existsByRepairOrderIdAndStatusNot`; `findByRepairOrderId` ưu tiên hóa đơn khác `VOID` |
+| `repair/service/impl/RepairServiceImpl.java` | 431 (handOver) | Lấy hóa đơn khác `VOID` khi tạo sổ bảo hành |
+| `features/repair/utils/stageLocks.ts` (**mới**) | | Bản tương ứng của `RepairStageRules` ở frontend: `isDiagnosisLocked`, `canReopenDiagnosis`, `estimateKindFor`, `allowedAttachmentCategories`, `lockReason` |
+| `features/repair/components/RepairOrderDetailModal.tsx` | 140–200, 268–310, 446–490, 496–560, 630–640 | Áp dụng AC-10 |
+| `features/repair/components/CreateEstimateModal.tsx` | | Nhận prop `kind` và `parentEstimateId`; đổi tiêu đề theo loại |
+| `features/repair/components/DiagnosisAttachmentGallery.tsx` | 80–125 | Nhận `allowedCategories`; ẩn ô tải lên khi danh sách rỗng |
+| `features/repair/hooks/useRepair.ts` | | Thêm hook mở lại chẩn đoán, dùng lại `useTransitionStatusMutation` với `DIAGNOSING` |
+| Test backend | | `RepairOrderServiceTest`, `EstimateServiceTest`, `EstimateApprovalServiceTest`, `AttachmentServiceTest`, `BillingServiceTest`, `EstimateMapperTest` (mới). Sửa các test hiện đang dựa vào chuyển tay sang `WAITING_APPROVAL` |
+| Test frontend | | `features/repair/utils/stageLocks.test.ts` (mới), `RepairOrderDetailModal.test.tsx` |
+| `docs/REPAIR_ORDER_LIFECYCLE.md` | | Đổi các mục 🔒 đã làm thành ✅ |
 
 ## 4. Hợp Đồng Kỹ Thuật
 
-### 4.1. Bố cục trực quan của `ShiftRegistrationModal`
-
-```text
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ Đăng ký ca làm việc                                                      [×] │
-│ Chọn ngày và khung ca mong muốn. Ca chỉ vào lịch chính thức sau khi duyệt.   │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ Ngày làm việc *                         Khoang mong muốn                     │
-│ [ 05/11/2026                       📅 ] [ Không chọn khoang (thợ cơ động) ▾] │
-│ Chọn nhanh: [Hôm nay] [Ngày mai] [Ngày kia]  Để trống nếu làm thợ cơ động    │
-│                                                                              │
-│ Khung ca mong muốn *                                                         │
-│ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────┐ │
-│ │ Ca sáng      │ │ Ca chiều     │ │ ● Cả ngày    │ │ Tăng ca      │ │Ca đêm│ │
-│ │ 07:30–11:30  │ │ 13:00–17:00  │ │ 08:00–17:00  │ │ 17:30–20:30  │ │20–24h│ │
-│ │ 4,0 giờ      │ │ 4,0 giờ      │ │ 9,0 giờ      │ │ 3,0 giờ      │ │4,0 h │ │
-│ └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘ └──────┘ │
-│                                                                              │
-│ ℹ️ Tóm tắt đăng ký: Thứ Năm, 05/11/2026 · Cả ngày (08:00–17:00 · 9,0 giờ)    │
-│    → Vị trí: Thợ cơ động (hỗ trợ toàn xưởng)                                 │
-│                                                                              │
-│ Lý do / ghi chú                                                              │
-│ [ Nhập ghi chú hoặc đề xuất ca trực (không bắt buộc)...                    ] │
-│                                                                              │
-│ ┌──────────────────────────────────────────────────────────────────────────┐ │
-│ │ 🕒 Ca của tôi gần đây                                       (Tối đa 5 ca)│ │
-│ │ ──────────────────────────────────────────────────────────────────────── │ │
-│ │ Ngày & Giờ           Loại ca     Khoang trực      Trạng thái             │ │
-│ │ 05/11/2026 08:00–17:00  Cả ngày  BAY-01           [Chờ duyệt]            │ │
-│ │ 03/11/2026 07:30–11:30  Ca sáng  Thợ cơ động      [Bị từ chối]           │ │
-│ │                                                   Lý do: Đủ quân số      │ │
-│ └──────────────────────────────────────────────────────────────────────────┘ │
-│ ──────────────────────────────────────────────────────────────────────────── │
-│                                                    [ Đóng ] [ Gửi đăng ký ca]│
-└──────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 4.2. Chi tiết kỹ thuật trong `ShiftRegistrationModal.tsx`
-- **Hàm tính thời lượng ca (`shiftDurationLabel`)**:
-  ```ts
-  function shiftDurationLabel(type: ShiftType): string {
-    const { start, end } = shiftTypeWindows[type];
-    const [sh, sm] = start.split(':').map(Number);
-    const [eh, em] = end.split(':').map(Number);
-    const hours = Math.round(((eh * 60 + em - (sh * 60 + sm)) / 60) * 10) / 10;
-    return `${String(hours).replace('.', ',')} giờ`;
-  }
-  ```
-- **Giữ khả năng tương thích ngược với test & accessibility**:
-  - Bên cạnh hoặc tích hợp cùng bộ chọn khung ca, vẫn đảm bảo control có label `"Khung ca mong muốn"` (dùng `<select aria-label="Khung ca mong muốn">` hoặc `Field label="Khung ca mong muốn"` kết hợp các thẻ chọn nhanh) để cả thao tác chuột nhanh trên thẻ lẫn truy vấn `getByLabelText('Khung ca mong muốn')` đều hoạt động mượt mà.
-- **Định dạng thời gian ca trong bảng "Ca của tôi gần đây"**:
-  - Hiển thị ngày kèm khung giờ bắt đầu – kết thúc: `dd/MM/yyyy · HH:mm–HH:mm`.
-  - Ánh xạ `serviceBayId` sang `bayCode` từ danh sách `bays.data?.content` (nếu không có `serviceBayId` thì hiển thị `'Thợ cơ động'`).
-  - Giới hạn hiển thị 5 bản ghi gần nhất (`.slice(0, 5)`) để modal luôn gọn trong khung nhìn desktop, không gây thanh cuộn dài.
-
-### 4.3. Phân quyền nút hành động trên `SchedulingPage.tsx`
-- Sử dụng `const { user } = useAuth();`
-- `const isAdmin = user?.role === 'ADMIN';`
-- `const isTechnician = user?.role === 'TECHNICIAN';`
-- Trên `PageHeader`:
-  - Nếu `isTechnician`: hiển thị `<Button variant="primary" onClick={() => setRegisterModalOpen(true)}><CalendarClock size={16} /> Đăng ký ca làm việc</Button>`.
-  - Nếu `isAdmin`: giữ nguyên các nút `Thêm khoang`, `Xếp ca làm việc`, `Thêm kỹ thuật viên` theo từng tab.
-
----
+- **Không thêm endpoint mới.** "Mở lại chẩn đoán" dùng `PATCH /api/v1/repair-orders/{id}/status` với `newStatus = DIAGNOSING`, giữ `@PreAuthorize(HAS_TECHNICAL_ACCESS)`.
+- **Lỗi nghiệp vụ** dùng `BusinessRuleException` như các guard cùng file, để thống nhất thông điệp tiếng Việt và mã lỗi đang có. Thông điệp:
+  - "Chẩn đoán đã chốt khi lập báo giá. Hãy dùng báo giá phát sinh hoặc mở lại chẩn đoán khi khách từ chối toàn bộ."
+  - "Thông tin tiếp nhận chỉ sửa được khi phiếu vừa tiếp nhận."
+  - "Phiếu đã có hạng mục được duyệt, chỉ lập được báo giá phát sinh."
+  - "Cần ghi kết luận chẩn đoán trước khi lập báo giá."
+  - "Báo giá phát sinh chỉ lập khi phiếu đang thi công hoặc QC chưa đạt."
+  - "Báo giá gốc phải đã được khách duyệt."
+  - "Chỉ chuyển sang chờ duyệt bằng cách lập báo giá."
+  - "Còn công việc chưa hoàn thành hoặc đồng hồ đang chạy."
+  - "Chỉ mở lại chẩn đoán khi khách đã từ chối toàn bộ báo giá."
+  - "Ảnh <loại> chỉ tải lên ở giai đoạn <giai đoạn>."
+  - Billing giữ `BusinessException(ResponseCode.BAD_REQUEST)` như hiện tại.
+- **`RepairStageRules`** chỉ chứa `EnumSet` và hàm thuần, không phụ thuộc Spring. `EstimateServiceImpl` và `AttachmentServiceImpl` dùng chung nó, nên không còn chép tay danh sách trạng thái.
+- **Audit:** "Mở lại chẩn đoán" đi qua `transitionStatus`, giữ nguyên audit có sẵn của endpoint status nếu có. Không thêm action mới.
+- **UI:**
+  - Dùng `Badge` (`variant="secondary"`) với chữ "Đã chốt", và `info-strip` để giải thích lý do.
+  - Ô `textarea` dùng `readOnly`, không dùng `disabled`, để vẫn chọn và sao chép được chữ.
+  - Nút "Mở lại chẩn đoán" là `Button variant="ghost"`, có hộp xác nhận vì thao tác này hủy các bản nháp.
 
 ## 5. Checklist Thực Thi
 
-- [x] **Step 1: Bổ sung CSS cho form đăng ký ca và bảng lịch sử ca gần đây trong `frontend/src/styles.css`** _(AC-1, AC-2, AC-4)_
-  - Thêm style cho `.shift-quick-dates`, `.shift-type-grid`, `.shift-type-pill`, `.shift-recent-section`, `.shift-recent-empty` sử dụng đúng biến màu (`var(--primary)`, `var(--border)`, `var(--muted)`, `#f8fafc`) và responsive về 1 cột trên màn hình nhỏ.
-- [x] **Step 2: Thiết kế lại `ShiftRegistrationModal.tsx`** _(AC-1, AC-2, AC-3, AC-4)_
-  - Chuyển bố cục sang lưới 2 cột cân đối (`Ngày làm việc` cột 1, `Khoang mong muốn` cột 2).
-  - Thêm nút chọn nhanh ngày (`Hôm nay`, `Ngày mai`, `Ngày kia`).
-  - Thêm thẻ chọn nhanh 5 loại khung ca kèm khung giờ & tổng giờ công, đồng bộ với trường `Khung ca mong muốn`.
-  - Thêm dải `info-strip` tóm tắt thông tin ca đăng ký và quy định giới hạn giờ làm.
-  - Đưa khối `Ca của tôi gần đây` vào trong bố cục form (phía trên `.form-actions`), bổ sung cột `Khoang trực`, định dạng khung giờ `HH:mm–HH:mm`, và làm đẹp trạng thái rỗng.
-- [x] **Step 3: Đồng bộ nút "Đăng ký ca làm việc" trên `SchedulingPage.tsx` và `LiveDispatchBoard.tsx`** _(AC-5)_
-  - Cập nhật `SchedulingPage.tsx` để hiển thị nút `Đăng ký ca làm việc` trên `PageHeader` cho `TECHNICIAN` và chỉ hiển thị các nút quản trị (`Thêm khoang`, `Xếp ca làm việc`, `Thêm kỹ thuật viên`) khi người dùng có quyền phù hợp.
-- [x] **Step 4: Viết Unit Test `ShiftRegistrationModal.test.tsx` & Xác minh toàn trình** _(AC-1, AC-2, AC-3, AC-4, AC-5, AC-6)_
-  - Tạo file test kiểm chứng: hiển thị form, chọn nhanh ngày/khung ca, cập nhật dải tóm tắt, gửi request `POST /api/v1/shifts/register`, hiển thị danh sách ca gần đây (kể cả trạng thái rỗng và trạng thái bị từ chối kèm lý do).
-  - Chạy `npm --prefix AutoGarage/frontend run test` và `npm --prefix AutoGarage/frontend run build`.
----
+- [x] **Step 1: Thêm `RepairStageRules` và test thuần cho nó** _(nền cho AC-1 → AC-7)_
+- [x] **Step 2: Chốt tiếp nhận và chẩn đoán trong `RepairServiceImpl`** (`updateRepairOrder`, `updateDiagnosis`: chỉ hoàn tất nhật ký ở lần đầu) _(AC-1, AC-2)_
+- [x] **Step 3: Siết `validateTransition` / `transitionStatus`** _(AC-5, AC-6)_
+  - Bỏ việc chuyển tay sang `WAITING_APPROVAL`.
+  - Chặn `→ WAITING_QC` khi còn việc chưa xong.
+  - Thêm `WAITING_APPROVAL → DIAGNOSING`, kèm hủy các bản `DRAFT`.
+  - Khi hủy phiếu thì hủy luôn các báo giá còn mở.
+- [x] **Step 4: Siết `EstimateServiceImpl.createEstimate` và `decide`, thêm repository query** _(AC-3, AC-4)_
+- [x] **Step 5: `EstimateMapper` hiển thị `EXPIRED`** _(AC-8)_
+- [x] **Step 6: Khóa ảnh theo giai đoạn trong `AttachmentServiceImpl`** _(AC-7)_
+- [x] **Step 7 (làm sau theo yêu cầu, kèm migration V19 — ngoại lệ của mục 1.3): Hủy hóa đơn đưa phiếu về `COMPLETED` và cho phát hành lại; `handOver` lấy hóa đơn khác `VOID`** _(AC-9)_
+- [x] **Step 8: Cập nhật test backend bị ảnh hưởng và chạy `./mvnw test`** _(AC-1 → AC-9, AC-11)_
+- [x] **Step 9: Thêm `stageLocks.ts` cùng test** _(AC-10)_
+- [x] **Step 10: Cập nhật `RepairOrderDetailModal`, `CreateEstimateModal`, `DiagnosisAttachmentGallery`** _(AC-10)_
+  - "Đã chốt" và lý do.
+  - Nút "Mở lại chẩn đoán".
+  - Nút duyệt chỉ cho `SENT` / `PARTIALLY_APPROVED`.
+  - Báo giá phát sinh.
+  - Loại ảnh theo giai đoạn.
+- [x] **Step 11: Kiểm thử và xác minh** _(tất cả AC)_
+  - Chạy lint, test, build frontend.
+  - Build lại container backend và frontend.
+  - Mở trên trình duyệt một phiếu ở mỗi trạng thái `DIAGNOSING`, `WAITING_APPROVAL`, `IN_PROGRESS`, `CLOSED` để xem khóa. Không lưu dữ liệu thật nếu người dùng chưa đồng ý.
+  - Đổi các mục 🔒 trong `docs/REPAIR_ORDER_LIFECYCLE.md` thành ✅.
 
-## 6. Kết Quả Hội Tụ (Converge)
-
-- **Ngày**: 2026-11-04
-- **Kết luận**: `converged` — mọi tiêu chí trong phạm vi đều `Đạt`.
-- **Bằng chứng kiểm chứng**: `npm run test` (12 files / 105 tests pass), `npm run build` (exit 0), `npm run lint` (`eslint --max-warnings 0`, exit 0), `npm run typecheck` (exit 0).
-
-| Mục | Trạng thái | Ghi chú / Bằng chứng |
-|---|---|---|
-| AC-1 — Bố cục 2 cột, khối ca gần đây nằm trong form trước hàng nút | Đạt | `ShiftRegistrationModal.tsx:139-160` (hai `Field` liền nhau trên lưới `.account-editor-form`), khối `shift-recent-section` đặt trong `<form>` trước `.form-actions` (`:259-311`). Test `keeps the recent shift panel inside the form ahead of the action row` khẳng định `section.closest('form') === form` và section đứng trước nút gửi. Mobile 1 cột nhờ `@media (max-width: 640px) .centered-dialog .account-editor-form { grid-template-columns: 1fr }`. |
-| AC-2 — Chọn nhanh ngày + 5 thẻ khung ca kèm giờ & số giờ công, payload đúng | Đạt | `ShiftRegistrationModal.tsx:162-226` (`shift-quick-dates`, `shift-type-grid` với `role="radiogroup"`), `shiftDurationLabel()` (`:27-33`). Test `sends the chosen quick date, shift window, bay and notes` kiểm chứng `startsAt`/`endsAt` = `07:30`–`11:30` giờ địa phương, `shiftType: 'MORNING'`, `serviceBayId: 10`, `notes` đã trim. |
-| AC-3 — `info-strip` cập nhật tức thì | Đạt | `ShiftRegistrationModal.tsx:228-238`. Test `updates the summary strip for date, shift type and bay` kiểm chứng `08:00–17:00 · 9,0 giờ`, đổi sang `07:30–11:30 · 4,0 giờ`, vị trí `Thợ cơ động` → `BAY-01`. |
-| AC-4 — Bảng "Ca của tôi gần đây" đủ cột, trạng thái, lý do từ chối, trạng thái rỗng | Đạt | `ShiftRegistrationModal.tsx:259-302` (cột `Ngày & giờ`, `Loại ca`, `Khoang trực`, `Trạng thái`; `formatShiftRange()` → `dd/MM/yyyy · HH:mm–HH:mm`; giới hạn `.slice(0, 5)`). Test `lists recent shifts with full range, bay, status and rejection reason` và `shows a tidy empty state when there are no registrations`. |
-| AC-5 — Nút `Đăng ký ca làm việc` cho `TECHNICIAN`, ẩn nút quản trị | Đạt | `SchedulingPage.tsx:89-91` (`useAuth`, `isAdmin`, `isTechnician`), `:575-579` (`isTechnician` → mở `ShiftRegistrationModal`, `!isAdmin → null` ẩn `Thêm khoang`/`Xếp ca làm việc`/`Thêm kỹ thuật viên`), `:891-895` gắn modal. Nút trùng trong `LiveDispatchBoard.tsx` đã bỏ để tránh 2 nút cùng chức năng. Kiểm chứng bằng `tsc -b` + đọc code (không có test RTL riêng cho `SchedulingPage`). |
-| AC-6 — Không hồi quy test & build | Đạt | `npm run test` → 12 files / 105 tests passed; `npm run build` → `built in 4.01s`; `npm run lint` → exit 0. |
-| Mục tiêu 1.2.2 — Chọn ngày & khung ca trực quan | Đạt | Thẻ chọn khung ca kèm giờ + thời lượng, chip ngày nhanh, `aria-pressed`/`role="radio"` cho điều hướng bàn phím. |
-| Mục tiêu 1.2.3 — Giới hạn giờ làm | Đạt | Dòng mô tả giới hạn 12h/ngày, 60h/tuần, nghỉ 8h (`ShiftRegistrationModal.tsx:240-245`). |
-
-### Sai lệch nhỏ đã chấp nhận
-
-- Kích thước modal dùng `size="md"` thay vì `lg` để form 4 trường cân đối, đúng UI guideline (không còn 1000px trống).
-- Tên class CSS thực tế theo Step 1: `.shift-quick-dates`, `.shift-type-grid`, `.shift-type-pill`, `.shift-recent-section`, `.shift-recent-empty` (bảng file ở mục 3 dùng tên nháp `.shift-type-selector`, `.shift-type-card`, `.shift-recent-panel`).
-- Bảng ca gần đây trên mobile dùng `table-layout: fixed` + giảm padding (không tạo thanh cuộn ngang).
-- `LiveDispatchBoard.tsx` bỏ hoàn toàn nút + modal đăng ký ca để tránh lặp với `PageHeader`.
-
-### Còn lại ngoài phạm vi (không chặn hội tụ)
-
-- `SchedulingPage` vẫn cho mọi role thấy tab `Kỹ thuật viên` với các nút thao tác `Xếp ca` / `Sửa` / `Xóa` trong bảng; backend trả 403 nếu không đủ quyền. Nếu muốn ẩn theo role thì cần plan riêng cho toàn bộ tab/table action.
-- Chưa xác minh UI bằng trình duyệt (không có phiên đăng nhập trong môi trường này); đã kiểm chứng bằng RTL + build.
+<!-- Mục 6 "Kết Quả Hội Tụ" do /converge thêm vào, không viết sẵn. -->

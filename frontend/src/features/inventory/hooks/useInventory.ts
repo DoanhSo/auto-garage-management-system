@@ -54,6 +54,16 @@ export function useUpdateSupplierMutation() {
   });
 }
 
+export function useActivateSupplierMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string | number) => inventoryApi.activateSupplier(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+    },
+  });
+}
+
 export function useDeactivateSupplierMutation() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -112,6 +122,16 @@ export function useUpdatePartMutation() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['parts'] });
       queryClient.invalidateQueries({ queryKey: ['part', id] });
+    },
+  });
+}
+
+export function useActivatePartMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string | number) => inventoryApi.activatePart(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['parts'] });
     },
   });
 }
@@ -189,6 +209,8 @@ export function useReconciliationQuery(partId?: string | number) {
   return useQuery({
     queryKey: ['inventory-reconciliation', partId],
     queryFn: () =>
-      partId ? inventoryApi.reconcilePart(partId).then((r) => [r]) : inventoryApi.reconcileAllParts(),
+      partId
+        ? inventoryApi.reconcilePart(partId).then((r) => [r])
+        : inventoryApi.reconcileAllParts(),
   });
 }

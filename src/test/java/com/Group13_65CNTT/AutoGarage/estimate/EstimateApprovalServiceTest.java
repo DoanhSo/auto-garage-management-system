@@ -123,6 +123,19 @@ class EstimateApprovalServiceTest {
     }
 
     @Test
+    void decide_AfterQcStarted_Rejected() {
+        mockOrder.setStatus(RepairOrderStatus.WAITING_QC);
+        when(estimateRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mockEstimate));
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+
+        assertThatThrownBy(() -> estimateService.decide(1L, 1L,
+                List.of(new EstimateApproval.LineDecision(10L, EstimateApproval.Decision.APPROVED, null)), "KEY-QC"))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException.class)
+                .hasMessageContaining("không thể duyệt thêm hạng mục");
+        verify(estimateItemRepository, never()).save(any());
+    }
+
+    @Test
     void decide_ReservationFailureAbortsApproval() {
         when(estimateRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mockEstimate));
         when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));

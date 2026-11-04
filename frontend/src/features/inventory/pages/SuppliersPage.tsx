@@ -32,6 +32,7 @@ import {
   useSuppliersQuery,
   useCreateSupplierMutation,
   useUpdateSupplierMutation,
+  useActivateSupplierMutation,
   useDeactivateSupplierMutation,
 } from '../hooks/useInventory';
 import type { Supplier, SupplierCreateInput, SupplierUpdateInput } from '../types/inventory';
@@ -74,6 +75,9 @@ export function SuppliersPage() {
   const createMutation = useCreateSupplierMutation();
   const updateMutation = useUpdateSupplierMutation();
   const deactivateMutation = useDeactivateSupplierMutation();
+  const activateMutation = useActivateSupplierMutation();
+  const activateSupplier = activateMutation.mutateAsync;
+  const activatingId = activateMutation.isPending ? String(activateMutation.variables) : null;
 
   const filterCount = (query.trim() ? 1 : 0) + (active !== undefined ? 1 : 0);
   const isFiltered =
@@ -145,6 +149,19 @@ export function SuppliersPage() {
       notify(errorMessage(err) ?? 'Thao tác không thành công.');
     }
   };
+
+  // Reopening is reversible, so it runs without a confirmation step.
+  const handleActivate = useCallback(
+    async (supplier: Supplier) => {
+      try {
+        await activateSupplier(supplier.id);
+        notify(`Đã hợp tác lại với nhà cung cấp ${supplier.supplierName}.`);
+      } catch (err: unknown) {
+        notify(errorMessage(err) ?? 'Thao tác không thành công.');
+      }
+    },
+    [activateSupplier, notify],
+  );
 
   const openEdit = useCallback((supplier: Supplier) => {
     setEditing(supplier);
@@ -258,11 +275,22 @@ export function SuppliersPage() {
                 <span>Ngừng</span>
               </Button>
             )}
+            {!row.original.isActive && (
+              <Button
+                variant="ghost"
+                aria-label={`Hợp tác lại ${row.original.supplierName}`}
+                pending={activatingId === String(row.original.id)}
+                onClick={() => handleActivate(row.original)}
+              >
+                <RotateCcw size={16} />
+                <span>Mở lại</span>
+              </Button>
+            )}
           </div>
         ),
       },
     ],
-    [openEdit],
+    [openEdit, activatingId, handleActivate],
   );
 
   const suppliersList = data?.content || [];
@@ -465,6 +493,16 @@ export function SuppliersPage() {
                         onClick={() => setDeletingSupplier(s)}
                       >
                         <Trash2 size={15} /> Ngừng
+                      </Button>
+                    )}
+                    {!s.isActive && (
+                      <Button
+                        variant="ghost"
+                        aria-label={`Hợp tác lại ${s.supplierName}`}
+                        pending={activatingId === String(s.id)}
+                        onClick={() => handleActivate(s)}
+                      >
+                        <RotateCcw size={15} /> Mở lại
                       </Button>
                     )}
                   </div>

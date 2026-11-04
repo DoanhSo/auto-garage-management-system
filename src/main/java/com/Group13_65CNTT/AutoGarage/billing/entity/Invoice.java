@@ -45,7 +45,7 @@ public class Invoice {
     @Column(name = "invoice_code", nullable = false, unique = true, length = 30)
     private String invoiceCode;
 
-    @Column(name = "repair_order_id", nullable = false, unique = true)
+    @Column(name = "repair_order_id", nullable = false)
     private Long repairOrderId;
 
     @Column(name = "customer_id", nullable = false)

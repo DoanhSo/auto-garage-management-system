@@ -47,6 +47,7 @@ public class AttachmentServiceImpl implements AttachmentService {
 
     private final AttachmentStorage storage;
     private final CurrentUserProvider currentUser;
+    private final com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderRepository repairOrderRepository;
 
     @Override
     @Audited(action = AuditConstants.ACTION_ATTACHMENT_UPLOADED, entity = AuditConstants.ENTITY_ATTACHMENT)
@@ -91,6 +92,15 @@ public class AttachmentServiceImpl implements AttachmentService {
 
         customerScope.requireResource(repairOrderId != null ? AccessResource.REPAIR_ORDER : AccessResource.WARRANTY_CLAIM,
                 repairOrderId != null ? repairOrderId : warrantyClaimId);
+        if (repairOrderId != null) {
+            var orderStatus = repairOrderRepository.findById(repairOrderId)
+                    .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND))
+                    .getStatus();
+            if (!com.Group13_65CNTT.AutoGarage.repair.service.RepairStageRules.attachmentWindow(category).contains(orderStatus)) {
+                throw new BusinessRuleException("Ảnh " + com.Group13_65CNTT.AutoGarage.repair.service.RepairStageRules.attachmentCategoryLabel(category)
+                        + " chỉ tải lên ở giai đoạn " + com.Group13_65CNTT.AutoGarage.repair.service.RepairStageRules.attachmentStageLabel(category));
+            }
+        }
         if (vehicleCheckId != null) {
             var check = vehicleCheckRepository.findById(vehicleCheckId)
                     .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));

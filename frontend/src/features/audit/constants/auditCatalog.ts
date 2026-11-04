@@ -4,6 +4,7 @@ export type AuditDomain =
   | 'shift'
   | 'payroll'
   | 'bay'
+  | 'catalog'
   | 'booking'
   | 'repair'
   | 'qc_warranty'
@@ -25,6 +26,7 @@ export const auditDomains: { key: AuditDomain; label: string }[] = [
   { key: 'shift', label: 'Ca trực & Điểm danh' },
   { key: 'payroll', label: 'Bảng lương & Hoa hồng' },
   { key: 'bay', label: 'Khoang xưởng & Thiết bị' },
+  { key: 'catalog', label: 'Khách hàng, Xe & Dịch vụ' },
   { key: 'booking', label: 'Lịch hẹn & Tiếp nhận' },
   { key: 'repair', label: 'Lệnh sửa chữa & Thi công' },
   { key: 'qc_warranty', label: 'Nghiệm thu & Bảo hành' },
@@ -214,7 +216,85 @@ const byDomain: Record<AuditDomain, Record<string, Entry>> = {
       'warning',
     ],
   },
+  catalog: {
+    CUSTOMER_CREATED: [
+      'Thêm khách hàng',
+      'Tạo hồ sơ khách hàng mới trong danh bạ gara.',
+      'success',
+    ],
+    CUSTOMER_UPDATED: [
+      'Cập nhật khách hàng',
+      'Sửa thông tin liên hệ hoặc hồ sơ khách hàng.',
+      'info',
+    ],
+    CUSTOMER_DEACTIVATED: [
+      'Ngừng theo dõi khách hàng',
+      'Chuyển hồ sơ khách hàng sang trạng thái ngừng hoạt động.',
+      'danger',
+    ],
+    CUSTOMER_ACTIVATED: [
+      'Mở lại khách hàng',
+      'Mở lại hồ sơ khách hàng đã ngừng theo dõi.',
+      'success',
+    ],
+    VEHICLE_CREATED: ['Thêm phương tiện', 'Đăng ký xe mới vào hồ sơ khách hàng.', 'success'],
+    VEHICLE_UPDATED: [
+      'Cập nhật phương tiện',
+      'Sửa thông tin biển số, dòng xe hoặc số ODO.',
+      'info',
+    ],
+    VEHICLE_DEACTIVATED: [
+      'Ngừng theo dõi phương tiện',
+      'Chuyển xe sang trạng thái ngừng hoạt động, không nhận lịch hẹn mới.',
+      'danger',
+    ],
+    VEHICLE_ACTIVATED: [
+      'Mở lại phương tiện',
+      'Mở lại xe đã ngừng theo dõi để nhận lịch hẹn và tiếp nhận.',
+      'success',
+    ],
+    VEHICLE_TRANSFERRED: [
+      'Chuyển chủ sở hữu xe',
+      'Chuyển phương tiện sang hồ sơ của khách hàng khác.',
+      'warning',
+    ],
+    SERVICE_CREATED: [
+      'Thêm dịch vụ',
+      'Khai báo dịch vụ hoặc gói bảo dưỡng mới vào bảng giá.',
+      'success',
+    ],
+    SERVICE_UPDATED: [
+      'Cập nhật dịch vụ',
+      'Sửa đơn giá tiền công, định mức thời gian hoặc điều kiện bảo hành.',
+      'info',
+    ],
+    SERVICE_DEACTIVATED: [
+      'Ngừng áp dụng dịch vụ',
+      'Dịch vụ không còn xuất hiện khi lập báo giá mới.',
+      'danger',
+    ],
+    SERVICE_ACTIVATED: [
+      'Áp dụng lại dịch vụ',
+      'Mở lại dịch vụ đã ngừng để dùng tiếp khi lập báo giá.',
+      'success',
+    ],
+  },
   booking: {
+    BOOKING_CREATED: ['Đặt lịch hẹn', 'Tạo lịch hẹn bảo dưỡng/sửa chữa cho khách hàng.', 'success'],
+    BOOKING_CONFIRMED: ['Xác nhận lịch hẹn', 'Gara xác nhận lịch hẹn với khách hàng.', 'info'],
+    BOOKING_RESCHEDULED: ['Dời lịch hẹn', 'Đổi ngày giờ của lịch hẹn đã đặt.', 'warning'],
+    BOOKING_CANCELLED: ['Hủy lịch hẹn', 'Hủy lịch hẹn theo yêu cầu kèm lý do.', 'danger'],
+    BOOKING_NO_SHOW: ['Khách không đến', 'Đánh dấu khách vắng mặt theo lịch hẹn.', 'warning'],
+    VEHICLE_RECEIVED: [
+      'Tiếp nhận xe vào xưởng',
+      'Ghi nhận ODO, nhiên liệu, yêu cầu của khách và mở lệnh sửa chữa.',
+      'success',
+    ],
+    VEHICLE_CHECK_RECORDED: [
+      'Ghi phiếu kiểm tra xe',
+      'Lưu kết quả kiểm tra hiện trạng xe khi tiếp nhận.',
+      'info',
+    ],
     CREATE_BOOKING: [
       'Đặt lịch hẹn dịch vụ',
       'Tiếp nhận và xếp lịch hẹn bảo dưỡng/sửa chữa cho khách hàng.',
@@ -237,6 +317,11 @@ const byDomain: Record<AuditDomain, Record<string, Entry>> = {
     ],
   },
   repair: {
+    ATTACHMENT_UPLOADED: [
+      'Tải ảnh / tài liệu đính kèm',
+      'Gắn ảnh hiện trạng hoặc tài liệu vào lệnh sửa chữa, phiếu kiểm tra hay bảo hành.',
+      'info',
+    ],
     CREATE_REPAIR_ORDER: [
       'Mở lệnh sửa chữa',
       'Lập lệnh sửa chữa mới cho xe đang ở xưởng kèm chẩn đoán sơ bộ.',
@@ -274,6 +359,16 @@ const byDomain: Record<AuditDomain, Record<string, Entry>> = {
     ],
   },
   qc_warranty: {
+    WARRANTY_ADJUSTED: [
+      'Điều chỉnh sổ bảo hành',
+      'Quản trị viên sửa số ngày, số km hoặc điều khoản của sổ bảo hành.',
+      'warning',
+    ],
+    WARRANTY_VOIDED: [
+      'Hủy sổ bảo hành',
+      'Quản trị viên hủy sổ bảo hành kèm lý do; sổ vẫn được giữ để tra cứu.',
+      'danger',
+    ],
     CREATE_ESTIMATE: [
       'Lập báo giá dịch vụ',
       'Soạn phiếu báo giá chi tiết phụ tùng và tiền công gửi khách hàng.',
@@ -385,6 +480,14 @@ export const auditEntityLabels: Record<string, string> = {
   Part: 'Phụ tùng',
   Invoice: 'Hóa đơn',
   PaymentReceipt: 'Phiếu thu',
+  ATTACHMENT: 'Tệp đính kèm',
+  BOOKING: 'Lịch hẹn',
+  CUSTOMER: 'Khách hàng',
+  REPAIR_ORDER: 'Lệnh sửa chữa',
+  SERVICE: 'Dịch vụ',
+  VEHICLE: 'Phương tiện',
+  VEHICLE_CHECK: 'Phiếu kiểm tra xe',
+  WARRANTY: 'Sổ bảo hành',
 };
 
 /** Unknown codes (newer backend than client) still render, flagged as plain information. */

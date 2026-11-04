@@ -123,4 +123,13 @@ public class PartController {
         partService.deactivatePart(id);
         return ApiResponse.success(ResponseCode.SUCCESS, null, http.getRequestURI());
     }
+
+    @PostMapping(ApiPaths.ACTIVATE)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_ADMIN)
+    @Operation(summary = "Kinh doanh lại phụ tùng đã vô hiệu hóa")
+    public ApiResponse<PartResponse> activate(
+            @PathVariable Long id,
+            HttpServletRequest http) {
+        return ApiResponse.success(ResponseCode.UPDATED, partService.activatePart(id), http.getRequestURI());
+    }
 }

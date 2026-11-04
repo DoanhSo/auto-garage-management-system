@@ -47,10 +47,10 @@ public class InvoiceItem {
     @Column(name = "item_type", nullable = false, length = 10)
     private InvoiceItemType itemType;
 
-    @Column(name = "repair_task_id", unique = true)
+    @Column(name = "repair_task_id")
     private Long repairTaskId;
 
-    @Column(name = "repair_order_part_id", unique = true)
+    @Column(name = "repair_order_part_id")
     private Long repairOrderPartId;
 
     @Column(name = "item_name", nullable = false, length = 150)

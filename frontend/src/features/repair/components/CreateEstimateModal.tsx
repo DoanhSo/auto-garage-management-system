@@ -22,11 +22,15 @@ export function CreateEstimateModal({
   orderId,
   open,
   onClose,
+  parentEstimateId,
 }: {
   orderId: string | number;
   open: boolean;
   onClose: () => void;
+  /** Set once the customer has approved: the new estimate is then a supplement to this one. */
+  parentEstimateId?: string | number | null;
 }) {
+  const supplemental = parentEstimateId != null;
   const notify = useToast();
   const createEstimate = useCreateEstimateMutation();
 
@@ -54,6 +58,8 @@ export function CreateEstimateModal({
     try {
       await createEstimate.mutateAsync({
         repairOrderId: orderId,
+        estimateKind: supplemental ? 'SUPPLEMENTAL' : 'INITIAL',
+        parentEstimateId: supplemental ? parentEstimateId : null,
         notes: notes.trim() || undefined,
         items: items.map((item) => ({
           itemType: item.itemType,
@@ -65,7 +71,7 @@ export function CreateEstimateModal({
           unitPrice: Number(item.unitPrice) || 0,
         })),
       });
-      notify('Đã tạo bản báo giá mới thành công!');
+      notify(supplemental ? 'Đã lập báo giá phát sinh.' : 'Đã tạo bản báo giá mới thành công!');
       onClose();
     } catch (err: unknown) {
       notify(errorMessage(err));
@@ -78,8 +84,12 @@ export function CreateEstimateModal({
       onClose={onClose}
       placement="center"
       size="lg"
-      title="Lập bản báo giá mới"
-      description="Chọn dịch vụ và phụ tùng từ danh mục để gửi khách hàng phê duyệt."
+      title={supplemental ? 'Lập báo giá phát sinh' : 'Lập bản báo giá mới'}
+      description={
+        supplemental
+          ? 'Hạng mục phát sinh trong lúc sửa chữa, gửi khách duyệt riêng. Báo giá đã duyệt giữ nguyên.'
+          : 'Chọn dịch vụ và phụ tùng từ danh mục để gửi khách hàng phê duyệt.'
+      }
     >
       <form onSubmit={handleSubmit} noValidate className="editor-form">
         <FormError

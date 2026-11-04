@@ -49,6 +49,11 @@ export const customerApi = {
     return customerSchema.parse(raw);
   },
 
+  activate: async (id: string): Promise<Customer> => {
+    const raw = await request<unknown>(`/customers/${id}/activate`, { method: 'POST' });
+    return customerSchema.parse(raw);
+  },
+
   remove: (id: string): Promise<null> => {
     return request<null>(`/customers/${id}`, {
       method: 'DELETE',

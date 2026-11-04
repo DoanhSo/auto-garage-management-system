@@ -39,6 +39,9 @@ export function useIssueInvoiceMutation() {
     mutationFn: (data: InvoiceIssueInput) => billingApi.issueInvoice(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      // Issuing moves the repair order to INVOICED.
+      queryClient.invalidateQueries({ queryKey: ['repair-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['repair-order'] });
     },
   });
 }
@@ -51,6 +54,9 @@ export function useVoidInvoiceMutation() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice', id] });
+      // Voiding sends the repair order back to COMPLETED so it can be invoiced again.
+      queryClient.invalidateQueries({ queryKey: ['repair-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['repair-order'] });
     },
   });
 }

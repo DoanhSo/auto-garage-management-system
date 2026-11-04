@@ -129,6 +129,16 @@ public class VehicleController {
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.DELETED, null, httpRequest.getRequestURI()));
     }
 
+    @PostMapping(ApiPaths.ACTIVATE)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
+    @Operation(summary = "Reactivate vehicle")
+    public ResponseEntity<ApiResponse<VehicleResponse>> activateVehicle(
+            @PathVariable Long id,
+            HttpServletRequest httpRequest) {
+        VehicleResponse response = vehicleService.activateVehicle(id);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
+    }
+
     @GetMapping("/{id}/timeline")
     @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
     @Operation(summary = "Get vehicle service and ownership timeline")

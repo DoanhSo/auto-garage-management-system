@@ -23,6 +23,8 @@ public interface VehicleService {
 
     void deactivateVehicle(Long id);
 
+    VehicleResponse activateVehicle(Long id);
+
     com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse getVehicleTimeline(Long vehicleId, Long requestingCustomerId, String userRole);
 
     com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse getVehicleTimelineByPlate(String plate, Long requestingCustomerId, String userRole);

@@ -21,4 +21,6 @@ public interface CustomerService {
     CustomerResponse updateCustomer(Long id, UpdateCustomerRequest request);
 
     void deactivateCustomer(Long id);
+
+    CustomerResponse activateCustomer(Long id);
 }

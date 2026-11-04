@@ -1,5 +1,6 @@
 export type EstimateKind = 'INITIAL' | 'SUPPLEMENTAL';
-export type EstimateStatus = 'DRAFT' | 'SENT' | 'PARTIALLY_APPROVED' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+export type EstimateStatus =
+  'DRAFT' | 'SENT' | 'PARTIALLY_APPROVED' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
 export type ItemType = 'SERVICE' | 'PART';
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 

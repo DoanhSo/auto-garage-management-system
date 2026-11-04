@@ -88,4 +88,23 @@ class CatalogServiceTest {
         assertTrue(ex.getMessage().contains("không được âm"));
         verify(serviceRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("Mở lại dịch vụ đã ngừng áp dụng")
+    void testActivateService_ReactivatesInactiveService() {
+        ServiceEntity inactive = new ServiceEntity();
+        inactive.setId(7L);
+        inactive.setServiceName("Cân chỉnh thước lái");
+        inactive.setServiceType(ServiceType.SINGLE);
+        inactive.setIsActive(false);
+        when(serviceRepository.findById(7L)).thenReturn(java.util.Optional.of(inactive));
+        when(serviceRepository.save(any(ServiceEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ServiceResponse response = catalogService.activateService(7L);
+
+        assertTrue(inactive.getIsActive());
+        assertEquals(7L, response.getId());
+        verify(customerScope).requireAdmin();
+        verify(serviceRepository).save(inactive);
+    }
 }

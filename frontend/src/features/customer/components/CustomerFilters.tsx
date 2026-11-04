@@ -21,9 +21,7 @@ export function CustomerFilters({
 }) {
   const id = useId();
   const filterCount =
-    (search.trim() ? 1 : 0) +
-    (customerType !== 'ALL' ? 1 : 0) +
-    (isActive !== 'ALL' ? 1 : 0);
+    (search.trim() ? 1 : 0) + (customerType !== 'ALL' ? 1 : 0) + (isActive !== 'ALL' ? 1 : 0);
 
   return (
     <section className="user-filters" aria-label="Bộ lọc khách hàng">

@@ -1,5 +1,15 @@
-import { useMemo, useRef, useState } from 'react';
-import { Plus, SquarePen, Trash2, Clock, ShieldCheck, RotateCw, Box, Layers } from 'lucide-react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  Plus,
+  SquarePen,
+  Trash2,
+  Clock,
+  ShieldCheck,
+  RotateCw,
+  RotateCcw,
+  Box,
+  Layers,
+} from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -16,7 +26,11 @@ import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { errorMessage } from '../../../shared/api/errors';
 import { money } from '../../../shared/utils/format';
 import type { Service, ServiceType } from '../../../shared/types/contracts';
-import { useServicesQuery, useDeleteServiceMutation } from '../hooks/useCatalog';
+import {
+  useActivateServiceMutation,
+  useServicesQuery,
+  useDeleteServiceMutation,
+} from '../hooks/useCatalog';
 import { ServiceEditor } from '../components/ServiceEditor';
 import { ServiceFilters } from '../components/ServiceFilters';
 import { ServiceCards } from '../components/ServiceCards';
@@ -49,6 +63,8 @@ export function ServicesPage() {
 
   const { data: services = [], isLoading, isError, error, refetch } = useServicesQuery(queryParams);
   const deleteMutation = useDeleteServiceMutation();
+  const activateMutation = useActivateServiceMutation();
+  const activatingId = activateMutation.isPending ? activateMutation.variables : null;
 
   const handleOpenCreate = () => {
     setEditingId(null);
@@ -71,14 +87,26 @@ export function ServicesPage() {
     }
   };
 
+  // Reactivation is reversible and harmless, so it runs without a confirmation step.
+  const activateService = activateMutation.mutateAsync;
+  const handleActivate = useCallback(
+    async (service: Service) => {
+      try {
+        await activateService(service.id);
+        notify(`Đã áp dụng lại dịch vụ "${service.serviceName}"`);
+      } catch (err: unknown) {
+        notify(errorMessage(err));
+      }
+    },
+    [activateService, notify],
+  );
+
   const columns = useMemo<ColumnDef<Service>[]>(
     () => [
       {
         id: 'serviceCode',
         header: 'Mã DV',
-        cell: ({ row }) => (
-          <span className="code-tag">{row.original.serviceCode}</span>
-        ),
+        cell: ({ row }) => <span className="code-tag">{row.original.serviceCode}</span>,
       },
       {
         id: 'serviceInfo',
@@ -100,9 +128,7 @@ export function ServicesPage() {
         cell: ({ row }) => {
           const isPackage = row.original.serviceType === 'PACKAGE';
           return (
-            <span
-              className={`badge ${isPackage ? 'badge-primary' : 'badge-neutral'}`}
-            >
+            <span className={`badge ${isPackage ? 'badge-primary' : 'badge-neutral'}`}>
               {isPackage ? 'Gói bảo dưỡng' : 'Dịch vụ lẻ'}
             </span>
           );
@@ -209,12 +235,24 @@ export function ServicesPage() {
                   Ngừng áp dụng
                 </Button>
               )}
+
+              {!service.isActive && (
+                <Button
+                  variant="ghost"
+                  aria-label={`Áp dụng lại dịch vụ ${service.serviceName}`}
+                  pending={activatingId === service.id}
+                  onClick={() => handleActivate(service)}
+                >
+                  <RotateCcw size={16} />
+                  Áp dụng lại
+                </Button>
+              )}
             </div>
           );
         },
       },
     ],
-    [isAdmin],
+    [isAdmin, activatingId, handleActivate],
   );
 
   return (
@@ -236,7 +274,8 @@ export function ServicesPage() {
       <div className="info-strip">
         <Layers size={18} />
         <span>
-          Bảng giá tiền công tiêu chuẩn, thời gian định mức và chu kỳ bảo dưỡng định kỳ (Quản trị viên quản lý, Nhân viên tra cứu).
+          Bảng giá tiền công tiêu chuẩn, thời gian định mức và chu kỳ bảo dưỡng định kỳ (Quản trị
+          viên quản lý, Nhân viên tra cứu).
         </span>
       </div>
 
@@ -265,6 +304,8 @@ export function ServicesPage() {
             services={services}
             onEdit={handleOpenEdit}
             onDeactivate={setDeactivatingService}
+            onActivate={handleActivate}
+            activatingId={activatingId}
           />
         ) : (
           <DataTable<Service>

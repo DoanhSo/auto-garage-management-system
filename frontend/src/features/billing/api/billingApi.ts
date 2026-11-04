@@ -14,7 +14,33 @@ import type {
   SupplierDebtBalance,
   InvoiceStatus,
   PaymentDirection,
+  CustomerSnapshot,
+  VehicleSnapshot,
 } from '../types/billing';
+
+/** Snapshots are stored and returned as JSON text; empty values were written as the string "null". */
+function parseSnapshot<T extends object>(raw: unknown): T {
+  let value: unknown = raw;
+  if (typeof raw === 'string') {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      value = {};
+    }
+  }
+  if (!value || typeof value !== 'object') return {} as T;
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => v !== null && v !== 'null' && v !== ''),
+  ) as T;
+}
+
+function normalizeInvoice(invoice: Invoice): Invoice {
+  return {
+    ...invoice,
+    customerSnapshot: parseSnapshot<CustomerSnapshot>(invoice.customerSnapshot),
+    vehicleSnapshot: parseSnapshot<VehicleSnapshot>(invoice.vehicleSnapshot),
+  };
+}
 
 export const billingApi = {
   // Invoices
@@ -40,19 +66,19 @@ export const billingApi = {
           sortBy: params.sortBy ?? 'id',
           sortDir: params.sortDir ?? 'desc',
         }),
-    ),
+    ).then((page) => ({ ...page, content: page.content.map(normalizeInvoice) })),
 
   getInvoice: (id: string | number) =>
-    request<Invoice>(`/billing/invoices/${id}`),
+    request<Invoice>(`/billing/invoices/${id}`).then(normalizeInvoice),
 
   getInvoiceByOrder: (orderId: string | number) =>
-    request<Invoice>(`/billing/invoices/order/${orderId}`),
+    request<Invoice>(`/billing/invoices/order/${orderId}`).then(normalizeInvoice),
 
   issueInvoice: (data: InvoiceIssueInput) =>
     request<Invoice>('/billing/invoices/issue', {
       method: 'POST',
       body: data,
-    }),
+    }).then(normalizeInvoice),
 
   voidInvoice: (id: string | number, data: InvoiceVoidInput) =>
     request<null>(`/billing/invoices/${id}/void`, {
@@ -158,7 +184,10 @@ export const billingApi = {
         const sum = totals.get(customer.id) ?? { invoiced: 0, paid: 0, balance: 0, items: [] };
         const open = sum.items.filter((item) => Number(item.balanceAmount) > 0);
         const overdue = open.filter((item) => item.dueDate && item.dueDate.slice(0, 10) < today);
-        const dueDates = open.map((item) => item.dueDate).filter((d): d is string => !!d).sort();
+        const dueDates = open
+          .map((item) => item.dueDate)
+          .filter((d): d is string => !!d)
+          .sort();
         return {
           customerId: customer.id,
           customerCode: customer.customerCode,

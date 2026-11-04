@@ -35,6 +35,7 @@ import {
   useSuppliersQuery,
   useCreatePartMutation,
   useUpdatePartMutation,
+  useActivatePartMutation,
   useDeactivatePartMutation,
 } from '../hooks/useInventory';
 import type { Part, PartCreateInput, PartUpdateInput } from '../types/inventory';
@@ -90,6 +91,9 @@ export function PartsPage() {
   const createMutation = useCreatePartMutation();
   const updateMutation = useUpdatePartMutation();
   const deactivateMutation = useDeactivatePartMutation();
+  const activateMutation = useActivatePartMutation();
+  const activatePart = activateMutation.mutateAsync;
+  const activatingId = activateMutation.isPending ? String(activateMutation.variables) : null;
 
   const filterCount =
     (query.trim() ? 1 : 0) +
@@ -185,6 +189,19 @@ export function PartsPage() {
       notify(errorMessage(err) ?? 'Thao tác không thành công.');
     }
   };
+
+  // Reopening is reversible, so it runs without a confirmation step.
+  const handleActivate = useCallback(
+    async (part: Part) => {
+      try {
+        await activatePart(part.id);
+        notify(`Đã kinh doanh lại phụ tùng ${part.partName}.`);
+      } catch (err: unknown) {
+        notify(errorMessage(err) ?? 'Thao tác không thành công.');
+      }
+    },
+    [activatePart, notify],
+  );
 
   const openEdit = useCallback((part: Part) => {
     setEditing(part);
@@ -324,13 +341,24 @@ export function PartsPage() {
                       <span>Ngừng</span>
                     </Button>
                   )}
+                  {isAdmin && !row.original.isActive && (
+                    <Button
+                      variant="ghost"
+                      aria-label={`Kinh doanh lại ${row.original.partName}`}
+                      pending={activatingId === String(row.original.id)}
+                      onClick={() => handleActivate(row.original)}
+                    >
+                      <RotateCcw size={16} />
+                      <span>Mở lại</span>
+                    </Button>
+                  )}
                 </div>
               ),
             },
           ]
         : []),
     ],
-    [openEdit, canManage, isAdmin],
+    [openEdit, canManage, isAdmin, activatingId, handleActivate],
   );
 
   const totalElements = onlyLowStock ? lowStockParts?.length || 0 : data?.totalElements || 0;
@@ -566,6 +594,16 @@ export function PartsPage() {
                           onClick={() => setDeletingPart(p)}
                         >
                           <Trash2 size={15} /> Ngừng
+                        </Button>
+                      )}
+                      {isAdmin && !p.isActive && (
+                        <Button
+                          variant="ghost"
+                          aria-label={`Kinh doanh lại ${p.partName}`}
+                          pending={activatingId === String(p.id)}
+                          onClick={() => handleActivate(p)}
+                        >
+                          <RotateCcw size={15} /> Mở lại
                         </Button>
                       )}
                     </div>

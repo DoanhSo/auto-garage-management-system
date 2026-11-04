@@ -1,4 +1,13 @@
-import { Building2, Phone, Mail, MapPin, SquarePen, UserX, CreditCard } from 'lucide-react';
+import {
+  Building2,
+  Phone,
+  Mail,
+  MapPin,
+  SquarePen,
+  UserX,
+  CreditCard,
+  RotateCcw,
+} from 'lucide-react';
 import type { Customer } from '../../../shared/types/contracts';
 import { Button, Empty, StatusBadge } from '../../../shared/components/ui';
 import { initials } from '../../../shared/utils/format';
@@ -7,10 +16,14 @@ export function CustomerCards({
   customers,
   onEdit,
   onDeactivate,
+  onActivate,
+  activatingId,
 }: {
   customers: Customer[];
   onEdit: (id: string, trigger: HTMLElement) => void;
   onDeactivate: (customer: Customer) => void;
+  onActivate: (customer: Customer) => void;
+  activatingId?: string | null;
 }) {
   if (!customers.length) {
     return (
@@ -101,6 +114,17 @@ export function CustomerCards({
                 >
                   <UserX size={17} />
                   Ngừng hoạt động
+                </Button>
+              )}
+              {!cust.isActive && (
+                <Button
+                  variant="ghost"
+                  aria-label={`Mở lại khách hàng ${cust.fullName}`}
+                  pending={activatingId === cust.id}
+                  onClick={() => onActivate(cust)}
+                >
+                  <RotateCcw size={17} />
+                  Mở lại
                 </Button>
               )}
             </div>

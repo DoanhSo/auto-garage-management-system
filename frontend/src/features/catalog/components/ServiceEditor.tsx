@@ -119,20 +119,20 @@ function ServiceForm({
   return (
     <>
       <form
-        className="editor-form account-editor-form"
+        className="editor-form account-editor-form grid-4col"
         onSubmit={handleSubmit(onSubmit)}
         noValidate
       >
         <FormError message={generalError ? errorMessage(generalError) : undefined} />
 
-        <div className="form-section-label">THÔNG TIN DỊCH VỤ CƠ BẢN & ĐỊNH MỨC</div>
+        <div className="form-section-label">THÔNG TIN DỊCH VỤ & ĐỊNH MỨC</div>
 
-        <div className="full-width-field">
+        <div className="col-span-2">
           <Field label="Tên dịch vụ / Hạng mục" required error={errors.serviceName?.message}>
             <input
               type="text"
               className="input"
-              placeholder="Ví dụ: Thay dầu động cơ, Bảo dưỡng cấp 40.000 km..."
+              placeholder="Ví dụ: Thay dầu động cơ, Bảo dưỡng 40.000 km..."
               disabled={busy}
               autoFocus
               {...register('serviceName')}
@@ -143,12 +143,12 @@ function ServiceForm({
         <Field
           label="Mã dịch vụ"
           error={errors.serviceCode?.message}
-          hint={existing ? 'Mã dịch vụ cố định' : undefined}
+          hint={existing ? 'Mã dịch vụ cố định' : 'Để trống để tự sinh'}
         >
           <input
             type="text"
             className="input"
-            placeholder="SRV-OIL-01 (tự sinh nếu để trống)"
+            placeholder="SRV-OIL-01"
             disabled={Boolean(existing) || busy}
             {...register('serviceCode')}
           />
@@ -156,8 +156,8 @@ function ServiceForm({
 
         <Field label="Phân loại dịch vụ" required error={errors.serviceType?.message}>
           <select className="select" disabled={busy} {...register('serviceType')}>
-            <option value="SINGLE">Dịch vụ đơn lẻ (Single)</option>
-            <option value="PACKAGE">Gói bảo dưỡng định kỳ (Package)</option>
+            <option value="SINGLE">Dịch vụ đơn lẻ</option>
+            <option value="PACKAGE">Gói bảo dưỡng định kỳ</option>
           </select>
         </Field>
 
@@ -171,9 +171,9 @@ function ServiceForm({
           </select>
         </Field>
 
-        <Field label="Yêu cầu khoang kỹ thuật" error={errors.requiredBayType?.message}>
+        <Field label="Khoang kỹ thuật" error={errors.requiredBayType?.message}>
           <select className="select" disabled={busy} {...register('requiredBayType')}>
-            <option value="">Khoang tự do (Không yêu cầu đặc biệt)</option>
+            <option value="">Không yêu cầu</option>
             {bayTypes.map((b) => (
               <option key={b} value={b}>
                 {b}
@@ -182,7 +182,7 @@ function ServiceForm({
           </select>
         </Field>
 
-        <Field label="Đơn giá tiền công (VND)" required error={errors.unitPrice?.message}>
+        <Field label="Đơn giá tiền công (đ)" required error={errors.unitPrice?.message}>
           <input
             type="number"
             className="input"
@@ -195,7 +195,7 @@ function ServiceForm({
         </Field>
 
         <Field
-          label="Định mức thời gian (phút)"
+          label="Định mức (phút)"
           required
           error={errors.standardMinutes?.message}
           hint={minutes ? `~${hours}h tiêu chuẩn` : undefined}
@@ -211,97 +211,75 @@ function ServiceForm({
           />
         </Field>
 
-        <Field label="Thời hạn bảo hành (Ngày)" error={errors.warrantyDays?.message}>
-          <input
-            type="number"
-            className="input"
-            min="0"
-            placeholder="Số ngày bảo hành kỹ thuật"
-            disabled={busy}
-            {...register('warrantyDays')}
-          />
-        </Field>
-
         <div className="form-section-label">
-          {selectedType === 'PACKAGE' ? 'CẤU HÌNH GÓI BẢO DƯỠNG & BẢO HÀNH' : 'CHÍNH SÁCH BẢO HÀNH & NỘI DUNG'}
+          {selectedType === 'PACKAGE' ? 'CHU KỲ BẢO DƯỠNG & BẢO HÀNH' : 'BẢO HÀNH & NỘI DUNG'}
         </div>
 
-        {selectedType === 'PACKAGE' ? (
+        {selectedType === 'PACKAGE' && (
           <>
-            <Field label="Chu kỳ bảo dưỡng (km)" error={errors.intervalKm?.message}>
+            <Field label="Chu kỳ (km)" error={errors.intervalKm?.message}>
               <input
                 type="number"
                 className="input"
                 step="1000"
                 min="0"
-                placeholder="Ví dụ: 5000, 10000 km"
+                placeholder="VD: 5000"
                 disabled={busy}
                 {...register('intervalKm')}
               />
             </Field>
 
-            <Field label="Chu kỳ bảo dưỡng (tháng)" error={errors.intervalMonths?.message}>
+            <Field label="Chu kỳ (tháng)" error={errors.intervalMonths?.message}>
               <input
                 type="number"
                 className="input"
                 min="0"
-                placeholder="Ví dụ: 3, 6, 12 tháng"
+                placeholder="VD: 6"
                 disabled={busy}
                 {...register('intervalMonths')}
               />
             </Field>
-
-            <Field label="Giới hạn bảo hành (km)" error={errors.warrantyKm?.message}>
-              <input
-                type="number"
-                className="input"
-                min="0"
-                step="500"
-                placeholder="Số km tối đa bảo hành"
-                disabled={busy}
-                {...register('warrantyKm')}
-              />
-            </Field>
-
-            <div className="full-width-field">
-              <Field label="Mô tả chi tiết nội dung công việc" error={errors.description?.message}>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Ghi chú chi tiết các bước kiểm tra, bảo dưỡng trong hạng mục dịch vụ này..."
-                  disabled={busy}
-                  {...register('description')}
-                />
-              </Field>
-            </div>
-          </>
-        ) : (
-          <>
-            <Field label="Giới hạn bảo hành (km)" error={errors.warrantyKm?.message}>
-              <input
-                type="number"
-                className="input"
-                min="0"
-                step="500"
-                placeholder="Số km tối đa bảo hành"
-                disabled={busy}
-                {...register('warrantyKm')}
-              />
-            </Field>
-
-            <div className="full-width-field">
-              <Field label="Mô tả chi tiết nội dung công việc" error={errors.description?.message}>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Ghi chú chi tiết các bước kiểm tra, sửa chữa trong hạng mục này..."
-                  disabled={busy}
-                  {...register('description')}
-                />
-              </Field>
-            </div>
           </>
         )}
+
+        <Field label="Bảo hành (ngày)" error={errors.warrantyDays?.message}>
+          <input
+            type="number"
+            className="input"
+            min="0"
+            placeholder="0"
+            disabled={busy}
+            {...register('warrantyDays')}
+          />
+        </Field>
+
+        <Field label="Bảo hành (km)" error={errors.warrantyKm?.message}>
+          <input
+            type="number"
+            className="input"
+            min="0"
+            step="500"
+            placeholder="0"
+            disabled={busy}
+            {...register('warrantyKm')}
+          />
+        </Field>
+
+        <div className={selectedType === 'PACKAGE' ? 'full-width-field' : 'col-span-2'}>
+          <Field label="Mô tả nội dung công việc" error={errors.description?.message}>
+            <input
+              type="text"
+              className="input"
+              placeholder={
+                selectedType === 'PACKAGE'
+                  ? 'Các bước kiểm tra, bảo dưỡng trong gói này...'
+                  : 'Các bước kiểm tra, sửa chữa trong hạng mục này...'
+              }
+              disabled={busy}
+              {...register('description')}
+            />
+          </Field>
+        </div>
 
         <div className="form-actions account-editor-actions">
           <Button

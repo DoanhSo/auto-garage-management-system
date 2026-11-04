@@ -45,9 +45,41 @@ import java.util.*;
 class BillingServiceTest {
 
     @Test
+    void voidingUnpaidInvoiceReturnsOrderToCompletedForReissue() {
+        Invoice invoice = Invoice.builder().id(1L).repairOrderId(500L).status(InvoiceStatus.UNPAID)
+                .totalAmount(new BigDecimal("1000000")).build();
+        when(invoiceRepository.findByIdWithLock(1L)).thenReturn(Optional.of(invoice));
+        when(paymentRepository.calculatePaidAmountForInvoice(1L)).thenReturn(BigDecimal.ZERO);
+        when(jdbcTemplate.queryForList(contains("FROM repair_orders"), eq(500L)))
+                .thenReturn(List.of(Map.of("status", "INVOICED")));
+
+        service.voidInvoice(10L, 1L, "Nhập sai chiết khấu");
+
+        assertThat(invoice.getStatus()).isEqualTo(InvoiceStatus.VOID);
+        assertThat(invoice.getVoidReason()).isEqualTo("Nhập sai chiết khấu");
+        verify(jdbcTemplate).update(contains("SET status = 'COMPLETED'"), eq(500L));
+    }
+
+    @Test
+    void voidingInvoiceAfterHandoverIsRejected() {
+        Invoice invoice = Invoice.builder().id(1L).repairOrderId(500L).status(InvoiceStatus.UNPAID)
+                .totalAmount(new BigDecimal("1000000")).build();
+        when(invoiceRepository.findByIdWithLock(1L)).thenReturn(Optional.of(invoice));
+        when(paymentRepository.calculatePaidAmountForInvoice(1L)).thenReturn(BigDecimal.ZERO);
+        when(jdbcTemplate.queryForList(contains("FROM repair_orders"), eq(500L)))
+                .thenReturn(List.of(Map.of("status", "CLOSED")));
+
+        assertThatThrownBy(() -> service.voidInvoice(10L, 1L, "Muộn"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("chưa bàn giao");
+        assertThat(invoice.getStatus()).isEqualTo(InvoiceStatus.UNPAID);
+        verify(invoiceRepository, never()).save(any());
+    }
+
+    @Test
     void voidInvoiceCannotAuthorizeHandoverEvenWithZeroBalance() {
-        Invoice invoice = Invoice.builder().id(1L).status(InvoiceStatus.VOID).totalAmount(BigDecimal.ZERO).build();
-        when(invoiceRepository.findByRepairOrderIdWithLock(500L)).thenReturn(Optional.of(invoice));
+        // Only a voided invoice exists, so there is no live invoice to hand over against.
+        when(invoiceRepository.findActiveByRepairOrderIdWithLock(500L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.requireHandoverAllowed(10L, 500L))
                 .isInstanceOf(BusinessException.class).hasFieldOrPropertyWithValue("responseCode", ResponseCode.BAD_REQUEST);
         verifyNoInteractions(paymentRepository);
@@ -93,7 +125,7 @@ class BillingServiceTest {
                 .taxAmount(new BigDecimal("100000"))
                 .build();
 
-        when(invoiceRepository.existsByRepairOrderId(200L)).thenReturn(false);
+        when(invoiceRepository.existsByRepairOrderIdAndStatusNot(200L, InvoiceStatus.VOID)).thenReturn(false);
 
         // Mock order query
         Map<String, Object> orderMap = new HashMap<>();
@@ -179,7 +211,7 @@ class BillingServiceTest {
                 .repairOrderId(200L)
                 .build();
 
-        when(invoiceRepository.existsByRepairOrderId(200L)).thenReturn(true);
+        when(invoiceRepository.existsByRepairOrderIdAndStatusNot(200L, InvoiceStatus.VOID)).thenReturn(true);
 
         assertThatThrownBy(() -> service.issueInvoice(10L, req))
                 .isInstanceOf(BusinessException.class)
@@ -248,7 +280,7 @@ class BillingServiceTest {
                 .id(1L).customerId(100L).status(InvoiceStatus.PARTIALLY_PAID).totalAmount(new BigDecimal("5000000"))
                 .build();
 
-        when(invoiceRepository.findByRepairOrderIdWithLock(500L)).thenReturn(Optional.of(invoice));
+        when(invoiceRepository.findActiveByRepairOrderIdWithLock(500L)).thenReturn(Optional.of(invoice));
         when(paymentRepository.calculatePaidAmountForInvoice(1L)).thenReturn(new BigDecimal("1000000"));
 
         Map<String, Object> custMap = new HashMap<>();

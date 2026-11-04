@@ -120,6 +120,17 @@ public class PartServiceImpl implements PartService {
     }
 
     @Override
+    @Transactional
+    public PartResponse activatePart(Long id) {
+        Part part = partRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        part.setIsActive(true);
+        Part saved = partRepository.save(part);
+        log.info("Reactivated part id: {}", id);
+        return partMapper.toResponse(saved);
+    }
+
+    @Override
     public List<PartResponse> getLowStockParts() {
         return partRepository.findPartsBelowReorderLevel().stream()
                 .map(partMapper::toResponse)

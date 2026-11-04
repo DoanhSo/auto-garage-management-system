@@ -101,4 +101,14 @@ public class CustomerController {
         customerService.deactivateCustomer(id);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.DELETED, null, httpRequest.getRequestURI()));
     }
+
+    @PostMapping(ApiPaths.ACTIVATE)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
+    @Operation(summary = "Reactivate customer")
+    public ResponseEntity<ApiResponse<CustomerResponse>> activateCustomer(
+            @PathVariable Long id,
+            HttpServletRequest httpRequest) {
+        CustomerResponse response = customerService.activateCustomer(id);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
+    }
 }

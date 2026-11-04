@@ -709,7 +709,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         title="Khoang sửa chữa & lịch ca làm việc"
         description="Điều phối cầu nâng, đội ngũ kỹ thuật viên và ca trực của xưởng dịch vụ."
         actions={
-          <div className="row-actions">
+          <>
             <Button
               variant="secondary"
               onClick={() => {
@@ -721,7 +721,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
               <RefreshCw size={15} /> Làm mới
             </Button>
             {primaryAction}
-          </div>
+          </>
         }
       />
 

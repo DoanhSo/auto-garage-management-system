@@ -583,12 +583,12 @@ function ReadyReports({ policy }: { policy: UiPolicy }) {
         title="Báo cáo"
         description="Theo dõi kết quả trong kỳ, số dư hiện tại và xuất báo cáo CSV cho kế toán."
         actions={
-          <div className="row-actions">
+          <>
             <Button variant="primary" disabled={!applied || !d} onClick={exportFull}>
               <Download size={17} />
               Xuất báo cáo CSV đầy đủ
             </Button>
-          </div>
+          </>
         }
       />
       <section className="panel report-filter">

@@ -79,14 +79,14 @@ export function BroadcastModal({ onClose }: { onClose: () => void }) {
     <Sheet
       open
       placement="center"
-      size="md"
+      size="lg"
       title="Phát thông báo"
       description="Soạn nội dung và chọn nhóm người nhận."
       onClose={onClose}
       pending={busy}
     >
       <form
-        className="editor-form notification-compose"
+        className="editor-form account-editor-form grid-4col notification-compose"
         noValidate
         onSubmit={form.handleSubmit(async (values) => {
           try {
@@ -102,17 +102,17 @@ export function BroadcastModal({ onClose }: { onClose: () => void }) {
           }
         })}
       >
-        <fieldset className="notification-audience" disabled={busy}>
+        <fieldset className="notification-audience full-width-field" disabled={busy}>
           <legend>Người nhận</legend>
-          <label className="notification-all">
-            <input
-              type="checkbox"
-              checked={!selected.length}
-              onChange={() => form.setValue('targetRoles', [], { shouldDirty: true })}
-            />
-            Tất cả tài khoản đang hoạt động
-          </label>
           <div className="notification-role-options">
+            <label className="notification-all">
+              <input
+                type="checkbox"
+                checked={!selected.length}
+                onChange={() => form.setValue('targetRoles', [], { shouldDirty: true })}
+              />
+              Tất cả tài khoản đang hoạt động
+            </label>
             {roles.map((role) => (
               <label key={role}>
                 <input type="checkbox" value={role} {...form.register('targetRoles')} />
@@ -126,52 +126,54 @@ export function BroadcastModal({ onClose }: { onClose: () => void }) {
               : 'Thông báo sẽ được gửi tới toàn hệ thống.'}
           </p>
         </fieldset>
-        <Field label="Tiêu đề" required error={form.formState.errors.subject?.message}>
-          <input
-            className="input"
-            {...form.register('subject')}
-            maxLength={255}
-            disabled={busy}
-            placeholder="Thông tin cần thông báo"
-          />
-        </Field>
-        <Field label="Nội dung" required error={form.formState.errors.content?.message}>
-          <textarea
-            className="input"
-            {...form.register('content')}
-            maxLength={2000}
-            rows={5}
-            disabled={busy}
-            placeholder="Viết nội dung ngắn gọn, rõ ràng…"
-          />
-        </Field>
-        <div className="form-grid">
-          <Field label="Loại thông báo">
-            <select className="input" {...form.register('priority')} disabled={busy}>
-              {BROADCAST_PRIORITIES.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Liên kết đính kèm">
-            <select className="input" {...form.register('actionUrl')} disabled={busy}>
-              <option value="">Không đính kèm</option>
-              {BROADCAST_LINK_TARGETS.map((item) => (
-                <option key={item.url} value={item.url}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
+        <div className="col-span-2">
+          <Field label="Tiêu đề" required error={form.formState.errors.subject?.message}>
+            <input
+              className="input"
+              {...form.register('subject')}
+              maxLength={255}
+              disabled={busy}
+              placeholder="Thông tin cần thông báo"
+            />
           </Field>
         </div>
-        <div className="broadcast-preview-box" aria-label="Xem trước thông báo">
+        <Field label="Loại thông báo">
+          <select className="input" {...form.register('priority')} disabled={busy}>
+            {BROADCAST_PRIORITIES.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Liên kết đính kèm">
+          <select className="input" {...form.register('actionUrl')} disabled={busy}>
+            <option value="">Không đính kèm</option>
+            {BROADCAST_LINK_TARGETS.map((item) => (
+              <option key={item.url} value={item.url}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div className="col-span-2">
+          <Field label="Nội dung" required error={form.formState.errors.content?.message}>
+            <textarea
+              className="input"
+              {...form.register('content')}
+              maxLength={2000}
+              rows={5}
+              disabled={busy}
+              placeholder="Viết nội dung ngắn gọn, rõ ràng…"
+            />
+          </Field>
+        </div>
+        <div className="broadcast-preview-box col-span-2" aria-label="Xem trước thông báo">
           <span className="broadcast-preview-label">Xem trước trong hộp thư người nhận</span>
           <NotificationCard parsed={preview} preview />
         </div>
         <FormError message={form.formState.errors.root?.message} />
-        <div className="form-actions">
+        <div className="form-actions account-editor-actions">
           <Button onClick={onClose} disabled={busy}>
             Hủy
           </Button>

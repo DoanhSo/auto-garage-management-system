@@ -29,7 +29,7 @@ export function EmployeeWorkSummaryModal({
       {query.isLoading && <Loading />}
       {query.isError && <QueryError error={query.error} retry={() => void query.refetch()} />}
       {summary && (
-        <div className="stack">
+        <div className="dialog-body">
           <MetricGrid
             label="Tổng hợp công việc"
             items={[
