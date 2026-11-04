@@ -6,8 +6,7 @@ docker/*
 !docker/backend-entrypoint.sh
 docs
 scripts
-target/*
-!target/AutoGarage-0.0.1-SNAPSHOT.jar
+target
 .env
 .env.*
 .docker-local

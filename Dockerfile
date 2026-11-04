@@ -1,8 +1,18 @@
+# Stage 1: Build package from source
+FROM eclipse-temurin:21-jdk-alpine AS builder
+WORKDIR /build
+COPY .mvn .mvn
+COPY mvnw pom.xml ./
+RUN chmod +x mvnw
+COPY src src
+RUN ./mvnw clean package -DskipTests -B
+
+# Stage 2: Minimal runtime image
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 RUN addgroup -S garage && adduser -S garage -G garage \
     && mkdir -p /app/data/attachments && chown -R garage:garage /app/data
-COPY target/AutoGarage-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=builder /build/target/AutoGarage-0.0.1-SNAPSHOT.jar app.jar
 COPY docker/backend-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh && mkdir -p /app/data/attachments && chown -R garage:garage /app/data
 USER garage
