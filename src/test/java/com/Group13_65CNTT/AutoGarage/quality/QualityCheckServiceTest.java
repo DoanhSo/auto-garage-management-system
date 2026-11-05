@@ -338,7 +338,9 @@ class QualityCheckServiceTest {
         assertThatThrownBy(() -> qualityService.performQualityCheck(99L, adminRequest()))
                 .isInstanceOf(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class)
                 .hasFieldOrPropertyWithValue("responseCode",
-                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.QC_INSPECTOR_NOT_ASSIGNED);
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.QC_INSPECTOR_NOT_ASSIGNED)
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException.class)
+                .hasMessageContaining("chưa phân công kỹ thuật viên QC");
         verifyNoInteractions(vehicleCheckRepository);
     }
 

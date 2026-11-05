@@ -31,6 +31,7 @@ import com.Group13_65CNTT.AutoGarage.repair.repository.RepairTaskRepository;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.Employee;
 import com.Group13_65CNTT.AutoGarage.scheduling.repository.EmployeeRepository;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
+import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,17 +75,17 @@ public class QualityServiceImpl implements QualityService {
                 .distinct()
                 .toList();
         if (assignedIds.isEmpty()) {
-            throw new BusinessException(ResponseCode.QC_INSPECTOR_NOT_ASSIGNED,
-                    "Phiếu chưa phân công kỹ thuật viên QC");
+            throw new ConflictException(ResponseCode.QC_INSPECTOR_NOT_ASSIGNED,
+                    "Phiếu chưa phân công kỹ thuật viên QC. Hãy phân công một kỹ thuật viên có quyền QC cho một công việc của phiếu rồi thử lại");
         }
         if (assignedIds.size() > 1) {
-            throw new BusinessException(ResponseCode.QC_INSPECTOR_INVALID,
+            throw new ConflictException(ResponseCode.QC_INSPECTOR_INVALID,
                     "Phiếu có nhiều kỹ thuật viên QC đang được phân công, hãy giữ lại một người");
         }
         return employeeRepository.findById(assignedIds.get(0))
                 .filter(employee -> Boolean.TRUE.equals(employee.getIsActive())
                         && Boolean.TRUE.equals(employee.getCanQc()))
-                .orElseThrow(() -> new BusinessException(ResponseCode.QC_INSPECTOR_INVALID,
+                .orElseThrow(() -> new ConflictException(ResponseCode.QC_INSPECTOR_INVALID,
                         "Kỹ thuật viên QC được phân công không còn đủ điều kiện kiểm định"));
     }
 

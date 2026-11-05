@@ -18,3 +18,4 @@
 | 2026-11 | [Chốt dữ liệu theo giai đoạn phiếu sửa chữa](2026-11-repair-lifecycle-lock.md) | done (chưa /converge) | 11/11 bước; thiếu test RTL cho `RepairOrderDetailModal` và test riêng `RepairStageRules`; đã thử hủy/lập lại hóa đơn trên dữ liệu thật |
 | 2026-11 | [Phân tích hệ thống & ERD Chen](2026-11-system-analysis-erd.md) | done (chưa /converge) | 10/10 bước; lưu trước khi ghi đè bằng plan `qc-admin-on-behalf` |
 | 2026-11 | [Admin ghi QC thay kỹ thuật viên](2026-11-qc-admin-on-behalf.md) | partial | AC-5 (nút QC theo vai trò) và AC-6 (sửa xe) chưa xác minh trên trình duyệt; chưa có test RTL cho nút QC |
+| 2026-11 | [Phân công QC tại màn lệnh sửa chữa](2026-11-qc-assignment-on-order.md) | partial | AC-5 (403 theo vai trò) và AC-6..8 chưa xác minh trên trình duyệt; thiếu test riêng cho đường QC khi người được chọn ngoài ca |
