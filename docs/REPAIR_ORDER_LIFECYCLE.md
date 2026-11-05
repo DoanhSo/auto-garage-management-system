@@ -134,6 +134,7 @@ DRAFT ──gửi──► SENT ──khách duyệt từng dòng──► PARTI
 |---|---|
 | QC chỉ làm khi `WAITING_QC`, mọi công việc đã `COMPLETED` và không còn đồng hồ chạy | ✅ `QualityServiceImpl`, dòng 71–82 |
 | Người QC phải đang trong ca và không phải thợ chính của phiếu | ✅ dòng 94–100 |
+| Admin được ghi QC thay kỹ thuật viên QC đã phân công: người kiểm định, nhật ký công và thưởng QC tính cho kỹ thuật viên đó, biên bản lưu `checkedBy` là admin. Phiếu chưa phân công QC (`QC_INSPECTOR_NOT_ASSIGNED`) hoặc có nhiều hơn một người, hoặc người đó không đủ điều kiện (`QC_INSPECTOR_INVALID`) thì bị từ chối | ✅ `QualityServiceImpl.resolveInspector` |
 | Mỗi lần QC tạo một biên bản mới, không sửa biên bản cũ; `latestQcCheckId` trỏ biên bản mới nhất | ✅ |
 | `IN_PROGRESS → WAITING_QC` (chuyển tay) bị chặn khi còn việc chưa xong hoặc đồng hồ chạy | ✅ `RepairServiceImpl.transitionStatus` |
 | Ảnh `QC` chỉ tải lên khi `WAITING_QC` / `QC_FAILED` / `COMPLETED` | ✅ `AttachmentServiceImpl` |

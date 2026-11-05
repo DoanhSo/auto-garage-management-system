@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { errorMessage } from '../../../shared/api/errors';
 import { Button, Field, FormError, Sheet } from '../../../shared/components/ui';
@@ -15,6 +16,7 @@ export function PerformQCModal({
   onClose: () => void;
 }) {
   const notify = useToast();
+  const { user } = useAuth();
   const performQC = usePerformQualityCheckMutation();
 
   const [result, setResult] = useState<CheckResult>('PASSED');
@@ -61,7 +63,11 @@ export function PerformQCModal({
       placement="center"
       size="md"
       title="Kiểm định chất lượng sau sửa chữa (QC)"
-      description="Kiểm tra toàn bộ các hạng mục đã hoàn thành, lắp ráp phụ tùng và chạy thử trước khi bàn giao xe."
+      description={
+        user?.role === 'ADMIN'
+          ? 'Kết quả được ghi thay cho kỹ thuật viên QC đã phân công trên phiếu.'
+          : 'Kiểm tra toàn bộ các hạng mục đã hoàn thành, lắp ráp phụ tùng và chạy thử trước khi bàn giao xe.'
+      }
     >
       <form onSubmit={handleSubmit} noValidate className="modal-form">
         <FormError message={performQC.error ? errorMessage(performQC.error) : undefined} />

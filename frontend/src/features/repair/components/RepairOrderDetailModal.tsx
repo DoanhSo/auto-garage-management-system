@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
-import { FRONT_DESK_ROLES, TECHNICAL_ROLES } from '../../../app/access';
+import { FRONT_DESK_ROLES, QC_ROLES, TECHNICAL_ROLES } from '../../../app/access';
 import { useVehicleQuery } from '../../vehicle/hooks/useVehicles';
 import {
   useOnShiftTechniciansQuery,
@@ -88,6 +88,7 @@ export function RepairOrderDetailModal({
   const { user } = useAuth();
   const isCustomer = user?.role === 'CUSTOMER';
   const canTechnical = !!user && TECHNICAL_ROLES.includes(user.role);
+  const canPerformQc = !!user && QC_ROLES.includes(user.role);
   const canFrontDesk = !!user && FRONT_DESK_ROLES.includes(user.role);
   const canDecideEstimate = isCustomer || canFrontDesk;
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -328,12 +329,11 @@ export function RepairOrderDetailModal({
                     <ArrowRight size={15} /> Yêu cầu kiểm tra QC
                   </Button>
                 )}
-                {canTechnical &&
-                  (order.status === 'WAITING_QC' || order.status === 'QC_FAILED') && (
-                    <Button variant="primary" onClick={() => setPerformQCOpen(true)}>
-                      <ShieldCheck size={15} /> Kiểm tra chất lượng (QC)
-                    </Button>
-                  )}
+                {canPerformQc && order.status === 'WAITING_QC' && (
+                  <Button variant="primary" onClick={() => setPerformQCOpen(true)}>
+                    <ShieldCheck size={15} /> Kiểm tra chất lượng (QC)
+                  </Button>
+                )}
                 {canFrontDesk && order.status === 'COMPLETED' && (
                   <Button variant="primary" onClick={() => setHandoverOpen(true)}>
                     <UserCheck size={15} /> Bàn giao xe

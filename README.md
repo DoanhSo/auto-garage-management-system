@@ -8,6 +8,7 @@ Hệ thống quản lý gara một chi nhánh, Java 21/Spring Boot 4.1.1/MySQL 8
 - [Kiến trúc thực tế](docs/ARCHITECTURE.md), [phân công TV1–TV4](docs/WORK_BREAKDOWN.md), [kế hoạch/trạng thái TV1](docs/TV1_IMPLEMENTATION_PLAN.md).
 - [API auth/tài khoản (Keycloak OIDC Resource Server)](docs/api/SECURITY.md), [API audit/notification/report và I08](docs/api/TV1.md).
 - [Thiết lập Keycloak, quản trị viên đầu tiên và nâng cấp realm đã tồn tại](docs/KEYCLOAK_SETUP.md).
+- [Phân tích hệ thống](docs/analysis/): mô tả bài toán, BR01–BR24, 38 use case, DFD, 8 luồng hoạt động, ma trận CRUD; [ERD chuẩn Chen](docs/erd/README.md) khớp V19.
 - [Database](docs/DATABASE.md), [data dictionary](docs/DATA_DICTIONARY.md), [I01–I08](docs/SERVICE_CONTRACTS.md), [T01–T38](docs/ACCEPTANCE_TESTS.md).
 - [Kết quả kiểm chứng thực tế](docs/VALIDATION.md).
 - [Bộ Docker chạy ngay, tài khoản và dữ liệu DEMO](docs/DOCKER.md).
@@ -38,6 +39,15 @@ Từ thư mục chứa `pom.xml`; cần JDK 21 và Docker đang chạy:
 docker compose up -d --wait mysql keycloak-postgres keycloak
 # Tạo quản trị viên gara và cấu hình bootstrap theo docs/KEYCLOAK_SETUP.md trước lần chạy đầu.
 .\mvnw.cmd spring-boot:run
+```
+
+Chạy toàn bộ hệ thống bằng container: `Dockerfile` của backend và frontend chỉ chép file đã build sẵn (`target/*.jar`, `frontend/dist`), nên phải build trước khi build image, nếu không container vẫn chứa code cũ:
+
+```powershell
+.\mvnw.cmd -DskipTests package
+npm --prefix frontend run build
+docker compose build backend frontend
+docker compose up -d --wait backend frontend
 ```
 
 Script tạo secret ngẫu nhiên trong `.env` riêng và không ghi đè file đã có. Dịch vụ `keycloak` tự động nạp cấu hình realm từ [`docker/keycloak/realm-export.json`](docker/keycloak/realm-export.json) (`autogarage-realm`, 5 roles, `autogarage-frontend` với PKCE S256 & Refresh Token Rotation, `autogarage-api` Resource Server).
