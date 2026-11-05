@@ -8,7 +8,9 @@ import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.*;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.RepairOrderResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.RepairTaskResponse;
+import com.Group13_65CNTT.AutoGarage.repair.dto.response.TaskAssignmentResponse;
 import com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrderStatus;
+import com.Group13_65CNTT.AutoGarage.repair.service.LaborExecutionService;
 import com.Group13_65CNTT.AutoGarage.repair.service.RepairService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -32,6 +34,7 @@ import java.util.List;
 public class RepairOrderController {
 
     private final RepairService repairService;
+    private final LaborExecutionService laborExecutionService;
     private final CurrentUserProvider currentUserProvider;
 
     @PostMapping
@@ -128,6 +131,29 @@ public class RepairOrderController {
             HttpServletRequest httpRequest) {
         Long actorId = currentUserProvider.userId();
         RepairOrderResponse response = repairService.handOverOrder(actorId, id, request);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
+    }
+
+    @PostMapping("/{id}/qc-assignment")
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
+    @Operation(summary = "Phân công (hoặc đổi) kỹ thuật viên QC cho phiếu đang chờ QC")
+    public ResponseEntity<ApiResponse<TaskAssignmentResponse>> assignQcInspector(
+            @PathVariable Long id,
+            @Valid @RequestBody QcAssignmentRequest request,
+            HttpServletRequest httpRequest) {
+        Long actorId = currentUserProvider.userId();
+        TaskAssignmentResponse response = laborExecutionService.assignQcInspector(actorId, id, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                ApiResponse.success(ResponseCode.CREATED, response, httpRequest.getRequestURI()));
+    }
+
+    @GetMapping("/{id}/qc-assignment")
+    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @Operation(summary = "Lấy kỹ thuật viên QC đang được phân công của phiếu (null nếu chưa có)")
+    public ResponseEntity<ApiResponse<TaskAssignmentResponse>> getQcAssignment(
+            @PathVariable Long id,
+            HttpServletRequest httpRequest) {
+        TaskAssignmentResponse response = laborExecutionService.getQcAssignment(id);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
 

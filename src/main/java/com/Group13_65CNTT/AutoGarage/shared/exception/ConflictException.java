@@ -8,6 +8,10 @@ public class ConflictException extends BusinessException {
         super(ResponseCode.DUPLICATE_RESOURCE, message);
     }
 
+    public ConflictException(ResponseCode responseCode, String message) {
+        super(responseCode, message);
+    }
+
     public ConflictException(ResponseCode responseCode) {
         super(responseCode);
     }
