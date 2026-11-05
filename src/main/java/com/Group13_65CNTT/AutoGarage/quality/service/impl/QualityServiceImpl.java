@@ -4,7 +4,10 @@ import com.Group13_65CNTT.AutoGarage.common.security.ActorIds;
 import com.Group13_65CNTT.AutoGarage.common.enums.AccessResource;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.common.enums.Role;
+import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
+import com.Group13_65CNTT.AutoGarage.repair.entity.TaskAssignment;
 import com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService;
 import com.Group13_65CNTT.AutoGarage.quality.dto.request.QualityCheckCreateRequest;
 import com.Group13_65CNTT.AutoGarage.quality.dto.response.QualityCheckResponse;
@@ -53,6 +56,37 @@ public class QualityServiceImpl implements QualityService {
     private final com.Group13_65CNTT.AutoGarage.repair.repository.TaskAssignmentRepository assignmentRepository;
     private final WorkLogRecorder workLogRecorder;
     private final RepairOrderAssignmentRepository workLogRepository;
+    private final CurrentUserProvider currentUserProvider;
+
+    /**
+     * A technician inspects as themselves and must be an active, QC-capable employee.
+     * An admin records the result on behalf of the single QC inspector assigned to the order.
+     */
+    private Employee resolveInspector(long actorId, RepairOrder order) {
+        if (currentUserProvider.role() != Role.ADMIN) {
+            return employeeRepository.findByUserId(actorId)
+                    .filter(employee -> Boolean.TRUE.equals(employee.getIsActive())
+                            && Boolean.TRUE.equals(employee.getCanQc()))
+                    .orElseThrow(() -> new BusinessException(ResponseCode.FORBIDDEN));
+        }
+        List<Long> assignedIds = assignmentRepository.findActiveQcForOrder(order.getId()).stream()
+                .map(TaskAssignment::getEmployeeId)
+                .distinct()
+                .toList();
+        if (assignedIds.isEmpty()) {
+            throw new BusinessException(ResponseCode.QC_INSPECTOR_NOT_ASSIGNED,
+                    "Phiếu chưa phân công kỹ thuật viên QC");
+        }
+        if (assignedIds.size() > 1) {
+            throw new BusinessException(ResponseCode.QC_INSPECTOR_INVALID,
+                    "Phiếu có nhiều kỹ thuật viên QC đang được phân công, hãy giữ lại một người");
+        }
+        return employeeRepository.findById(assignedIds.get(0))
+                .filter(employee -> Boolean.TRUE.equals(employee.getIsActive())
+                        && Boolean.TRUE.equals(employee.getCanQc()))
+                .orElseThrow(() -> new BusinessException(ResponseCode.QC_INSPECTOR_INVALID,
+                        "Kỹ thuật viên QC được phân công không còn đủ điều kiện kiểm định"));
+    }
 
     @Override
     @Transactional
@@ -82,11 +116,7 @@ public class QualityServiceImpl implements QualityService {
             throw new BusinessRuleException("Vẫn còn phiên làm việc (timer) của kỹ thuật viên chưa kết thúc");
         }
 
-        // Only an active, QC-capable employee assigned to inspect this order may record QC.
-        Employee inspector = employeeRepository.findByUserId(actorId)
-                .filter(employee -> Boolean.TRUE.equals(employee.getIsActive())
-                        && Boolean.TRUE.equals(employee.getCanQc()))
-                .orElseThrow(() -> new BusinessException(ResponseCode.FORBIDDEN));
+        Employee inspector = resolveInspector(actorId, order);
 
         // Four-eyes principle: inspector must be on shift and must not be a main repairer of this order.
         Instant inspectionTime = Instant.now();

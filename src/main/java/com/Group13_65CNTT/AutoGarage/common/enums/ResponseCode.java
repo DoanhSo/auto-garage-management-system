@@ -50,6 +50,10 @@ public enum ResponseCode {
             2018, "Vehicle does not belong to the selected customer", HttpStatus.BAD_REQUEST),
     BAY_UNAVAILABLE(
             2019, "Service bay is already reserved for the requested period", HttpStatus.CONFLICT),
+    QC_INSPECTOR_NOT_ASSIGNED(
+            2020, "Repair order has no active QC inspector assigned", HttpStatus.CONFLICT),
+    QC_INSPECTOR_INVALID(
+            2021, "Assigned QC inspector cannot perform this inspection", HttpStatus.CONFLICT),
     UNAUTHORIZED(3001, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),
     FORBIDDEN(3002, "You do not have permission for this operation", HttpStatus.FORBIDDEN),
     INVALID_TOKEN(3003, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),
