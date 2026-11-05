@@ -79,6 +79,9 @@ function VehicleForm({
         await update.mutateAsync({
           id: existing.id,
           values: {
+            licensePlate: values.licensePlate?.trim() || existing.licensePlate,
+            vin: values.vin?.trim() || null,
+            engineNumber: values.engineNumber?.trim() || null,
             brand: values.brand.trim(),
             model: values.model.trim(),
             manufactureYear: values.manufactureYear ? Number(values.manufactureYear) : null,
@@ -156,12 +159,18 @@ function VehicleForm({
           </Field>
         </div>
 
-        <Field label="Biển số xe" required={!existing} error={errors.licensePlate?.message}>
+        <Field
+          label="Biển số xe"
+          required={!existing}
+          error={errors.licensePlate?.message}
+          hint={existing ? 'Biển số xe là mã định danh cố định không thể sửa đổi.' : undefined}
+        >
           <input
             type="text"
             className="input"
             placeholder="Ví dụ: 30A-12345, 51K-99999"
-            disabled={Boolean(existing) || busy}
+            readOnly={Boolean(existing)}
+            disabled={busy}
             {...register('licensePlate')}
           />
         </Field>

@@ -103,6 +103,9 @@ export interface VehicleCreate {
 }
 
 export interface VehicleUpdate {
+  licensePlate?: string;
+  vin?: string | null;
+  engineNumber?: string | null;
   brand?: string;
   model?: string;
   manufactureYear?: number | null;

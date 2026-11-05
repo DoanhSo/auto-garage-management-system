@@ -8,5 +8,6 @@ Mỗi lỗi có một file `<slug>.md` theo [`_TEMPLATE.md`](_TEMPLATE.md), tạ
 |---|---|---|---|
 | 2026-11-03 | Chuông đọc "0 chưa đọc" | Số lượng dạng chuỗi `"0"` bị coi là có giá trị (`NotificationPopover.tsx`) | verified |
 | 2026-11-03 | Thông báo khẩn mang badge "Thông báo chung" | Parser luôn lấy nhãn theo nhóm, bỏ qua mức ưu tiên (`notificationParser.ts`) | verified |
+| 2026-11-05 | [Mất định dạng biển số xe khi load và gửi form chỉnh sửa](2026-11-vehicle-edit-license-plate-format-stripping.md) | `VehicleServiceImpl` bóc tách ký tự `-` và `.`; `UpdateVehicleRequest` yêu cầu `@NotBlank` khiến payload cập nhật bị từ chối | verified |
 
 _Hai lỗi trên được sửa trước khi có quy trình này nên không có file hồ sơ riêng; chi tiết nằm trong [plan Thông báo](../plans/2026-11-notifications.md)._

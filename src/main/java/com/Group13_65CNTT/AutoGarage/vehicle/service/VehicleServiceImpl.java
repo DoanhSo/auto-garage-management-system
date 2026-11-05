@@ -120,13 +120,17 @@ public class VehicleServiceImpl implements VehicleService {
         Vehicle vehicle = vehicleRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phương tiện với ID: " + id));
 
-        String normalizedPlate = normalizePlate(request.getLicensePlate());
-        if (vehicleRepository.existsByLicensePlateAndIdNot(normalizedPlate, id)) {
-            throw new BusinessException(
-                    ResponseCode.VEHICLE_PLATE_DUPLICATE,
-                    "Biển số xe " + normalizedPlate + " đã tồn tại ở phương tiện khác");
+        if (request.getLicensePlate() != null && !request.getLicensePlate().isBlank()) {
+            String normalizedPlate = normalizePlate(request.getLicensePlate());
+            if (vehicleRepository.existsByLicensePlateAndIdNot(normalizedPlate, id)) {
+                throw new BusinessException(
+                        ResponseCode.VEHICLE_PLATE_DUPLICATE,
+                        "Biển số xe " + normalizedPlate + " đã tồn tại ở phương tiện khác");
+            }
+            request.setLicensePlate(normalizedPlate);
+        } else {
+            request.setLicensePlate(vehicle.getLicensePlate());
         }
-        request.setLicensePlate(normalizedPlate);
 
         if (request.getVin() != null && !request.getVin().isBlank()) {
             String cleanVin = request.getVin().trim().toUpperCase();
@@ -284,6 +288,6 @@ public class VehicleServiceImpl implements VehicleService {
         if (plate == null) {
             return "";
         }
-        return plate.replaceAll("[\\s.-]", "").toUpperCase();
+        return plate.trim().replaceAll("\\s+", "").toUpperCase();
     }
 }

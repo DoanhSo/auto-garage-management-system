@@ -1,14 +1,12 @@
 package com.Group13_65CNTT.AutoGarage.vehicle.dto;
 
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
 public class UpdateVehicleRequest {
 
-    @NotBlank(message = "Biển số xe không được để trống")
     @Size(max = 20, message = "Biển số xe tối đa 20 ký tự")
     private String licensePlate;
 
@@ -18,11 +16,11 @@ public class UpdateVehicleRequest {
     @Size(max = 50, message = "Số máy tối đa 50 ký tự")
     private String engineNumber;
 
-    @NotBlank(message = "Hãng xe không được để trống")
+    @jakarta.validation.constraints.NotBlank(message = "Hãng xe không được để trống")
     @Size(max = 80, message = "Hãng xe tối đa 80 ký tự")
     private String brand;
 
-    @NotBlank(message = "Dòng xe (model) không được để trống")
+    @jakarta.validation.constraints.NotBlank(message = "Dòng xe (model) không được để trống")
     @Size(max = 80, message = "Dòng xe tối đa 80 ký tự")
     private String model;
 
