@@ -12,6 +12,7 @@ import {
   type TransferOwnershipFormValues,
 } from '../schemas/vehicleSchema';
 import { ShieldAlert } from 'lucide-react';
+import { formatPlate } from '../../../shared/utils/format';
 
 export function TransferOwnershipDialog({
   vehicle,
@@ -65,7 +66,7 @@ export function TransferOwnershipDialog({
           transferNote: values.transferNote?.trim() || null,
         },
       });
-      notify(`Đã chuyển nhượng quyền sở hữu xe ${vehicle.licensePlate} thành công`);
+      notify(`Đã chuyển nhượng quyền sở hữu xe ${formatPlate(vehicle.licensePlate)} thành công`);
       reset();
       onClose();
     } catch (err: unknown) {
@@ -81,7 +82,7 @@ export function TransferOwnershipDialog({
       onClose={onClose}
       placement="center"
       size="md"
-      title={`Chuyển nhượng xe ${vehicle.licensePlate}`}
+      title={`Chuyển nhượng xe ${formatPlate(vehicle.licensePlate)}`}
       description={`Chuyển giao quyền sở hữu xe ${vehicle.brand} ${vehicle.model} cho khách hàng mới.`}
     >
       <form

@@ -239,7 +239,7 @@ class VehicleServiceTest {
 
         assertNotNull(timeline);
         assertEquals(100L, timeline.getVehicleId());
-        assertEquals("51F12345", timeline.getLicensePlate());
+        assertEquals("51F-123.45", timeline.getLicensePlate());
         assertEquals("Tran Van Chu Xe", timeline.getCurrentCustomerName());
     }
 

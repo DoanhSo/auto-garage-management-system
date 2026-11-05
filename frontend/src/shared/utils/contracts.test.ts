@@ -2,7 +2,7 @@ import { vehicleCheckSchema, vehicleTimelineSchema } from '../types/schemas';
 import { describe, expect, it } from 'vitest';
 import { decodeJson, encodeJson, numericVersion } from '../api/json';
 import { dateRange, reportFileName, dateTimeInput } from './dates';
-import { money, safeReturnTo } from './format';
+import { money, safeReturnTo, formatPlate } from './format';
 import {
   loginSchema,
   passwordChangeSchema,
@@ -183,5 +183,16 @@ describe('Reception response contracts', () => {
         tasksDone: ['Brake service'], partsReplaced: [], technicalAttachments: [] }] });
     expect(result.historyEntries[0].isCurrentOwnerRecord).toBe(false);
     expect(result.historyEntries[0].totalAmount).toBeNull();
+  });
+
+  it('formats vehicle license plate to standard Vietnamese format (e.g. 14A-567.89)', () => {
+    expect(formatPlate('14A56789')).toBe('14A-567.89');
+    expect(formatPlate('14A-567.89')).toBe('14A-567.89');
+    expect(formatPlate('14A-56789')).toBe('14A-567.89');
+    expect(formatPlate('26K56789')).toBe('26K-567.89');
+    expect(formatPlate('29A1234')).toBe('29A-1234');
+    expect(formatPlate('29H156789')).toBe('29H1-567.89');
+    expect(formatPlate('')).toBe('');
+    expect(formatPlate(null)).toBe('');
   });
 });

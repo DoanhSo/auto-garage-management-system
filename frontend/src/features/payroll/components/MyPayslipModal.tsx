@@ -1,5 +1,5 @@
 import { Badge, Modal } from '../../../shared/components/ui';
-import { formatDate, money } from '../../../shared/utils/format';
+import { formatDate, money, formatPlate } from '../../../shared/utils/format';
 import {
   commissionStatusLabels,
   commissionTypeLabels,
@@ -100,7 +100,7 @@ export function MyPayslipModal({
                         </td>
                         <td>{row.bayCode ?? '—'}</td>
                         <td>
-                          <strong>{row.licensePlate ?? '—'}</strong>
+                          <strong>{row.licensePlate ? formatPlate(row.licensePlate) : '—'}</strong>
                         </td>
                         <td className="tabular">#{row.repairOrderId}</td>
                         <td className="tabular">

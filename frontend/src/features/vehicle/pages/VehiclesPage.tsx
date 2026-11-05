@@ -26,7 +26,7 @@ import {
 import { DataTable } from '../../../shared/components/DataTable';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { errorMessage } from '../../../shared/api/errors';
-import { formatDate } from '../../../shared/utils/format';
+import { formatDate, formatPlate } from '../../../shared/utils/format';
 import type { Vehicle } from '../../../shared/types/contracts';
 import {
   useVehiclesQuery,
@@ -101,7 +101,7 @@ export function VehiclesPage() {
     async (vehicle: Vehicle) => {
       try {
         await activateVehicle(vehicle.id);
-        notify(`Đã mở lại phương tiện "${vehicle.licensePlate}"`);
+        notify(`Đã mở lại phương tiện "${formatPlate(vehicle.licensePlate)}"`);
       } catch (err: unknown) {
         notify(errorMessage(err));
       }
@@ -113,7 +113,7 @@ export function VehiclesPage() {
     if (!deactivatingVehicle) return;
     try {
       await deleteMutation.mutateAsync(deactivatingVehicle.id);
-      notify(`Đã ngừng hoạt động phương tiện "${deactivatingVehicle.licensePlate}"`);
+      notify(`Đã ngừng hoạt động phương tiện "${formatPlate(deactivatingVehicle.licensePlate)}"`);
       setDeactivatingVehicle(null);
     } catch (err: unknown) {
       notify(errorMessage(err));
@@ -127,7 +127,7 @@ export function VehiclesPage() {
         header: 'Biển số & Định danh',
         cell: ({ row }) => (
           <div>
-            <span className="plate-badge">{row.original.licensePlate}</span>
+            <span className="plate-badge">{formatPlate(row.original.licensePlate)}</span>
             {row.original.vin && (
               <div className="muted" style={{ marginTop: 4 }}>
                 <span className="code-tag">VIN: {row.original.vin}</span>
@@ -222,7 +222,7 @@ export function VehiclesPage() {
             <div className="row-actions">
               <Button
                 variant="ghost"
-                aria-label={`Lịch sử kỹ thuật xe ${vehicle.licensePlate}`}
+                aria-label={`Lịch sử kỹ thuật xe ${formatPlate(vehicle.licensePlate)}`}
                 onClick={() => handleOpenTimeline(vehicle.id)}
               >
                 <History size={16} />
@@ -232,7 +232,7 @@ export function VehiclesPage() {
               {canManage && (
                 <Button
                   variant="ghost"
-                  aria-label={`Chuyển nhượng quyền sở hữu xe ${vehicle.licensePlate}`}
+                  aria-label={`Chuyển nhượng quyền sở hữu xe ${formatPlate(vehicle.licensePlate)}`}
                   onClick={() => handleOpenTransfer(vehicle)}
                 >
                   <ArrowRightLeft size={16} />
@@ -243,7 +243,7 @@ export function VehiclesPage() {
               {canManage && (
                 <Button
                   variant="ghost"
-                  aria-label={`Sửa thông tin xe ${vehicle.licensePlate}`}
+                  aria-label={`Sửa thông tin xe ${formatPlate(vehicle.licensePlate)}`}
                   onClick={() => handleOpenEdit(vehicle.id)}
                 >
                   <SquarePen size={16} />
@@ -255,7 +255,7 @@ export function VehiclesPage() {
                 <Button
                   variant="ghost"
                   className="delete-action"
-                  aria-label={`Ngừng hoạt động xe ${vehicle.licensePlate}`}
+                  aria-label={`Ngừng hoạt động xe ${formatPlate(vehicle.licensePlate)}`}
                   onClick={() => setDeactivatingVehicle(vehicle)}
                 >
                   <Trash2 size={16} />
@@ -266,7 +266,7 @@ export function VehiclesPage() {
               {canManage && !vehicle.isActive && (
                 <Button
                   variant="ghost"
-                  aria-label={`Mở lại xe ${vehicle.licensePlate}`}
+                  aria-label={`Mở lại xe ${formatPlate(vehicle.licensePlate)}`}
                   pending={activatingId === vehicle.id}
                   onClick={() => handleActivate(vehicle)}
                 >
@@ -391,7 +391,7 @@ export function VehiclesPage() {
       <ConfirmDialog
         open={Boolean(deactivatingVehicle)}
         title="Xác nhận ngừng hoạt động phương tiện"
-        description={`Bạn có chắc muốn chuyển phương tiện biển số "${deactivatingVehicle?.licensePlate}" sang trạng thái ngừng hoạt động? Xe này sẽ không thể tạo lệnh sửa chữa mới.`}
+        description={`Bạn có chắc muốn chuyển phương tiện biển số "${formatPlate(deactivatingVehicle?.licensePlate)}" sang trạng thái ngừng hoạt động? Xe này sẽ không thể tạo lệnh sửa chữa mới.`}
         confirmLabel="Ngừng hoạt động"
         danger
         onConfirm={handleConfirmDeactivate}

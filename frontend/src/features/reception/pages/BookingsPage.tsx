@@ -26,7 +26,7 @@ import { DataTable } from '../../../shared/components/DataTable';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import { errorMessage } from '../../../shared/api/errors';
-import { formatDateTime } from '../../../shared/utils/format';
+import { formatDateTime, formatPlate } from '../../../shared/utils/format';
 import type { Booking, BookingStatus } from '../../../shared/types/contracts';
 import {
   useBookingsQuery,
@@ -164,7 +164,7 @@ export function BookingsPage() {
         header: 'Phương tiện',
         cell: ({ row }) => (
           <div>
-            <span className="plate-badge">{row.original.licensePlate}</span>
+            <span className="plate-badge">{formatPlate(row.original.licensePlate)}</span>
             {row.original.vehicleModel && (
               <div className="muted" style={{ marginTop: 2 }}>
                 {row.original.vehicleModel}
@@ -213,7 +213,7 @@ export function BookingsPage() {
               {canManage && b.status === 'CONFIRMED' && (
                 <Button
                   variant="primary"
-                  aria-label={`Tiếp nhận xe ${b.licensePlate} vào xưởng`}
+                  aria-label={`Tiếp nhận xe ${formatPlate(b.licensePlate)} vào xưởng`}
                   onClick={() => {
                     setCheckInBooking(b);
                     setCheckInOpen(true);

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { Vehicle } from '../../../shared/types/contracts';
 import { Button, Empty, StatusBadge } from '../../../shared/components/ui';
-import { formatDate } from '../../../shared/utils/format';
+import { formatDate, formatPlate } from '../../../shared/utils/format';
 
 export function VehicleCards({
   canManage = false,
@@ -53,7 +53,7 @@ export function VehicleCards({
         return (
           <li key={v.id}>
             <div className="user-card-top">
-              <span className="plate-badge">{v.licensePlate}</span>
+              <span className="plate-badge">{formatPlate(v.licensePlate)}</span>
               <div>
                 <strong>
                   {v.brand} {v.model}
@@ -103,7 +103,7 @@ export function VehicleCards({
               <div className="row-actions">
                 <Button
                   variant="ghost"
-                  aria-label={`Lịch sử kỹ thuật xe ${v.licensePlate}`}
+                  aria-label={`Lịch sử kỹ thuật xe ${formatPlate(v.licensePlate)}`}
                   onClick={() => onTimeline(v.id)}
                 >
                   <History size={16} />
@@ -113,7 +113,7 @@ export function VehicleCards({
                 {canManage && (
                   <Button
                     variant="ghost"
-                    aria-label={`Chuyển nhượng xe ${v.licensePlate}`}
+                    aria-label={`Chuyển nhượng xe ${formatPlate(v.licensePlate)}`}
                     onClick={() => onTransfer(v)}
                   >
                     <ArrowRightLeft size={16} />
@@ -124,7 +124,7 @@ export function VehicleCards({
                 {canManage && (
                   <Button
                     variant="ghost"
-                    aria-label={`Sửa thông tin xe ${v.licensePlate}`}
+                    aria-label={`Sửa thông tin xe ${formatPlate(v.licensePlate)}`}
                     onClick={(e) => onEdit(v.id, e.currentTarget)}
                   >
                     <SquarePen size={16} />
@@ -136,7 +136,7 @@ export function VehicleCards({
                   <Button
                     variant="ghost"
                     className="delete-action"
-                    aria-label={`Ngừng hoạt động xe ${v.licensePlate}`}
+                    aria-label={`Ngừng hoạt động xe ${formatPlate(v.licensePlate)}`}
                     onClick={() => onDeactivate(v)}
                   >
                     <Trash2 size={16} />
@@ -147,7 +147,7 @@ export function VehicleCards({
                 {canManage && !v.isActive && (
                   <Button
                     variant="ghost"
-                    aria-label={`Mở lại xe ${v.licensePlate}`}
+                    aria-label={`Mở lại xe ${formatPlate(v.licensePlate)}`}
                     pending={activatingId === v.id}
                     onClick={() => onActivate(v)}
                   >

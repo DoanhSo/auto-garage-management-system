@@ -19,7 +19,7 @@ import { errorMessage } from '../../../shared/api/errors';
 import { useRepairOrdersQuery } from '../../repair/hooks/useRepair';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
 import { useUiPolicy } from '../../../shared/config/policy';
-import { money, formatDate, formatDateTime } from '../../../shared/utils/format';
+import { money, formatDate, formatDateTime, formatPlate } from '../../../shared/utils/format';
 import { useEstimatesQuery, useSendEstimateMutation } from '../hooks/useEstimate';
 import { EstimateEditor } from '../components/EstimateEditor';
 import { EstimateDecisionModal } from '../components/EstimateDecisionModal';
@@ -148,7 +148,7 @@ function ReadyEstimates({
               <div>
                 <strong>#{order?.orderCode ?? row.original.repairOrderId}</strong>
                 <span>
-                  {v ? `${v.licensePlate} · ${v.brand} ${v.model}` : ''}
+                  {v ? `${formatPlate(v.licensePlate)} · ${v.brand} ${v.model}` : ''}
                   {v?.customerName && ` · ${v.customerName}`}
                 </span>
               </div>

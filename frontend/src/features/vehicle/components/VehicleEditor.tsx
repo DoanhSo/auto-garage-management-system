@@ -13,6 +13,7 @@ import {
   Sheet,
 } from '../../../shared/components/ui';
 import type { Vehicle } from '../../../shared/types/contracts';
+import { formatPlate } from '../../../shared/utils/format';
 import { useUnsavedChangesGuard } from '../../../shared/hooks/useUnsavedChangesGuard';
 import { useCustomersQuery } from '../../customer/hooks/useCustomers';
 import {
@@ -79,7 +80,7 @@ function VehicleForm({
         await update.mutateAsync({
           id: existing.id,
           values: {
-            licensePlate: values.licensePlate?.trim() || existing.licensePlate,
+            licensePlate: formatPlate(values.licensePlate) || formatPlate(existing.licensePlate),
             vin: values.vin?.trim() || null,
             engineNumber: values.engineNumber?.trim() || null,
             brand: values.brand.trim(),
@@ -95,7 +96,7 @@ function VehicleForm({
       } else {
         await create.mutateAsync({
           customerId: values.customerId,
-          licensePlate: values.licensePlate.trim().toUpperCase(),
+          licensePlate: formatPlate(values.licensePlate),
           vin: values.vin?.trim() || null,
           engineNumber: values.engineNumber?.trim() || null,
           brand: values.brand.trim(),
@@ -168,7 +169,7 @@ function VehicleForm({
           <input
             type="text"
             className="input"
-            placeholder="Ví dụ: 30A-12345, 51K-99999"
+            placeholder="Ví dụ: 14A-567.89, 30H-889.23"
             readOnly={Boolean(existing)}
             disabled={busy}
             {...register('licensePlate')}

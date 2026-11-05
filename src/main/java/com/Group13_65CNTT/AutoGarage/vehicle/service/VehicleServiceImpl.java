@@ -237,7 +237,7 @@ public class VehicleServiceImpl implements VehicleService {
 
         com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse timeline = new com.Group13_65CNTT.AutoGarage.vehicle.dto.VehicleTimelineResponse();
         timeline.setVehicleId(vehicle.getId());
-        timeline.setLicensePlate(vehicle.getLicensePlate());
+        timeline.setLicensePlate(VehicleMapper.formatPlate(vehicle.getLicensePlate()));
         timeline.setBrand(vehicle.getBrand());
         timeline.setModel(vehicle.getModel());
         timeline.setCurrentOdometer(vehicle.getOdometer());
@@ -288,6 +288,6 @@ public class VehicleServiceImpl implements VehicleService {
         if (plate == null) {
             return "";
         }
-        return plate.trim().replaceAll("\\s+", "").toUpperCase();
+        return VehicleMapper.formatPlate(plate);
     }
 }
