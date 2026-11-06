@@ -128,6 +128,9 @@ export const schedulingApi = {
   listShifts: (params?: {
     employeeId?: number;
     status?: ShiftStatus;
+    /** Ngày YYYY-MM-DD theo giờ xưởng; lấy mọi ca giao với khoảng này. */
+    from?: string;
+    to?: string;
     page?: number;
     size?: number;
   }) =>
@@ -136,6 +139,8 @@ export const schedulingApi = {
         queryString({
           employeeId: params?.employeeId,
           status: params?.status,
+          from: params?.from,
+          to: params?.to,
           page: params?.page ?? 0,
           size: params?.size ?? 50,
           sortBy: 'startsAt',

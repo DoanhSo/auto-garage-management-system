@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { errorMessage } from '../../../shared/api/errors';
 import { Button, Field, FormError, Modal } from '../../../shared/components/ui';
-import { useOnShiftTechniciansQuery } from '../../scheduling/hooks/useScheduling';
-import { SKILL_LABELS, availabilityLabels } from '../../scheduling/types/scheduling';
-import { useAssignQcInspectorMutation } from '../hooks/useRepair';
+import { formatDateTime } from '../../../shared/utils/format';
+import { SKILL_LABELS } from '../../scheduling/types/scheduling';
+import { useAssignQcInspectorMutation, useQcCandidatesQuery } from '../hooks/useRepair';
+import { QC_INELIGIBLE_LABELS } from '../types/repairTypes';
 import { DEFAULT_ASSIGNMENT_HOURS, toLocalInput } from '../utils/assignmentWindow';
 
 export function AssignQcModal({
@@ -18,20 +19,20 @@ export function AssignQcModal({
 }) {
   const notify = useToast();
   const assign = useAssignQcInspectorMutation();
-  const onShift = useOnShiftTechniciansQuery(open);
-  const inspectors = useMemo(
-    () => (onShift.data ?? []).filter((tech) => tech.canQc),
-    [onShift.data],
-  );
+  const candidatesQuery = useQcCandidatesQuery(orderId, open);
+  const candidates = useMemo(() => candidatesQuery.data ?? [], [candidatesQuery.data]);
+  const inspectors = useMemo(() => candidates.filter((tech) => tech.eligible), [candidates]);
 
   const [employeeId, setEmployeeId] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
+  const [listedAt, setListedAt] = useState('');
 
   useEffect(() => {
     if (!open) return;
     setEmployeeId('');
     const now = new Date();
+    setListedAt(now.toISOString());
     setStartsAt(toLocalInput(now));
     setEndsAt(toLocalInput(new Date(now.getTime() + DEFAULT_ASSIGNMENT_HOURS * 3_600_000)));
   }, [open]);
@@ -86,9 +87,9 @@ export function AssignQcModal({
             label="Kỹ thuật viên QC đang trực ca"
             required
             hint={
-              inspectors.length === 0
-                ? 'Chưa có kỹ thuật viên QC nào trong ca trực. Hãy xếp ca ở màn Khoang & lịch ca.'
-                : 'Chỉ hiển thị người có quyền QC và có ca trực bao phủ thời điểm hiện tại'
+              candidates.length === 0
+                ? 'Chưa có kỹ thuật viên QC nào trong ca trực lúc này. Hãy xếp ca ở màn Khoang & lịch ca.'
+                : `Theo ca đang trực lúc ${formatDateTime(listedAt)}, không phải ca của ngày nhập xe`
             }
           >
             <select
@@ -98,11 +99,13 @@ export function AssignQcModal({
               onChange={(e) => pickEmployee(e.target.value)}
             >
               <option value="">-- Chọn kỹ thuật viên --</option>
-              {inspectors.map((tech) => (
-                <option key={tech.employeeId} value={tech.employeeId}>
+              {candidates.map((tech) => (
+                <option key={tech.employeeId} value={tech.employeeId} disabled={!tech.eligible}>
                   {tech.fullName} ·{' '}
-                  {tech.skills.map((s) => SKILL_LABELS[s] ?? s).join(', ') || 'Đa năng'} ·{' '}
-                  {availabilityLabels[tech.availabilityStatus]}
+                  {tech.bayName
+                    ? `Khoang ${tech.bayName}`
+                    : tech.skills.map((s) => SKILL_LABELS[s] ?? s).join(', ') || 'Đa năng'}
+                  {tech.reason ? ` · ${QC_INELIGIBLE_LABELS[tech.reason]}` : ''}
                 </option>
               ))}
             </select>

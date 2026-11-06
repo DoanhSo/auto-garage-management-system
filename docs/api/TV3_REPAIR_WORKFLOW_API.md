@@ -28,6 +28,10 @@ Tài liệu bàn giao API và hợp đồng liên module cho toàn bộ 11 gói 
 }
 ```
 
+### `GET /api/v1/employee-shifts`
+
+Quyền: ADMIN, RECEPTIONIST, WAREHOUSE_STAFF, TECHNICIAN. Tham số lọc: `employeeId`, `status`, `from`, `to` (ngày `YYYY-MM-DD` theo múi giờ xưởng), phân trang. Khi có `from` và/hoặc `to`, trả mọi ca giao với khoảng `[from 00:00, to + 1 ngày 00:00)`, kể cả ca qua nửa đêm; không truyền thì giữ hành vi cũ. `to` trước `from` trả 400. Sơ đồ tuần của màn lịch ca dùng `from`/`to` của tuần đang xem.
+
 ### `POST /api/v1/employee-shifts`
 * **Mô tả:** Phân ca làm việc cho nhân viên (kiểm tra chống trùng ca, `endsAt > startsAt`).
 * **Quyền:** `ROLE_ADMIN`

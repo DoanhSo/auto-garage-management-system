@@ -15,6 +15,8 @@ import com.Group13_65CNTT.AutoGarage.scheduling.entity.ShiftStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
+
 public interface SchedulingService {
 
     EmployeeResponse createEmployee(EmployeeCreateRequest request);
@@ -45,7 +47,13 @@ public interface SchedulingService {
 
     Page<ShiftResponse> getEmployeeShifts(Long employeeId, Pageable pageable);
 
-    Page<ShiftResponse> getShifts(Long employeeId, ShiftStatus status, Pageable pageable);
+    default Page<ShiftResponse> getShifts(Long employeeId, ShiftStatus status, Pageable pageable) {
+        return getShifts(employeeId, status, null, null, pageable);
+    }
+
+    /** {@code from}/{@code to} are garage-local dates; shifts overlapping the whole range are returned. */
+    Page<ShiftResponse> getShifts(
+            Long employeeId, ShiftStatus status, LocalDate from, LocalDate to, Pageable pageable);
 
     ServiceBayResponse createServiceBay(ServiceBayCreateRequest request);
 

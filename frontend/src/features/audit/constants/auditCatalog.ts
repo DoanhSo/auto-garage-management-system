@@ -1,3 +1,5 @@
+import { normalizeSearchText } from '../../../shared/utils/text';
+
 export type AuditDomain =
   | 'security'
   | 'hr'
@@ -510,4 +512,20 @@ export function formatAuditEntity(type: string, id: string | null, label?: strin
 
 export function auditActionsOf(domain: AuditDomain | '') {
   return Object.entries(auditCatalog).filter(([, meta]) => !domain || meta.domain === domain);
+}
+
+/** Số mã hành động tối đa gửi kèm một lần tìm (khớp giới hạn của máy chủ). */
+export const AUDIT_SEARCH_ACTIONS_LIMIT = 50;
+
+/** Mã hành động có nhãn hoặc mô tả tiếng Việt chứa từ khóa (không phân biệt hoa thường và dấu). */
+export function auditActionCodesMatching(
+  term: string,
+  limit = AUDIT_SEARCH_ACTIONS_LIMIT,
+): string[] {
+  const needle = normalizeSearchText(term);
+  if (!needle) return [];
+  return Object.entries(auditCatalog)
+    .filter(([, meta]) => normalizeSearchText(`${meta.label} ${meta.description}`).includes(needle))
+    .map(([code]) => code)
+    .slice(0, limit);
 }

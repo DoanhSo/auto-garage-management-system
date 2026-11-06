@@ -25,7 +25,12 @@ import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { errorMessage } from '../../../shared/api/errors';
-import { usePaymentsQuery, usePaySupplierMutation } from '../hooks/useBilling';
+import {
+  usePaymentsQuery,
+  usePaySupplierMutation,
+  useSuggestPaymentCodeMutation,
+} from '../hooks/useBilling';
+import { validatePaymentAmount } from '../utils/paymentAmount';
 import { useSuppliersQuery, useDocumentsQuery } from '../../inventory/hooks/useInventory';
 import type {
   Payment,
@@ -63,6 +68,8 @@ export function PaymentsPage() {
   const [payAmount, setPayAmount] = useState<number>(0);
   const [payMethod, setPayMethod] = useState<PaymentMethod>('BANK_TRANSFER');
   const [payReference, setPayReference] = useState('');
+  const [payCode, setPayCode] = useState('');
+  const [payAmountError, setPayAmountError] = useState('');
   const [payNotes, setPayNotes] = useState('');
 
   const createTrigger = useRef<HTMLButtonElement>(null);
@@ -87,6 +94,19 @@ export function PaymentsPage() {
   });
 
   const paySupplierMutation = usePaySupplierMutation();
+  const suggestCode = useSuggestPaymentCodeMutation();
+  const selectedDocument = supplierDocuments.find((d) => String(d.id) === selectedDocumentId);
+
+  const refreshPayCode = () => {
+    suggestCode.mutate('OUT', { onSuccess: (code) => setPayCode(code) });
+  };
+
+  const openPaySupplier = () => {
+    setPayAmountError('');
+    setPayCode('');
+    refreshPayCode();
+    setPayingSupplier(true);
+  };
 
   const filterCount = (query.trim() ? 1 : 0) + (direction !== '' ? 1 : 0);
   const isFiltered =
@@ -102,16 +122,24 @@ export function PaymentsPage() {
 
   const handlePaySupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDocumentId || payAmount <= 0) {
-      notify('Vui lòng chọn chứng từ nhập kho và nhập số tiền thanh toán hợp lệ.');
+    if (!selectedDocumentId) {
+      notify('Vui lòng chọn chứng từ nhập kho cần thanh toán.');
       return;
     }
+    const problem = validatePaymentAmount(
+      payAmount,
+      selectedDocument ? Number(selectedDocument.totalAmount) : null,
+      'chi',
+    );
+    setPayAmountError(problem ?? '');
+    if (problem) return;
 
     const payload: SupplierPaymentInput = {
       inventoryDocumentId: Number(selectedDocumentId),
       amount: payAmount,
       paymentMethod: payMethod,
-      providerReference: payReference || undefined,
+      transactionCode: payCode.trim() || undefined,
+      providerReference: payReference.trim() || undefined,
       notes: payNotes || undefined,
     };
 
@@ -123,6 +151,8 @@ export function PaymentsPage() {
       setSelectedDocumentId('');
       setPayAmount(0);
       setPayReference('');
+      setPayCode('');
+      setPayAmountError('');
       setPayNotes('');
     } catch (err: unknown) {
       notify(errorMessage(err) ?? 'Lập phiếu chi thất bại.');
@@ -190,7 +220,7 @@ export function PaymentsPage() {
               )}
               {p.providerReference && (
                 <div className="muted font-mono" style={{ fontSize: '11px' }}>
-                  Mã GD: {p.providerReference}
+                  Mã tham chiếu: {p.providerReference}
                 </div>
               )}
               {!p.invoiceCode && !p.documentCode && <span className="muted">—</span>}
@@ -267,7 +297,7 @@ export function PaymentsPage() {
         description="Nhật ký giao dịch thu tiền khách hàng và thanh toán tiền hàng nhà cung cấp."
         actions={
           isAdmin ? (
-            <Button variant="primary" ref={createTrigger} onClick={() => setPayingSupplier(true)}>
+            <Button variant="primary" ref={createTrigger} onClick={openPaySupplier}>
               <Plus size={18} />
               <span>Lập phiếu chi trả NCC</span>
             </Button>
@@ -513,7 +543,7 @@ export function PaymentsPage() {
         description="Thanh toán tiền hàng cho đối tác cung ứng dựa trên chứng từ nhập kho đã ghi sổ."
         size="lg"
       >
-        <form onSubmit={handlePaySupplier} className="modal-form">
+        <form onSubmit={handlePaySupplier} className="modal-form" noValidate>
           <div className="form-section-label">THÔNG TIN ĐỐI TÁC & CHỨNG TỪ CHI TRẢ</div>
 
           <Field label="Nhà cung cấp" required>
@@ -557,13 +587,16 @@ export function PaymentsPage() {
             </select>
           </Field>
 
-          <Field label="Số tiền chi trả (VNĐ)" required>
+          <Field label="Số tiền chi trả (VNĐ)" required error={payAmountError || undefined}>
             <input
               type="number"
-              min="1"
-              step="1000"
+              inputMode="numeric"
+              step="any"
               value={payAmount}
-              onChange={(e) => setPayAmount(Number(e.target.value))}
+              onChange={(e) => {
+                setPayAmount(Number(e.target.value));
+                setPayAmountError('');
+              }}
               className="input font-bold"
               required
             />
@@ -583,7 +616,26 @@ export function PaymentsPage() {
             </select>
           </Field>
 
-          <Field label="Mã giao dịch / Ủy nhiệm chi">
+          <Field
+            label="Mã giao dịch"
+            hint={
+              <>
+                Tự sinh theo ngày, sửa được. Để trống thì hệ thống tự sinh khi lưu.{' '}
+                <Button variant="ghost" onClick={refreshPayCode} pending={suggestCode.isPending}>
+                  Sinh lại
+                </Button>
+              </>
+            }
+          >
+            <input
+              className="input font-mono"
+              placeholder="VD: PC-20261106-0001"
+              value={payCode}
+              onChange={(e) => setPayCode(e.target.value)}
+            />
+          </Field>
+
+          <Field label="Mã tham chiếu ngân hàng / Ủy nhiệm chi" hint="Không bắt buộc.">
             <input
               className="input font-mono"
               placeholder="VD: FT2629810239"

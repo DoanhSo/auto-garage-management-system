@@ -5,6 +5,7 @@ import type {
   RepairOrderStatus,
   RepairTask,
   TaskAssignment,
+  QcCandidate,
   LaborSession,
   TaskWorkSummary,
   AssignmentRole,
@@ -118,6 +119,10 @@ export const repairApi = {
 
   async getQcAssignment(orderId: string | number): Promise<TaskAssignment | null> {
     return request<TaskAssignment | null>(`/repair-orders/${orderId}/qc-assignment`);
+  },
+
+  async getQcCandidates(orderId: string | number): Promise<QcCandidate[]> {
+    return request<QcCandidate[]>(`/repair-orders/${orderId}/qc-candidates`);
   },
 
   async releaseAssignment(assignmentId: string | number): Promise<void> {

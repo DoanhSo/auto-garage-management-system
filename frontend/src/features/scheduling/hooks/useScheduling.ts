@@ -120,15 +120,21 @@ export function useSchedulingEmployeesQuery(params?: { active?: boolean }, enabl
   });
 }
 
-export function useShiftsQuery(params?: {
-  employeeId?: number;
-  status?: ShiftStatus;
-  page?: number;
-  size?: number;
-}) {
+export function useShiftsQuery(
+  params?: {
+    employeeId?: number;
+    status?: ShiftStatus;
+    from?: string;
+    to?: string;
+    page?: number;
+    size?: number;
+  },
+  enabled = true,
+) {
   return useQuery({
     queryKey: ['employee-shifts', params],
     queryFn: () => schedulingApi.listShifts(params),
+    enabled,
   });
 }
 

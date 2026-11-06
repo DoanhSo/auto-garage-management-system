@@ -21,6 +21,7 @@ import jakarta.validation.constraints.Size;
 
 import lombok.RequiredArgsConstructor;
 
+import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -45,6 +46,10 @@ public class AuditController {
             @RequestParam(required = false) @Positive Long actorId,
             @RequestParam(required = false) @Size(max = AuditConstants.ACTION_MAX_LENGTH)
                     String action,
+            @RequestParam(required = false) @Size(max = AuditConstants.QUERY_MAX_LENGTH) String query,
+            @RequestParam(required = false)
+                    @Size(max = AuditConstants.ACTIONS_MAX_COUNT)
+                    List<@Size(max = AuditConstants.ACTION_MAX_LENGTH) String> actions,
             @RequestParam(defaultValue = UserQueryConstants.DEFAULT_PAGE) @Min(0) int page,
             @RequestParam(defaultValue = UserQueryConstants.DEFAULT_SIZE_EXPRESSION) @Min(1)
                     int size,
@@ -54,6 +59,8 @@ public class AuditController {
                 auditService.searchEvents(
                         actorId,
                         action,
+                        query,
+                        actions,
                         pagination.page(
                                 page,
                                 size,

@@ -6,6 +6,7 @@ import com.Group13_65CNTT.AutoGarage.common.dto.ApiResponse;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.*;
+import com.Group13_65CNTT.AutoGarage.repair.dto.response.QcCandidateResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.RepairOrderResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.RepairTaskResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.TaskAssignmentResponse;
@@ -154,6 +155,16 @@ public class RepairOrderController {
             @PathVariable Long id,
             HttpServletRequest httpRequest) {
         TaskAssignmentResponse response = laborExecutionService.getQcAssignment(id);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
+    }
+
+    @GetMapping("/{id}/qc-candidates")
+    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
+    @Operation(summary = "Danh sách kỹ thuật viên có quyền QC đang trong ca, kèm lý do không chọn được")
+    public ResponseEntity<ApiResponse<List<QcCandidateResponse>>> getQcCandidates(
+            @PathVariable Long id,
+            HttpServletRequest httpRequest) {
+        List<QcCandidateResponse> response = laborExecutionService.getQcCandidates(id);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, response, httpRequest.getRequestURI()));
     }
 

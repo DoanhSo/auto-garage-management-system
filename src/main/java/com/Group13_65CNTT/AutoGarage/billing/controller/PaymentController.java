@@ -10,6 +10,8 @@ import com.Group13_65CNTT.AutoGarage.common.constant.SecurityConstants;
 import com.Group13_65CNTT.AutoGarage.common.constant.UserQueryConstants;
 import com.Group13_65CNTT.AutoGarage.common.dto.ApiResponse;
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
 
@@ -70,6 +72,21 @@ public class PaymentController {
         return ApiResponse.success(
                 ResponseCode.CREATED,
                 billingService.paySupplier(actorId, request),
+                http.getRequestURI());
+    }
+
+    @GetMapping(ApiPaths.PAYMENTS_SUGGEST_CODE)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTION_OR_ADMIN)
+    @Operation(summary = "Gợi ý mã giao dịch chưa dùng cho phiếu thu (IN) hoặc phiếu chi (OUT)")
+    public ApiResponse<String> suggestCode(
+            @RequestParam PaymentDirection direction,
+            HttpServletRequest http) {
+        if (direction == PaymentDirection.OUT && currentUser.role() != Role.ADMIN) {
+            throw new BusinessException(ResponseCode.FORBIDDEN);
+        }
+        return ApiResponse.success(
+                ResponseCode.SUCCESS,
+                billingService.suggestTransactionCode(direction),
                 http.getRequestURI());
     }
 

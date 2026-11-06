@@ -3316,6 +3316,42 @@ select.input {
 .timeline-chip.is-focused {
   box-shadow: 0 0 0 2px #245bdb;
 }
+/* Sơ đồ ca làm việc: hàng là kỹ thuật viên, cột là ngày */
+.timeline-week-staff {
+  min-width: 980px;
+}
+.timeline-week-staff .timeline-week-row {
+  grid-template-columns: 168px repeat(7, minmax(0, 1fr));
+}
+.timeline-staff-head {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 10px;
+  border-right: 1px solid var(--border);
+  background: #fafbfd;
+  font-size: 12px;
+  color: #526278;
+  min-width: 0;
+}
+.timeline-staff-head strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #172338;
+}
+.timeline-chip-upcoming {
+  border-left-color: #245bdb;
+}
+.timeline-chip-live {
+  border-color: #bfe6cd;
+  border-left-color: #1a9d55;
+}
+.timeline-chip-done {
+  opacity: 0.7;
+  border-left-color: #8693a5;
+}
 .timeline-add {
   align-self: center;
   display: grid;
@@ -4618,4 +4654,161 @@ button.notification-card-title:hover {
   .shift-recent-section .data-table td:nth-child(3) {
     width: 26%;
   }
+}
+
+/* Handover dialog: payment rule and per-line warranty */
+.handover-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.handover-section h4 {
+  margin: 0;
+}
+.handover-payment {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.handover-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+  width: 100%;
+}
+.handover-metrics dt {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.handover-metrics dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.handover-reasons {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--danger);
+}
+.handover-payment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.handover-warranty-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.handover-warranty-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.handover-warranty-fields {
+  display: grid;
+  grid-template-columns: 110px 130px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+@media (max-width: 720px) {
+  .handover-warranty-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Sidebar hub tabs: shown under the open page's entry */
+.nav-children {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 6px 28px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+.nav-subitem {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: inherit;
+  font-size: 0.875rem;
+  text-decoration: none;
+  opacity: 0.8;
+}
+.nav-subitem:hover,
+.nav-subitem.active {
+  opacity: 1;
+}
+.nav-subitem.active {
+  font-weight: 600;
+  background: rgba(127, 127, 127, 0.14);
+}
+
+/* Strip of links to dependent screens, under a page header */
+.related-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin: -4px 0 12px;
+  font-size: 0.875rem;
+}
+.related-links a {
+  color: var(--primary);
+  text-decoration: none;
+}
+.related-links a:hover {
+  text-decoration: underline;
+}
+
+/* Employee detail panel */
+.employee-detail {
+  display: grid;
+  gap: 16px;
+}
+.employee-detail section {
+  display: grid;
+  gap: 8px;
+}
+.employee-detail h4 {
+  margin: 0;
+}
+.employee-detail dl {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) 1fr;
+  gap: 6px 12px;
+  margin: 0;
+}
+.employee-detail dt {
+  color: var(--muted);
+}
+.employee-detail dd {
+  margin: 0;
+}
+.employee-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.employee-detail ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.link-button:hover {
+  color: var(--primary);
+  text-decoration: underline;
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Eye, ShieldCheck } from 'lucide-react';
+import { Eye, Search, ShieldCheck, X } from 'lucide-react';
 import { parse, stringify } from 'lossless-json';
 import { useUiPolicy } from '../../../shared/config/policy';
 import {
@@ -28,6 +28,7 @@ import {
   formatAuditEntity,
   getAuditActionMeta,
   type AuditDomain,
+  auditActionCodesMatching,
 } from '../constants/auditCatalog';
 
 const ACTOR_OPTION_LIMIT = 100;
@@ -73,6 +74,9 @@ export function safeAuditDetails(raw: string | null) {
     return 'Không thể đọc metadata.';
   }
 }
+/** Giới hạn độ dài từ khóa tìm, khớp AuditConstants.QUERY_MAX_LENGTH của máy chủ. */
+const AUDIT_QUERY_MAX_LENGTH = 100;
+
 function ReadyAudit({ policy }: { policy: UiPolicy }) {
   const table = useTableSearchParams(policy);
   const actor = table.params.get('actorId') ?? '';
@@ -82,6 +86,9 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
   const domainActions = auditActionsOf(domain);
   const debouncedActor = useDebouncedValue(actor);
   const debouncedAction = useDebouncedValue(action);
+  const search = table.params.get('q')?.slice(0, AUDIT_QUERY_MAX_LENGTH) ?? '';
+  const debouncedSearch = useDebouncedValue(search);
+  const searchActions = useMemo(() => auditActionCodesMatching(debouncedSearch), [debouncedSearch]);
   const [selected, setSelected] = useState<AuditEvent | null>(null);
   const users = useUsersQuery({
     page: 0,
@@ -92,11 +99,14 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
   // actorId arrives from the URL, so an edited link must not reach the API with a bad id.
   const validActor =
     !actor || (/^[1-9]\d{0,18}$/.test(actor) && BigInt(actor) <= 9223372036854775807n);
-  const ready = actor === debouncedActor && action === debouncedAction;
+  const ready =
+    actor === debouncedActor && action === debouncedAction && search === debouncedSearch;
   const events = useAuditEventsQuery(
     {
       actorId: debouncedActor || undefined,
       action: debouncedAction.trim() || undefined,
+      query: debouncedSearch.trim() || undefined,
+      actions: debouncedSearch.trim() && searchActions.length > 0 ? searchActions : undefined,
       page: table.page,
       size: table.size,
     },
@@ -175,6 +185,29 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
       </div>
       <section className="panel table-panel">
         <div className="filter-bar audit-filters">
+          <Field label="Tìm kiếm nhật ký">
+            <div className="user-search">
+              <Search size={17} aria-hidden />
+              <input
+                type="search"
+                className="input"
+                placeholder="Tìm theo hành động, người thực hiện, đối tượng…"
+                value={search}
+                maxLength={AUDIT_QUERY_MAX_LENGTH}
+                onChange={(event) => table.update({ q: event.target.value || undefined, page: 0 })}
+              />
+              {search && (
+                <button
+                  type="button"
+                  className="search-clear"
+                  aria-label="Xóa từ khóa tìm kiếm"
+                  onClick={() => table.update({ q: undefined, page: 0 })}
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
+          </Field>
           <Field label="Phân hệ nghiệp vụ">
             <select
               className="input"
@@ -236,7 +269,7 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
               )}
             </select>
           </Field>
-          {(actor || action || domain) && (
+          {(actor || action || domain || search) && (
             <Button
               variant="ghost"
               onClick={() =>
@@ -244,6 +277,7 @@ function ReadyAudit({ policy }: { policy: UiPolicy }) {
                   actorId: undefined,
                   action: undefined,
                   domain: undefined,
+                  q: undefined,
                   page: 0,
                 })
               }

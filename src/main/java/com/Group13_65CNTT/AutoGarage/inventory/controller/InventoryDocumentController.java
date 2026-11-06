@@ -10,6 +10,7 @@ import com.Group13_65CNTT.AutoGarage.common.util.PaginationPolicy;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.request.InventoryDocumentCreateRequest;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.request.InventoryDocumentPostRequest;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.response.InventoryDocumentResponse;
+import com.Group13_65CNTT.AutoGarage.inventory.dto.response.IssueCandidateResponse;
 import com.Group13_65CNTT.AutoGarage.inventory.entity.DocumentStatus;
 import com.Group13_65CNTT.AutoGarage.inventory.entity.DocumentType;
 import com.Group13_65CNTT.AutoGarage.inventory.service.InventoryService;
@@ -35,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Set;
 
 @RestController
@@ -80,6 +82,18 @@ public class InventoryDocumentController {
         return ApiResponse.success(
                 ResponseCode.SUCCESS,
                 inventoryService.searchDocuments(type, status, supplierId, orderId, query, pageable),
+                http.getRequestURI());
+    }
+
+    @GetMapping(ApiPaths.INVENTORY_ISSUE_CANDIDATES)
+    @PreAuthorize(SecurityConstants.HAS_ROLE_WAREHOUSE_OR_ADMIN)
+    @Operation(summary = "Danh sách phụ tùng đã duyệt và giữ chỗ của lệnh sửa chữa đang chờ xuất kho")
+    public ApiResponse<List<IssueCandidateResponse>> getIssueCandidates(
+            @RequestParam Long repairOrderId,
+            HttpServletRequest http) {
+        return ApiResponse.success(
+                ResponseCode.SUCCESS,
+                inventoryService.getIssueCandidates(repairOrderId),
                 http.getRequestURI());
     }
 

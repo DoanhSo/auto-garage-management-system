@@ -1,4 +1,5 @@
 import { Component, Suspense, lazy, type ReactNode } from 'react';
+import { LegacyTabRedirect } from './guards/LegacyTabRedirect';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createBrowserRouter,
@@ -22,6 +23,7 @@ import {
   REPAIR_VIEW_ROLES,
   INVOICE_VIEW_ROLES,
   PAYROLL_VIEW_ROLES,
+  STAFF_MANAGE_ROLES,
   ESTIMATE_VIEW_ROLES,
   WARRANTY_ROLES,
   homePathForRole,
@@ -115,6 +117,11 @@ const InvoicesPage = lazy(() =>
 const PaymentsPage = lazy(() =>
   import('../features/billing/pages/PaymentsPage').then((module) => ({
     default: module.PaymentsPage,
+  })),
+);
+const StaffPage = lazy(() =>
+  import('../features/staff/pages/StaffPage').then((module) => ({
+    default: module.StaffPage,
   })),
 );
 const PayrollPage = lazy(() =>
@@ -241,7 +248,14 @@ const router = createBrowserRouter([
                 element: <RequireRoles allowedRoles={STAFF_ROLES} />,
                 children: [
                   { path: 'repairs', element: <RepairOrdersPage /> },
-                  { path: 'scheduling', element: <SchedulingPage /> },
+                  {
+                    path: 'scheduling',
+                    element: (
+                      <LegacyTabRedirect moved={{ employees: '/staff?tab=profiles' }}>
+                        <SchedulingPage />
+                      </LegacyTabRedirect>
+                    ),
+                  },
                   { path: 'inventory/parts', element: <PartsPage /> },
                   { path: 'inventory/documents', element: <InventoryDocumentsPage /> },
                 ],
@@ -270,8 +284,26 @@ const router = createBrowserRouter([
                 children: [{ path: 'billing/debt-ledger', element: <DebtLedgerPage /> }],
               },
               {
+                element: <RequireRoles allowedRoles={STAFF_MANAGE_ROLES} />,
+                children: [{ path: 'staff', element: <StaffPage /> }],
+              },
+              {
                 element: <RequireRoles allowedRoles={PAYROLL_VIEW_ROLES} />,
-                children: [{ path: 'payroll', element: <PayrollPage /> }],
+                children: [
+                  {
+                    path: 'payroll',
+                    element: (
+                      <LegacyTabRedirect
+                        moved={{
+                          employees: '/staff?tab=profiles',
+                          coefficients: '/staff?tab=salary',
+                        }}
+                      >
+                        <PayrollPage />
+                      </LegacyTabRedirect>
+                    ),
+                  },
+                ],
               },
               {
                 element: <RequireAdmin />,
