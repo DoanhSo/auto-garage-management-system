@@ -84,7 +84,8 @@ public class QualityServiceImpl implements QualityService {
         return employeeRepository.findById(assignedIds.get(0))
                 .filter(employee -> Boolean.TRUE.equals(employee.getIsActive())
                         && Boolean.TRUE.equals(employee.getCanQc()))
-                .orElse(null);
+                .orElseThrow(() -> new ConflictException(ResponseCode.QC_INSPECTOR_INVALID,
+                        "Kỹ thuật viên QC được phân công không còn đủ điều kiện kiểm định"));
     }
 
     @Override
@@ -120,7 +121,7 @@ public class QualityServiceImpl implements QualityService {
         // Four-eyes principle: inspector must be on shift and must not be a main repairer of this order.
         Instant inspectionTime = Instant.now();
         if (inspector != null) {
-            if (currentUserProvider.role() != Role.ADMIN && workLogRecorder.activeShift(inspector.getId(), inspectionTime).isEmpty()) {
+            if (workLogRecorder.activeShift(inspector.getId(), inspectionTime).isEmpty()) {
                 throw new BusinessRuleException("Kỹ thuật viên QC phải đang trong ca trực");
             }
             boolean repairedByInspector = workLogRepository

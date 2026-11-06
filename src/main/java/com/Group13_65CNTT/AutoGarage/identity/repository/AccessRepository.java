@@ -110,7 +110,11 @@ SELECT COALESCE(c.user_id,wc.user_id) ownerId,
     @Query(
             value =
                     """
-SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id JOIN repair_tasks t ON t.id=a.task_id WHERE e.user_id=:actorId AND e.is_active=TRUE AND a.is_active=TRUE AND t.repair_order_id=:resourceId
+SELECT (
+    (SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id JOIN repair_tasks t ON t.id=a.task_id WHERE e.user_id=:actorId AND e.is_active=TRUE AND a.is_active=TRUE AND t.repair_order_id=:resourceId)
+    +
+    (SELECT COUNT(*) FROM repair_orders ro JOIN employees e ON (e.id = ro.diagnostic_technician_id OR e.id = ro.lead_technician_id OR e.id = ro.qc_technician_id OR (e.can_qc = TRUE AND ro.status = 'WAITING_QC')) WHERE e.user_id=:actorId AND e.is_active=TRUE AND ro.id=:resourceId)
+)
 """,
             nativeQuery = true)
     long assignedToOrder(@Param("actorId") Long actorId, @Param("resourceId") Long resourceId);
@@ -134,7 +138,11 @@ SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id J
     @Query(
             value =
                     """
-SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id JOIN repair_tasks t ON t.id=a.task_id WHERE e.user_id=:actorId AND e.is_active=TRUE AND e.can_qc=TRUE AND a.is_active=TRUE AND a.assignment_role='QC' AND t.repair_order_id=:resourceId
+SELECT (
+    (SELECT COUNT(*) FROM task_assignments a JOIN employees e ON e.id=a.employee_id JOIN repair_tasks t ON t.id=a.task_id WHERE e.user_id=:actorId AND e.is_active=TRUE AND e.can_qc=TRUE AND a.is_active=TRUE AND a.assignment_role='QC' AND t.repair_order_id=:resourceId)
+    +
+    (SELECT COUNT(*) FROM repair_orders ro JOIN employees e ON (e.id = ro.qc_technician_id OR (e.can_qc = TRUE AND ro.status = 'WAITING_QC')) WHERE e.user_id=:actorId AND e.is_active=TRUE AND e.can_qc=TRUE AND ro.id=:resourceId)
+)
 """,
             nativeQuery = true)
     long assignedToQc(@Param("actorId") Long actorId, @Param("resourceId") Long resourceId);

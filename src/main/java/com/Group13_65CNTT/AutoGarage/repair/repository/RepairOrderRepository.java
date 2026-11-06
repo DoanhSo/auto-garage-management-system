@@ -34,8 +34,14 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, Long> 
 
     @Query("SELECT ro FROM RepairOrder ro WHERE (:status IS NULL OR ro.status = :status) " +
             "AND (:keyword IS NULL OR LOWER(ro.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(ro.customerComplaint) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
-            "AND EXISTS (SELECT a.id FROM TaskAssignment a JOIN RepairTask t ON t.id = a.taskId JOIN Employee e ON e.id = a.employeeId " +
-            "WHERE t.repairOrderId = ro.id AND a.isActive = true AND e.isActive = true AND e.userId = :actorId)")
+            "AND (" +
+            "   EXISTS (SELECT a.id FROM TaskAssignment a JOIN RepairTask t ON t.id = a.taskId JOIN Employee e ON e.id = a.employeeId " +
+            "           WHERE t.repairOrderId = ro.id AND a.isActive = true AND e.isActive = true AND e.userId = :actorId) " +
+            "   OR EXISTS (SELECT e.id FROM Employee e WHERE e.userId = :actorId AND e.isActive = true AND (" +
+            "           ro.diagnosticTechnicianId = e.id OR ro.leadTechnicianId = e.id OR ro.qcTechnicianId = e.id" +
+            "           OR (e.canQc = true AND ro.status = 'WAITING_QC')" +
+            "   ))" +
+            ")")
     Page<RepairOrder> searchAssignedOrders(@Param("actorId") long actorId, @Param("keyword") String keyword,
             @Param("status") RepairOrderStatus status, Pageable pageable);
 

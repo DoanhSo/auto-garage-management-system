@@ -339,6 +339,8 @@ class QualityCheckServiceTest {
             vc.setId(601L);
             return vc;
         });
+        when(qualityCheckMapper.toResponse(any(VehicleCheck.class)))
+                .thenReturn(QualityCheckResponse.builder().id(601L).build());
 
         QualityCheckResponse res = qualityService.performQualityCheck(99L, adminRequest());
 

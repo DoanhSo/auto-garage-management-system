@@ -250,7 +250,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
                 throw new BusinessRuleException("Kỹ thuật viên chẩn đoán đã ngưng hoạt động");
             }
             if (workLogRecorder.activeShift(diagnosticTechnicianId, now).isEmpty()) {
-                throw new BusinessRuleException("Kỹ thuật viên chẩn đoán phải đang trong ca trực");
+                log.info("Kỹ thuật viên chẩn đoán #{} chưa có ca trực đang hoạt động tại thời điểm tiếp nhận", diagnosticTechnicianId);
             }
             order.setDiagnosticTechnicianId(diagnosticTechnicianId);
             workLogRecorder.start(order, diagnosticTechnicianId, AssignmentStage.DIAGNOSIS, null, now, null);

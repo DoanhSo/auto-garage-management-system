@@ -10,6 +10,7 @@ import {
   useActiveReservationsQuery,
   useBayDayRosterQuery,
   useOnShiftTechniciansQuery,
+  useSchedulingEmployeesQuery,
   useServiceBaysQuery,
 } from '../../scheduling/hooks/useScheduling';
 import {
@@ -94,6 +95,7 @@ export function CheckInModal({
   const roster = useBayDayRosterQuery(selectedBayId, today);
   const onShift = useOnShiftTechniciansQuery(open);
   const mobileTechs = (onShift.data ?? []).filter((tech) => !tech.serviceBayId);
+  const allEmployees = useSchedulingEmployeesQuery({ active: true }, open);
   async function onSubmit(values: CheckInFormValues) {
     if (activeVehicle && values.odometerIn < activeVehicle.odometer) {
       setError('odometerIn', {
@@ -149,6 +151,66 @@ export function CheckInModal({
 
   const generalError = checkIn.error;
   const busy = checkIn.isPending || uploadPhoto.isPending;
+
+  const technicianOptions = (() => {
+    const handled = new Set<string>();
+    const items: Array<{
+      value: string;
+      label: string;
+      group: string;
+      disabled?: boolean;
+      description?: string;
+    }> = [];
+
+    if (selectedBayId && roster.data) {
+      for (const tech of roster.data) {
+        handled.add(String(tech.employeeId));
+        items.push({
+          value: String(tech.employeeId),
+          label: tech.fullName,
+          group: 'Thợ trực tại khoang này',
+          disabled: !tech.onShiftNow,
+          description: [
+            `${tech.shiftType ? `${shiftTypeLabels[tech.shiftType]} ` : 'Ca '}${hhmm(tech.shiftStartsAt)}–${hhmm(tech.shiftEndsAt)}`,
+            tech.skills.map((skill) => SKILL_LABELS[skill] ?? skill).join(', '),
+            tech.onShiftNow ? '' : 'ngoài giờ ca',
+          ].filter(Boolean).join(' · '),
+        });
+      }
+    }
+
+    for (const tech of mobileTechs) {
+      if (!handled.has(String(tech.employeeId))) {
+        handled.add(String(tech.employeeId));
+        items.push({
+          value: String(tech.employeeId),
+          label: tech.fullName,
+          group: 'Thợ trực ca sẵn sàng điều động',
+          description: [
+            availabilityLabels[tech.availabilityStatus],
+            `${tech.activeOrdersCount} xe đang làm`,
+            tech.skills.map((skill) => SKILL_LABELS[skill] ?? skill).join(', '),
+          ].filter(Boolean).join(' · '),
+        });
+      }
+    }
+
+    for (const emp of allEmployees.data ?? []) {
+      if (!handled.has(String(emp.id))) {
+        items.push({
+          value: String(emp.id),
+          label: emp.fullName || emp.employeeCode,
+          group: 'Kỹ thuật viên xưởng',
+          description: [
+            emp.employeeCode,
+            emp.canQc ? 'Có quyền QC' : 'Kỹ thuật viên sửa chữa',
+          ].filter(Boolean).join(' · '),
+        });
+      }
+    }
+
+    return items;
+  })();
 
   return (
     <Sheet
@@ -257,33 +319,7 @@ export function CheckInModal({
                   placeholder="Gõ tên thợ…"
                   value={watch('diagnosticTechnicianId') ?? ''}
                   onChange={(next) => setValue('diagnosticTechnicianId', next)}
-                  options={[
-                    ...(selectedBayId ? (roster.data ?? []) : []).map((tech) => ({
-                      value: String(tech.employeeId),
-                      label: tech.fullName,
-                      group: 'Thợ trực tại khoang này',
-                      disabled: !tech.onShiftNow,
-                      description: [
-                        `${tech.shiftType ? `${shiftTypeLabels[tech.shiftType]} ` : 'Ca '}${hhmm(tech.shiftStartsAt)}–${hhmm(tech.shiftEndsAt)}`,
-                        tech.skills.map((skill) => SKILL_LABELS[skill] ?? skill).join(', '),
-                        tech.onShiftNow ? '' : 'ngoài giờ ca',
-                      ]
-                        .filter(Boolean)
-                        .join(' · '),
-                    })),
-                    ...mobileTechs.map((tech) => ({
-                      value: String(tech.employeeId),
-                      label: tech.fullName,
-                      group: 'Thợ sẵn sàng điều động',
-                      description: [
-                        availabilityLabels[tech.availabilityStatus],
-                        `${tech.activeOrdersCount} xe đang làm`,
-                        tech.skills.map((skill) => SKILL_LABELS[skill] ?? skill).join(', '),
-                      ]
-                        .filter(Boolean)
-                        .join(' · '),
-                    })),
-                  ]}
+                  options={technicianOptions}
                 />
               </Field>
             </div>
