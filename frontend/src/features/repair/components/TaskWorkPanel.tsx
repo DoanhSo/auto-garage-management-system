@@ -119,6 +119,7 @@ export function TaskWorkPanel({
                     {roleLabels[assignment.assignmentRole]}
                   </Badge>{' '}
                   {!assignment.isActive && <Badge variant="outline">Đã kết thúc</Badge>}
+                  {assignment.isActive && !running && <Badge variant="secondary">Đã phân công</Badge>}
                   {running && <Badge variant="warning">Đang bấm giờ</Badge>}
                 </div>
                 {assignment.assignmentRole !== 'QC' && (

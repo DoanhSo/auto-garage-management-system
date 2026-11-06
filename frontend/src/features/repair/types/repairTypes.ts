@@ -43,7 +43,7 @@ export interface RepairOrder {
 }
 
 export type TaskType = 'REPAIR' | 'DIAGNOSIS' | 'MAINTENANCE';
-export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+export type TaskStatus = 'PENDING' | 'ASSIGNED' | 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'REWORK' | 'CANCELLED';
 
 export interface RepairTask {
   id: string;

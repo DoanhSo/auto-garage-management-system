@@ -855,14 +855,22 @@ export function RepairOrderDetailModal({
                                         ? 'badge-success'
                                         : task.status === 'IN_PROGRESS'
                                           ? 'badge-primary'
-                                          : 'badge-warning'
+                                          : task.status === 'ASSIGNED'
+                                            ? 'badge-info'
+                                            : task.status === 'PAUSED'
+                                              ? 'badge-warning'
+                                              : 'badge-secondary'
                                     }`}
                                   >
                                     {task.status === 'COMPLETED'
                                       ? '✓ Đã hoàn thành'
                                       : task.status === 'IN_PROGRESS'
                                         ? 'Đang thực hiện'
-                                        : 'Chờ thực hiện'}
+                                        : task.status === 'ASSIGNED'
+                                          ? 'Đã phân công'
+                                          : task.status === 'PAUSED'
+                                            ? 'Tạm dừng'
+                                            : 'Chờ thực hiện'}
                                   </span>
                                 </td>
                                 <td className="text-right">

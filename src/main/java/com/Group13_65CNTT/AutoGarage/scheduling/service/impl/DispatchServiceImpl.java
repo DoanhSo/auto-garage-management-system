@@ -110,7 +110,7 @@ public class DispatchServiceImpl implements DispatchService {
 
             Availability availability = orders >= OVERLOAD_ORDER_COUNT
                     ? Availability.OVERLOADED
-                    : timer != null ? Availability.BUSY : Availability.AVAILABLE;
+                    : (timer != null || orders > 0) ? Availability.BUSY : Availability.AVAILABLE;
 
             result.add(new OnShiftTechnicianResponse(
                     employee.getId(),
