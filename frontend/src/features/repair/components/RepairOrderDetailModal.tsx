@@ -347,7 +347,7 @@ export function RepairOrderDetailModal({
                 )}
                 {canFrontDesk && order.status === 'COMPLETED' && (
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     onClick={() => {
                       onClose();
                       navigate('/billing/invoices');
@@ -1076,7 +1076,6 @@ export function RepairOrderDetailModal({
                         <span>Phiếu đã nghiệm thu QC đạt chuẩn. Hãy lập hóa đơn và xác nhận quyết toán trước khi tiến hành bàn giao xe.</span>
                       </div>
                       <Button
-                        size="sm"
                         variant="primary"
                         onClick={() => {
                           onClose();
