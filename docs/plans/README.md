@@ -19,3 +19,5 @@
 | 2026-11 | [Phân tích hệ thống & ERD Chen](2026-11-system-analysis-erd.md) | done (chưa /converge) | 10/10 bước; lưu trước khi ghi đè bằng plan `qc-admin-on-behalf` |
 | 2026-11 | [Admin ghi QC thay kỹ thuật viên](2026-11-qc-admin-on-behalf.md) | partial | AC-5 (nút QC theo vai trò) và AC-6 (sửa xe) chưa xác minh trên trình duyệt; chưa có test RTL cho nút QC |
 | 2026-11 | [Phân công QC tại màn lệnh sửa chữa](2026-11-qc-assignment-on-order.md) | partial | AC-5 (403 theo vai trò) và AC-6..8 chưa xác minh trên trình duyệt; thiếu test riêng cho đường QC khi người được chọn ngoài ca |
+| 2026-11 | [Danh sách người QC theo ca hiện tại và lỗi bàn giao](2026-11-qc-candidates-clarity.md) | partial | AC-5/6/7/12 chưa xác minh trên trình duyệt (hộp phân công QC, nhãn ca, tab Bàn giao lệnh #21) |
+| 2026-11 | [Báo đúng lý do khi không lập được hóa đơn](2026-11-invoice-blocked-reasons.md) | partial | AC-5/6 chưa xác minh trên trình duyệt (hộp phát hành, xuất kho lệnh #21); chưa gọi API thật trên #21 |

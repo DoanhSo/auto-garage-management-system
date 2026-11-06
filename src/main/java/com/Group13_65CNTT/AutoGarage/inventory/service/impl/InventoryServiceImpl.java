@@ -4,6 +4,7 @@ import com.Group13_65CNTT.AutoGarage.common.util.RequestFingerprint;
 
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.request.InventoryDocumentCreateRequest;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.request.InventoryDocumentItemRequest;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.response.InventoryDocumentItemResponse;
@@ -57,6 +58,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class InventoryServiceImpl implements InventoryService {
+    /** Pending parts named in the invoice-blocked message before summarising the rest. */
+    private static final int MAX_PENDING_PARTS_SHOWN = 5;
     private final InventoryDocumentRepository documentRepository;
     private final InventoryDocumentItemRepository itemRepository;
     private final InventoryTransactionRepository transactionRepository;
@@ -451,14 +454,26 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     @Transactional(readOnly = true)
     public void requireIssueComplete(long repairOrderId) {
-        Integer remaining = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM estimate_items ei JOIN estimates e ON e.id = ei.estimate_id " +
-                "WHERE e.repair_order_id = ? AND ei.reserved_quantity > 0", Integer.class, repairOrderId);
+        List<String> pendingParts = jdbcTemplate.queryForList(
+                "SELECT ei.item_name FROM estimate_items ei JOIN estimates e ON e.id = ei.estimate_id " +
+                "WHERE e.repair_order_id = ? AND ei.reserved_quantity > 0 ORDER BY ei.id",
+                String.class, repairOrderId);
+        if (!pendingParts.isEmpty()) {
+            int shown = Math.min(pendingParts.size(), MAX_PENDING_PARTS_SHOWN);
+            String names = String.join(", ", pendingParts.subList(0, shown));
+            if (pendingParts.size() > shown) {
+                names += " và " + (pendingParts.size() - shown) + " phụ tùng khác";
+            }
+            throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
+                    "Còn phụ tùng đã giữ chỗ nhưng chưa xuất kho: " + names
+                            + ". Hãy xuất kho hoặc hủy giữ chỗ trước khi lập hóa đơn.");
+        }
         Integer drafts = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM inventory_documents WHERE repair_order_id = ? " +
                 "AND document_type IN ('OUT','RETURN') AND status = 'DRAFT'", Integer.class, repairOrderId);
-        if ((remaining != null && remaining > 0) || (drafts != null && drafts > 0)) {
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+        if (drafts != null && drafts > 0) {
+            throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
+                    "Còn phiếu kho xuất hoặc trả ở trạng thái nháp. Hãy hoàn tất hoặc hủy phiếu nháp trước khi lập hóa đơn.");
         }
     }
 

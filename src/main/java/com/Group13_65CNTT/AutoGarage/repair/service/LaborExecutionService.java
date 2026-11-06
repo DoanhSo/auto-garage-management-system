@@ -6,6 +6,7 @@ import com.Group13_65CNTT.AutoGarage.repair.dto.request.QcAssignmentRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.TaskAssignmentRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.TaskCompletionRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.LaborSessionResponse;
+import com.Group13_65CNTT.AutoGarage.repair.dto.response.QcCandidateResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.TaskAssignmentResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.TaskWorkSummaryResponse;
 
@@ -20,6 +21,9 @@ public interface LaborExecutionService {
 
     /** Active QC inspector assignment of the order, or {@code null} when none. */
     TaskAssignmentResponse getQcAssignment(Long orderId);
+
+    /** QC-capable technicians on shift now, marking those who cannot inspect this order. */
+    List<QcCandidateResponse> getQcCandidates(Long orderId);
 
     void releaseAssignment(Long actorUserId, Long assignmentId);
 

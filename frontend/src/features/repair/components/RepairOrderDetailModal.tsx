@@ -23,10 +23,7 @@ import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { FRONT_DESK_ROLES, QC_ROLES, TECHNICAL_ROLES } from '../../../app/access';
 import { useVehicleQuery } from '../../vehicle/hooks/useVehicles';
-import {
-  useOnShiftTechniciansQuery,
-  useSchedulingEmployeesQuery,
-} from '../../scheduling/hooks/useScheduling';
+import { useSchedulingEmployeesQuery } from '../../scheduling/hooks/useScheduling';
 import { errorMessage } from '../../../shared/api/errors';
 import {
   Badge,
@@ -43,6 +40,7 @@ import {
   useRepairOrderQuery,
   useRepairTasksQuery,
   useQcAssignmentQuery,
+  useQcCandidatesQuery,
   useUpdateDiagnosisMutation,
   useUpdateRepairOrderMutation,
   useTransitionStatusMutation,
@@ -57,6 +55,7 @@ import { useQualityChecksQuery } from '../../quality/hooks/useQuality';
 import { RepairOrderStatusBadge } from './RepairOrderCards';
 import { REPAIR_STATUS_LABELS } from './RepairOrderFilters';
 import { CreateTaskModal } from './CreateTaskModal';
+import { useInvoicesQuery } from '../../billing/hooks/useBilling';
 import { AssignQcModal } from './AssignQcModal';
 import { AssignTaskModal } from './AssignTaskModal';
 import { TaskWorkPanel } from './TaskWorkPanel';
@@ -98,7 +97,6 @@ export function RepairOrderDetailModal({
   const updateOrder = useUpdateRepairOrderMutation();
   const [assigningTask, setAssigningTask] = useState<RepairTask | null>(null);
   const { data: staff = [] } = useSchedulingEmployeesQuery({ active: true }, canTechnical);
-  const onShift = useOnShiftTechniciansQuery(open && canTechnical);
   const ownEmployeeId = staff.find((e) => String(e.userId) === String(user?.id))?.id;
   const staffName = (employee: { fullName?: string | null; employeeCode: string }) =>
     employee.fullName ?? employee.employeeCode;
@@ -134,6 +132,17 @@ export function RepairOrderDetailModal({
     : allEstimates;
   const { data: qcChecks = [], isLoading: isLoadingQC } = useQualityChecksQuery(
     open ? orderId : null,
+  );
+  const qcCandidates = useQcCandidatesQuery(
+    open ? orderId : null,
+    canTechnical && order?.status === 'WAITING_QC',
+  );
+  const handoverInvoices = useInvoicesQuery(
+    { orderId: orderId ?? undefined, size: 20 },
+    open && canFrontDesk && order?.status === 'COMPLETED',
+  );
+  const handoverInvoice = (handoverInvoices.data?.content ?? []).find(
+    (invoice) => invoice.status !== 'VOID',
   );
   const { data: qcAssignment } = useQcAssignmentQuery(
     open ? orderId : null,
@@ -923,9 +932,9 @@ export function RepairOrderDetailModal({
                 )}
                 {canTechnical && (
                   <p className="text-xs muted" aria-label="Thợ QC đủ điều kiện">
-                    Thợ QC đủ điều kiện đang trực ca:{' '}
-                    {(onShift.data ?? [])
-                      .filter((tech) => tech.canQc)
+                    Thợ QC đủ điều kiện, theo ca đang trực lúc này:{' '}
+                    {(qcCandidates.data ?? [])
+                      .filter((tech) => tech.eligible)
                       .map((tech) => tech.fullName)
                       .join(', ') || 'chưa có'}
                     . Thợ chính đã sửa chữa phiếu này không được tự kiểm định.
@@ -1032,6 +1041,19 @@ export function RepairOrderDetailModal({
                       <p className="text-xs muted">
                         Khách hàng thanh toán hóa đơn dịch vụ hoặc xác nhận ghi sổ công nợ hợp lệ.
                       </p>
+                      {order.status === 'COMPLETED' &&
+                        canFrontDesk &&
+                        !handoverInvoices.isLoading && (
+                          <p className="text-xs font-semibold" aria-label="Trạng thái hóa đơn">
+                            {handoverInvoice
+                              ? `Hóa đơn ${handoverInvoice.invoiceCode} · ${
+                                  handoverInvoice.status === 'PAID'
+                                    ? 'đã thanh toán'
+                                    : `còn nợ ${money(handoverInvoice.balanceAmount ?? handoverInvoice.totalAmount)}`
+                                }`
+                              : 'Chưa có hóa đơn'}
+                          </p>
+                        )}
                     </div>
 
                     <div className="p-3 ro-summary-banner border rounded-lg space-y-1">
@@ -1063,9 +1085,20 @@ export function RepairOrderDetailModal({
                     </div>
 
                     {order.status === 'COMPLETED' && canFrontDesk ? (
-                      <Button variant="primary" onClick={() => setHandoverOpen(true)}>
-                        <UserCheck size={15} /> Tiến hành bàn giao xe
-                      </Button>
+                      <div className="flex items-center gap-3">
+                        {!handoverInvoices.isLoading && !handoverInvoice && (
+                          <span className="text-xs muted italic">
+                            Cần lập hóa đơn trước khi bàn giao.
+                          </span>
+                        )}
+                        <Button
+                          variant="primary"
+                          onClick={() => setHandoverOpen(true)}
+                          disabled={handoverInvoices.isLoading || !handoverInvoice}
+                        >
+                          <UserCheck size={15} /> Tiến hành bàn giao xe
+                        </Button>
+                      </div>
                     ) : order.status !== 'CLOSED' && canFrontDesk ? (
                       <span className="text-xs muted italic">
                         Cần hoàn thành sửa chữa và kiểm định QC đạt chuẩn trước khi bàn giao xe.

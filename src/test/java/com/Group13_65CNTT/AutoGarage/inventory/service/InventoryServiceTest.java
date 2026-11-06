@@ -188,4 +188,54 @@ class InventoryServiceTest {
         assertThat(resp.getDiscrepancy()).isEqualByComparingTo("-2");
         assertThat(resp.isMatched()).isFalse();
     }
+
+    @Test
+    @DisplayName("Xuất kho đủ: còn phụ tùng giữ chỗ thì chặn lập hóa đơn và nêu tên phụ tùng")
+    void requireIssueComplete_ReservedPartsRemaining_ThrowsWithPartNames() {
+        when(jdbcTemplate.queryForList(contains("reserved_quantity > 0"), eq(String.class), eq(21L)))
+                .thenReturn(List.of("Lốp xe Michelin Primacy 4"));
+
+        assertThatThrownBy(() -> service.requireIssueComplete(21L))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVOICE_BLOCKED)
+                .hasMessageContaining("Lốp xe Michelin Primacy 4")
+                .hasMessageContaining("chưa xuất kho");
+    }
+
+    @Test
+    @DisplayName("Xuất kho đủ: nhiều phụ tùng chỉ liệt kê tối đa 5 tên rồi gộp phần còn lại")
+    void requireIssueComplete_ManyParts_SummarisesTheRest() {
+        when(jdbcTemplate.queryForList(contains("reserved_quantity > 0"), eq(String.class), eq(21L)))
+                .thenReturn(List.of("P1", "P2", "P3", "P4", "P5", "P6", "P7"));
+
+        assertThatThrownBy(() -> service.requireIssueComplete(21L))
+                .hasMessageContaining("P1, P2, P3, P4, P5")
+                .hasMessageContaining("và 2 phụ tùng khác")
+                .satisfies(e -> org.assertj.core.api.Assertions.assertThat(e.getMessage()).doesNotContain("P6"));
+    }
+
+    @Test
+    @DisplayName("Xuất kho đủ: còn phiếu kho nháp thì thông điệp riêng")
+    void requireIssueComplete_DraftDocuments_ThrowsDraftMessage() {
+        when(jdbcTemplate.queryForList(contains("reserved_quantity > 0"), eq(String.class), eq(21L)))
+                .thenReturn(List.of());
+        when(jdbcTemplate.queryForObject(contains("inventory_documents"), eq(Integer.class), eq(21L)))
+                .thenReturn(1);
+
+        assertThatThrownBy(() -> service.requireIssueComplete(21L))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVOICE_BLOCKED)
+                .hasMessageContaining("phiếu kho");
+    }
+
+    @Test
+    @DisplayName("Xuất kho đủ: không còn giữ chỗ và không có phiếu nháp thì qua")
+    void requireIssueComplete_Clean_Passes() {
+        when(jdbcTemplate.queryForList(contains("reserved_quantity > 0"), eq(String.class), eq(21L)))
+                .thenReturn(List.of());
+        when(jdbcTemplate.queryForObject(contains("inventory_documents"), eq(Integer.class), eq(21L)))
+                .thenReturn(0);
+
+        service.requireIssueComplete(21L);
+    }
 }

@@ -97,7 +97,7 @@ export function AssignTaskModal({
             hint={
               technicians.length === 0
                 ? 'Chưa có ai trong ca trực. Hãy xếp ca ở màn Khoang & lịch ca.'
-                : 'Chỉ hiển thị thợ có ca trực bao phủ thời điểm hiện tại'
+                : 'Theo ca đang trực lúc này, không phải ca của ngày nhập xe'
             }
           >
             <select

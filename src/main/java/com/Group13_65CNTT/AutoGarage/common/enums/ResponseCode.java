@@ -54,6 +54,10 @@ public enum ResponseCode {
             2020, "Repair order has no active QC inspector assigned", HttpStatus.CONFLICT),
     QC_INSPECTOR_INVALID(
             2021, "Assigned QC inspector cannot perform this inspection", HttpStatus.CONFLICT),
+    HANDOVER_BLOCKED(
+            2022, "Handover is not allowed in the current state", HttpStatus.CONFLICT),
+    INVOICE_BLOCKED(
+            2023, "Invoice cannot be issued in the current state", HttpStatus.CONFLICT),
     UNAUTHORIZED(3001, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),
     FORBIDDEN(3002, "You do not have permission for this operation", HttpStatus.FORBIDDEN),
     INVALID_TOKEN(3003, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),

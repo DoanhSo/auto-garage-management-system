@@ -2,6 +2,7 @@ package com.Group13_65CNTT.AutoGarage.billing.controller;
 
 import com.Group13_65CNTT.AutoGarage.billing.dto.request.InvoiceIssueRequest;
 import com.Group13_65CNTT.AutoGarage.billing.dto.request.InvoiceVoidRequest;
+import com.Group13_65CNTT.AutoGarage.billing.dto.response.InvoiceReadinessResponse;
 import com.Group13_65CNTT.AutoGarage.billing.dto.response.InvoiceResponse;
 import com.Group13_65CNTT.AutoGarage.billing.entity.InvoiceStatus;
 import com.Group13_65CNTT.AutoGarage.billing.service.BillingService;
@@ -56,6 +57,18 @@ public class InvoiceController {
         return ApiResponse.success(
                 ResponseCode.CREATED,
                 billingService.issueInvoice(actorId, request),
+                http.getRequestURI());
+    }
+
+    @GetMapping("/order/{orderId}/readiness")
+    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTION_OR_ADMIN)
+    @Operation(summary = "Kiểm tra phiếu sửa chữa đã đủ điều kiện lập hóa đơn chưa (kèm lý do nếu chưa)")
+    public ApiResponse<InvoiceReadinessResponse> getInvoiceReadiness(
+            @PathVariable Long orderId,
+            HttpServletRequest http) {
+        return ApiResponse.success(
+                ResponseCode.SUCCESS,
+                billingService.getInvoiceReadiness(orderId),
                 http.getRequestURI());
     }
 

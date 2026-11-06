@@ -135,6 +135,7 @@ DRAFT ──gửi──► SENT ──khách duyệt từng dòng──► PARTI
 | QC chỉ làm khi `WAITING_QC`, mọi công việc đã `COMPLETED` và không còn đồng hồ chạy | ✅ `QualityServiceImpl`, dòng 71–82 |
 | Người QC phải đang trong ca và không phải thợ chính của phiếu | ✅ dòng 94–100 |
 | Kỹ thuật viên QC của phiếu `WAITING_QC` được phân công ngay tại tab QC (admin, lễ tân): `POST/GET /repair-orders/{id}/qc-assignment`. Chỉ chọn được người có `canQc`, đang trong ca, không phải thợ chính; đổi người thì phân công cũ được giải phóng, phiếu luôn có tối đa một người QC đang hoạt động | ✅ `LaborExecutionServiceImpl.assignQcInspector` |
+| Danh sách người QC (`GET /repair-orders/{id}/qc-candidates`) luôn theo ca **đang trực lúc này**, không theo ngày nhập xe, kể cả với lệnh cũ. Người có ca gắn khoang chọn được bình thường; thợ chính của phiếu vẫn hiện nhưng bị khóa kèm lý do `MAIN_REPAIRER` | ✅ `LaborExecutionServiceImpl.getQcCandidates` |
 | Admin được ghi QC thay kỹ thuật viên QC đã phân công: người kiểm định, nhật ký công và thưởng QC tính cho kỹ thuật viên đó, biên bản lưu `checkedBy` là admin. Phiếu chưa phân công QC (`QC_INSPECTOR_NOT_ASSIGNED`) hoặc có nhiều hơn một người, hoặc người đó không đủ điều kiện (`QC_INSPECTOR_INVALID`) thì bị từ chối | ✅ `QualityServiceImpl.resolveInspector` |
 | Mỗi lần QC tạo một biên bản mới, không sửa biên bản cũ; `latestQcCheckId` trỏ biên bản mới nhất | ✅ |
 | `IN_PROGRESS → WAITING_QC` (chuyển tay) bị chặn khi còn việc chưa xong hoặc đồng hồ chạy | ✅ `RepairServiceImpl.transitionStatus` |
@@ -147,6 +148,8 @@ DRAFT ──gửi──► SENT ──khách duyệt từng dòng──► PARTI
 | Hóa đơn chỉ phát hành khi QC gần nhất đạt, mọi công việc xong, không còn đồng hồ chạy; mỗi phiếu một hóa đơn | ✅ `BillingServiceImpl`, dòng 110–147 |
 | Hóa đơn chụp lại thông tin khách tại thời điểm phát hành (sửa khách sau đó không đổi hóa đơn) | ✅ dòng 148+ |
 | Bàn giao: ODO ra ≥ ODO vào; hóa đơn đã thanh toán đủ hoặc nằm trong hạn mức công nợ; giải phóng khoang và lượng giữ kho; tạo sổ bảo hành | ✅ `RepairServiceImpl.handOver`, dòng 352–431 |
+| Lập hóa đơn bị từ chối trả HTTP 409, `code = 2023` (`INVOICE_BLOCKED`) kèm lý do tiếng Việt riêng: còn phụ tùng đã giữ chỗ nhưng chưa xuất kho (nêu tên phụ tùng), còn phiếu kho nháp, chưa có QC hoặc QC chưa đạt, còn đồng hồ đang chạy, không có hạng mục tính tiền. `GET /billing/invoices/order/{orderId}/readiness` trả `ready` và `reason` theo đúng quy tắc đó; hộp phát hành hóa đơn dùng nó để báo trước và khóa nút | ✅ `BillingServiceImpl.requireIssueReady`, `InventoryServiceImpl.requireIssueComplete` |
+| Bàn giao bị từ chối trả HTTP 409, `code = 2022` (`HANDOVER_BLOCKED`) kèm lý do tiếng Việt riêng: chưa có hóa đơn còn hiệu lực, hóa đơn đã hủy, công nợ vượt hạn mức, khách không được ghi công nợ, khách có hóa đơn quá hạn. Tab Bàn giao hiện trạng thái hóa đơn và khóa nút khi chưa có hóa đơn | ✅ `BillingServiceImpl.requireHandoverAllowed` |
 | **Hủy hóa đơn** (chỉ ADMIN, khi chưa thu tiền và xe chưa bàn giao): hóa đơn chuyển `VOID` nhưng được giữ lại, phiếu quay về `COMPLETED` và phát hành được hóa đơn mới | ✅ `BillingServiceImpl.voidInvoice`; migration V19 thay `uq_invoices_order` bằng ràng buộc duy nhất trên hóa đơn khác `VOID` (`uq_invoices_active_order`) |
 | Phiếu `INVOICED` / `CLOSED` / `CANCELLED`: mọi dữ liệu là chỉ đọc | ✅ |
 

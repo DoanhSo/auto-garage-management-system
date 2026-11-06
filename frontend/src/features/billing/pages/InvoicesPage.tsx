@@ -21,6 +21,7 @@ import {
   Badge,
   Button,
   Field,
+  FormError,
   Loading,
   Modal,
   PageHeader,
@@ -35,6 +36,7 @@ import { errorMessage } from '../../../shared/api/errors';
 import { useRepairOrdersQuery } from '../../repair/hooks/useRepair';
 import {
   useInvoicesQuery,
+  useInvoiceReadinessQuery,
   useIssueInvoiceMutation,
   useVoidInvoiceMutation,
   useReceivePaymentMutation,
@@ -73,6 +75,7 @@ export function InvoicesPage() {
 
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [issuing, setIssuing] = useState(false);
+  const [issueOrderId, setIssueOrderId] = useState('');
   const [voidingInvoice, setVoidingInvoice] = useState<Invoice | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
@@ -101,6 +104,11 @@ export function InvoicesPage() {
     sortDir: 'desc',
   });
   const issueMutation = useIssueInvoiceMutation();
+  const readiness = useInvoiceReadinessQuery(issueOrderId || null, issuing);
+  const issueBlockedReason =
+    readiness.data && !readiness.data.ready
+      ? (readiness.data.reason ?? 'Chưa lập được hóa đơn cho lệnh này.')
+      : undefined;
   const voidMutation = useVoidInvoiceMutation();
   const receivePaymentMutation = useReceivePaymentMutation();
 
@@ -130,6 +138,7 @@ export function InvoicesPage() {
       await issueMutation.mutateAsync(input);
       notify('Đã phát hành hóa đơn dịch vụ thành công.');
       setIssuing(false);
+      setIssueOrderId('');
     } catch (err: unknown) {
       notify(errorMessage(err) ?? 'Lỗi khi phát hành hóa đơn.');
     }
@@ -376,7 +385,14 @@ export function InvoicesPage() {
         }
         actions={
           canCollect ? (
-            <Button variant="primary" ref={createTrigger} onClick={() => setIssuing(true)}>
+            <Button
+              variant="primary"
+              ref={createTrigger}
+              onClick={() => {
+                setIssueOrderId('');
+                setIssuing(true);
+              }}
+            >
               <Plus size={18} />
               <span>Phát hành hóa đơn</span>
             </Button>
@@ -630,6 +646,9 @@ export function InvoicesPage() {
         size="lg"
       >
         <form onSubmit={handleIssue} className="modal-form">
+          <FormError
+            message={issueMutation.error ? errorMessage(issueMutation.error) : undefined}
+          />
           <div className="form-section-label">THÔNG TIN PHÁT HÀNH HÓA ĐƠN DỊCH VỤ</div>
 
           <Field
@@ -639,10 +658,20 @@ export function InvoicesPage() {
             hint={
               completedOrders.data && completedOrders.data.content.length === 0
                 ? 'Chưa có lệnh sửa chữa nào hoàn thành để phát hành hóa đơn.'
-                : undefined
+                : readiness.isLoading && issueOrderId
+                  ? 'Đang kiểm tra điều kiện lập hóa đơn…'
+                  : issueBlockedReason
             }
+            error={issueBlockedReason}
           >
-            <select name="repairOrderId" className="input" required autoFocus defaultValue="">
+            <select
+              name="repairOrderId"
+              className="input"
+              required
+              autoFocus
+              value={issueOrderId}
+              onChange={(e) => setIssueOrderId(e.target.value)}
+            >
               <option value="" disabled>
                 {completedOrders.isLoading ? 'Đang tải danh sách…' : 'Chọn lệnh sửa chữa'}
               </option>
@@ -688,7 +717,12 @@ export function InvoicesPage() {
             >
               Hủy
             </Button>
-            <Button variant="primary" type="submit" pending={issueMutation.isPending}>
+            <Button
+              variant="primary"
+              type="submit"
+              pending={issueMutation.isPending}
+              disabled={!issueOrderId || readiness.isLoading || !!issueBlockedReason}
+            >
               Phát hành hóa đơn
             </Button>
           </div>

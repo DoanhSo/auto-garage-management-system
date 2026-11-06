@@ -9,19 +9,23 @@ import type {
   PaymentDirection,
 } from '../types/billing';
 
-export function useInvoicesQuery(params: {
-  status?: InvoiceStatus;
-  customerId?: string | number;
-  orderId?: string | number;
-  query?: string;
-  page?: number;
-  size?: number;
-  sortBy?: string;
-  sortDir?: string;
-}) {
+export function useInvoicesQuery(
+  params: {
+    status?: InvoiceStatus;
+    customerId?: string | number;
+    orderId?: string | number;
+    query?: string;
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: string;
+  },
+  enabled = true,
+) {
   return useQuery({
     queryKey: ['invoices', params],
     queryFn: () => billingApi.listInvoices(params),
+    enabled,
   });
 }
 
@@ -30,6 +34,14 @@ export function useInvoiceQuery(id: string | number) {
     queryKey: ['invoice', id],
     queryFn: () => billingApi.getInvoice(id),
     enabled: !!id,
+  });
+}
+
+export function useInvoiceReadinessQuery(orderId: string | number | null, enabled = true) {
+  return useQuery({
+    queryKey: ['invoice-readiness', orderId],
+    queryFn: () => billingApi.getInvoiceReadiness(orderId as string | number),
+    enabled: !!orderId && enabled,
   });
 }
 

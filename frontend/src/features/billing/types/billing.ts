@@ -71,6 +71,12 @@ export interface InvoiceIssueInput {
   requestKey?: string;
 }
 
+/** Whether an invoice can be issued for a repair order now, with the first blocking reason. */
+export interface InvoiceReadiness {
+  ready: boolean;
+  reason?: string | null;
+}
+
 export interface InvoiceVoidInput {
   voidReason: string;
 }

@@ -95,6 +95,8 @@ class LaborExecutionServiceTest {
     private com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository serviceRepository;
     @Mock
     private com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderAssignmentRepository workLogRepository;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.scheduling.service.DispatchService dispatchService;
 
     private RepairOrder mockOrder;
     private RepairTask mockTask;
@@ -468,5 +470,79 @@ class LaborExecutionServiceTest {
 
         when(taskAssignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of());
         assertThat(laborExecutionService.getQcAssignment(100L)).isNull();
+    }
+
+    // =========================================================================
+    // Danh sách ứng viên QC theo ca đang trực
+    // =========================================================================
+
+    private com.Group13_65CNTT.AutoGarage.scheduling.dto.response.OnShiftTechnicianResponse onShift(
+            long employeeId, String name, boolean canQc, Long bayId, String bayCode) {
+        return new com.Group13_65CNTT.AutoGarage.scheduling.dto.response.OnShiftTechnicianResponse(
+                employeeId, "NV-" + employeeId, name, 100L + employeeId, null, null,
+                Instant.now().minus(1, ChronoUnit.HOURS), Instant.now().plus(3, ChronoUnit.HOURS),
+                bayId, bayCode, bayId == null ? null : "Khoang " + bayCode, List.of("ENGINE"), canQc,
+                0, 0, BigDecimal.ZERO, false, null,
+                com.Group13_65CNTT.AutoGarage.scheduling.dto.response.OnShiftTechnicianResponse.Availability.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Ứng viên QC: chỉ người có quyền QC đang trong ca; người ca gắn khoang vẫn chọn được")
+    void getQcCandidates_ListsQcCapableOnShiftIncludingBayFixed() {
+        when(repairOrderRepository.existsById(100L)).thenReturn(true);
+        when(workLogRepository.findByRepairOrderIdAndAssignmentStage(100L, AssignmentStage.REPAIR_MAIN))
+                .thenReturn(List.of());
+        when(dispatchService.getOnShiftTechnicians()).thenReturn(List.of(
+                onShift(1L, "An", true, 6L, "B06"),
+                onShift(2L, "Binh", false, null, null),
+                onShift(3L, "Chi", true, null, null)));
+
+        var result = laborExecutionService.getQcCandidates(100L);
+
+        assertThat(result).extracting(c -> c.employeeId()).containsExactly(1L, 3L);
+        var bayFixed = result.get(0);
+        assertThat(bayFixed.eligible()).isTrue();
+        assertThat(bayFixed.reason()).isNull();
+        assertThat(bayFixed.serviceBayId()).isEqualTo(6L);
+        assertThat(bayFixed.bayCode()).isEqualTo("B06");
+    }
+
+    @Test
+    @DisplayName("Ứng viên QC: thợ chính của phiếu vẫn hiện nhưng bị khóa với lý do MAIN_REPAIRER, xếp sau người chọn được")
+    void getQcCandidates_MarksMainRepairerIneligible() {
+        when(repairOrderRepository.existsById(100L)).thenReturn(true);
+        when(workLogRepository.findByRepairOrderIdAndAssignmentStage(100L, AssignmentStage.REPAIR_MAIN))
+                .thenReturn(List.of(RepairOrderAssignment.builder().employeeId(1L).build()));
+        when(dispatchService.getOnShiftTechnicians()).thenReturn(List.of(
+                onShift(1L, "An", true, 6L, "B06"),
+                onShift(3L, "Chi", true, null, null)));
+
+        var result = laborExecutionService.getQcCandidates(100L);
+
+        assertThat(result).extracting(c -> c.employeeId()).containsExactly(3L, 1L);
+        assertThat(result.get(1).eligible()).isFalse();
+        assertThat(result.get(1).reason())
+                .isEqualTo(com.Group13_65CNTT.AutoGarage.repair.dto.response.QcCandidateResponse.Reason.MAIN_REPAIRER);
+    }
+
+    @Test
+    @DisplayName("Ứng viên QC: không ai trong ca lúc này (ca chỉ ở ngày đã qua) thì danh sách rỗng")
+    void getQcCandidates_EmptyWhenNobodyOnShiftNow() {
+        when(repairOrderRepository.existsById(100L)).thenReturn(true);
+        when(workLogRepository.findByRepairOrderIdAndAssignmentStage(100L, AssignmentStage.REPAIR_MAIN))
+                .thenReturn(List.of());
+        when(dispatchService.getOnShiftTechnicians()).thenReturn(List.of());
+
+        assertThat(laborExecutionService.getQcCandidates(100L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Ứng viên QC: phiếu không tồn tại thì báo không tìm thấy")
+    void getQcCandidates_UnknownOrder() {
+        when(repairOrderRepository.existsById(999L)).thenReturn(false);
+
+        assertThatThrownBy(() -> laborExecutionService.getQcCandidates(999L))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException.class);
+        verifyNoInteractions(dispatchService);
     }
 }

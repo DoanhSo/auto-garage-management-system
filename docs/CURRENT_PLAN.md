@@ -1,8 +1,8 @@
-# Kế Hoạch Phân Công Kỹ Thuật Viên QC Ngay Tại Màn Lệnh Sửa Chữa
+# Kế Hoạch Báo Đúng Lý Do Khi Không Lập Được Hóa Đơn
 
-> **Mã plan**: `qc-assignment-on-order`
+> **Mã plan**: `invoice-blocked-reasons`
 > **Chế độ**: `PLAN:` (tuân thủ `AGENTS.md`, `docs/CODING_GUIDELINES.md`, `docs/UI_DESIGN_GUIDELINES.md`).
-> **Kế thừa từ**: `plans/2026-11-qc-admin-on-behalf.md`. Plan đó cho admin ghi QC thay kỹ thuật viên được phân công, nhưng chưa có đường nào trên giao diện để phân công QC khi phiếu đã chờ QC.
+> **Kế thừa từ**: `plans/2026-11-qc-candidates-clarity.md` (Lỗi 3: bàn giao bị từ chối nhưng lý do bị nuốt). Cùng căn nguyên, lần này ở bước lập hóa đơn.
 
 Đường dẫn Java dưới đây tính từ `src/main/java/com/Group13_65CNTT/AutoGarage/`. Đường dẫn frontend tính từ `frontend/src/`.
 
@@ -12,160 +12,143 @@
 
 ### 1.1. Hiện trạng
 
-**Phiếu `WAITING_QC` không còn chỗ nào trên giao diện để phân công kỹ thuật viên QC.**
+**Bấm phát hành hóa đơn báo `2004 - Request fields or JSON are invalid` (`POST /api/v1/billing/invoices/issue`, 07:59 UTC).** Đây không phải dữ liệu gửi lên sai mà là một điều kiện nghiệp vụ bị từ chối, lý do bị nuốt:
 
-- Chỗ phân công duy nhất là nút "Phân công" trong `features/repair/components/TaskWorkPanel.tsx:96`, nằm trong từng công việc ở tab "Công việc". Nút bị ẩn khi `finished` (công việc `COMPLETED`/`CANCELLED`, dòng 63).
-- Phiếu chỉ sang `WAITING_QC` khi mọi công việc đã `COMPLETED`, nên đúng lúc cần QC thì mọi nút "Phân công" đều biến mất.
-- Backend lại cho phép: `repair/service/impl/LaborExecutionServiceImpl.java:69` cố ý bỏ qua điều kiện "công việc đã hoàn thành" khi vai trò là QC.
-- Hệ quả: admin bấm QC trên phiếu chưa có người QC bị từ chối `QC_INSPECTOR_NOT_ASSIGNED` (2020, `quality/service/impl/QualityServiceImpl.java:77`) mà không có cách xử lý từ giao diện. Kỹ thuật viên cũng bị chặn tương tự ở `identity/service/impl/ObjectAccessServiceImpl.java:89` (`assignedToQc`).
-- Phân công QC gắn với một công việc cụ thể (`POST /repair-tasks/{taskId}/assignments`), người dùng khó hiểu "QC của phiếu" lại chọn qua "một công việc".
-- Tab QC (`features/repair/components/RepairOrderDetailModal.tsx:896-910`) chỉ liệt kê tên thợ QC đang trực ca, không cho phân công và không cho biết ai đã được phân công.
-- Các nút "Bắt đầu kiểm tra QC" ở dòng 913 và khoảng dòng 925 vẫn dùng `canTechnical` và không kiểm tra trạng thái, lệch với nút QC ở dòng 332 (đã giới hạn theo `canPerformQc` và `WAITING_QC`).
-- Đổi người QC hiện phải gỡ phân công cũ rồi tạo mới trên công việc. Nếu phiếu có hai phân công QC đang hoạt động, admin ghi QC bị từ chối `QC_INSPECTOR_INVALID` (2021).
+- Dữ liệu gửi lên hợp lệ: `features/billing/pages/InvoicesPage.tsx:119-128` gửi `repairOrderId`, `taxAmount`, `discountAmount` đều là số.
+- Hai lệnh đang `COMPLETED` (#8 và #21) đều có QC `PASSED`, không còn công việc dở, không còn đồng hồ chạy và đều có hạng mục tính tiền.
+- **Nguyên nhân tìm được trên lệnh #21:** phụ tùng "Lốp xe Michelin Primacy 4 ST 215/55R17" (dòng báo giá #71, đã duyệt) còn `reserved_quantity = 1`, chưa có phiếu xuất kho nào cho lệnh (`inventory_documents` rỗng). Hàm kiểm tra `InventoryServiceImpl.requireIssueComplete` (`inventory/service/impl/InventoryServiceImpl.java:453-463`) ném `BusinessException(ResponseCode.BAD_REQUEST)` không kèm lời nhắn, được gọi từ `RepairServiceImpl.requireInvoiceReady` (`repair/service/impl/RepairServiceImpl.java:353-355`).
+- `GlobalExceptionHandler.authoredDetail` (`common/exception/GlobalExceptionHandler.java:59-67`) chỉ cho phép lời nhắn của `BusinessRuleException`, `ResourceNotFoundException`, `ConflictException`, nên người dùng chỉ thấy câu chung của mã 2004.
+- Lúc báo lỗi không còn log của lần bấm (container đã được tạo lại sau đó), nên kết luận trên dựa vào dữ liệu thật và thứ tự kiểm tra trong code; cần xác nhận lại ở Step 1.
+- Cùng hàm `issueInvoice` (`billing/service/impl/BillingServiceImpl.java:101-340`) còn nhiều chỗ ném `BusinessException(...)` không lời nhắn, người dùng cũng chỉ thấy câu chung: phiếu chưa có QC (dòng 139), QC chưa đạt (dòng 147), còn đồng hồ đang chạy (dòng 159), không có hạng mục tính tiền (dòng 298), giảm giá lớn hơn tạm tính (dòng 302) và phiếu đã có hóa đơn (dòng 110, mã `DUPLICATE_RESOURCE`).
+- Giao diện không báo trước: hộp "Phát hành hóa đơn" (`InvoicesPage.tsx:632-695`) liệt kê mọi lệnh `COMPLETED` dù chưa lập được hóa đơn, chỉ biết lỗi sau khi bấm.
+- Lưu ý ngoài phạm vi: lệnh #21 vẫn sang `COMPLETED` và QC đạt dù còn phụ tùng chưa xuất kho, nên lỗi chỉ lộ ra ở bước hóa đơn.
 
 ### 1.2. Mục tiêu
 
-- Ngay ở tab QC của lệnh sửa chữa, admin và lễ tân thấy ai đang được phân công QC và phân công hoặc đổi người bằng một thao tác, khi phiếu `WAITING_QC`.
-- Chỉ chọn được kỹ thuật viên đủ điều kiện: đang hoạt động, có quyền QC, đang trong ca, không phải thợ chính của phiếu. Mọi lúc phiếu chỉ có tối đa một kỹ thuật viên QC đang hoạt động.
-- Sau khi phân công, admin hoặc chính kỹ thuật viên đó ghi QC được ngay, không phải sang màn Khoang & lịch ca.
-- Các nút "Bắt đầu kiểm tra QC" trong tab QC nhất quán với nút ở đầu phiếu: chỉ hiện cho `ADMIN`/`TECHNICIAN` khi phiếu `WAITING_QC`.
+- Khi không lập được hóa đơn, người dùng thấy đúng lý do bằng tiếng Việt, ví dụ "Còn phụ tùng đã giữ chỗ nhưng chưa xuất kho: Lốp xe Michelin Primacy 4 ST 215/55R17. Hãy xuất kho hoặc hủy giữ chỗ trước khi lập hóa đơn."
+- Mã lỗi nói đúng bản chất: bị chặn bởi điều kiện nghiệp vụ (409), không phải dữ liệu gửi lên sai.
+- Hộp phát hành hóa đơn báo trước lý do khi chọn một lệnh chưa lập được và khóa nút, giống tab Bàn giao.
+- Sau khi xuất kho phụ tùng của lệnh #21 qua màn Kho, lập được hóa đơn.
 
 ### 1.3. Ngoài phạm vi
 
-- Không đổi quy tắc ghi QC của plan `qc-admin-on-behalf` (admin ghi thay, bốn mắt, điều kiện ca).
-- Không cho `TECHNICIAN` tự phân công QC cho mình. Chỉ `ADMIN` và `RECEPTIONIST` phân công, giống `assignTask` hiện tại.
-- Không đổi phân công thợ chính và thợ phụ, không đổi `TaskWorkPanel`.
-- Không cho admin ghi QC khi chưa phân công QC (đã chốt giữ yêu cầu phân công).
-- Không đổi màn Khoang & lịch ca. Xếp ca cho kỹ thuật viên vẫn làm ở đó.
-- Không thêm migration. Dữ liệu vẫn nằm ở `task_assignments`.
+- Không đổi điều kiện lập hóa đơn: vẫn phải xuất hết phụ tùng đã giữ chỗ và không còn phiếu kho nháp.
+- Không tự động xuất kho hay hủy giữ chỗ thay người dùng.
+- Không chặn chuyển lệnh sang `COMPLETED`/QC khi còn phụ tùng chưa xuất (ghi nhận để xem xét riêng).
+- Không đổi `GlobalExceptionHandler.authoredDetail` và không sửa các `BusinessException` không lời nhắn ở module khác.
 
 ## 2. Tiêu Chí Chấp Nhận (Acceptance Criteria)
 
-- **AC-1**: `POST /api/v1/repair-orders/{id}/qc-assignment` khi phiếu `WAITING_QC` tạo một phân công vai trò `QC` đang hoạt động cho kỹ thuật viên đủ điều kiện, gắn vào công việc cuối cùng của phiếu. Phản hồi 201. _Kiểm chứng_: unit test `LaborExecutionServiceTest`.
-- **AC-2**: Gọi lại với kỹ thuật viên khác thì phân công QC cũ được giải phóng và chỉ còn đúng một phân công QC đang hoạt động. _Kiểm chứng_: unit test kiểm tra `isActive=false`, `releasedAt` ở bản cũ và `findActiveQcForOrder` trả một bản.
-- **AC-3**: Bị từ chối bằng lỗi nghiệp vụ rõ ràng và không đổi dữ liệu khi:
-  - phiếu không ở `WAITING_QC`;
-  - phiếu chưa có công việc nào;
-  - kỹ thuật viên không hoạt động, không có `canQc` hoặc không trong ca (các lỗi này đã có ở `assignTask`);
-  - kỹ thuật viên là thợ chính (`REPAIR_MAIN`) của phiếu.
-
-  _Kiểm chứng_: unit test từng trường hợp.
-- **AC-4**: `GET /api/v1/repair-orders/{id}/qc-assignment` trả phân công QC đang hoạt động (có tên kỹ thuật viên) hoặc `data: null` khi chưa có. _Kiểm chứng_: unit test và gọi API.
-- **AC-5**: Chỉ `ADMIN`/`RECEPTIONIST` gọi được `POST`. `TECHNICIAN` và `CUSTOMER` nhận 403. _Kiểm chứng_: kiểm tra `@PreAuthorize` bằng test hoặc gọi API với hai vai trò.
-- **AC-6**: Tab QC của phiếu `WAITING_QC` hiện dòng "Kỹ thuật viên QC được phân công: <tên>" hoặc "Chưa phân công". Admin và lễ tân thấy nút "Phân công QC" (hoặc "Đổi người"). Vai trò khác không thấy nút. _Kiểm chứng_: thao tác trình duyệt với admin, lễ tân và kỹ thuật viên.
-- **AC-7**: Modal phân công QC chỉ liệt kê kỹ thuật viên có `canQc` đang trong ca. Phân công thành công thì tab QC cập nhật ngay, lỗi API hiển thị bằng `errorMessage`. _Kiểm chứng_: thao tác trình duyệt.
-- **AC-8**: Sau khi phân công, admin bấm "Kiểm tra chất lượng (QC)" ghi được biên bản (không còn lỗi 2020). _Kiểm chứng_: thao tác trình duyệt trên container mới.
-- **AC-9**: Các nút "Bắt đầu kiểm tra QC" trong tab QC chỉ hiện với `ADMIN`/`TECHNICIAN` khi phiếu `WAITING_QC`. _Kiểm chứng_: thao tác trình duyệt và `npm run lint`/`tsc`.
-- **AC-10**: Test hiện có vẫn qua: `LaborExecutionServiceTest`, `QualityCheckServiceTest`, `TV3WorkflowIntegrationTest`, `BusinessWorkflowIntegrationTests`, Vitest. _Kiểm chứng_: `./mvnw test` (bật `mysql-test` cho test tích hợp) và `npm --prefix frontend test`.
+- **AC-1**: `POST /billing/invoices/issue` trên lệnh còn phụ tùng giữ chỗ chưa xuất kho trả HTTP 409, `code = 2023`, `message` tiếng Việt nêu tên phụ tùng còn lại. Không còn trả 2004. _Kiểm chứng_: unit test cho `InventoryServiceImpl.requireIssueComplete` (mã, thông điệp có tên phụ tùng) và gọi API trên lệnh #21.
+- **AC-2**: Khi còn phiếu kho xuất/trả ở trạng thái nháp, thông điệp riêng khác AC-1: "Còn phiếu kho nháp…". Khi hết cả hai thì `requireIssueComplete` qua. _Kiểm chứng_: unit test ba nhánh.
+- **AC-3**: Mỗi nhánh còn lại của `issueInvoice` báo thông điệp riêng bằng tiếng Việt: phiếu chưa có QC, QC chưa đạt, còn đồng hồ đang chạy, không có hạng mục tính tiền, giảm giá lớn hơn tạm tính, đã có hóa đơn. Trạng thái nghiệp vụ trả 409/2023; giảm giá sai là 400/2004 kèm thông điệp. _Kiểm chứng_: unit test từng nhánh trong `BillingServiceTest`.
+- **AC-4**: `GET /api/v1/billing/invoices/order/{orderId}/readiness` trả `ready` và `reason` (rỗng khi lập được) bằng đúng quy tắc của `issueInvoice`, không ghi dữ liệu. _Kiểm chứng_: unit test và gọi API trên lệnh #21 trước và sau khi xuất kho.
+- **AC-5**: Hộp "Phát hành hóa đơn" chọn lệnh chưa lập được thì hiện lý do dưới ô chọn và khóa nút "Phát hành"; chọn lệnh lập được thì nút bật. Lỗi từ máy chủ nếu vẫn xảy ra hiển thị đúng thông điệp. _Kiểm chứng_: thao tác trình duyệt với lệnh #21.
+- **AC-6**: Sau khi xuất kho phụ tùng của lệnh #21 ở màn Kho, hộp phát hành cho phép lập hóa đơn và tạo thành công, lệnh chuyển `INVOICED`. _Kiểm chứng_: thao tác trình duyệt.
+- **AC-7**: Test hiện có vẫn qua: `BillingServiceTest`, `RepairWorkflowServiceTest`, `BusinessWorkflowIntegrationTests`, Vitest, lint, `tsc`. _Kiểm chứng_: `./mvnw test` (bật `mysql-test`) và `npm --prefix frontend test`.
 
 ## 3. Danh Sách File Mục Tiêu
 
 | File | Vùng dòng | Thay đổi |
 |---|---|---|
-| `repair/dto/request/QcAssignmentRequest.java` | file mới | DTO `employeeId`, `startsAt`, `endsAt` với Jakarta Validation có message |
-| `repair/service/LaborExecutionService.java` | 15-17 | Thêm `assignQcInspector` và `getQcAssignment` |
-| `repair/service/impl/LaborExecutionServiceImpl.java` | 60-153 (`assignTask`), 157-177 (`releaseAssignment`) | Thêm 2 hàm mới. Tái dùng kiểm tra của `assignTask` bằng cách tách phần tạo phân công thành hàm private dùng chung |
-| `repair/controller/RepairOrderController.java` | gần 134-150 (`/{id}/tasks`) | Thêm `POST` và `GET /{id}/qc-assignment`, `@PreAuthorize`, `@Operation` |
-| `repair/repository/TaskAssignmentRepository.java` | 19-21 | Dùng lại `findActiveQcForOrder`. Không cần query mới |
-| `src/test/.../repair/LaborExecutionServiceTest.java` | cuối file | Test cho AC-1 → AC-4 |
-| `frontend/src/features/repair/api/repairApi.ts` | 94-117 | Thêm `assignQcInspector`, `getQcAssignment` |
-| `frontend/src/features/repair/hooks/useRepair.ts` | cạnh `useAssignTaskMutation` | Thêm `useQcAssignmentQuery`, `useAssignQcInspectorMutation` (invalidate query của phiếu) |
-| `frontend/src/features/repair/utils/assignmentWindow.ts` | file mới | Chuyển `toLocalInput` và `DEFAULT_ASSIGNMENT_HOURS` từ `AssignTaskModal.tsx:10-22` sang để dùng chung |
-| `frontend/src/features/repair/components/AssignTaskModal.tsx` | 10-22 | Import từ `assignmentWindow.ts`, không đổi hành vi |
-| `frontend/src/features/repair/components/AssignQcModal.tsx` | file mới | Modal chọn kỹ thuật viên QC và khoảng thời gian |
-| `frontend/src/features/repair/components/RepairOrderDetailModal.tsx` | 896-935 (tab QC), 1057 | Thêm khối phân công QC, gắn `AssignQcModal`, đổi điều kiện hai nút "Bắt đầu kiểm tra QC" sang `canPerformQc && WAITING_QC` |
-| `docs/REPAIR_ORDER_LIFECYCLE.md` | mục 2.5 | Ghi cách phân công QC tại tab QC |
+| `common/enums/ResponseCode.java` | sau `HANDOVER_BLOCKED` (dòng 57-58) | Thêm `INVOICE_BLOCKED(2023, "Invoice cannot be issued in the current state", HttpStatus.CONFLICT)` |
+| `inventory/service/impl/InventoryServiceImpl.java` | 453-463 (`requireIssueComplete`) | Lấy tên phụ tùng còn giữ chỗ; ném `ConflictException(ResponseCode.INVOICE_BLOCKED, ...)` hai thông điệp riêng |
+| `billing/service/impl/BillingServiceImpl.java` | 101-340 (`issueInvoice`); thêm hàm `getInvoiceReadiness` | Thay các `BusinessException(BAD_REQUEST/DUPLICATE_RESOURCE)` không lời nhắn bằng `ConflictException(INVOICE_BLOCKED/…, "…")` hoặc `BusinessRuleException`; tách phần kiểm tra sẵn sàng thành hàm dùng chung cho `issueInvoice` và `getInvoiceReadiness` |
+| `billing/service/BillingService.java` | cạnh `issueInvoice` | Thêm `InvoiceReadinessResponse getInvoiceReadiness(Long repairOrderId)` |
+| `billing/dto/response/InvoiceReadinessResponse.java` | file mới | Record `ready`, `reason` |
+| `billing/controller/InvoiceController.java` | gần dòng 49-60 | Thêm `GET /order/{orderId}/readiness`, `@PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTION_OR_ADMIN)`, `@Operation` |
+| `src/test/.../inventory/` (tìm test của `InventoryServiceImpl`) và `billing/service/BillingServiceTest.java` | cuối file | Test AC-1 → AC-4 |
+| `frontend/src/features/billing/api/billingApi.ts` | cạnh `getInvoiceByOrder` (dòng 74-75) | Thêm `getInvoiceReadiness(orderId)` |
+| `frontend/src/features/billing/hooks/useBilling.ts` | cạnh `useInvoiceQuery` | Thêm `useInvoiceReadinessQuery(orderId, enabled)` |
+| `frontend/src/features/billing/types/billing.ts` | cạnh `InvoiceIssueInput` (dòng 66-72) | Thêm `InvoiceReadiness` |
+| `frontend/src/features/billing/pages/InvoicesPage.tsx` | 119-135 (`handleIssue`), 632-695 (hộp phát hành) | Lưu lệnh đang chọn; hiện lý do từ `readiness`; khóa nút khi `ready=false` |
+| `docs/REPAIR_ORDER_LIFECYCLE.md` | mục 2.6 | Ghi: lập hóa đơn bị chặn kèm lý do 409/2023; phải xuất hết phụ tùng giữ chỗ |
 
 ## 4. Hợp Đồng Kỹ Thuật
 
-**Endpoint** (đường dẫn dùng `ApiPaths.REPAIR_ORDERS_BASE`):
-
-```
-POST /api/v1/repair-orders/{id}/qc-assignment   @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)   -> 201 ApiResponse<TaskAssignmentResponse>
-GET  /api/v1/repair-orders/{id}/qc-assignment   @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF) -> 200 ApiResponse<TaskAssignmentResponse | null>
-```
-
-**DTO** `QcAssignmentRequest`:
+**Mã lỗi mới** (`ResponseCode.java`):
 
 ```java
-@NotNull(message = "ID nhân viên không được để trống") private Long employeeId;
-@NotNull(message = "Thời gian bắt đầu không được để trống") private Instant startsAt;
-@NotNull(message = "Thời gian dự kiến kết thúc không được để trống") private Instant endsAt;
+INVOICE_BLOCKED(2023, "Invoice cannot be issued in the current state", HttpStatus.CONFLICT),
 ```
 
-**Service** (`LaborExecutionService`):
+Dùng `new ConflictException(ResponseCode.INVOICE_BLOCKED, "<thông điệp>")` (`shared/exception/ConflictException.java` đã có hàm tạo `(ResponseCode, String)`), để `authoredDetail` hiển thị lời nhắn mà không cần đổi handler.
+
+**Thông điệp**:
+
+| Nhánh | Loại | Thông điệp |
+|---|---|---|
+| Còn phụ tùng giữ chỗ chưa xuất | 409/2023 | "Còn phụ tùng đã giữ chỗ nhưng chưa xuất kho: <tên 1>, <tên 2>. Hãy xuất kho hoặc hủy giữ chỗ trước khi lập hóa đơn." (tối đa 5 tên, thêm "và N phụ tùng khác" nếu nhiều hơn) |
+| Còn phiếu kho xuất/trả nháp | 409/2023 | "Còn phiếu kho xuất hoặc trả ở trạng thái nháp. Hãy hoàn tất hoặc hủy phiếu nháp trước khi lập hóa đơn." |
+| Chưa có QC | 409/2023 | "Phiếu chưa có kết quả QC. Hãy hoàn tất kiểm tra chất lượng trước khi lập hóa đơn." |
+| QC chưa đạt | 409/2023 | "Biên bản QC gần nhất chưa đạt. Hãy kiểm tra chất lượng lại trước khi lập hóa đơn." |
+| Còn đồng hồ đang chạy | 409/2023 | "Còn kỹ thuật viên đang bấm giờ làm việc. Hãy dừng bấm giờ trước khi lập hóa đơn." |
+| Không có hạng mục tính tiền | 409/2023 | "Phiếu không có hạng mục dịch vụ hoặc phụ tùng nào để tính tiền." |
+| Phiếu đã có hóa đơn | 409/2003 (giữ) | "Phiếu đã có hóa đơn còn hiệu lực." |
+| Giảm giá lớn hơn tạm tính | 400/2004 (`BusinessRuleException`) | "Số tiền giảm giá không được lớn hơn tạm tính của hóa đơn." |
+
+**Kiểm tra sẵn sàng** (`BillingService`):
 
 ```java
-TaskAssignmentResponse assignQcInspector(Long actorUserId, Long orderId, QcAssignmentRequest request);
-TaskAssignmentResponse getQcAssignment(Long orderId); // null khi chưa có
+InvoiceReadinessResponse getInvoiceReadiness(Long repairOrderId);   // @Transactional(readOnly = true)
+public record InvoiceReadinessResponse(boolean ready, String reason) {}
 ```
 
-Quy tắc `assignQcInspector` (`@Transactional`, khóa phiếu bằng `findByIdForUpdate`):
-
-1. Phiếu phải `WAITING_QC`, nếu không ném `BusinessRuleException("Chỉ phân công kỹ thuật viên QC khi phiếu đang chờ QC")`.
-2. Lấy công việc cuối cùng của phiếu làm điểm gắn. Không có công việc: `BusinessRuleException("Phiếu chưa có công việc để gắn phân công QC")`.
-3. Nếu kỹ thuật viên là thợ chính của phiếu (`RepairOrderAssignmentRepository.findByRepairOrderIdAndAssignmentStage(..., REPAIR_MAIN)`): `BusinessRuleException("Thợ chính đã sửa chữa không được làm kỹ thuật viên QC của phiếu này")`.
-4. Giải phóng mọi phân công QC đang hoạt động của phiếu (`findActiveQcForOrder`): `isActive=false`, `releasedAt=now`. Đóng timer mở nếu có, theo cách `releaseAssignment` đang làm.
-5. Tạo phân công mới bằng đường dùng chung của `assignTask` với vai trò `QC`. Phần này đã có các kiểm tra hoạt động, `canQc`, chồng lịch, ca làm việc, kỹ năng. Lỗi nào xảy ra thì cả giao dịch rollback, phân công cũ giữ nguyên.
-
-Không thêm `ResponseCode` mới, dùng `BusinessRuleException` và `ConflictException` có thông báo tiếng Việt như `assignTask`.
+- Chạy đúng chuỗi kiểm tra của `issueInvoice` trước khi tạo hóa đơn (đã có hóa đơn, `repairWorkflow.requireInvoiceReady`, QC, đồng hồ, hạng mục tính tiền), bắt `BusinessException` đầu tiên và trả `ready=false`, `reason=<message>`; không ghi dữ liệu và không dùng `FOR UPDATE` (dùng bản đọc của truy vấn đơn hàng).
+- Kiểm tra dùng chung nằm trong một hàm private để `issueInvoice` và `getInvoiceReadiness` không lệch quy tắc.
 
 **Frontend**:
 
 ```ts
-assignQcInspector(orderId, { employeeId, startsAt, endsAt }): Promise<TaskAssignment>
-getQcAssignment(orderId): Promise<TaskAssignment | null>
+interface InvoiceReadiness { ready: boolean; reason?: string | null }
+getInvoiceReadiness(orderId: string | number): Promise<InvoiceReadiness>
+useInvoiceReadinessQuery(orderId: string | null, enabled: boolean)
 ```
 
-- `AssignQcModal` dùng `Modal`, `Field`, `Button`, `FormError` chung và `useOnShiftTechniciansQuery`, lọc `canQc`. Bố cục hai cột theo `UI_DESIGN_GUIDELINES.md`, không có ô chọn vai trò.
-- Khối trong tab QC dùng class có sẵn (`text-xs muted`, `Button variant="secondary"`), không thêm style mới.
-- Điều kiện hiện nút: `canFrontDesk && order.status === 'WAITING_QC'`.
+- Trong hộp phát hành: `Field` có `hint` hiện `reason` khi `ready=false`; nút "Phát hành" dùng `disabled`. Dùng `Field`, `Button`, `FormError` có sẵn, không thêm style.
+- `handleIssue` giữ `notify(errorMessage(err))`; thêm `FormError` trong hộp để thông điệp vẫn thấy sau khi toast biến mất.
 
 ## 5. Checklist Thực Thi
 
-- [x] **Step 1: DTO và service phân công QC** _(AC-1, AC-2, AC-3, AC-4)_
-  - Thêm `QcAssignmentRequest`.
-  - Thêm `assignQcInspector`, `getQcAssignment` vào `LaborExecutionService` và `LaborExecutionServiceImpl`.
-  - Tách phần tạo phân công của `assignTask` thành hàm private dùng chung, giữ nguyên hành vi của `assignTask`.
-- [x] **Step 2: Endpoint trong `RepairOrderController`** _(AC-1, AC-4, AC-5)_
-  - Thêm `POST` và `GET /{id}/qc-assignment` với `@PreAuthorize` và `@Operation` tiếng Việt.
-- [x] **Step 3: Test backend** _(AC-1 → AC-5, AC-10)_
-  - Thêm vào `LaborExecutionServiceTest`: phân công thành công, đổi người (chỉ còn một bản đang hoạt động), phiếu không `WAITING_QC`, phiếu không có công việc, thợ chính, kỹ thuật viên không `canQc`, `getQcAssignment` có và không có.
-  - Chạy `./mvnw test -Dtest=LaborExecutionServiceTest,QualityCheckServiceTest,TV3WorkflowIntegrationTest`.
-- [x] **Step 4: API client, hook và tiện ích dùng chung** _(AC-6, AC-7)_
-  - Thêm hàm vào `repairApi.ts`, hook vào `useRepair.ts`.
-  - Tách `assignmentWindow.ts` và cập nhật `AssignTaskModal.tsx`.
-- [x] **Step 5: `AssignQcModal` và khối phân công trong tab QC** _(AC-6, AC-7, AC-9)_
-  - Tạo `AssignQcModal.tsx`.
-  - Thêm khối "Kỹ thuật viên QC được phân công" và nút "Phân công QC"/"Đổi người".
-  - Đổi điều kiện hai nút "Bắt đầu kiểm tra QC" sang `canPerformQc && WAITING_QC`.
-  - Chạy `npm --prefix frontend run lint`, `tsc` và `test`.
-- [x] **Step 6: Cập nhật tài liệu** _(AC-6)_
-  - Ghi cách phân công QC tại tab QC vào `docs/REPAIR_ORDER_LIFECYCLE.md` mục 2.5.
-- [x] **Step 7: Kiểm thử & xác minh** _(tất cả AC)_
-  - Bật `mysql-test`, chạy `BusinessWorkflowIntegrationTests`.
-  - Build lại container theo `README.md` (jar, frontend, `docker compose build`, `up`).
-  - Trên trình duyệt với admin, lễ tân, kỹ thuật viên: phân công QC, đổi người, admin ghi QC thành công, vai trò không đủ quyền không thấy nút.
+- [x] **Step 1: Xác nhận nguyên nhân trên dữ liệu thật** _(AC-1, AC-6)_
+  - Gọi API phát hành cho lệnh #21 (hoặc bấm trên giao diện) và đối chiếu: sau Step 2-3, thông điệp phải nêu phụ tùng Lốp Michelin. Nếu thông điệp khác, ghi lại nguyên nhân thật vào mục 1.1 trước khi sửa tiếp.
+- [x] **Step 2: `ResponseCode` và `requireIssueComplete`** _(AC-1, AC-2)_
+  - Thêm `INVOICE_BLOCKED`; sửa `InventoryServiceImpl.requireIssueComplete` theo bảng thông điệp.
+- [x] **Step 3: Thông điệp rõ ràng trong `issueInvoice`** _(AC-3)_
+  - Thay các lần ném không lời nhắn theo bảng.
+- [x] **Step 4: Kiểm tra sẵn sàng và endpoint** _(AC-4)_
+  - Tách hàm kiểm tra dùng chung, thêm `getInvoiceReadiness`, `InvoiceReadinessResponse`, endpoint `GET /order/{orderId}/readiness`.
+- [x] **Step 5: Test backend** _(AC-1 → AC-4, AC-7)_
+  - Thêm test cho `requireIssueComplete` (còn giữ chỗ, còn phiếu nháp, sạch), từng nhánh `issueInvoice`, `getInvoiceReadiness` sẵn sàng và bị chặn.
+  - Chạy `./mvnw test -Dtest=BillingServiceTest,RepairWorkflowServiceTest` và test của Inventory.
+- [x] **Step 6: Frontend** _(AC-5)_
+  - Thêm kiểu, API, hook; cập nhật hộp phát hành; chạy `npm --prefix frontend run lint`, `tsc`, `test`.
+- [x] **Step 7: Cập nhật tài liệu** _(AC-5)_
+  - Ghi quy tắc vào `docs/REPAIR_ORDER_LIFECYCLE.md` mục 2.6.
+- [x] **Step 8: Kiểm thử & xác minh** _(tất cả AC)_
+  - Bật `mysql-test`, chạy `BusinessWorkflowIntegrationTests`; build lại container theo `README.md`.
+  - Trên trình duyệt: chọn lệnh #21 thấy lý do về phụ tùng Michelin và nút khóa; xuất kho phụ tùng ở màn Kho; phát hành thành công (AC-6); rồi bàn giao (nối với plan trước).
+
+- [x] **Step 9 (converge): Bổ sung test nhánh giảm giá lớn hơn tạm tính** _(AC-3)_
+  - Trong `src/test/.../billing/service/BillingServiceTest.java` thêm test `issueInvoice` với một dòng dịch vụ tính tiền (tạm tính > 0) và `discountAmount` lớn hơn tạm tính → `BusinessRuleException` (400/2004) có thông điệp chứa "giảm giá" (`BillingServiceImpl.java`, nhánh `invoice.getDiscountAmount().compareTo(subtotal) > 0`).
+  - Chạy `./mvnw test -Dtest=BillingServiceTest`.
 
 <!-- Mục 6 "Kết Quả Hội Tụ" do /converge thêm vào, không viết sẵn. -->
 
 ## 6. Kết Quả Hội Tụ (Converge)
 
-Ngày: 2026-11-05. Kết luận: **partial** (mọi mục trong phạm vi đã có code; các mục kiểm chứng bằng giao diện và phân quyền chưa xác minh).
+Ngày: 2026-11-06. Kết luận: **partial** (mọi mục trong phạm vi đã có code và test; các mục kiểm chứng bằng giao diện và gọi API thật chưa xác minh).
 
 | Mục tiêu | Trạng thái | Ghi chú |
 |---|---|---|
-| AC-1 Phân công QC khi phiếu `WAITING_QC` | Đạt | `LaborExecutionServiceImpl.java:171`; test `assignQcInspector_Success` (vai trò QC, gắn công việc cuối, không ghi nhật ký công) |
-| AC-2 Đổi người giải phóng phân công cũ | Đạt | Test `assignQcInspector_ReplacesPreviousInspector` kiểm tra `isActive=false`, `releasedAt` |
-| AC-3 Từ chối các trường hợp không hợp lệ | Đạt | Có test: sai trạng thái, chưa có công việc, thợ chính, thiếu `canQc`. Không trong ca và không hoạt động dùng chung kiểm tra của `assignTask` (đã có test riêng ở `assignmentOutsideActiveShiftIsRejected`), chưa có test riêng cho đường QC |
-| AC-4 `GET` trả phân công hoặc `null` | Đạt | `LaborExecutionServiceImpl.java:216`; test `getQcAssignment_ReturnsActiveOrNull`. Chưa gọi thử qua HTTP |
-| AC-5 Chỉ `ADMIN`/`RECEPTIONIST` gọi `POST` | Chưa xác minh | `@PreAuthorize(HAS_FRONT_DESK)` ở `RepairOrderController.java:138`, chưa có test hay lệnh gọi API với vai trò khác |
-| AC-6 Tab QC hiện người được phân công và nút | Chưa xác minh | `RepairOrderDetailModal.tsx:138,911-919`; chưa thử trên trình duyệt |
-| AC-7 Modal chỉ liệt kê người QC trong ca | Chưa xác minh | `AssignQcModal.tsx` lọc `canQc` từ danh sách đang trong ca; chưa thử trên trình duyệt |
-| AC-8 Admin ghi QC được sau khi phân công | Chưa xác minh | Đường backend đã có test ở `qc-admin-on-behalf` (`adminRecordsQcOnBehalfOfAssignedInspector`); chưa chạy trọn luồng trên container |
-| AC-9 Nút "Bắt đầu kiểm tra QC" theo vai trò và trạng thái | Đạt (code) / chưa xác minh UI | `RepairOrderDetailModal.tsx:938,952` dùng `canPerformQc && WAITING_QC`; lint, `tsc`, build qua |
-| AC-10 Test hiện có vẫn qua | Đạt | `./mvnw test` 41/41 (gồm `BusinessWorkflowIntegrationTests` với MySQL test), Vitest 111/111 |
+| AC-1 Còn phụ tùng giữ chỗ → 409/2023 nêu tên phụ tùng | Đạt | `InventoryServiceImpl.requireIssueComplete`; test kiểm tra mã và tên phụ tùng; chưa gọi API thật trên lệnh #21 |
+| AC-2 Thông điệp riêng cho phiếu kho nháp, và trường hợp sạch | Đạt | Test ba nhánh và test cắt tối đa 5 tên |
+| AC-3 Mỗi nhánh `issueInvoice` có thông điệp riêng | Đạt | Sau Step 9: test cho đã có hóa đơn, chưa có QC, QC chưa đạt, còn đồng hồ chạy, không có hạng mục, giảm giá lớn hơn tạm tính |
+| AC-4 Endpoint `readiness` | Đạt | `BillingServiceImpl.getInvoiceReadiness`; test bị chặn, sẵn sàng không khóa dòng, không có hạng mục, lỗi hạ tầng không bị nuốt; chưa gọi qua HTTP |
+| AC-5 Hộp phát hành báo lý do và khóa nút | Chưa xác minh | `InvoicesPage.tsx`; lint, `tsc`, build qua; chưa thử trên trình duyệt |
+| AC-6 Xuất kho phụ tùng #21 rồi lập được hóa đơn | Chưa xác minh | Cần thao tác tay trên giao diện |
+| AC-7 Test hiện có vẫn qua | Đạt | Toàn bộ 524 test backend (có MySQL test), Vitest 111/111 |
 
-Điều chỉnh so với plan: kiểm tra kỹ năng dịch vụ được bỏ qua cho vai trò QC (`createAssignment(..., checkServiceSkills=false)`), vì người kiểm định không cần kỹ năng của dịch vụ gắn vào công việc cuối. `assignTask` thường giữ nguyên.
+Lỗi phát hiện và đã sửa trong quá trình: converge lần đầu thiếu test nhánh giảm giá lớn hơn tạm tính, đã bổ sung ở Step 9.
 
-Còn lại cần kiểm tay trên container mới: phân công/đổi QC bằng admin và lễ tân, kỹ thuật viên không thấy nút, admin ghi QC thành công sau khi phân công, gọi `POST` bằng vai trò kỹ thuật viên nhận 403.
+Còn cần kiểm tay: chọn lệnh #21 trong hộp phát hành để thấy lý do về phụ tùng lốp Michelin và nút khóa; xuất kho phụ tùng ở màn Kho; phát hành hóa đơn; sau đó bàn giao.

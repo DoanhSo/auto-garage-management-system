@@ -7,6 +7,7 @@ import com.Group13_65CNTT.AutoGarage.billing.dto.request.PaymentReceiveRequest;
 import com.Group13_65CNTT.AutoGarage.billing.dto.request.SupplierPaymentRequest;
 import com.Group13_65CNTT.AutoGarage.billing.dto.response.InvoiceBalanceResponse;
 import com.Group13_65CNTT.AutoGarage.billing.dto.response.InvoiceItemResponse;
+import com.Group13_65CNTT.AutoGarage.billing.dto.response.InvoiceReadinessResponse;
 import com.Group13_65CNTT.AutoGarage.billing.dto.response.InvoiceResponse;
 import com.Group13_65CNTT.AutoGarage.billing.dto.response.PaymentResponse;
 import com.Group13_65CNTT.AutoGarage.billing.dto.response.SupplierBalanceResponse;
@@ -33,6 +34,9 @@ import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
+import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
+import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
 import com.Group13_65CNTT.AutoGarage.inventory.entity.DocumentStatus;
@@ -109,55 +113,9 @@ public class BillingServiceImpl implements BillingService {
             }
         }
 
-        if (invoiceRepository.existsByRepairOrderIdAndStatusNot(request.getRepairOrderId(), InvoiceStatus.VOID)) {
-            log.warn("Invoice already issued for repair order {}", request.getRepairOrderId());
-            throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
-        }
-
-        // Check readiness via I03 contract if available, and also verify DB state directly
-        if (repairWorkflow.isPresent()) {
-            repairWorkflow.get().requireInvoiceReady(actorUserId, request.getRepairOrderId());
-        }
-
-        // Direct DB verification of order readiness
-        List<Map<String, Object>> orderRows = jdbcTemplate.queryForList(
-                "SELECT ro.id, ro.customer_id, ro.vehicle_id, ro.latest_qc_check_id, ro.status " +
-                "FROM repair_orders ro WHERE ro.id = ? FOR UPDATE",
-                request.getRepairOrderId());
-
-        if (orderRows.isEmpty()) {
-            throw new BusinessException(ResponseCode.RESOURCE_NOT_FOUND);
-        }
-
-        Map<String, Object> order = orderRows.get(0);
+        Map<String, Object> order = requireIssueReady(actorUserId, request.getRepairOrderId(), true);
         Long customerId = ((Number) order.get("customer_id")).longValue();
         Long vehicleId = ((Number) order.get("vehicle_id")).longValue();
-        Object latestQcObj = order.get("latest_qc_check_id");
-
-        if (latestQcObj == null) {
-            log.warn("Cannot issue invoice: repair order {} has not passed QC", request.getRepairOrderId());
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
-        }
-
-        Long latestQcId = ((Number) latestQcObj).longValue();
-        List<Map<String, Object>> qcRows = jdbcTemplate.queryForList(
-                "SELECT check_type, result FROM vehicle_checks WHERE id = ?", latestQcId);
-        if (qcRows.isEmpty() || !"QC".equals(qcRows.get(0).get("check_type")) || !"PASSED".equals(qcRows.get(0).get("result"))) {
-            log.warn("Cannot issue invoice: QC check {} is not PASSED", latestQcId);
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
-        }
-
-        // Verify no active labor timers
-        Integer openTimers = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM labor_sessions ls " +
-                "JOIN task_assignments ta ON ls.assignment_id = ta.id " +
-                "JOIN repair_tasks rt ON ta.task_id = rt.id " +
-                "WHERE rt.repair_order_id = ? AND ls.ends_at IS NULL",
-                Integer.class, request.getRepairOrderId());
-        if (openTimers != null && openTimers > 0) {
-            log.warn("Cannot issue invoice: repair order {} has {} active labor timers", request.getRepairOrderId(), openTimers);
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
-        }
 
         // Capture immutable customer snapshot
         Map<String, Object> cust = jdbcTemplate.queryForMap(
@@ -295,11 +253,12 @@ public class BillingServiceImpl implements BillingService {
 
         if (items.isEmpty()) {
             log.warn("Cannot issue invoice: repair order {} has no billable service tasks or parts", request.getRepairOrderId());
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
+                    "Phiếu không có hạng mục dịch vụ hoặc phụ tùng nào để tính tiền.");
         }
 
         if (invoice.getDiscountAmount().compareTo(subtotal) > 0) {
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new BusinessRuleException("Số tiền giảm giá không được lớn hơn tạm tính của hóa đơn.");
         }
 
         BigDecimal total = subtotal.subtract(invoice.getDiscountAmount()).add(invoice.getTaxAmount());
@@ -323,6 +282,82 @@ public class BillingServiceImpl implements BillingService {
 
         log.info("Issued invoice id: {}, code: {} for order: {}", saved.getId(), saved.getInvoiceCode(), request.getRepairOrderId());
         return enrichInvoiceResponse(saved);
+    }
+
+    /**
+     * Rules shared by issuing an invoice and its read-only readiness check. Returns the order row;
+     * {@code lockOrder} takes a row lock and is only wanted when the invoice is actually issued.
+     */
+    private Map<String, Object> requireIssueReady(long actorUserId, Long repairOrderId, boolean lockOrder) {
+        if (invoiceRepository.existsByRepairOrderIdAndStatusNot(repairOrderId, InvoiceStatus.VOID)) {
+            log.warn("Invoice already issued for repair order {}", repairOrderId);
+            throw new ConflictException("Phiếu đã có hóa đơn còn hiệu lực.");
+        }
+
+        // Check readiness via I03 contract if available, and also verify DB state directly
+        if (repairWorkflow.isPresent()) {
+            repairWorkflow.get().requireInvoiceReady(actorUserId, repairOrderId);
+        }
+
+        // Direct DB verification of order readiness
+        List<Map<String, Object>> orderRows = jdbcTemplate.queryForList(
+                "SELECT ro.id, ro.customer_id, ro.vehicle_id, ro.latest_qc_check_id, ro.status " +
+                "FROM repair_orders ro WHERE ro.id = ?" + (lockOrder ? " FOR UPDATE" : ""),
+                repairOrderId);
+        if (orderRows.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + repairOrderId);
+        }
+        Map<String, Object> order = orderRows.get(0);
+
+        Object latestQcObj = order.get("latest_qc_check_id");
+        if (latestQcObj == null) {
+            log.warn("Cannot issue invoice: repair order {} has not passed QC", repairOrderId);
+            throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
+                    "Phiếu chưa có kết quả QC. Hãy hoàn tất kiểm tra chất lượng trước khi lập hóa đơn.");
+        }
+        Long latestQcId = ((Number) latestQcObj).longValue();
+        List<Map<String, Object>> qcRows = jdbcTemplate.queryForList(
+                "SELECT check_type, result FROM vehicle_checks WHERE id = ?", latestQcId);
+        if (qcRows.isEmpty() || !"QC".equals(qcRows.get(0).get("check_type")) || !"PASSED".equals(qcRows.get(0).get("result"))) {
+            log.warn("Cannot issue invoice: QC check {} is not PASSED", latestQcId);
+            throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
+                    "Biên bản QC gần nhất chưa đạt. Hãy kiểm tra chất lượng lại trước khi lập hóa đơn.");
+        }
+
+        // Verify no active labor timers
+        Integer openTimers = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM labor_sessions ls " +
+                "JOIN task_assignments ta ON ls.assignment_id = ta.id " +
+                "JOIN repair_tasks rt ON ta.task_id = rt.id " +
+                "WHERE rt.repair_order_id = ? AND ls.ends_at IS NULL",
+                Integer.class, repairOrderId);
+        if (openTimers != null && openTimers > 0) {
+            log.warn("Cannot issue invoice: repair order {} has {} active labor timers", repairOrderId, openTimers);
+            throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
+                    "Còn kỹ thuật viên đang bấm giờ làm việc. Hãy dừng bấm giờ trước khi lập hóa đơn.");
+        }
+        return order;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public InvoiceReadinessResponse getInvoiceReadiness(Long repairOrderId) {
+        try {
+            requireIssueReady(currentUser.userId(), repairOrderId, false);
+            Integer billable = jdbcTemplate.queryForObject(
+                    "SELECT (SELECT COUNT(*) FROM repair_tasks rt JOIN estimate_items ei ON rt.estimate_item_id = ei.id " +
+                    "WHERE rt.repair_order_id = ? AND rt.status = 'COMPLETED' AND rt.task_type = 'REPAIR' " +
+                    "AND ei.approval_status = 'APPROVED') + " +
+                    "(SELECT COUNT(*) FROM repair_order_parts WHERE repair_order_id = ? AND quantity > 0)",
+                    Integer.class, repairOrderId, repairOrderId);
+            if (billable == null || billable == 0) {
+                throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
+                        "Phiếu không có hạng mục dịch vụ hoặc phụ tùng nào để tính tiền.");
+            }
+            return new InvoiceReadinessResponse(true, null);
+        } catch (BusinessException blocked) {
+            return new InvoiceReadinessResponse(false, blocked.getMessage());
+        }
     }
 
     @Override
@@ -600,11 +635,12 @@ public class BillingServiceImpl implements BillingService {
     @Transactional
     public void requireHandoverAllowed(long actorUserId, long repairOrderId) {
         Invoice invoice = invoiceRepository.findActiveByRepairOrderIdWithLock(repairOrderId)
-                .orElseThrow(() -> new BusinessException(ResponseCode.BAD_REQUEST,
-                        "Phiếu chưa có hóa đơn còn hiệu lực, hãy lập hóa đơn trước khi bàn giao"));
+                .orElseThrow(() -> new ConflictException(ResponseCode.HANDOVER_BLOCKED,
+                        "Phiếu chưa có hóa đơn còn hiệu lực. Hãy lập hóa đơn trước khi bàn giao."));
 
         if (invoice.getStatus() == InvoiceStatus.VOID) {
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new ConflictException(ResponseCode.HANDOVER_BLOCKED,
+                    "Hóa đơn của phiếu đã bị hủy. Hãy lập lại hóa đơn trước khi bàn giao.");
         }
         if (invoice.getStatus() == InvoiceStatus.PAID) {
             return; // Handover allowed
@@ -623,7 +659,7 @@ public class BillingServiceImpl implements BillingService {
                 invoice.getCustomerId());
 
         if (custRows.isEmpty()) {
-            throw new BusinessException(ResponseCode.RESOURCE_NOT_FOUND);
+            throw new ResourceNotFoundException("Không tìm thấy khách hàng của hóa đơn");
         }
 
         BigDecimal creditLimit = (BigDecimal) custRows.get(0).get("credit_limit");
@@ -633,12 +669,14 @@ public class BillingServiceImpl implements BillingService {
 
         if (totalCustomerDebt.compareTo(creditLimit) > 0) {
             log.warn("Customer {} total debt {} exceeds credit limit {}", invoice.getCustomerId(), totalCustomerDebt, creditLimit);
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new ConflictException(ResponseCode.HANDOVER_BLOCKED,
+                    "Hóa đơn chưa thanh toán đủ và công nợ của khách vượt hạn mức. Hãy thu tiền trước khi bàn giao.");
         }
 
         Number term = (Number) custRows.get(0).get("payment_term_days");
         if (term == null || term.intValue() <= 0 || invoice.getDueDate() == null) {
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new ConflictException(ResponseCode.HANDOVER_BLOCKED,
+                    "Hóa đơn chưa thanh toán đủ và khách không được ghi công nợ. Hãy thu tiền trước khi bàn giao.");
         }
 
         // Check if customer has overdue invoices
@@ -647,7 +685,8 @@ public class BillingServiceImpl implements BillingService {
         for (InvoiceBalanceView iv : customerInvoices) {
             if (iv.getDueDate() != null && iv.getDueDate().isBefore(today) && iv.getBalanceAmount().compareTo(BigDecimal.ZERO) > 0) {
                 log.warn("Customer {} has overdue invoice {} with balance {}", invoice.getCustomerId(), iv.getInvoiceCode(), iv.getBalanceAmount());
-                throw new BusinessException(ResponseCode.BAD_REQUEST);
+                throw new ConflictException(ResponseCode.HANDOVER_BLOCKED,
+                        "Khách có hóa đơn quá hạn chưa thanh toán. Hãy thu nợ quá hạn trước khi bàn giao.");
             }
         }
     }

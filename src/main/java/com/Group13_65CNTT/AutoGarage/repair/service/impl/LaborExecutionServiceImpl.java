@@ -5,6 +5,8 @@ import com.Group13_65CNTT.AutoGarage.repair.dto.request.QcAssignmentRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.TaskAssignmentRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.TaskCompletionRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.LaborSessionResponse;
+import com.Group13_65CNTT.AutoGarage.repair.dto.response.QcCandidateResponse;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.OnShiftTechnicianResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.TaskAssignmentResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.TaskWorkSummaryResponse;
 import com.Group13_65CNTT.AutoGarage.repair.entity.*;
@@ -49,6 +51,8 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     private final com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository userRepository;
 
     private final com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderAssignmentRepository workLogRepository;
+
+    private final com.Group13_65CNTT.AutoGarage.scheduling.service.DispatchService dispatchService;
 
     private final TaskAssignmentMapper taskAssignmentMapper;
     private final LaborSessionMapper laborSessionMapper;
@@ -222,6 +226,30 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
                     return response;
                 })
                 .orElse(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<QcCandidateResponse> getQcCandidates(Long orderId) {
+        if (!repairOrderRepository.existsById(orderId)) {
+            throw new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + orderId);
+        }
+        java.util.Set<Long> mainRepairers = workLogRepository
+                .findByRepairOrderIdAndAssignmentStage(orderId, AssignmentStage.REPAIR_MAIN).stream()
+                .map(RepairOrderAssignment::getEmployeeId)
+                .collect(java.util.stream.Collectors.toSet());
+        return dispatchService.getOnShiftTechnicians().stream()
+                .filter(OnShiftTechnicianResponse::canQc)
+                .map(tech -> {
+                    boolean main = mainRepairers.contains(tech.employeeId());
+                    return new QcCandidateResponse(
+                            tech.employeeId(), tech.employeeCode(), tech.fullName(), tech.shiftEndsAt(),
+                            tech.serviceBayId(), tech.bayCode(), tech.bayName(), tech.skills(),
+                            !main, main ? QcCandidateResponse.Reason.MAIN_REPAIRER : null);
+                })
+                .sorted(java.util.Comparator.comparing(QcCandidateResponse::eligible).reversed()
+                        .thenComparing(QcCandidateResponse::fullName, java.text.Collator.getInstance()))
+                .toList();
     }
 
     @Override

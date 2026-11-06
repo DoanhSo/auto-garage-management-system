@@ -81,7 +81,9 @@ class BillingServiceTest {
         // Only a voided invoice exists, so there is no live invoice to hand over against.
         when(invoiceRepository.findActiveByRepairOrderIdWithLock(500L)).thenReturn(Optional.empty());
         assertThatThrownBy(() -> service.requireHandoverAllowed(10L, 500L))
-                .isInstanceOf(BusinessException.class).hasFieldOrPropertyWithValue("responseCode", ResponseCode.BAD_REQUEST);
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.HANDOVER_BLOCKED)
+                .hasMessageContaining("chưa có hóa đơn còn hiệu lực");
         verifyNoInteractions(paymentRepository);
     }
 
@@ -295,7 +297,88 @@ class BillingServiceTest {
 
         assertThatThrownBy(() -> service.requireHandoverAllowed(10L, 500L))
                 .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.BAD_REQUEST);
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.HANDOVER_BLOCKED)
+                .hasMessageContaining("vượt hạn mức");
+    }
+
+    private Invoice unpaidInvoice() {
+        return Invoice.builder().id(1L).customerId(100L).status(InvoiceStatus.PARTIALLY_PAID)
+                .totalAmount(new BigDecimal("5000000")).dueDate(java.time.LocalDate.now().plusDays(10)).build();
+    }
+
+    private void stubUnpaid(Invoice invoice, Object creditLimit, Object termDays, BigDecimal totalDebt) {
+        when(invoiceRepository.findActiveByRepairOrderIdWithLock(500L)).thenReturn(Optional.of(invoice));
+        when(paymentRepository.calculatePaidAmountForInvoice(1L)).thenReturn(new BigDecimal("1000000"));
+        Map<String, Object> custMap = new HashMap<>();
+        custMap.put("credit_limit", creditLimit);
+        custMap.put("payment_term_days", termDays);
+        when(jdbcTemplate.queryForList(contains("SELECT credit_limit"), eq(100L))).thenReturn(List.of(custMap));
+        when(invoiceBalanceViewRepository.calculateTotalOutstandingBalanceForCustomer(100L)).thenReturn(totalDebt);
+    }
+
+    @Test
+    @DisplayName("Bàn giao bị chặn khi khách không có hạn thanh toán công nợ: thông điệp riêng")
+    void requireHandoverAllowed_NoPaymentTerm_ThrowsBlocked() {
+        stubUnpaid(unpaidInvoice(), new BigDecimal("9000000"), 0, new BigDecimal("4000000"));
+
+        assertThatThrownBy(() -> service.requireHandoverAllowed(10L, 500L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.HANDOVER_BLOCKED)
+                .hasMessageContaining("không được ghi công nợ");
+    }
+
+    @Test
+    @DisplayName("Bàn giao bị chặn khi khách có hóa đơn quá hạn: thông điệp riêng")
+    void requireHandoverAllowed_OverdueInvoice_ThrowsBlocked() {
+        stubUnpaid(unpaidInvoice(), new BigDecimal("9000000"), 15, new BigDecimal("4000000"));
+        InvoiceBalanceView overdue = org.mockito.Mockito.mock(InvoiceBalanceView.class);
+        when(overdue.getDueDate()).thenReturn(java.time.LocalDate.now().minusDays(3));
+        when(overdue.getBalanceAmount()).thenReturn(new BigDecimal("100000"));
+        when(invoiceBalanceViewRepository.findByCustomerId(100L)).thenReturn(List.of(overdue));
+
+        assertThatThrownBy(() -> service.requireHandoverAllowed(10L, 500L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.HANDOVER_BLOCKED)
+                .hasMessageContaining("quá hạn");
+    }
+
+    @Test
+    @DisplayName("Bàn giao bị chặn khi hóa đơn của phiếu đã bị hủy: thông điệp riêng")
+    void requireHandoverAllowed_VoidInvoice_ThrowsBlocked() {
+        Invoice voided = Invoice.builder().id(1L).customerId(100L).status(InvoiceStatus.VOID)
+                .totalAmount(new BigDecimal("5000000")).build();
+        when(invoiceRepository.findActiveByRepairOrderIdWithLock(500L)).thenReturn(Optional.of(voided));
+
+        assertThatThrownBy(() -> service.requireHandoverAllowed(10L, 500L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.HANDOVER_BLOCKED)
+                .hasMessageContaining("đã bị hủy");
+        verifyNoInteractions(paymentRepository);
+    }
+
+    @Test
+    @DisplayName("Bàn giao báo không tìm thấy khi thiếu hồ sơ khách của hóa đơn")
+    void requireHandoverAllowed_MissingCustomer_ThrowsNotFound() {
+        Invoice invoice = unpaidInvoice();
+        when(invoiceRepository.findActiveByRepairOrderIdWithLock(500L)).thenReturn(Optional.of(invoice));
+        when(paymentRepository.calculatePaidAmountForInvoice(1L)).thenReturn(new BigDecimal("1000000"));
+        when(jdbcTemplate.queryForList(contains("SELECT credit_limit"), eq(100L))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.requireHandoverAllowed(10L, 500L))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException.class)
+                .hasMessageContaining("khách hàng");
+    }
+
+    @Test
+    @DisplayName("Bàn giao được khi hóa đơn đã thanh toán đủ")
+    void requireHandoverAllowed_PaidInvoice_Allowed() {
+        Invoice paid = Invoice.builder().id(1L).customerId(100L).status(InvoiceStatus.PAID)
+                .totalAmount(new BigDecimal("5000000")).build();
+        when(invoiceRepository.findActiveByRepairOrderIdWithLock(500L)).thenReturn(Optional.of(paid));
+
+        service.requireHandoverAllowed(10L, 500L);
+
+        verifyNoInteractions(jdbcTemplate);
     }
 
     @Test
@@ -340,5 +423,193 @@ class BillingServiceTest {
 
         verify(customerScope, never()).customerIdForQuery(any());
         verify(invoiceRepository).searchInvoices(null, 9L, null, null, pageable);
+    }
+
+    // =========================================================================
+    // Lý do không lập được hóa đơn
+    // =========================================================================
+
+    private InvoiceIssueRequest issueRequest() {
+        return InvoiceIssueRequest.builder().repairOrderId(200L).build();
+    }
+
+    private void stubOrderRow(Object latestQc) {
+        Map<String, Object> orderMap = new HashMap<>();
+        orderMap.put("id", 200L);
+        orderMap.put("customer_id", 100L);
+        orderMap.put("vehicle_id", 300L);
+        orderMap.put("latest_qc_check_id", latestQc);
+        orderMap.put("status", "COMPLETED");
+        when(jdbcTemplate.queryForList(contains("FROM repair_orders"), eq(200L))).thenReturn(List.of(orderMap));
+    }
+
+    private void stubQc(String result) {
+        Map<String, Object> qcMap = new HashMap<>();
+        qcMap.put("check_type", "QC");
+        qcMap.put("result", result);
+        when(jdbcTemplate.queryForList(contains("FROM vehicle_checks"), eq(400L))).thenReturn(List.of(qcMap));
+    }
+
+    @Test
+    @DisplayName("Lập hóa đơn khi phiếu đã có hóa đơn: thông điệp riêng")
+    void issueInvoice_AlreadyIssued_HasMessage() {
+        when(invoiceRepository.existsByRepairOrderIdAndStatusNot(200L, InvoiceStatus.VOID)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.issueInvoice(10L, issueRequest()))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("đã có hóa đơn còn hiệu lực");
+    }
+
+    @Test
+    @DisplayName("Lập hóa đơn khi phiếu chưa có QC: 409/INVOICE_BLOCKED kèm thông điệp")
+    void issueInvoice_NoQc_ThrowsBlocked() {
+        stubOrderRow(null);
+
+        assertThatThrownBy(() -> service.issueInvoice(10L, issueRequest()))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVOICE_BLOCKED)
+                .hasMessageContaining("chưa có kết quả QC");
+    }
+
+    @Test
+    @DisplayName("Lập hóa đơn khi QC gần nhất chưa đạt: thông điệp riêng")
+    void issueInvoice_QcFailed_ThrowsBlocked() {
+        stubOrderRow(400L);
+        stubQc("FAILED");
+
+        assertThatThrownBy(() -> service.issueInvoice(10L, issueRequest()))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVOICE_BLOCKED)
+                .hasMessageContaining("QC gần nhất chưa đạt");
+    }
+
+    @Test
+    @DisplayName("Lập hóa đơn khi còn đồng hồ đang chạy: thông điệp riêng")
+    void issueInvoice_OpenTimer_ThrowsBlocked() {
+        stubOrderRow(400L);
+        stubQc("PASSED");
+        when(jdbcTemplate.queryForObject(contains("COUNT(*) FROM labor_sessions"), eq(Integer.class), eq(200L)))
+                .thenReturn(2);
+
+        assertThatThrownBy(() -> service.issueInvoice(10L, issueRequest()))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVOICE_BLOCKED)
+                .hasMessageContaining("bấm giờ");
+    }
+
+    @Test
+    @DisplayName("Lập hóa đơn khi không có hạng mục tính tiền: thông điệp riêng")
+    void issueInvoice_NoBillableItems_ThrowsBlocked() {
+        stubOrderRow(400L);
+        stubQc("PASSED");
+        when(jdbcTemplate.queryForObject(contains("COUNT(*) FROM labor_sessions"), eq(Integer.class), eq(200L)))
+                .thenReturn(0);
+        Map<String, Object> custMap = new HashMap<>();
+        custMap.put("customer_code", "C1");
+        custMap.put("full_name", "A");
+        custMap.put("payment_term_days", 0);
+        when(jdbcTemplate.queryForMap(contains("FROM customers"), eq(100L))).thenReturn(custMap);
+        Map<String, Object> vehMap = new HashMap<>();
+        vehMap.put("plate_number", "30A-123.45");
+        when(jdbcTemplate.queryForMap(contains("FROM vehicles"), eq(300L))).thenReturn(vehMap);
+        when(jdbcTemplate.queryForList(contains("FROM repair_tasks rt"), eq(200L))).thenReturn(List.of());
+        when(jdbcTemplate.queryForList(contains("FROM repair_order_parts"), eq(200L))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.issueInvoice(10L, issueRequest()))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVOICE_BLOCKED)
+                .hasMessageContaining("không có hạng mục");
+    }
+
+    @Test
+    @DisplayName("Lập hóa đơn với giảm giá lớn hơn tạm tính: 400 kèm thông điệp, không lưu hóa đơn")
+    void issueInvoice_DiscountExceedsSubtotal_ThrowsRuleViolation() {
+        stubOrderRow(400L);
+        stubQc("PASSED");
+        when(jdbcTemplate.queryForObject(contains("COUNT(*) FROM labor_sessions"), eq(Integer.class), eq(200L)))
+                .thenReturn(0);
+        Map<String, Object> custMap = new HashMap<>();
+        custMap.put("customer_code", "C1");
+        custMap.put("full_name", "A");
+        custMap.put("payment_term_days", 0);
+        when(jdbcTemplate.queryForMap(contains("FROM customers"), eq(100L))).thenReturn(custMap);
+        Map<String, Object> vehMap = new HashMap<>();
+        vehMap.put("plate_number", "30A-123.45");
+        when(jdbcTemplate.queryForMap(contains("FROM vehicles"), eq(300L))).thenReturn(vehMap);
+        Map<String, Object> taskMap = new HashMap<>();
+        taskMap.put("task_id", 1L);
+        taskMap.put("quantity", BigDecimal.ONE);
+        taskMap.put("service_name", "Oil change");
+        taskMap.put("unit", "service");
+        taskMap.put("unit_price", new BigDecimal("200000"));
+        taskMap.put("unit_cost", new BigDecimal("50000"));
+        when(jdbcTemplate.queryForList(contains("FROM repair_tasks rt"), eq(200L))).thenReturn(List.of(taskMap));
+        when(jdbcTemplate.queryForList(contains("FROM repair_order_parts"), eq(200L))).thenReturn(List.of());
+        InvoiceIssueRequest request = InvoiceIssueRequest.builder()
+                .repairOrderId(200L).discountAmount(new BigDecimal("500000")).build();
+
+        assertThatThrownBy(() -> service.issueInvoice(10L, request))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.BAD_REQUEST)
+                .hasMessageContaining("giảm giá");
+        verify(invoiceRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Kiểm tra sẵn sàng: bị chặn thì trả ready=false kèm lý do, không ghi dữ liệu")
+    void getInvoiceReadiness_Blocked_ReturnsReason() {
+        when(currentUser.userId()).thenReturn(10L);
+        stubOrderRow(null);
+
+        var result = service.getInvoiceReadiness(200L);
+
+        assertThat(result.ready()).isFalse();
+        assertThat(result.reason()).contains("chưa có kết quả QC");
+        verify(invoiceRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Kiểm tra sẵn sàng: đủ điều kiện thì ready=true và không khóa dòng phiếu")
+    void getInvoiceReadiness_Ready() {
+        when(currentUser.userId()).thenReturn(10L);
+        stubOrderRow(400L);
+        stubQc("PASSED");
+        when(jdbcTemplate.queryForObject(contains("COUNT(*) FROM labor_sessions"), eq(Integer.class), eq(200L)))
+                .thenReturn(0);
+        when(jdbcTemplate.queryForObject(contains("FROM repair_tasks rt"), eq(Integer.class), eq(200L), eq(200L)))
+                .thenReturn(3);
+
+        var result = service.getInvoiceReadiness(200L);
+
+        assertThat(result.ready()).isTrue();
+        assertThat(result.reason()).isNull();
+        verify(jdbcTemplate, never()).queryForList(contains("FOR UPDATE"), eq(200L));
+    }
+
+    @Test
+    @DisplayName("Kiểm tra sẵn sàng: phiếu không có hạng mục tính tiền thì ready=false")
+    void getInvoiceReadiness_NoBillableItems() {
+        when(currentUser.userId()).thenReturn(10L);
+        stubOrderRow(400L);
+        stubQc("PASSED");
+        when(jdbcTemplate.queryForObject(contains("COUNT(*) FROM labor_sessions"), eq(Integer.class), eq(200L)))
+                .thenReturn(0);
+        when(jdbcTemplate.queryForObject(contains("FROM repair_tasks rt"), eq(Integer.class), eq(200L), eq(200L)))
+                .thenReturn(0);
+
+        var result = service.getInvoiceReadiness(200L);
+
+        assertThat(result.ready()).isFalse();
+        assertThat(result.reason()).contains("không có hạng mục");
+    }
+
+    @Test
+    @DisplayName("Kiểm tra sẵn sàng: lỗi hạ tầng không bị nuốt thành ready=false")
+    void getInvoiceReadiness_InfrastructureFailurePropagates() {
+        when(currentUser.userId()).thenReturn(10L);
+        var failure = new org.springframework.dao.DataAccessResourceFailureException("db down");
+        when(jdbcTemplate.queryForList(contains("FROM repair_orders"), eq(200L))).thenThrow(failure);
+
+        assertThatThrownBy(() -> service.getInvoiceReadiness(200L)).isSameAs(failure);
     }
 }

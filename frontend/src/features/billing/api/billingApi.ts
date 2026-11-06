@@ -5,6 +5,7 @@ import type { Supplier } from '../../inventory/types/inventory';
 import type {
   Invoice,
   InvoiceIssueInput,
+  InvoiceReadiness,
   InvoiceVoidInput,
   Payment,
   PaymentReceiveInput,
@@ -73,6 +74,9 @@ export const billingApi = {
 
   getInvoiceByOrder: (orderId: string | number) =>
     request<Invoice>(`/billing/invoices/order/${orderId}`).then(normalizeInvoice),
+
+  getInvoiceReadiness: (orderId: string | number) =>
+    request<InvoiceReadiness>(`/billing/invoices/order/${orderId}/readiness`),
 
   issueInvoice: (data: InvoiceIssueInput) =>
     request<Invoice>('/billing/invoices/issue', {
