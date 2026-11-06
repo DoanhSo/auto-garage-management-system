@@ -65,7 +65,7 @@ export function PerformQCModal({
       title="Kiểm định chất lượng sau sửa chữa (QC)"
       description={
         user?.role === 'ADMIN'
-          ? 'Kết quả được ghi thay cho kỹ thuật viên QC đã phân công trên phiếu.'
+          ? 'Quản trị viên có toàn quyền kiểm định và phê duyệt chất lượng xuất xưởng cho phiếu sửa chữa.'
           : 'Kiểm tra toàn bộ các hạng mục đã hoàn thành, lắp ráp phụ tùng và chạy thử trước khi bàn giao xe.'
       }
     >

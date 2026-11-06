@@ -330,18 +330,21 @@ class QualityCheckServiceTest {
     }
 
     @Test
-    @DisplayName("Admin ghi QC khi phiếu chưa phân công QC: báo QC_INSPECTOR_NOT_ASSIGNED")
-    void adminCannotRecordQcWithoutAssignedInspector() {
+    @DisplayName("Admin có toàn quyền trực tiếp kiểm tra QC ngay cả khi phiếu chưa phân công KTV QC")
+    void adminCanRecordQcWithoutAssignedInspector() {
         adminOnReadyOrder();
         when(assignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of());
+        when(vehicleCheckRepository.save(any(VehicleCheck.class))).thenAnswer(inv -> {
+            VehicleCheck vc = inv.getArgument(0);
+            vc.setId(601L);
+            return vc;
+        });
 
-        assertThatThrownBy(() -> qualityService.performQualityCheck(99L, adminRequest()))
-                .isInstanceOf(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class)
-                .hasFieldOrPropertyWithValue("responseCode",
-                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.QC_INSPECTOR_NOT_ASSIGNED)
-                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException.class)
-                .hasMessageContaining("chưa phân công kỹ thuật viên QC");
-        verifyNoInteractions(vehicleCheckRepository);
+        QualityCheckResponse res = qualityService.performQualityCheck(99L, adminRequest());
+
+        assertThat(res).isNotNull();
+        assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.COMPLETED);
+        verify(vehicleCheckRepository).save(any(VehicleCheck.class));
     }
 
     @Test

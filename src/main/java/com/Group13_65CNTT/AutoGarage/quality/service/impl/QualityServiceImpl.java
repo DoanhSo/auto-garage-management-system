@@ -75,8 +75,7 @@ public class QualityServiceImpl implements QualityService {
                 .distinct()
                 .toList();
         if (assignedIds.isEmpty()) {
-            throw new ConflictException(ResponseCode.QC_INSPECTOR_NOT_ASSIGNED,
-                    "Phiếu chưa phân công kỹ thuật viên QC. Hãy phân công một kỹ thuật viên có quyền QC cho một công việc của phiếu rồi thử lại");
+            return null;
         }
         if (assignedIds.size() > 1) {
             throw new ConflictException(ResponseCode.QC_INSPECTOR_INVALID,
@@ -85,8 +84,7 @@ public class QualityServiceImpl implements QualityService {
         return employeeRepository.findById(assignedIds.get(0))
                 .filter(employee -> Boolean.TRUE.equals(employee.getIsActive())
                         && Boolean.TRUE.equals(employee.getCanQc()))
-                .orElseThrow(() -> new ConflictException(ResponseCode.QC_INSPECTOR_INVALID,
-                        "Kỹ thuật viên QC được phân công không còn đủ điều kiện kiểm định"));
+                .orElse(null);
     }
 
     @Override
@@ -121,14 +119,16 @@ public class QualityServiceImpl implements QualityService {
 
         // Four-eyes principle: inspector must be on shift and must not be a main repairer of this order.
         Instant inspectionTime = Instant.now();
-        if (workLogRecorder.activeShift(inspector.getId(), inspectionTime).isEmpty()) {
-            throw new BusinessRuleException("Kỹ thuật viên QC phải đang trong ca trực");
-        }
-        boolean repairedByInspector = workLogRepository
-                .findByRepairOrderIdAndAssignmentStage(order.getId(), AssignmentStage.REPAIR_MAIN).stream()
-                .anyMatch(row -> row.getEmployeeId().equals(inspector.getId()));
-        if (repairedByInspector) {
-            throw new BusinessRuleException("Thợ chính đã sửa chữa không được tự kiểm định QC cho chính phiếu này");
+        if (inspector != null) {
+            if (currentUserProvider.role() != Role.ADMIN && workLogRecorder.activeShift(inspector.getId(), inspectionTime).isEmpty()) {
+                throw new BusinessRuleException("Kỹ thuật viên QC phải đang trong ca trực");
+            }
+            boolean repairedByInspector = workLogRepository
+                    .findByRepairOrderIdAndAssignmentStage(order.getId(), AssignmentStage.REPAIR_MAIN).stream()
+                    .anyMatch(row -> row.getEmployeeId().equals(inspector.getId()));
+            if (repairedByInspector) {
+                throw new BusinessRuleException("Thợ chính đã sửa chữa không được tự kiểm định QC cho chính phiếu này");
+            }
         }
 
         int nextAttemptNo = vehicleCheckRepository.findMaxAttemptNo(order.getId(), CheckType.QC) + 1;
@@ -157,15 +157,17 @@ public class QualityServiceImpl implements QualityService {
 
         // Cập nhật latest_qc_check_id cho phiếu sửa chữa
         order.setLatestQcCheckId(savedCheck.getId());
-        order.setQcTechnicianId(inspector.getId());
+        if (inspector != null) {
+            order.setQcTechnicianId(inspector.getId());
 
-        Instant inspectionStart = order.getUpdatedAt() != null && order.getUpdatedAt().isBefore(inspectionTime)
-                ? order.getUpdatedAt() : inspectionTime;
-        workLogRecorder.start(order, inspector.getId(), AssignmentStage.QC_INSPECTION, null,
-                inspectionStart, request.getNotes());
-        workLogRecorder.finish(order.getId(), inspector.getId(), AssignmentStage.QC_INSPECTION, inspectionTime,
-                request.getResult() == CheckResult.PASSED ? WorkResultStatus.PASSED : WorkResultStatus.REWORK_FAILED,
-                request.getNotes());
+            Instant inspectionStart = order.getUpdatedAt() != null && order.getUpdatedAt().isBefore(inspectionTime)
+                    ? order.getUpdatedAt() : inspectionTime;
+            workLogRecorder.start(order, inspector.getId(), AssignmentStage.QC_INSPECTION, null,
+                    inspectionStart, request.getNotes());
+            workLogRecorder.finish(order.getId(), inspector.getId(), AssignmentStage.QC_INSPECTION, inspectionTime,
+                    request.getResult() == CheckResult.PASSED ? WorkResultStatus.PASSED : WorkResultStatus.REWORK_FAILED,
+                    request.getNotes());
+        }
 
         if (request.getResult() == CheckResult.PASSED) {
             var qcAssignments = assignmentRepository.findActiveQcForOrder(order.getId());
