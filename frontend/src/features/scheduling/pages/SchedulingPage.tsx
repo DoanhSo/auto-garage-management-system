@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus,
   SquarePen,
@@ -33,7 +34,7 @@ import { DataTable, Pagination } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { useUiPolicy } from '../../../shared/config/policy';
 import { useUrlTab } from '../../../shared/hooks/useUrlTab';
-import { formatDate, money } from '../../../shared/utils/format';
+import { money } from '../../../shared/utils/format';
 import { shiftDate, todayKey, weekStart } from '../../../shared/utils/weekCalendar';
 import { filterShifts } from '../utils/shiftTimeline';
 import {
@@ -43,21 +44,22 @@ import {
   useCancelShiftMutation,
   useSchedulingEmployeesQuery,
   useActiveReservationsQuery,
-  useUpdateEmployeeMutation,
 } from '../hooks/useScheduling';
 import { ServiceBayEditor } from '../components/ServiceBayEditor';
 import { ShiftEditor } from '../components/ShiftEditor';
 import { ShiftTimelineBoard } from '../components/ShiftTimelineBoard';
 import { BayMaintenanceModal } from '../components/BayMaintenanceModal';
 import { BayReservationsModal } from '../components/BayReservationsModal';
-import { EmployeeEditor } from '../components/EmployeeEditor';
+import { EmployeeLink } from '../../staff/components/EmployeeLink';
+import { RelatedLinks } from '../../../shared/components/RelatedLinks';
+import { PAYROLL_MANAGE_ROLES, STAFF_MANAGE_ROLES } from '../../../app/access';
 import { LiveDispatchBoard } from '../components/LiveDispatchBoard';
 import { ShiftRegistrationModal } from '../components/ShiftRegistrationModal';
 import type { BayReservation, Employee, ServiceBay, Shift } from '../types/scheduling';
 import { bayTypeLabels, parseSkills, SKILL_LABELS, shiftStatusLabels } from '../types/scheduling';
 import type { UiPolicy } from '../../../shared/types/contracts';
 
-const TABS = ['dispatch', 'bays', 'shifts', 'employees'] as const;
+const TABS = ['dispatch', 'bays', 'shifts'] as const;
 type Tab = (typeof TABS)[number];
 type BayFilter = 'ALL' | 'FREE' | 'BUSY' | 'INACTIVE';
 
@@ -105,10 +107,12 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
 
   const [bayFilter, setBayFilter] = useState<BayFilter>('ALL');
   const [bayKeyword, setBayKeyword] = useState('');
-  const [shiftEmployee, setShiftEmployee] = useState('');
+  // ?employeeId= and ?q= pre-fill the shift filters so other screens can link to a person's or bay's shifts.
+  const [urlParams] = useSearchParams();
+  const [shiftEmployee, setShiftEmployee] = useState(() => urlParams.get('employeeId') ?? '');
   const [shiftDay, setShiftDay] = useState('');
   const [shiftStatus, setShiftStatus] = useState<'ALL' | 'ACTIVE' | 'CANCELLED'>('ALL');
-  const [shiftKeyword, setShiftKeyword] = useState('');
+  const [shiftKeyword, setShiftKeyword] = useState(() => urlParams.get('q') ?? '');
   const [shiftView, setShiftView] = useState<'week' | 'list'>('week');
   const [shiftWeekDate, setShiftWeekDate] = useState(() => todayKey());
 
@@ -125,9 +129,6 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const [shiftPresetDate, setShiftPresetDate] = useState<string | null>(null);
   const [cancelingShiftId, setCancelingShiftId] = useState<number | string | null>(null);
 
-  const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
-  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-
   const baysQuery = useServiceBaysQuery();
   const shiftsQuery = useShiftsQuery({ size: 100 });
   const weekFrom = weekStart(shiftWeekDate);
@@ -140,7 +141,6 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
 
   const deleteBayMutation = useDeleteServiceBayMutation();
   const cancelShiftMutation = useCancelShiftMutation();
-  const updateEmployee = useUpdateEmployeeMutation();
 
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
   const employeeMap = useMemo(
@@ -160,7 +160,6 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
       ),
     [employees],
   );
-  const takenUserIds = useMemo(() => new Set(employees.map((e) => String(e.userId))), [employees]);
 
   const allBays = useMemo(() => baysQuery.data?.content ?? [], [baysQuery.data?.content]);
   const allShifts = useMemo(() => shiftsQuery.data?.content ?? [], [shiftsQuery.data?.content]);
@@ -184,14 +183,6 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const liveShiftCount = allShifts.filter(
     (s) => s.status !== 'CANCELLED' && new Date(s.endsAt).getTime() >= now,
   ).length;
-  const shiftCountByEmployee = useMemo(() => {
-    const map = new Map<string, number>();
-    allShifts
-      .filter((s) => s.status !== 'CANCELLED' && new Date(s.endsAt).getTime() >= Date.now())
-      .forEach((s) => map.set(String(s.employeeId), (map.get(String(s.employeeId)) ?? 0) + 1));
-    return map;
-  }, [allShifts]);
-
   const employeeName = (id: string | number) => {
     const emp = employeeMap.get(String(id));
     return emp ? (userMap.get(String(emp.userId))?.fullName ?? emp.employeeCode) : `NV #${id}`;
@@ -296,6 +287,17 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         header: 'Thao tác',
         cell: ({ row }) => (
           <div className="row-actions">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShiftKeyword(row.original.bayCode);
+                setShiftEmployee('');
+                setShiftView('list');
+                setActiveTab('shifts');
+              }}
+            >
+              <CalendarRange size={14} /> Ca gán khoang
+            </Button>
             <Button variant="ghost" onClick={() => setReservationsBay(row.original)}>
               <History size={14} /> Lịch đặt
             </Button>
@@ -322,7 +324,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         ),
       },
     ],
-    [currentByBay],
+    [currentByBay, setActiveTab],
   );
 
   const skillBadges = (emp?: Employee) => {
@@ -351,7 +353,9 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
           return (
             <div className="account-cell">
               <div>
-                <strong>{employeeName(row.original.employeeId)}</strong>
+                <EmployeeLink id={row.original.employeeId}>
+                  {employeeName(row.original.employeeId)}
+                </EmployeeLink>
                 <span>
                   {emp?.employeeCode}
                   {user?.username && ` · ${user.username}`}
@@ -442,132 +446,6 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
     [employeeMap, userMap],
   );
 
-  const employeeColumns = useMemo<ColumnDef<Employee>[]>(
-    () => [
-      {
-        accessorKey: 'employeeCode',
-        header: 'Mã KTV & họ tên',
-        cell: ({ row }) => (
-          <div className="account-cell">
-            <div>
-              <strong>{userMap.get(String(row.original.userId))?.fullName ?? '—'}</strong>
-              <span>{row.original.employeeCode}</span>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: 'contact',
-        header: 'Liên hệ',
-        cell: ({ row }) => {
-          const u = userMap.get(String(row.original.userId));
-          return <span className="muted">{u?.email ?? u?.username ?? '—'}</span>;
-        },
-      },
-      { id: 'skills', header: 'Chuyên môn & QC', cell: ({ row }) => skillBadges(row.original) },
-      {
-        id: 'joinedAt',
-        header: 'Ngày vào làm',
-        cell: ({ row }) => (
-          <span>{row.original.joinedAt ? formatDate(row.original.joinedAt) : '—'}</span>
-        ),
-      },
-      {
-        id: 'bank',
-        header: 'Ngân hàng & STK',
-        cell: ({ row }) =>
-          row.original.bankAccountNumber ? (
-            <div className="account-cell">
-              <div>
-                <strong>{row.original.bankName ?? '—'}</strong>
-                <span>{row.original.bankAccountNumber}</span>
-              </div>
-            </div>
-          ) : (
-            <span className="muted">Chưa cập nhật STK</span>
-          ),
-      },
-      {
-        accessorKey: 'hourlyCost',
-        header: 'Giá giờ công & hệ số',
-        cell: ({ row }) => (
-          <div className="account-cell">
-            <div>
-              <strong>
-                {row.original.hourlyCost != null ? money(row.original.hourlyCost) : '—'}
-              </strong>
-              <span>
-                {row.original.salaryCoefficient != null
-                  ? `Hệ số ${Number(row.original.salaryCoefficient).toFixed(2)}x`
-                  : '—'}
-              </span>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: 'shifts',
-        header: 'Ca hiệu lực',
-        cell: ({ row }) => <span>{shiftCountByEmployee.get(String(row.original.id)) ?? 0} ca</span>,
-      },
-      {
-        accessorKey: 'isActive',
-        header: 'Trạng thái',
-        cell: ({ row }) => (
-          <Badge variant={row.original.isActive ? 'success' : 'secondary'}>
-            {row.original.isActive ? 'Đang hoạt động' : 'Ngưng hoạt động'}
-          </Badge>
-        ),
-      },
-      {
-        id: 'actions',
-        header: 'Thao tác',
-        cell: ({ row }) => (
-          <div className="row-actions">
-            <Button
-              variant="ghost"
-              disabled={!row.original.isActive}
-              onClick={() => {
-                setShiftPresetEmployee(row.original.id);
-                setShiftPresetBay(null);
-                setShiftModalOpen(true);
-              }}
-            >
-              <CalendarClock size={14} /> Xếp ca
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setEditingEmployee(row.original);
-                setEmployeeModalOpen(true);
-              }}
-            >
-              <SquarePen size={14} /> Sửa
-            </Button>
-            <Button
-              variant="ghost"
-              className="delete-action"
-              onClick={() => toggleEmployeeActive(row.original)}
-            >
-              {row.original.isActive ? 'Ngưng' : 'Kích hoạt'}
-            </Button>
-          </div>
-        ),
-      },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [userMap, shiftCountByEmployee],
-  );
-
-  async function toggleEmployeeActive(emp: Employee) {
-    try {
-      await updateEmployee.mutateAsync({ id: emp.id, data: { isActive: !emp.isActive } });
-      notify(emp.isActive ? 'Đã ngưng hoạt động kỹ thuật viên' : 'Đã kích hoạt lại kỹ thuật viên');
-    } catch (err: unknown) {
-      notify(errorMessage(err));
-    }
-  }
-
   const handleDeleteBay = async () => {
     if (!deletingBayId) return;
     try {
@@ -597,7 +475,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         ? shiftView === 'week'
           ? weekShiftsQuery
           : shiftsQuery
-        : employeesQuery;
+        : weekShiftsQuery;
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
     setPage(0);
@@ -629,17 +507,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
     >
       <Plus size={16} /> Xếp ca làm việc
     </Button>
-  ) : (
-    <Button
-      variant="primary"
-      onClick={() => {
-        setEditingEmployee(null);
-        setEmployeeModalOpen(true);
-      }}
-    >
-      <Plus size={16} /> Thêm kỹ thuật viên
-    </Button>
-  );
+  ) : null;
 
   const filtersFor = (tab: Tab) =>
     tab === 'bays' ? (
@@ -789,6 +657,14 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         }
       />
 
+      <RelatedLinks
+        links={[
+          { to: '/staff', label: 'Quản lý nhân viên', roles: STAFF_MANAGE_ROLES },
+          { to: '/payroll?tab=monthly', label: 'Bảng lương', roles: PAYROLL_MANAGE_ROLES },
+          { to: '/payroll', label: 'Phiếu lương của tôi', roles: ['TECHNICIAN'] },
+        ]}
+      />
+
       <MetricGrid
         label="Tổng quan xưởng"
         items={[
@@ -845,12 +721,6 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
             'Lịch ca làm việc',
             allShifts.length,
           )}
-          {tabButton(
-            'employees',
-            <Users size={15} aria-hidden />,
-            'Đội ngũ kỹ thuật viên',
-            employees.length,
-          )}
         </div>
 
         {activeTab === 'shifts' && (
@@ -872,7 +742,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
           </div>
         )}
 
-        {activeTab !== 'employees' && activeTab !== 'dispatch' && (
+        {activeTab !== 'dispatch' && (
           <div className="user-filters" role="search" aria-label="Bộ lọc">
             {filtersFor(activeTab)}
           </div>
@@ -961,23 +831,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
               />
             </>
           )
-        ) : (
-          <>
-            <DataTable<Employee>
-              caption="Danh sách kỹ thuật viên"
-              columns={employeeColumns}
-              data={pageRows(employees)}
-              busy={employeesQuery.isFetching}
-            />
-            <Pagination
-              page={page}
-              size={size}
-              data={pageInfo(employees.length)}
-              policy={policy}
-              onChange={onPageChange}
-            />
-          </>
-        )}
+        ) : null}
       </section>
 
       {bayModalOpen && (
@@ -1032,19 +886,6 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         <ShiftRegistrationModal
           open={registerModalOpen}
           onClose={() => setRegisterModalOpen(false)}
-        />
-      )}
-
-      {employeeModalOpen && (
-        <EmployeeEditor
-          employee={editingEmployee}
-          takenUserIds={takenUserIds}
-          open={employeeModalOpen}
-          onClose={() => {
-            setEmployeeModalOpen(false);
-            setEditingEmployee(null);
-          }}
-          onSaved={() => employeesQuery.refetch()}
         />
       )}
 

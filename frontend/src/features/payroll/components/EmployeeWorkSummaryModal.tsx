@@ -61,7 +61,9 @@ export function EmployeeWorkSummaryModal({
                     <tr key={entry.id}>
                       <td>{formatDateTime(entry.startedAt)}</td>
                       <td>
-                        <strong>{entry.licensePlate ? formatPlate(entry.licensePlate) : '—'}</strong>
+                        <strong>
+                          {entry.licensePlate ? formatPlate(entry.licensePlate) : '—'}
+                        </strong>
                         <div className="description">#{entry.orderCode ?? entry.repairOrderId}</div>
                       </td>
                       <td>

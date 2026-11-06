@@ -1,8 +1,8 @@
-# Kế Hoạch Chốt Các Cổng Chặn Luồng Sửa Chữa, Bảo Hành Trước Bàn Giao Và Menu Nhân Sự
+# Kế Hoạch Thiết Kế Lại Điều Hướng Nhân Sự: Quản Lý Nhân Viên Và Quản Lý Khoang & Ca Làm Việc
 
-> **Mã plan**: `workflow-gates-warranty-hr-nav`
+> **Mã plan**: `hr-navigation-hubs`
 > **Chế độ**: `PLAN:` (tuân thủ `AGENTS.md`, `docs/CODING_GUIDELINES.md`, `docs/UI_DESIGN_GUIDELINES.md`).
-> **Kế thừa từ**: `plans/2026-11-inventory-issue-for-order.md` (cổng lập hóa đơn và xuất kho), `plans/2026-11-invoice-blocked-reasons.md` (lý do bị nuốt thành mã 2004), `plans/2026-11-payment-receipt-fix.md` (thu tiền hóa đơn).
+> **Kế thừa từ**: `plans/2026-11-workflow-gates-warranty-hr-nav.md` (Step 8: sidebar phẳng 7 mục, được thay bằng thiết kế này). Step 11–12 của plan đó vẫn còn mở, không thuộc plan này.
 
 Đường dẫn Java dưới đây tính từ `src/main/java/com/Group13_65CNTT/AutoGarage/`. Đường dẫn frontend tính từ `frontend/src/`.
 
@@ -10,148 +10,167 @@
 
 ## 1. Mục Tiêu & Phạm Vi
 
-### 1.1. Hiện trạng (kết quả rà soát luồng)
+### 1.1. Hiện trạng (kết quả rà soát)
 
-Luồng cần có: tiếp nhận xe → duyệt báo giá → xuất kho phụ tùng (nếu có) → **mới được bắt đầu công việc** → kiểm định → lập hóa đơn → thanh toán theo hạn mức → (thêm bảo hành) → bàn giao.
+- **Hai danh sách nhân viên trùng nhau**: tab "Quản lý nhân viên" của Lương (`features/payroll/components/EmployeePayrollDirectory.tsx`) và tab "Đội ngũ kỹ thuật viên" của Lịch ca (`SchedulingPage.tsx:445-530`, `employeeColumns`). Cả hai dùng chung `useSchedulingEmployeesQuery` và `EmployeeEditor`, chỉ khác cột hiển thị. Người dùng không biết nên sửa hồ sơ ở đâu.
+- **Các màn phụ thuộc nhau nhưng không dẫn sang nhau**: ca làm việc thuộc về nhân viên và khoang, lương tính từ giờ công và ca, hệ số lương nằm trên hồ sơ nhân viên. Tuy vậy:
+  - dòng nhân viên không có lối sang "lịch ca của người này" hay "công và lương tháng" (`EmployeeWorkSummaryModal` chỉ mở từ bảng lương);
+  - dòng ca và ô lịch tuần không có lối sang hồ sơ nhân viên;
+  - dòng khoang không cho xem ca đang gán khoang đó;
+  - hàng trong bảng lương không mở được hồ sơ nhân viên;
+  - duy nhất `notificationParser.ts:53-54` có đường dẫn `/scheduling?tab=shifts` và `/payroll`.
+- **Sidebar sau Step 8 trước** (`AppShell.tsx`) là 7 mục phẳng, mỗi mục là một tab của hai trang. Mục "Quản lý nhân viên" nằm ở trang Lương, "Đội kỹ thuật viên" nằm ở trang Lịch ca, nên người dùng vẫn phải đoán tab nằm ở trang nào. Hệ số & đơn giá lương và thưởng ca đặt cạnh mục nhân sự dù là cấu hình lương.
+- Quyền hiện có: danh sách nhân viên đọc được bởi mọi nhân viên (`EmployeeController`, `HAS_ROLE_STAFF`), tạo/sửa chỉ ADMIN; trang Lương dành cho ADMIN/lễ tân, kỹ thuật viên chỉ thấy phiếu lương của mình.
 
-| Cổng | Hiện trạng | Kết luận |
-|---|---|---|
-| Duyệt báo giá để vào thi công | `RepairServiceImpl.validateTransition` (`:693-751`): `WAITING_APPROVAL → APPROVED` chỉ qua duyệt báo giá | Đủ |
-| **Bắt đầu công việc** | `LaborExecutionServiceImpl.startTimer` (`:296-347`) chỉ gọi `requireOpenOrder` (`:476`), chỉ chặn phiếu `CLOSED/CANCELLED/INVOICED`. Không kiểm tra phiếu đã `APPROVED`, không kiểm tra phụ tùng đã xuất kho. `assignTask` (`:66`) cũng không kiểm tra | **Thiếu** |
-| Lập hóa đơn | `RepairServiceImpl.requireInvoiceReady` (`:323-356`) + `BillingServiceImpl.requireIssueReady` (`:294`): task xong, hết timer, QC `PASSED`, `InventoryOperations.requireIssueComplete` | Đủ |
-| **Bàn giao theo hạn mức** | `BillingServiceImpl.requireHandoverAllowed` (`:693-751`): chặn khi tổng nợ khách `>` hạn mức (đúng ý). Nhưng (a) thông điệp không nói cần trả bao nhiêu, (b) bắt thêm điều kiện `payment_term_days > 0` và hóa đơn có `dueDate` (`:735-739`) nên khách còn nợ trong hạn mức vẫn bị chặn nếu hạn thanh toán là 0, (c) giao diện không cho biết trước sẽ bị chặn | **Lệch** |
-| **Thêm bảo hành** | Bảo hành chỉ sinh tự động lúc bàn giao từ chính sách đã ghi trên dòng hóa đơn (`WarrantyServiceImpl.createFromInvoice`, `:79-123`, gọi ở `RepairServiceImpl:430-435`). Dòng nào `warranty_days = 0 và warranty_km = 0` thì không có bảo hành, và **không có chỗ nào để thêm** trước khi bàn giao. `HandoverModal.tsx` chỉ có ODO và ghi chú | **Thiếu luồng** |
-| Menu quản lý nhân viên | Sidebar `AppShell.tsx:72-226` là danh sách phẳng. "Quản lý nhân viên" nằm trong tab của `PayrollManagerView` (`?tab=employees`), "Lịch ca", "Khoang", "Kỹ thuật viên" nằm trong tab của `SchedulingPage` (`?tab=…`), "Hệ số lương", "Thưởng ca" cũng là tab. Người dùng phải vào trang rồi mới thấy | **Cần đưa ra sidebar** |
+### 1.2. Mục tiêu (thiết kế điều hướng)
 
-### 1.2. Mục tiêu
+Hai điểm đến chính cho công việc quản lý, cộng bảng lương, mỗi điểm đến là một "trung tâm" có thanh tab riêng và liên kết chéo:
 
-- Không bấm giờ hay bắt đầu việc được khi phiếu chưa được duyệt hoặc còn phụ tùng đã giữ chỗ chưa xuất kho; thông báo nêu rõ lý do và tên phụ tùng.
-- Trước khi bàn giao, người dùng thấy ngay: khách đang nợ bao nhiêu, hạn mức bao nhiêu, **cần thu tối thiểu bao nhiêu** để bàn giao được. Hạn mức 0 thì phải thu hết; hạn mức lớn hơn 0 thì chỉ cần thu để phần còn nợ không vượt hạn mức.
-- Trước khi bàn giao, nhân viên thêm được bảo hành (số ngày, số km, điều khoản) cho các dòng hóa đơn chưa có; bàn giao xong, hệ thống sinh sổ bảo hành như cũ.
-- Quản lý nhân viên, Lịch ca, Khoang, Đội kỹ thuật viên, Bảng lương, Hệ số lương, Thưởng ca đều là mục riêng trên sidebar, vào thẳng đúng tab.
+```
+NHÂN SỰ & LƯƠNG                    (sidebar, mở rộng theo trang đang xem)
+├─ Quản lý nhân viên   /staff
+│    ├─ Hồ sơ nhân viên          (gộp 2 danh sách trùng; chi tiết nhân viên mở trong khung bên)
+│    └─ Hệ số & đơn giá lương    (chuyển từ trang Lương)
+├─ Khoang & ca làm việc /scheduling
+│    ├─ Điều phối xưởng
+│    ├─ Khoang sửa chữa
+│    └─ Lịch ca làm việc         (sơ đồ tuần / danh sách, ca chờ duyệt)
+└─ Bảng lương           /payroll
+     ├─ Bảng lương tháng
+     └─ Chính sách thưởng ca
+     (kỹ thuật viên: "Phiếu lương của tôi")
+```
 
-### 1.3. Gợi ý thời điểm tạo luồng bảo hành (câu hỏi người dùng nêu)
+- Sidebar chỉ có **3 mục chính**; mục đang mở bung ra các tab con (dạng cây), bấm tab con đi thẳng tới tab đó.
+- **Khung chi tiết nhân viên** (một Sheet) là điểm nối: hồ sơ, đơn giá và hệ số, 5 ca sắp tới, công và lương tháng này, với các lối đi: "Xem lịch ca" → `/scheduling?tab=shifts&employeeId=…`, "Xếp ca" mở `ShiftEditor` đã chọn sẵn nhân viên, "Công & lương tháng" → `/payroll?tab=monthly&employeeId=…` (mở `EmployeeWorkSummaryModal`).
+- **Liên kết chéo ngược**: tên nhân viên trong dòng ca, ô lịch tuần, bảng lương, `LiveDispatchBoard` bấm được → `/staff?employeeId=…` mở khung chi tiết; dòng khoang có "Ca gán khoang này" → `/scheduling?tab=shifts&q=<mã khoang>`.
+- Thanh "Liên quan" nhỏ dưới tiêu đề mỗi trang trung tâm nêu hai trang còn lại (ví dụ ở Quản lý nhân viên: "Lịch ca & khoang", "Bảng lương").
 
-1. **Khuyến nghị: ngay bước Bàn giao** (plan này làm). Lý do: thời điểm bảo hành bắt đầu và số ODO xuất xưởng chỉ chốt lúc bàn giao; hóa đơn đã lập nên mọi dòng và giá đã cố định, chỉ còn chính sách bảo hành là thông tin bổ sung; lễ tân đang nói chuyện với khách nên hỏi nhu cầu bảo hành được luôn.
-2. Làm tốt hơn ở gốc (không thuộc plan này, chỉ đề xuất): đặt sẵn số ngày/km bảo hành mặc định cho từng dịch vụ và phụ tùng trong danh mục (`ServiceEntity`, `Part` đã có cột), để đa số dòng đã có bảo hành từ báo giá và bước Bàn giao chỉ bổ sung ngoại lệ.
-3. Sau bàn giao (cấp bảo hành bổ sung theo thiện chí) để dành cho đợt sau vì cần quyền admin và lý do riêng.
+### 1.3. Ngoài phạm vi
 
-### 1.4. Ngoài phạm vi
+- Không đổi API backend, không thêm bảng hay quyền mới (bộ lọc `employeeId` của API ca và dữ liệu nhân viên đã có).
+- Không đổi nghiệp vụ xếp ca, duyệt đăng ký ca, tính lương, hoa hồng.
+- Không đổi đường dẫn `/scheduling` và `/payroll` (giữ để thông báo và đường dẫn cũ còn chạy); chỉ thêm `/staff`.
+- Không làm màn "Tài khoản" (`/admin/users`) vì thuộc quản trị hệ thống.
 
-- Không đổi vòng đời trạng thái phiếu, không đổi cách tính hoa hồng.
-- Không thêm bảo hành sau khi phiếu đã `CLOSED`; không sửa giá hay số lượng dòng hóa đơn.
-- Không gộp hai tab "Nhân viên" của Lương và "Kỹ thuật viên" của Lịch ca thành một màn.
-- Không xóa thanh tab trong trang (giữ làm lối vào phụ).
+### 1.4. Quyết định thiết kế đã chọn (nêu để người dùng phản hồi)
 
-### 1.5. Điểm cần người dùng biết (đã chọn mặc định)
-
-- **Quy tắc hạn mức (đã chốt với người dùng)**: gọi D là tổng nợ của khách sau hóa đơn này, L là hạn mức nợ.
-  - Khách không có hạn mức (L = 0): phải thu hết hóa đơn (D phải bằng 0) mới bàn giao.
-  - Khách có hạn mức: D nhỏ hơn hoặc bằng L thì không cần thu vội, bàn giao được; D lớn hơn L thì phải thu ít nhất D − L để phần còn nợ không vượt hạn mức.
-  - Vì vậy **bỏ** điều kiện bắt buộc `payment_term_days > 0` và `dueDate`; giữ chặn khách có hóa đơn quá hạn.
-- **Phụ tùng của việc khác**: cổng bắt đầu việc chặn theo cả phiếu (còn phụ tùng giữ chỗ chưa xuất thì chưa việc nào bấm giờ được), đúng ý "phụ tùng của đơn phải xuất kho mới bắt đầu".
+1. Hồ sơ nhân viên gộp về **một** danh sách ở `/staff`. Tab "Đội ngũ kỹ thuật viên" của Lịch ca bị bỏ; đường dẫn cũ `/scheduling?tab=employees` và `/payroll?tab=employees|coefficients` tự chuyển hướng sang `/staff`.
+2. Kỹ thuật viên **không** thấy mục "Quản lý nhân viên" (hồ sơ có số tài khoản và lương). Họ vẫn thấy "Khoang & ca làm việc" (đăng ký ca) và "Phiếu lương của tôi". Lễ tân thấy cả ba, chỉ ADMIN được tạo/sửa (nút bị ẩn với lễ tân, như hiện tại).
+3. Cột chuyên môn/QC, số ca hiệu lực (từ danh sách của Lịch ca) và tài khoản nhận lương, đơn giá, hệ số (từ danh sách của Lương) đều có trong danh sách gộp; hai cột cuối ẩn với vai trò không phải quản lý.
 
 ---
 
 ## 2. Tiêu Chí Chấp Nhận (Acceptance Criteria)
 
-- **AC-1**: Phiếu chưa `APPROVED` (đang chờ duyệt báo giá) mà bấm giờ một việc thì nhận 409 mã `WORK_START_BLOCKED` kèm thông điệp "Phiếu chưa được duyệt báo giá…". _Kiểm chứng_: test `LaborExecutionServiceTest`.
-- **AC-2**: Phiếu `APPROVED` còn phụ tùng giữ chỗ chưa xuất kho thì bấm giờ nhận 409 `WORK_START_BLOCKED` nêu tên phụ tùng và dặn "Hãy xuất kho trước khi bắt đầu"; xuất kho xong thì bấm giờ được; phiếu không có phụ tùng bấm giờ được ngay. _Kiểm chứng_: test dịch vụ cộng test tích hợp MySQL.
-- **AC-3**: Phiếu `QC_FAILED` làm lại không bị chặn bởi cổng này khi đã xuất đủ. _Kiểm chứng_: test dịch vụ.
-- **AC-4**: Hạn mức 0, khách còn nợ: bàn giao bị chặn, thông điệp ghi "cần thu tối thiểu X đ". Hạn mức L lớn hơn 0, tổng nợ D lớn hơn L: thông điệp ghi tối thiểu `D − L`. Thu đúng `D − L` thì bàn giao được. _Kiểm chứng_: test `BillingServiceTest` các ca 0, đúng bằng hạn mức, vượt 1 đồng.
-- **AC-5**: Khách nợ không vượt hạn mức và hạn thanh toán 0 vẫn bàn giao được; khách có hóa đơn quá hạn vẫn bị chặn với thông điệp riêng. _Kiểm chứng_: test dịch vụ.
-- **AC-6**: Mở "Bàn giao xe" thấy khung "Điều kiện thanh toán" gồm: tổng nợ khách, hạn mức, số cần thu tối thiểu, trạng thái cho phép hay không; nút bàn giao tắt kèm lý do khi chưa đủ. _Kiểm chứng_: test RTL `HandoverModal`, xem trên trình duyệt.
-- **AC-7**: Mở "Bàn giao xe" thấy danh sách dòng hóa đơn kèm bảo hành hiện có; với dòng chưa có, nhập ngày/km/điều khoản và lưu được; dòng đã có sổ bảo hành thì khóa. _Kiểm chứng_: test dịch vụ, test RTL, trình duyệt.
-- **AC-8**: Sau khi bổ sung rồi bàn giao, sổ bảo hành sinh đủ cho các dòng có `days > 0 hoặc km > 0` (không trùng). _Kiểm chứng_: test tích hợp MySQL: bổ sung, bàn giao, đếm `warranties`.
-- **AC-9**: Chỉ ADMIN/RECEPTION bổ sung bảo hành; chỉ khi hóa đơn còn hiệu lực và phiếu chưa `CLOSED`; mỗi lần bổ sung ghi nhật ký kiểm toán. _Kiểm chứng_: test dịch vụ 403/409, kiểm tra `AuditConstants`.
-- **AC-10**: Sidebar có nhóm "NHÂN SỰ & LƯƠNG" gồm các mục: Quản lý nhân viên, Lịch ca làm việc, Đội kỹ thuật viên, Khoang & điều phối, Bảng lương tháng, Hệ số & đơn giá lương, Chính sách thưởng ca. Bấm vào thì mở đúng tab; chỉ đúng một mục sáng lên; mục theo vai trò (kỹ thuật viên chỉ thấy "Phiếu lương của tôi" và lịch ca của mình). _Kiểm chứng_: test RTL `AppShell`, trình duyệt.
-- **AC-11**: `lint`, `tsc`, build, toàn bộ test backend và frontend đạt. _Kiểm chứng_: lệnh trong Step cuối.
+- **AC-1**: Sidebar nhóm "NHÂN SỰ & LƯƠNG" có đúng 3 mục chính cho quản lý (Quản lý nhân viên, Khoang & ca làm việc, Bảng lương) và 2 mục cho kỹ thuật viên (Khoang & ca làm việc, Phiếu lương của tôi). Mục đang mở bung các tab con; chỉ một mục chính và một tab con sáng. _Kiểm chứng_: test `navMatch`/`AppShell` theo vai trò, trình duyệt.
+- **AC-2**: `/staff` có hai tab "Hồ sơ nhân viên" và "Hệ số & đơn giá lương", tab giữ trong URL (`?tab=`); danh sách hồ sơ gồm đủ cột chuyên môn & QC, ngày vào làm, số ca hiệu lực, STK, đơn giá & hệ số, trạng thái, bộ lọc tìm kiếm/chuyên môn/trạng thái, thêm/sửa/tạm ngưng cho ADMIN. _Kiểm chứng_: test RTL `StaffPage`.
+- **AC-3**: Bấm một nhân viên (hoặc mở `/staff?employeeId=5`) mở khung chi tiết với hồ sơ, đơn giá & hệ số, tối đa 5 ca sắp tới và 3 nút: "Xem lịch ca", "Xếp ca", "Công & lương tháng". _Kiểm chứng_: test RTL khung chi tiết với dữ liệu giả (msw).
+- **AC-4**: "Xem lịch ca" mở `/scheduling?tab=shifts&employeeId=5` với bộ lọc kỹ thuật viên đã chọn sẵn; dòng khoang có "Ca gán khoang này" mở tab ca với từ khóa là mã khoang. _Kiểm chứng_: test RTL `SchedulingPage` đọc tham số URL.
+- **AC-5**: Tên nhân viên trong dòng ca, ô lịch tuần, bảng lương tháng và bảng điều phối là liên kết tới `/staff?employeeId=…` (không hiện với vai trò không có quyền vào `/staff`). _Kiểm chứng_: test RTL.
+- **AC-6**: "Công & lương tháng" mở `/payroll?tab=monthly&employeeId=5` và tự mở `EmployeeWorkSummaryModal` của người đó. _Kiểm chứng_: test RTL `PayrollManagerView`.
+- **AC-7**: Đường dẫn cũ vẫn dùng được: `/scheduling?tab=employees`, `/payroll?tab=employees`, `/payroll?tab=coefficients` chuyển hướng sang `/staff` đúng tab; thông báo cũ trỏ `/payroll` vẫn mở bảng lương tháng. _Kiểm chứng_: test router.
+- **AC-8**: Mỗi trang trung tâm có thanh "Liên quan" nêu hai trang còn lại và chỉ hiện trang người dùng có quyền vào. _Kiểm chứng_: test RTL theo vai trò.
+- **AC-9**: Tab "Đội ngũ kỹ thuật viên" không còn trong `SchedulingPage`, tab "Quản lý nhân viên" và "Hệ số & đơn giá lương" không còn trong `PayrollManagerView`; danh sách trùng `employeeColumns` bị xóa. _Kiểm chứng_: `tsc`, `eslint` (không còn import thừa), test.
+- **AC-10**: `lint`, `tsc`, toàn bộ test frontend và build đạt; trình duyệt: đi qua cả ba mục và các liên kết chéo bằng vai trò ADMIN, lễ tân, kỹ thuật viên. _Kiểm chứng_: lệnh trong Step cuối, thao tác tay.
 
 ---
 
 ## 3. Danh Sách File Mục Tiêu
 
-| File | Vùng dòng | Thay đổi |
-|---|---|---|
-| `common/enums/ResponseCode.java` | cuối nhóm 20xx | thêm `WORK_START_BLOCKED(2026)`, `WARRANTY_BLOCKED(2027)` (409) |
-| `shared/contracts/InventoryOperations.java` | `:7` | thêm `requireIssuedForWorkStart(long repairOrderId)` hoặc tham số mục đích cho `requireIssueComplete` |
-| `inventory/service/impl/InventoryServiceImpl.java` | `:510-534` | dùng chung truy vấn phụ tùng chưa xuất, thông điệp theo mục đích (bắt đầu việc / lập hóa đơn) |
-| `repair/service/impl/LaborExecutionServiceImpl.java` | `:296-347`, `:476` | `startTimer` gọi cổng bắt đầu việc (phiếu `APPROVED/IN_PROGRESS/QC_FAILED`, đã xuất kho) |
-| `billing/service/BillingService.java`, `impl/BillingServiceImpl.java` | `:693-751` | tách `evaluateHandover` trả kết quả có số liệu; `requireHandoverAllowed` dùng nó; bỏ điều kiện hạn thanh toán bắt buộc; thêm `getHandoverReadiness`, `updateInvoiceItemWarranty` |
-| `billing/dto/response/HandoverReadinessResponse.java` (mới) | | `allowed, reasons[], invoiceId, invoiceBalance, customerDebt, creditLimit, minimumPayment, overdueInvoiceCodes[], items[]` |
-| `billing/dto/request/InvoiceItemWarrantyRequest.java` (mới) | | `warrantyDays, warrantyKm, warrantyTerms` |
-| `billing/controller/InvoiceController.java`, `common/constant/ApiPaths.java` | | `GET …/handover-readiness`, `PATCH …/items/{itemId}/warranty` |
-| `warranty/repository/WarrantyRepository.java` | | `existsByInvoiceItemId` (kiểm tra dòng đã có sổ) |
-| `common/constant/AuditConstants.java` | | hành động `INVOICE_ITEM_WARRANTY_SET` |
-| `docs/REPAIR_ORDER_LIFECYCLE.md` | | thêm 2 hàng: cổng bắt đầu việc, bảo hành trước bàn giao |
-| `frontend/src/features/repair/components/HandoverModal.tsx` (+ test) | | khung điều kiện thanh toán, bảng bảo hành theo dòng |
-| `frontend/src/features/repair/api/repairApi.ts`, `hooks/useRepair.ts` hoặc `features/billing/api`, `hooks` | | `getHandoverReadiness`, `setItemWarranty` |
-| `frontend/src/features/repair/components/RepairOrderDetailModal.tsx` | bàn giao | hiện lỗi cổng bắt đầu việc nếu có |
-| `frontend/src/app/layouts/AppShell.tsx` (+ test) | `:62-226`, `:250-300` | thêm `section`, `search` cho `NavItem`, kích hoạt theo tab, nhóm "NHÂN SỰ & LƯƠNG" |
-| `frontend/src/app/access.ts` | `:16-19` | thêm hằng vai trò cho từng mục nhân sự |
-| `frontend/src/features/scheduling/pages/SchedulingPage.tsx`, `features/payroll/components/PayrollManagerView.tsx` | `useUrlTab` | giữ tab, đọc `?tab=` từ sidebar |
+| File | Thay đổi |
+|---|---|
+| `app/layouts/navMatch.ts` (+ test) | thêm mô hình cây: mục chính có `children` (tab con); hàm xác định mục chính và tab con đang sáng |
+| `app/layouts/AppShell.tsx` | thay 7 mục phẳng bằng 3 mục chính có tab con, bung theo trang đang mở; ẩn theo vai trò |
+| `app/access.ts` | thêm `STAFF_MANAGE_ROLES` (ADMIN, lễ tân) |
+| `app/App.tsx` | thêm route `/staff` (bảo vệ theo vai trò như `/payroll`), chuyển hướng đường dẫn cũ |
+| `features/staff/pages/StaffPage.tsx` (mới) | trang trung tâm: tiêu đề, thanh "Liên quan", tab Hồ sơ / Hệ số |
+| `features/staff/components/EmployeeDirectory.tsx` (mới, thay `EmployeePayrollDirectory.tsx`) | danh sách gộp, mở khung chi tiết |
+| `features/staff/components/EmployeeDetailSheet.tsx` (mới) | khung chi tiết nhân viên với liên kết chéo |
+| `features/staff/hooks/useStaffEmployee.ts` (mới) | đọc `employeeId` từ URL, mở/đóng khung chi tiết |
+| `features/payroll/components/SalaryCoefficientManager.tsx` | chuyển vào tab của `/staff` (giữ nguyên nội dung) |
+| `features/payroll/components/PayrollManagerView.tsx` | bỏ tab nhân viên và hệ số, tab còn `monthly`, `bonus`; đọc `employeeId` để mở `EmployeeWorkSummaryModal`; tên nhân viên thành liên kết |
+| `features/payroll/types/payroll.ts` | `PAYROLL_TABS` còn `monthly`, `bonus` |
+| `features/scheduling/pages/SchedulingPage.tsx` | bỏ tab `employees` và `employeeColumns`; đọc `employeeId`, `q` từ URL làm bộ lọc ca; nút "Ca gán khoang này"; tên nhân viên thành liên kết; thanh "Liên quan" |
+| `features/scheduling/components/LiveDispatchBoard.tsx`, `ShiftTimelineBoard.tsx` | tên nhân viên thành liên kết |
+| `shared/components/RelatedLinks.tsx` (mới) | thanh liên kết "Liên quan" dùng chung |
+| `features/notification/utils/notificationParser.ts` | cập nhật nhãn và đường dẫn đích (`/scheduling?tab=shifts`, `/payroll?tab=monthly`) |
+| `docs/` (UI) | một dòng mô tả sơ đồ điều hướng nhân sự trong tài liệu giao diện nếu có |
 
-Test: `src/test/.../repair/service/LaborExecutionServiceTest.java`, `src/test/.../billing/service/BillingServiceTest.java`, `src/test/.../billing/HandoverWarrantyIntegrationTest.java` (mới, MySQL).
+Test mới: `app/layouts/navMatch.test.ts` (cập nhật), `features/staff/pages/StaffPage.test.tsx`, `features/staff/components/EmployeeDetailSheet.test.tsx`, `app/routes.redirects.test.tsx`.
 
 ---
 
 ## 4. Hợp Đồng Kỹ Thuật
 
-**Cổng bắt đầu việc** (`startTimer`, sau `requireOpenOrder`):
-- Cho phép khi trạng thái phiếu thuộc `APPROVED, IN_PROGRESS, QC_FAILED`; ngược lại ném `ConflictException(ResponseCode.WORK_START_BLOCKED, "Phiếu chưa được duyệt báo giá. Hãy duyệt báo giá trước khi bắt đầu công việc.")` (hoặc thông điệp theo trạng thái `WAITING_PARTS`).
-- Gọi `inventoryOperations.requireIssuedForWorkStart(orderId)`: cùng truy vấn với `requireIssueComplete`, nhưng thông điệp "Còn phụ tùng đã giữ chỗ chưa xuất kho: … Hãy xuất kho trước khi bắt đầu công việc." mang mã `WORK_START_BLOCKED`. Không chặn vì phiếu kho nháp (chỉ chặn ở bước hóa đơn).
-- `ConflictException` có thông điệp mới tới được người dùng (`GlobalExceptionHandler.authoredDetail`).
+**Cây điều hướng** (`navMatch.ts`):
+```ts
+interface NavNode extends NavTarget {
+  label: string; icon; roles: readonly Role[];
+  children?: ReadonlyArray<NavTarget & { label: string; roles?: readonly Role[] }>;
+}
+```
+`activeNode(nodes, pathname, search)` trả mục chính (khớp theo `to`) và tab con (khớp `tab`, `alsoTabs`, mặc định khi thiếu tab). Sidebar chỉ vẽ `children` của mục chính đang mở (hoặc khi đang rê/focus), có `aria-expanded`, tab con là `NavLink` thụt vào.
 
-**Cổng bàn giao**: `evaluateHandover(invoice)` trả `HandoverEvaluation{allowed, reasons, customerDebt, creditLimit, minimumPayment}` với `minimumPayment = max(0, customerDebt − creditLimit)`, nợ khách = `calculateTotalOutstandingBalanceForCustomer`. Thông điệp: "Công nợ của khách là {D} đ, vượt hạn mức {L} đ. Cần thu tối thiểu {D−L} đ trước khi bàn giao." Hạn mức 0 thì D−L = D (thu hết). Quá hạn: giữ thông điệp, thêm mã hóa đơn. `requireHandoverAllowed` ném `ConflictException(HANDOVER_BLOCKED, reasons[0])`. Dùng `formatMoney` có sẵn.
+**Route**: `/staff` (`ProtectedRoute` cho `STAFF_MANAGE_ROLES`), tab `profiles | salary`. Chuyển hướng: `/scheduling?tab=employees` → `/staff?tab=profiles`; `/payroll?tab=employees` → `/staff?tab=profiles`; `/payroll?tab=coefficients` → `/staff?tab=salary`. Thực hiện bằng một component `LegacyTabRedirect` đọc `?tab=` của trang cũ.
 
-**API mới** (`@PreAuthorize(HAS_ROLE_RECEPTION_OR_ADMIN)`):
-- `GET /api/v1/billing/invoices/by-order/{repairOrderId}/handover-readiness` → `HandoverReadinessResponse` (chỉ đọc, không khóa).
-- `PATCH /api/v1/billing/invoices/{invoiceId}/items/{itemId}/warranty` body `InvoiceItemWarrantyRequest{warrantyDays 0..3650, warrantyKm 0..1_000_000, warrantyTerms ≤ 1000}`. Quy tắc: hóa đơn `ISSUED/PARTIALLY_PAID/PAID` (không `VOID`), phiếu chưa `CLOSED`, dòng chưa có `Warranty` (`existsByInvoiceItemId`), `warrantyDays > 0 hoặc warrantyKm > 0` hoặc cả hai bằng 0 để gỡ. Vi phạm: `ConflictException(WARRANTY_BLOCKED, "…")` tiếng Việt. Không đổi tiền hay tổng hóa đơn. Ghi audit.
-- Không đổi `handover`, `createFromInvoice` (đã đọc từ dòng hóa đơn nên tự nhận phần bổ sung).
+**Tham số URL**: `employeeId` (id nhân viên) dùng ở `/staff` (mở khung chi tiết), `/scheduling?tab=shifts` (chọn sẵn bộ lọc `shiftEmployee`), `/payroll?tab=monthly` (mở bảng công). `q` ở `/scheduling?tab=shifts` đặt sẵn `shiftKeyword`. Khung chi tiết đóng thì xóa `employeeId` khỏi URL, giữ các tham số khác.
 
-**Sidebar**: `NavItem` thêm `search?: string` (ví dụ `tab=employees`). Khóa React dùng `to + search`. Kích hoạt thủ công: `location.pathname === to` và (`search` khớp tham số `tab`, hoặc không có `tab` thì mục `search` mặc định sáng). Thêm `NavSection` "NHÂN SỰ & LƯƠNG"; chuyển "Khoang & Lịch ca" và "Bảng lương & Năng suất" vào đây. Dùng `useUrlTab` hiện có, không thêm route. Tiêu đề trang (`currentLink`) lấy theo mục khớp cả tab.
+**Khung chi tiết** (`EmployeeDetailSheet`): dùng `Sheet` phải, dữ liệu từ `useSchedulingEmployeesQuery` (đã có), 5 ca sắp tới từ API ca với `employeeId`, `from = hôm nay` (tham số có sẵn ở `EmployeeShiftController`), công tháng từ `payrollApi.getWorkSummary` chỉ khi người xem là quản lý. Nút "Xếp ca" chỉ với ADMIN, mở `ShiftEditor` với `initialEmployeeId`.
 
-**UI dùng chung**: `Sheet`, `Field`, `Button`, `FormError`, `Badge`, `DataTable`, `useToast`, `errorMessage`; định dạng tiền theo tiện ích tiền tệ hiện có.
+**Liên kết chéo**: dùng `Link` của `react-router-dom`; liên kết sang `/staff` chỉ hiện khi `STAFF_MANAGE_ROLES` gồm vai trò hiện tại, ngược lại hiện chữ thường. Một hàm `employeeHref(id)` ở `features/staff/utils/links.ts` để mọi nơi dùng chung.
+
+**`RelatedLinks`**: nhận danh sách `{to, label, roles}`, lọc theo vai trò của `useAuth`, hiển thị dạng dải liên kết dưới `PageHeader`.
+
+**Không đổi** hợp đồng API, `ApiPaths`, `ResponseCode`.
 
 ---
 
 ## 5. Checklist Thực Thi
 
-- [x] **Step 1: Mã lỗi và cổng bắt đầu việc (backend)** _(AC-1, AC-2, AC-3)_
-  - Thêm `WORK_START_BLOCKED`, `WARRANTY_BLOCKED` vào `ResponseCode`; thêm `requireIssuedForWorkStart` vào `InventoryOperations` và `InventoryServiceImpl` (dùng chung truy vấn); gọi trong `LaborExecutionServiceImpl.startTimer`. Trước khi code, xác nhận chỗ nào đưa phiếu `APPROVED → IN_PROGRESS` để cổng không chặn nhầm lần đầu.
+- [x] **Step 1: Cây điều hướng và sidebar 3 mục** _(AC-1)_
+  - `navMatch.ts` thêm mô hình cây và `activeNode`; `AppShell.tsx` vẽ 3 mục chính với tab con bung theo trang đang mở; `access.ts` thêm `STAFF_MANAGE_ROLES`; cập nhật `navMatch.test.ts` và thêm test hiển thị theo vai trò.
 
-- [x] **Step 2: Test cổng bắt đầu việc** _(AC-1, AC-2, AC-3)_
-  - `LaborExecutionServiceTest`: chờ duyệt, còn phụ tùng, đã xuất, không phụ tùng, làm lại sau QC trượt. Thêm một ca tích hợp MySQL với dữ liệu giữ chỗ thật.
+- [x] **Step 2: Trung tâm Quản lý nhân viên** _(AC-2, AC-9)_
+  - Tạo `features/staff/` (`StaffPage`, `EmployeeDirectory` gộp cột của hai danh sách, tab Hệ số chứa `SalaryCoefficientManager`); thêm route `/staff` trong `App.tsx`; bỏ `EmployeePayrollDirectory.tsx`; test `StaffPage`.
 
-- [x] **Step 3: Cổng bàn giao có số liệu và API sẵn sàng bàn giao** _(AC-4, AC-5)_
-  - Tách `evaluateHandover` trong `BillingServiceImpl`, viết lại thông điệp, bỏ điều kiện hạn thanh toán bắt buộc, thêm `HandoverReadinessResponse` và endpoint `handover-readiness`.
+- [x] **Step 3: Khung chi tiết nhân viên và liên kết** _(AC-3, AC-5, AC-6)_
+  - `EmployeeDetailSheet`, `useStaffEmployee`, `links.ts`; liên kết "Xem lịch ca", "Xếp ca", "Công & lương tháng"; `PayrollManagerView` đọc `employeeId` mở bảng công; test khung chi tiết.
 
-- [x] **Step 4: Test cổng bàn giao** _(AC-4, AC-5)_
-  - `BillingServiceTest`: hạn mức 0 nợ đúng bằng số hóa đơn, hạn mức 5.000.000 nợ vượt 1 đồng, nợ đúng bằng hạn mức, hạn thanh toán 0 nhưng nợ trong hạn mức, có hóa đơn quá hạn, hóa đơn đã `PAID`.
+- [x] **Step 4: Trung tâm Khoang & ca làm việc** _(AC-4, AC-5, AC-8, AC-9)_
+  - `SchedulingPage` bỏ tab nhân viên và `employeeColumns`, đọc `employeeId` và `q` từ URL, thêm nút "Ca gán khoang này", tên nhân viên thành liên kết ở dòng ca, `ShiftTimelineBoard`, `LiveDispatchBoard`; thêm `RelatedLinks` ở hai trang; test đọc tham số URL.
 
-- [x] **Step 5: Bổ sung bảo hành theo dòng hóa đơn (backend)** _(AC-7, AC-8, AC-9)_
-  - `InvoiceItemWarrantyRequest`, `BillingService.updateInvoiceItemWarranty`, endpoint `PATCH`, `WarrantyRepository.existsByInvoiceItemId`, hằng audit; phản hồi hóa đơn đã có `warrantyDays/Km/Terms` nên không đổi mapper.
+- [x] **Step 5: Bảng lương gọn lại và đường dẫn cũ** _(AC-7, AC-8, AC-9)_
+  - `PAYROLL_TABS` còn `monthly`, `bonus`; `LegacyTabRedirect` cho ba đường dẫn cũ; cập nhật `notificationParser.ts`; test router chuyển hướng.
 
-- [x] **Step 6: Test bảo hành trước bàn giao** _(AC-7, AC-8, AC-9)_
-  - `BillingServiceTest` (quyền, trạng thái, dòng đã có sổ, hai giá trị 0 để gỡ) và `HandoverWarrantyIntegrationTest` (bổ sung rồi bàn giao, đếm sổ bảo hành, bàn giao lần hai không tạo trùng).
+- [x] **Step 6: Kiểm thử & xác minh** _(tất cả AC)_
+  - `npm --prefix frontend run lint`, `tsc`, `npm --prefix frontend test`, `npm --prefix frontend run build`; build lại container frontend; thử trên trình duyệt bằng ADMIN, lễ tân và kỹ thuật viên: sidebar bung tab, hồ sơ → khung chi tiết → lịch ca → quay lại hồ sơ, dòng khoang → ca gán khoang, bảng lương → hồ sơ, ba đường dẫn cũ.
 
-- [x] **Step 7: Giao diện Bàn giao: điều kiện thanh toán và bảo hành** _(AC-6, AC-7)_
-  - API client và hook (`getHandoverReadiness`, `setItemWarranty`), viết lại `HandoverModal.tsx` với khung "Điều kiện thanh toán" (gồm nút mở hóa đơn để thu tiền) và bảng "Bảo hành theo dòng"; tắt nút bàn giao kèm lý do khi `allowed = false`; test RTL.
+- [x] **Step 7 (converge): Test liên kết tên nhân viên và thanh "Liên quan" theo vai trò** _(AC-5, AC-8)_
+  - Thêm `features/staff/components/EmployeeLink.test.tsx`: ADMIN và lễ tân thấy liên kết tới `/staff?tab=profiles&employeeId=…`; kỹ thuật viên chỉ thấy chữ đậm không có liên kết (`EmployeeLink.tsx`).
+  - Thêm `shared/components/RelatedLinks.test.tsx`: lọc liên kết theo vai trò, trả `null` khi không còn liên kết nào (`RelatedLinks.tsx`).
 
-- [x] **Step 8: Sidebar nhóm Nhân sự & Lương** _(AC-10)_
-  - `AppShell.tsx` thêm `search`, kích hoạt theo tab, nhóm và 7 mục; `access.ts` hằng vai trò; kiểm tra `SchedulingPage` và `PayrollManagerView` đọc `?tab=` đúng; test RTL cho mục sáng và quyền theo vai trò.
+- [x] **Step 8 (converge): Test đọc tham số URL ở Lịch ca và Bảng lương** _(AC-4, AC-6)_
+  - Thêm test cho `SchedulingPage` (msw): mở `/scheduling?tab=shifts&employeeId=5&q=BAY-01` thì bộ lọc kỹ thuật viên và ô tìm kiếm có sẵn giá trị; bấm "Ca gán khoang" ở tab Khoang chuyển sang tab ca với từ khóa là mã khoang (`SchedulingPage.tsx`, `shiftEmployee`, `shiftKeyword`, `bayColumns`).
+  - Thêm test cho `PayrollManagerView`: `/payroll?tab=monthly&employeeId=5` mở `EmployeeWorkSummaryModal` của nhân viên đó và đóng thì xóa `employeeId` khỏi địa chỉ (`PayrollManagerView.tsx`, `linkedEmployeeId`).
 
-- [x] **Step 9: Cập nhật tài liệu** _(AC-1, AC-4, AC-7)_
-  - `docs/REPAIR_ORDER_LIFECYCLE.md` thêm cổng bắt đầu việc, công thức tối thiểu cần thu và bảo hành trước bàn giao.
+## 6. Kết Quả Hội Tụ (Converge)
 
-- [x] **Step 10: Kiểm thử & xác minh** _(tất cả AC)_
-  - `./mvnw test`; `npm --prefix frontend run lint`, `tsc`, `npm --prefix frontend test`, `npm --prefix frontend run build`; build lại và chạy lại container; thử trên trình duyệt: bấm giờ phiếu còn phụ tùng, bàn giao khách có hạn mức 0 và hạn mức lớn hơn 0, thêm bảo hành rồi bàn giao rồi kiểm tra sổ bảo hành, bấm lần lượt 7 mục nhân sự trên sidebar.
+Ngày 2026-11-06. **Kết luận: partial** (mọi tiêu chí có code và test; còn mục chỉ xác minh được trên trình duyệt).
 
-- [ ] **Step 11 (converge): Test tích hợp MySQL cho cổng bắt đầu việc và bảo hành trước bàn giao** _(AC-2, AC-8)_
-  - Thêm `src/test/.../billing/HandoverWarrantyIntegrationTest.java` (kế thừa `IntegrationTestSupport`): dựng hóa đơn có hai dòng dịch vụ, gọi `BillingServiceImpl.updateInvoiceItemWarranty` cho một dòng, rồi `WarrantyServiceImpl.createFromInvoice` hai lần; kiểm tra bảng `warranties` chỉ có đúng một sổ cho dòng đã đặt bảo hành, không trùng ở lần hai, và dòng đó bị khóa sau khi có sổ (`WARRANTY_BLOCKED`).
-  - Cùng lớp (hoặc `InventoryIssueGateIntegrationTest`): với `estimate_items.reserved_quantity > 0`, `InventoryServiceImpl.requireIssuedForWorkStart` ném `WORK_START_BLOCKED` nêu tên phụ tùng; sau khi `reserved_quantity = 0` thì không ném.
+| Mục tiêu | Trạng thái | Ghi chú |
+|---|---|---|
+| AC-1 sidebar 3 mục, tab con bung theo trang | Đạt (test) | `navItems.test.ts`, `navMatch.test.ts`; chưa xem trên trình duyệt |
+| AC-2 `/staff` hai tab, danh sách hồ sơ gộp | Đạt | `StaffPage.test.tsx` |
+| AC-3 khung chi tiết nhân viên, 3 lối đi | Đạt | `StaffPage.test.tsx` |
+| AC-4 lịch ca đọc `employeeId`, `q`; nút "Ca gán khoang" | Đạt | `SchedulingPage.test.tsx` |
+| AC-5 tên nhân viên là liên kết theo quyền | Đạt | `EmployeeLink.test.tsx` |
+| AC-6 bảng công mở theo `employeeId` | Đạt | `PayrollManagerView.test.tsx` |
+| AC-7 địa chỉ cũ chuyển hướng | Đạt | `LegacyTabRedirect.test.tsx` |
+| AC-8 dải "Liên quan" theo vai trò | Đạt | `RelatedLinks.test.tsx` |
+| AC-9 bỏ tab và danh sách trùng | Đạt | `tsc -b`, `eslint` sạch, không còn `employeeColumns` |
+| AC-10 lint, tsc, test, build; thử trình duyệt | Đạt (lệnh), chưa xác minh trình duyệt | 190/190 test; container frontend chưa build lại sau thay đổi cuối vì Docker Desktop đang tắt |
 
-- [ ] **Step 12 (converge): Test quyền cho hai endpoint mới** _(AC-9)_
-  - Thêm test MockMvc hoặc kiểm tra `@PreAuthorize` cho `InvoiceController.updateItemWarranty` và `getHandoverReadiness`: ADMIN và RECEPTIONIST được, TECHNICIAN và CUSTOMER nhận 403 (`InvoiceController.java`).
+**Lỗi phát hiện và đã sửa**: hộp thoại bảng công mở từ link `?employeeId=` hiện tiêu đề thiếu tên khi kỳ lương chưa tải; nay chỉ mở sau khi tải xong (`PayrollManagerView.tsx`).
 
-<!-- Mục 6 "Kết Quả Hội Tụ" do /converge thêm vào, không viết sẵn. -->
+**Còn lại (ngoài phạm vi code)**: thử tay bằng ADMIN, lễ tân, kỹ thuật viên; build lại container frontend khi Docker chạy.

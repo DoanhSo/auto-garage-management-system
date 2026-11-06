@@ -8,6 +8,14 @@ export interface NavTarget {
   defaultTab?: boolean;
 }
 
+/** A tab of a hub page, listed under its sidebar entry while that page is open. */
+export interface NavChild {
+  tab: string;
+  label: string;
+  alsoTabs?: readonly string[];
+  defaultTab?: boolean;
+}
+
 export function navHref(link: NavTarget): string {
   return link.tab ? `${link.to}?tab=${link.tab}` : link.to;
 }
@@ -34,4 +42,20 @@ export function isNavActive(
 
   const known = current !== null && siblings.some((s) => s.to === link.to && claims(s, current));
   return !known && !!link.defaultTab;
+}
+
+/** Whether the tab `child` of the hub entry `parent` is the one currently open. */
+export function isChildActive(
+  parent: { to: string; children?: ReadonlyArray<NavChild> },
+  child: NavChild,
+  pathname: string,
+  search: string,
+): boolean {
+  const asTarget = (c: NavChild): NavTarget => ({
+    to: parent.to,
+    tab: c.tab,
+    alsoTabs: c.alsoTabs,
+    defaultTab: c.defaultTab,
+  });
+  return isNavActive(asTarget(child), pathname, search, (parent.children ?? []).map(asTarget));
 }

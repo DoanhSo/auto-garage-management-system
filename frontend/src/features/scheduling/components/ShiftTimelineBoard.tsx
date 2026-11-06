@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { EmployeeLink } from '../../staff/components/EmployeeLink';
 import { ChevronLeft, ChevronRight, Plus, X, XCircle } from 'lucide-react';
 import { Badge, Button } from '../../../shared/components/ui';
 import {
@@ -114,7 +115,7 @@ export function ShiftTimelineBoard({
           </Button>
         </header>
         <p>
-          <strong>{employeeName(shift.employeeId)}</strong>
+          <EmployeeLink id={shift.employeeId}>{employeeName(shift.employeeId)}</EmployeeLink>
           {shift.shiftType ? ` · ${shiftTypeLabels[shift.shiftType]}` : ''}
           {` · ${hours.toFixed(1).replace('.', ',')} giờ`}
         </p>
@@ -209,7 +210,7 @@ export function ShiftTimelineBoard({
             {rows.map((employee) => (
               <div key={employee.id} className="timeline-week-row" role="row">
                 <div className="timeline-staff-head" role="rowheader">
-                  <strong>{employeeName(employee.id)}</strong>
+                  <EmployeeLink id={employee.id}>{employeeName(employee.id)}</EmployeeLink>
                   <span>
                     {employee.employeeCode}
                     {employee.canQc ? ' · QC' : ''}
