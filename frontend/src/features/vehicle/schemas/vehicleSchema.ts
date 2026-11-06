@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Vehicle } from '../../../shared/types/contracts';
+import { formatPlate } from '../../../shared/utils/format';
 
 export const fuelTypes = ['Xăng', 'Dầu (Diesel)', 'Điện', 'Hybrid'] as const;
 
@@ -10,7 +11,7 @@ export const vehicleFormSchema = z.object({
     .trim()
     .min(1, 'Biển số xe là bắt buộc')
     .max(20, 'Biển số xe tối đa 20 ký tự')
-    .transform((val) => val.toUpperCase().replace(/\s+/g, '')),
+    .transform((val) => formatPlate(val)),
   vin: z.string().trim().max(30, 'Số khung (VIN) tối đa 30 ký tự').optional(),
   engineNumber: z.string().trim().max(30, 'Số máy tối đa 30 ký tự').optional(),
   brand: z.string().trim().min(1, 'Hãng xe là bắt buộc').max(50, 'Hãng xe tối đa 50 ký tự'),
@@ -48,7 +49,7 @@ export type TransferOwnershipFormValues = z.infer<typeof transferOwnershipSchema
 export function vehicleDefaults(existing?: Vehicle): VehicleFormValues {
   return {
     customerId: existing?.customerId ?? '',
-    licensePlate: existing?.licensePlate ?? '',
+    licensePlate: formatPlate(existing?.licensePlate),
     vin: existing?.vin ?? '',
     engineNumber: existing?.engineNumber ?? '',
     brand: existing?.brand ?? '',

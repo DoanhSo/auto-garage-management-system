@@ -106,6 +106,20 @@ export const repairApi = {
     });
   },
 
+  async assignQcInspector(
+    orderId: string | number,
+    data: { employeeId: string | number; startsAt: string; endsAt: string },
+  ): Promise<TaskAssignment> {
+    return request<TaskAssignment>(`/repair-orders/${orderId}/qc-assignment`, {
+      method: 'POST',
+      body: data,
+    });
+  },
+
+  async getQcAssignment(orderId: string | number): Promise<TaskAssignment | null> {
+    return request<TaskAssignment | null>(`/repair-orders/${orderId}/qc-assignment`);
+  },
+
   async releaseAssignment(assignmentId: string | number): Promise<void> {
     await request<void>(`/repair-tasks/assignments/${assignmentId}`, {
       method: 'DELETE',

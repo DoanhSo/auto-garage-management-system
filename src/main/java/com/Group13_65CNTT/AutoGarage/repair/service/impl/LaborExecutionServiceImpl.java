@@ -1,6 +1,7 @@
 package com.Group13_65CNTT.AutoGarage.repair.service.impl;
 
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.LaborSessionStopRequest;
+import com.Group13_65CNTT.AutoGarage.repair.dto.request.QcAssignmentRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.TaskAssignmentRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.TaskCompletionRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.LaborSessionResponse;
@@ -47,6 +48,8 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     private final com.Group13_65CNTT.AutoGarage.repair.service.WorkLogRecorder workLogRecorder;
     private final com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository userRepository;
 
+    private final com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderAssignmentRepository workLogRepository;
+
     private final TaskAssignmentMapper taskAssignmentMapper;
     private final LaborSessionMapper laborSessionMapper;
 
@@ -80,6 +83,17 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         Employee employee = employeeRepository.findById(request.getEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên với ID: " + request.getEmployeeId()));
 
+        return createAssignment(actorUserId, task, order, employee, request, true);
+    }
+
+    /**
+     * Applies the assignment rules shared by task assignment and QC inspector assignment, then persists it.
+     * {@code checkServiceSkills} is false for QC inspection, which is not tied to the task's service skills.
+     */
+    private TaskAssignmentResponse createAssignment(Long actorUserId, RepairTask task, RepairOrder order,
+                                                    Employee employee, TaskAssignmentRequest request,
+                                                    boolean checkServiceSkills) {
+        Long taskId = task.getId();
         if (Boolean.FALSE.equals(employee.getIsActive())) {
             throw new BusinessRuleException("Nhân viên đang ngưng hoạt động");
         }
@@ -107,7 +121,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         if (!shiftRepository.coversAssignment(employee.getId(), request.getStartsAt(), request.getEndsAt())) {
             throw new BusinessRuleException("Thời gian phân công phải nằm trong ca làm việc đang hoạt động của nhân viên");
         }
-        if (task.getServiceId() != null) {
+        if (checkServiceSkills && task.getServiceId() != null) {
             var service = serviceRepository.findById(task.getServiceId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dịch vụ của công việc"));
             if (!skills(employee.getSkillsJson()).containsAll(skills(service.getRequiredSkillsJson()))) {
@@ -150,6 +164,64 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         TaskAssignmentResponse response = taskAssignmentMapper.toResponse(saved);
         response.setEmployeeName(displayName(employee));
         return response;
+    }
+
+    @Override
+    @Transactional
+    public TaskAssignmentResponse assignQcInspector(Long actorUserId, Long orderId, QcAssignmentRequest request) {
+        log.info("Assigning QC inspector employee #{} to order #{}", request.getEmployeeId(), orderId);
+
+        if (!request.getEndsAt().isAfter(request.getStartsAt())) {
+            throw new BusinessRuleException("Thời gian kết thúc phân công phải sau thời gian bắt đầu");
+        }
+        RepairOrder order = repairOrderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + orderId));
+        if (order.getStatus() != RepairOrderStatus.WAITING_QC) {
+            throw new BusinessRuleException("Chỉ phân công kỹ thuật viên QC khi phiếu đang chờ QC");
+        }
+        RepairTask anchor = repairTaskRepository.findByRepairOrderId(orderId).stream()
+                .filter(task -> task.getStatus() != TaskStatus.CANCELLED)
+                .max(java.util.Comparator.comparing(RepairTask::getId))
+                .orElseThrow(() -> new BusinessRuleException("Phiếu chưa có công việc để gắn phân công QC"));
+        Employee employee = employeeRepository.findById(request.getEmployeeId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy nhân viên với ID: " + request.getEmployeeId()));
+        boolean mainRepairer = workLogRepository
+                .findByRepairOrderIdAndAssignmentStage(orderId, AssignmentStage.REPAIR_MAIN).stream()
+                .anyMatch(row -> employee.getId().equals(row.getEmployeeId()));
+        if (mainRepairer) {
+            throw new BusinessRuleException("Thợ chính đã sửa chữa không được làm kỹ thuật viên QC của phiếu này");
+        }
+
+        // Only one active QC inspector per order: release the previous one in the same transaction.
+        Instant now = Instant.now();
+        List<TaskAssignment> previous = taskAssignmentRepository.findActiveQcForOrder(orderId);
+        previous.forEach(assignment -> {
+            assignment.setIsActive(false);
+            assignment.setReleasedAt(now);
+        });
+        taskAssignmentRepository.saveAll(previous);
+
+        TaskAssignmentRequest assignment = TaskAssignmentRequest.builder()
+                .employeeId(request.getEmployeeId())
+                .assignmentRole(AssignmentRole.QC)
+                .startsAt(request.getStartsAt())
+                .endsAt(request.getEndsAt())
+                .build();
+        return createAssignment(actorUserId, anchor, order, employee, assignment, false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TaskAssignmentResponse getQcAssignment(Long orderId) {
+        return taskAssignmentRepository.findActiveQcForOrder(orderId).stream().findFirst()
+                .map(assignment -> {
+                    TaskAssignmentResponse response = taskAssignmentMapper.toResponse(assignment);
+                    employeeRepository.findById(assignment.getEmployeeId())
+                            .ifPresent(employee -> response.setEmployeeName(displayName(employee)));
+                    return response;
+                })
+                .orElse(null);
     }
 
     @Override

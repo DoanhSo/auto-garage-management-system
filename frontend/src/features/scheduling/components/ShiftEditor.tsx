@@ -81,12 +81,22 @@ export function ShiftEditor({
       setShiftType('FULL_DAY');
       setServiceBayId(initialServiceBayId ? String(initialServiceBayId) : '');
       setDiscard(false);
+    } else {
+      setEmployeeId('');
+      setNotes('');
+      setServiceBayId('');
+      setDiscard(false);
     }
   }, [open, initialEmployeeId, initialServiceBayId]);
 
-  const isDirty = !!employeeId;
+  const isDirty = initialEmployeeId
+    ? employeeId !== String(initialEmployeeId) ||
+      serviceBayId !== (initialServiceBayId ? String(initialServiceBayId) : '') ||
+      notes.trim() !== '' ||
+      shiftType !== 'FULL_DAY'
+    : !!employeeId || !!notes.trim() || !!serviceBayId || shiftType !== 'FULL_DAY';
   const busy = createMutation.isPending;
-  const blocker = useUnsavedChangesGuard(isDirty && !busy);
+  const blocker = useUnsavedChangesGuard(open && isDirty && !busy);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -269,7 +279,7 @@ export function ShiftEditor({
       </Sheet>
 
       <ConfirmDialog
-        open={discard || blocker.state === 'blocked'}
+        open={open && (discard || blocker.state === 'blocked')}
         title="Bỏ thay đổi chưa lưu?"
         description="Thông tin ca làm việc đang nhập sẽ bị hủy."
         onCancel={() => {

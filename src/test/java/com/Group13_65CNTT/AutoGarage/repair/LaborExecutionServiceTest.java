@@ -93,6 +93,8 @@ class LaborExecutionServiceTest {
     private com.Group13_65CNTT.AutoGarage.scheduling.repository.EmployeeShiftRepository shiftRepository;
     @Mock
     private com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository serviceRepository;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderAssignmentRepository workLogRepository;
 
     private RepairOrder mockOrder;
     private RepairTask mockTask;
@@ -342,5 +344,129 @@ class LaborExecutionServiceTest {
         assertThat(openSession.getStopReason()).isEqualTo(StopReason.COMPLETE);
         assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.WAITING_QC);
         verify(repairOrderRepository).save(mockOrder);
+    }
+
+    // =========================================================================
+    // Phân công kỹ thuật viên QC cho phiếu đang chờ QC
+    // =========================================================================
+
+    private com.Group13_65CNTT.AutoGarage.repair.dto.request.QcAssignmentRequest qcRequest(long employeeId) {
+        Instant startsAt = Instant.now();
+        return com.Group13_65CNTT.AutoGarage.repair.dto.request.QcAssignmentRequest.builder()
+                .employeeId(employeeId).startsAt(startsAt).endsAt(startsAt.plus(1, ChronoUnit.HOURS)).build();
+    }
+
+    private void orderWaitingQcWithCompletedTask() {
+        mockOrder.setStatus(RepairOrderStatus.WAITING_QC);
+        mockTask.setStatus(TaskStatus.COMPLETED);
+        lenient().when(repairTaskRepository.findByRepairOrderId(100L)).thenReturn(List.of(mockTask));
+        mockEmployee.setCanQc(true);
+        lenient().when(employeeRepository.findById(5L)).thenReturn(Optional.of(mockEmployee));
+    }
+
+    @Test
+    @DisplayName("Phân công QC thành công khi phiếu chờ QC: tạo phân công vai trò QC gắn vào công việc cuối")
+    void assignQcInspector_Success() {
+        orderWaitingQcWithCompletedTask();
+        when(taskAssignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of());
+        when(taskAssignmentRepository.findOverlappingAssignments(eq(5L), any(), any())).thenReturn(List.of());
+        when(shiftRepository.coversAssignment(eq(5L), any(), any())).thenReturn(true);
+        when(taskAssignmentMapper.toEntity(any(TaskAssignmentRequest.class))).thenReturn(mockAssignment);
+        when(taskAssignmentRepository.save(any(TaskAssignment.class))).thenReturn(mockAssignment);
+        when(taskAssignmentMapper.toResponse(mockAssignment))
+                .thenReturn(TaskAssignmentResponse.builder().id(1L).taskId(10L).employeeId(5L).build());
+
+        TaskAssignmentResponse result = laborExecutionService.assignQcInspector(1L, 100L, qcRequest(5L));
+
+        assertThat(result.getEmployeeId()).isEqualTo(5L);
+        org.mockito.ArgumentCaptor<TaskAssignmentRequest> mapped =
+                org.mockito.ArgumentCaptor.forClass(TaskAssignmentRequest.class);
+        verify(taskAssignmentMapper).toEntity(mapped.capture());
+        assertThat(mapped.getValue().getAssignmentRole()).isEqualTo(AssignmentRole.QC);
+        verify(workLogRecorder, never()).start(any(), any(), any(), any(), any(), any());
+        assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.WAITING_QC);
+    }
+
+    @Test
+    @DisplayName("Đổi người QC: phân công QC cũ được giải phóng trước khi tạo phân công mới")
+    void assignQcInspector_ReplacesPreviousInspector() {
+        orderWaitingQcWithCompletedTask();
+        TaskAssignment previous = TaskAssignment.builder().id(9L).taskId(10L).employeeId(7L)
+                .assignmentRole(AssignmentRole.QC).isActive(true).build();
+        when(taskAssignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of(previous));
+        when(taskAssignmentRepository.findOverlappingAssignments(eq(5L), any(), any())).thenReturn(List.of());
+        when(shiftRepository.coversAssignment(eq(5L), any(), any())).thenReturn(true);
+        when(taskAssignmentMapper.toEntity(any(TaskAssignmentRequest.class))).thenReturn(mockAssignment);
+        when(taskAssignmentRepository.save(any(TaskAssignment.class))).thenReturn(mockAssignment);
+        when(taskAssignmentMapper.toResponse(mockAssignment)).thenReturn(TaskAssignmentResponse.builder().id(1L).build());
+
+        laborExecutionService.assignQcInspector(1L, 100L, qcRequest(5L));
+
+        assertThat(previous.getIsActive()).isFalse();
+        assertThat(previous.getReleasedAt()).isNotNull();
+        verify(taskAssignmentRepository).saveAll(List.of(previous));
+    }
+
+    @Test
+    @DisplayName("Không phân công QC khi phiếu chưa ở trạng thái chờ QC")
+    void assignQcInspector_RejectsWhenNotWaitingQc() {
+        orderWaitingQcWithCompletedTask();
+        mockOrder.setStatus(RepairOrderStatus.IN_PROGRESS);
+
+        assertThatThrownBy(() -> laborExecutionService.assignQcInspector(1L, 100L, qcRequest(5L)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("chờ QC");
+        verify(taskAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Không phân công QC khi phiếu chưa có công việc")
+    void assignQcInspector_RejectsWhenNoTasks() {
+        mockOrder.setStatus(RepairOrderStatus.WAITING_QC);
+        when(repairTaskRepository.findByRepairOrderId(100L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> laborExecutionService.assignQcInspector(1L, 100L, qcRequest(5L)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("chưa có công việc");
+        verify(taskAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Thợ chính của phiếu không được làm kỹ thuật viên QC")
+    void assignQcInspector_RejectsMainRepairer() {
+        orderWaitingQcWithCompletedTask();
+        when(workLogRepository.findByRepairOrderIdAndAssignmentStage(100L, AssignmentStage.REPAIR_MAIN))
+                .thenReturn(List.of(RepairOrderAssignment.builder().employeeId(5L).build()));
+
+        assertThatThrownBy(() -> laborExecutionService.assignQcInspector(1L, 100L, qcRequest(5L)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("Thợ chính");
+        verify(taskAssignmentRepository, never()).saveAll(any());
+        verify(taskAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Nhân viên không có quyền QC không được phân công QC")
+    void assignQcInspector_RejectsEmployeeWithoutCanQc() {
+        orderWaitingQcWithCompletedTask();
+        mockEmployee.setCanQc(false);
+        when(taskAssignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> laborExecutionService.assignQcInspector(1L, 100L, qcRequest(5L)))
+                .isInstanceOf(BusinessRuleException.class).hasMessageContaining("can_qc");
+        verify(taskAssignmentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Lấy phân công QC đang hoạt động: có tên kỹ thuật viên, và null khi chưa có")
+    void getQcAssignment_ReturnsActiveOrNull() {
+        TaskAssignment active = TaskAssignment.builder().id(9L).taskId(10L).employeeId(5L)
+                .assignmentRole(AssignmentRole.QC).isActive(true).build();
+        when(taskAssignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of(active));
+        when(taskAssignmentMapper.toResponse(active))
+                .thenReturn(TaskAssignmentResponse.builder().id(9L).employeeId(5L).build());
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(mockEmployee));
+
+        assertThat(laborExecutionService.getQcAssignment(100L).getId()).isEqualTo(9L);
+
+        when(taskAssignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of());
+        assertThat(laborExecutionService.getQcAssignment(100L)).isNull();
     }
 }

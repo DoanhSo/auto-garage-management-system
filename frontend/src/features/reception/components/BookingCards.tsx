@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { Booking, BookingStatus } from '../../../shared/types/contracts';
 import { Button, Empty } from '../../../shared/components/ui';
-import { formatDateTime } from '../../../shared/utils/format';
+import { formatDateTime, formatPlate } from '../../../shared/utils/format';
 
 export function BookingStatusBadge({ status }: { status: BookingStatus }) {
   switch (status) {
@@ -60,7 +60,7 @@ export function BookingCards({
         <li key={b.id}>
           <div className="user-card-top">
             <span className="code-tag">#{b.bookingCode}</span>
-            <span className="plate-badge">{b.licensePlate}</span>
+            <span className="plate-badge">{formatPlate(b.licensePlate)}</span>
             <div style={{ marginLeft: 'auto' }}>
               <BookingStatusBadge status={b.status} />
             </div>
@@ -113,7 +113,7 @@ export function BookingCards({
               {canManage && b.status === 'CONFIRMED' && (
                 <Button
                   variant="primary"
-                  aria-label={`Tiếp nhận xe ${b.licensePlate} vào xưởng`}
+                  aria-label={`Tiếp nhận xe ${formatPlate(b.licensePlate)} vào xưởng`}
                   onClick={() => onCheckIn(b)}
                 >
                   <LogIn size={16} />

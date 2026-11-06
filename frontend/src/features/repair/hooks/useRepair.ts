@@ -158,6 +158,34 @@ export function useAssignTaskMutation() {
   });
 }
 
+export function useQcAssignmentQuery(orderId: string | number | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['qc-assignment', orderId],
+    queryFn: () => repairApi.getQcAssignment(orderId as string | number),
+    enabled: !!orderId && enabled,
+  });
+}
+
+export function useAssignQcInspectorMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      orderId,
+      ...data
+    }: {
+      orderId: string | number;
+      employeeId: string | number;
+      startsAt: string;
+      endsAt: string;
+    }) => repairApi.assignQcInspector(orderId, data),
+    onSuccess: (_, { orderId }) => {
+      void qc.invalidateQueries({ queryKey: ['qc-assignment', orderId] });
+      void qc.invalidateQueries({ queryKey: ['on-shift-technicians'] });
+      void qc.invalidateQueries({ queryKey: ['repair-order', orderId] });
+    },
+  });
+}
+
 export function useReleaseAssignmentMutation() {
   const refresh = useRefreshTaskWork();
   return useMutation({

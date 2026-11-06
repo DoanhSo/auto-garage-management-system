@@ -10,6 +10,7 @@ import {
   Car,
   ShieldCheck,
   UserCheck,
+  UserPlus,
   Fuel,
   Calendar,
   AlertTriangle,
@@ -20,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
-import { FRONT_DESK_ROLES, TECHNICAL_ROLES } from '../../../app/access';
+import { FRONT_DESK_ROLES, QC_ROLES, TECHNICAL_ROLES } from '../../../app/access';
 import { useVehicleQuery } from '../../vehicle/hooks/useVehicles';
 import {
   useOnShiftTechniciansQuery,
@@ -41,6 +42,7 @@ import type { RepairOrderStatus, RepairTask } from '../types/repairTypes';
 import {
   useRepairOrderQuery,
   useRepairTasksQuery,
+  useQcAssignmentQuery,
   useUpdateDiagnosisMutation,
   useUpdateRepairOrderMutation,
   useTransitionStatusMutation,
@@ -55,6 +57,7 @@ import { useQualityChecksQuery } from '../../quality/hooks/useQuality';
 import { RepairOrderStatusBadge } from './RepairOrderCards';
 import { REPAIR_STATUS_LABELS } from './RepairOrderFilters';
 import { CreateTaskModal } from './CreateTaskModal';
+import { AssignQcModal } from './AssignQcModal';
 import { AssignTaskModal } from './AssignTaskModal';
 import { TaskWorkPanel } from './TaskWorkPanel';
 import { CreateEstimateModal } from './CreateEstimateModal';
@@ -88,6 +91,7 @@ export function RepairOrderDetailModal({
   const { user } = useAuth();
   const isCustomer = user?.role === 'CUSTOMER';
   const canTechnical = !!user && TECHNICAL_ROLES.includes(user.role);
+  const canPerformQc = !!user && QC_ROLES.includes(user.role);
   const canFrontDesk = !!user && FRONT_DESK_ROLES.includes(user.role);
   const canDecideEstimate = isCustomer || canFrontDesk;
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -104,6 +108,7 @@ export function RepairOrderDetailModal({
   const [createEstimateOpen, setCreateEstimateOpen] = useState(false);
   const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [performQCOpen, setPerformQCOpen] = useState(false);
+  const [assignQcOpen, setAssignQcOpen] = useState(false);
   const [handoverOpen, setHandoverOpen] = useState(false);
 
   // Queries
@@ -129,6 +134,10 @@ export function RepairOrderDetailModal({
     : allEstimates;
   const { data: qcChecks = [], isLoading: isLoadingQC } = useQualityChecksQuery(
     open ? orderId : null,
+  );
+  const { data: qcAssignment } = useQcAssignmentQuery(
+    open ? orderId : null,
+    !isCustomer && order?.status === 'WAITING_QC',
   );
   const { data: vehicleChecks = [] } = useVehicleChecksQuery(open ? orderId : null);
   const [vehicleCheckOpen, setVehicleCheckOpen] = useState(false);
@@ -328,12 +337,11 @@ export function RepairOrderDetailModal({
                     <ArrowRight size={15} /> Yêu cầu kiểm tra QC
                   </Button>
                 )}
-                {canTechnical &&
-                  (order.status === 'WAITING_QC' || order.status === 'QC_FAILED') && (
-                    <Button variant="primary" onClick={() => setPerformQCOpen(true)}>
-                      <ShieldCheck size={15} /> Kiểm tra chất lượng (QC)
-                    </Button>
-                  )}
+                {canPerformQc && order.status === 'WAITING_QC' && (
+                  <Button variant="primary" onClick={() => setPerformQCOpen(true)}>
+                    <ShieldCheck size={15} /> Kiểm tra chất lượng (QC)
+                  </Button>
+                )}
                 {canFrontDesk && order.status === 'COMPLETED' && (
                   <Button variant="primary" onClick={() => setHandoverOpen(true)}>
                     <UserCheck size={15} /> Bàn giao xe
@@ -895,6 +903,24 @@ export function RepairOrderDetailModal({
             {/* TAB 4: QUALITY CHECK (QC) */}
             {activeTab === 'qc' && (
               <div className="space-y-4 pt-1">
+                {canTechnical && order.status === 'WAITING_QC' && (
+                  <div className="row-actions" aria-label="Kỹ thuật viên QC được phân công">
+                    <span className="text-sm">
+                      Kỹ thuật viên QC được phân công:{' '}
+                      <strong>
+                        {qcAssignment
+                          ? (qcAssignment.employeeName ?? `NV #${qcAssignment.employeeId}`)
+                          : 'Chưa phân công'}
+                      </strong>
+                    </span>
+                    <span className="grow" />
+                    {canFrontDesk && (
+                      <Button variant="secondary" onClick={() => setAssignQcOpen(true)}>
+                        <UserPlus size={14} /> {qcAssignment ? 'Đổi người' : 'Phân công QC'}
+                      </Button>
+                    )}
+                  </div>
+                )}
                 {canTechnical && (
                   <p className="text-xs muted" aria-label="Thợ QC đủ điều kiện">
                     Thợ QC đủ điều kiện đang trực ca:{' '}
@@ -909,7 +935,7 @@ export function RepairOrderDetailModal({
                   <span className="text-sm font-semibold">
                     Biên bản kiểm tra chất lượng xuất xưởng ({qcChecks.length})
                   </span>
-                  {canTechnical && qcChecks.length > 0 && (
+                  {canPerformQc && order.status === 'WAITING_QC' && qcChecks.length > 0 && (
                     <Button variant="primary" onClick={() => setPerformQCOpen(true)}>
                       <ShieldCheck size={15} /> Bắt đầu kiểm tra QC
                     </Button>
@@ -923,7 +949,7 @@ export function RepairOrderDetailModal({
                     title="Chưa có biên bản kiểm tra chất lượng"
                     description="Kỹ thuật viên QC sẽ tiến hành kiểm tra xe sau khi hoàn tất các hạng mục sửa chữa."
                     action={
-                      canTechnical ? (
+                      canPerformQc && order.status === 'WAITING_QC' ? (
                         <Button variant="primary" onClick={() => setPerformQCOpen(true)}>
                           <ShieldCheck size={15} /> Bắt đầu kiểm tra QC
                         </Button>
@@ -1083,6 +1109,11 @@ export function RepairOrderDetailModal({
         orderId={order?.id || ''}
         open={performQCOpen}
         onClose={() => setPerformQCOpen(false)}
+      />
+      <AssignQcModal
+        orderId={order?.id || ''}
+        open={assignQcOpen}
+        onClose={() => setAssignQcOpen(false)}
       />
       {order && (
         <HandoverModal order={order} open={handoverOpen} onClose={() => setHandoverOpen(false)} />

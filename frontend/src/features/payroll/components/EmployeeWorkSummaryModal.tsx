@@ -1,6 +1,6 @@
 import { Badge, Loading, Modal, QueryError } from '../../../shared/components/ui';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
-import { formatDateTime } from '../../../shared/utils/format';
+import { formatDateTime, formatPlate } from '../../../shared/utils/format';
 import { assignmentStageLabels, workResultLabels } from '../../vehicle/types/workHistory';
 import { useEmployeeWorkSummaryQuery } from '../hooks/usePayroll';
 
@@ -61,7 +61,7 @@ export function EmployeeWorkSummaryModal({
                     <tr key={entry.id}>
                       <td>{formatDateTime(entry.startedAt)}</td>
                       <td>
-                        <strong>{entry.licensePlate ?? '—'}</strong>
+                        <strong>{entry.licensePlate ? formatPlate(entry.licensePlate) : '—'}</strong>
                         <div className="description">#{entry.orderCode ?? entry.repairOrderId}</div>
                       </td>
                       <td>

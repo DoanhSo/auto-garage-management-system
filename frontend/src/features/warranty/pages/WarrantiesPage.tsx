@@ -13,7 +13,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { Badge, Button, PageHeader, Loading, QueryError } from '../../../shared/components/ui';
 import { DataTable } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
-import { formatDate, formatDateTime } from '../../../shared/utils/format';
+import { formatDate, formatDateTime, formatPlate } from '../../../shared/utils/format';
 import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
@@ -145,7 +145,7 @@ export function WarrantiesPage() {
           return (
             <div className="account-cell">
               <div>
-                <strong>{v?.licensePlate ?? `Xe #${row.original.vehicleId}`}</strong>
+                <strong>{v ? formatPlate(v.licensePlate) : `Xe #${row.original.vehicleId}`}</strong>
                 <span>
                   {v ? `${v.brand} ${v.model}` : ''}
                   {(v?.customerName ?? c?.fullName) && ` · ${v?.customerName ?? c?.fullName}`}
@@ -453,7 +453,7 @@ export function WarrantiesPage() {
                 >
                   {vehicles.map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.licensePlate} ({v.brand} {v.model}){v.isActive ? '' : ' · ngừng theo dõi'}
+                      {formatPlate(v.licensePlate)} ({v.brand} {v.model}){v.isActive ? '' : ' · ngừng theo dõi'}
                     </option>
                   ))}
                 </select>

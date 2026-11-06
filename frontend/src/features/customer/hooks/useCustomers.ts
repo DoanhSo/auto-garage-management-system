@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { customerApi, type CustomerQueryParams } from '../api/customerApi';
-import type { CustomerCreate, CustomerUpdate } from '../../../shared/types/contracts';
+import type { Customer, CustomerCreate, CustomerUpdate } from '../../../shared/types/contracts';
 
 export const customerKeys = {
   all: ['customers'] as const,
@@ -26,11 +26,12 @@ export function useMyCustomerQuery(enabled = true) {
   });
 }
 
-export function useCustomerQuery(id: string | null) {
+export function useCustomerQuery(id: string | null, enabled = true) {
   return useQuery({
     queryKey: id ? customerKeys.detail(id) : ['customers', 'empty'],
     queryFn: ({ signal }) => (id ? customerApi.get(id, signal) : Promise.reject('No ID')),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && enabled,
+    refetchOnMount: 'always',
   });
 }
 
@@ -38,7 +39,8 @@ export function useCreateCustomerMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (values: CustomerCreate) => customerApi.create(values),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.setQueryData(customerKeys.detail(data.id), data);
       queryClient.invalidateQueries({ queryKey: customerKeys.all });
     },
   });
@@ -49,9 +51,13 @@ export function useUpdateCustomerMutation() {
   return useMutation({
     mutationFn: ({ id, values }: { id: string; values: CustomerUpdate }) =>
       customerApi.update(id, values),
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(customerKeys.detail(variables.id), data);
+      queryClient.setQueriesData({ queryKey: customerKeys.lists() }, (old: Customer[] | undefined) => {
+        if (!old) return old;
+        return old.map((c) => (c.id === variables.id ? data : c));
+      });
       queryClient.invalidateQueries({ queryKey: customerKeys.all });
-      queryClient.invalidateQueries({ queryKey: customerKeys.detail(variables.id) });
     },
   });
 }
@@ -60,7 +66,12 @@ export function useActivateCustomerMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => customerApi.activate(id),
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(customerKeys.detail(variables), data);
+      queryClient.setQueriesData({ queryKey: customerKeys.lists() }, (old: Customer[] | undefined) => {
+        if (!old) return old;
+        return old.map((c) => (c.id === variables ? data : c));
+      });
       queryClient.invalidateQueries({ queryKey: customerKeys.all });
     },
   });
@@ -70,8 +81,9 @@ export function useDeleteCustomerMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => customerApi.remove(id),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: customerKeys.all });
+      queryClient.invalidateQueries({ queryKey: customerKeys.detail(variables) });
     },
   });
 }

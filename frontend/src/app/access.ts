@@ -11,6 +11,7 @@ export const WAREHOUSE_ROLES: readonly Role[] = ['ADMIN', 'WAREHOUSE_STAFF'];
 export const FINANCE_ROLES: readonly Role[] = ['ADMIN', 'RECEPTIONIST', 'WAREHOUSE_STAFF'];
 export const FRONT_DESK_ROLES: readonly Role[] = ['ADMIN', 'RECEPTIONIST'];
 export const TECHNICAL_ROLES: readonly Role[] = ['ADMIN', 'RECEPTIONIST', 'TECHNICIAN'];
+export const QC_ROLES: readonly Role[] = ['ADMIN', 'TECHNICIAN'];
 export const ESTIMATE_VIEW_ROLES: readonly Role[] = [...TECHNICAL_ROLES, 'CUSTOMER'];
 export const SCHEDULING_ROLES: readonly Role[] = TECHNICAL_ROLES;
 export const WARRANTY_ROLES: readonly Role[] = [...TECHNICAL_ROLES, 'CUSTOMER'];

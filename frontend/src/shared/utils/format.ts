@@ -10,6 +10,24 @@ export function hours(value: string): string {
   return new Decimal(value).toFixed(2).replace('.', ',') + ' giờ';
 }
 
+export function formatPlate(value?: string | null): string {
+  if (!value) return '';
+  const clean = value.trim().toUpperCase().replace(/\s+/g, '');
+  const car5Match = clean.match(/^(\d{2}[A-Z]{1,2})[-.]?(\d{3})[-.]?(\d{2})$/);
+  if (car5Match) {
+    return car5Match[1] + '-' + car5Match[2] + '.' + car5Match[3];
+  }
+  const car4Match = clean.match(/^(\d{2}[A-Z]{1,2})[-.]?(\d{4})$/);
+  if (car4Match) {
+    return car4Match[1] + '-' + car4Match[2];
+  }
+  const moto5Match = clean.match(/^(\d{2}[A-Z]\d|\d{2}-[A-Z]\d)[-.]?(\d{3})[-.]?(\d{2})$/);
+  if (moto5Match) {
+    const prefix = moto5Match[1].replace('-', '');
+    return prefix + '-' + moto5Match[2] + '.' + moto5Match[3];
+  }
+  return clean;
+}
 export function dateTime(value: string, zone?: string): string {
   const date = new Date(value);
   return Number.isNaN(date.valueOf())

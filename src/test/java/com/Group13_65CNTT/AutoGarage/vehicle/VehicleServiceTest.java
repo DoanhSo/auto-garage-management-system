@@ -95,7 +95,7 @@ class VehicleServiceTest {
     @DisplayName("TV2-02: Tạo phương tiện thành công và chuẩn hóa biển số")
     void testCreateVehicle_Success() {
         when(customerRepository.findById(10L)).thenReturn(Optional.of(owner));
-        when(vehicleRepository.existsByLicensePlate("51F12345")).thenReturn(false);
+        when(vehicleRepository.existsByLicensePlate("51F-123.45")).thenReturn(false);
         when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(invocation -> {
             Vehicle v = invocation.getArgument(0);
             v.setId(100L);
@@ -106,7 +106,7 @@ class VehicleServiceTest {
 
         assertNotNull(response);
         assertEquals(100L, response.getId());
-        assertEquals("51F12345", response.getLicensePlate());
+        assertEquals("51F-123.45", response.getLicensePlate());
         assertEquals("Tran Van Chu Xe", response.getCustomerName());
         verify(vehicleRepository, times(1)).save(any(Vehicle.class));
     }
@@ -115,7 +115,7 @@ class VehicleServiceTest {
     @DisplayName("TV2-02: Báo lỗi khi biển số xe đã tồn tại")
     void testCreateVehicle_DuplicatePlate() {
         when(customerRepository.findById(10L)).thenReturn(Optional.of(owner));
-        when(vehicleRepository.existsByLicensePlate("51F12345")).thenReturn(true);
+        when(vehicleRepository.existsByLicensePlate("51F-123.45")).thenReturn(true);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> vehicleService.createVehicle(createReq));
         assertEquals(ResponseCode.VEHICLE_PLATE_DUPLICATE, ex.getResponseCode());
@@ -144,6 +144,33 @@ class VehicleServiceTest {
 
         BusinessRuleException ex = assertThrows(BusinessRuleException.class, () -> vehicleService.updateVehicle(100L, updateReq));
         assertTrue(ex.getMessage().contains("không được nhỏ hơn"));
+    }
+
+    @Test
+    @DisplayName("TV2-02: Cập nhật phương tiện giữ nguyên biển số có định dạng khi request không truyền hoặc truyền cùng biển")
+    void testUpdateVehicle_PreservesFormattedPlate() {
+        Vehicle existing = new Vehicle();
+        existing.setId(100L);
+        existing.setCustomerId(10L);
+        existing.setLicensePlate("14A-567.89");
+        existing.setBrand("Toyota");
+        existing.setModel("Corolla Cross");
+        existing.setOdometer(20000);
+
+        when(vehicleRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(existing));
+        when(customerRepository.findById(10L)).thenReturn(Optional.of(owner));
+        when(vehicleRepository.save(any(Vehicle.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateVehicleRequest updateReq = new UpdateVehicleRequest();
+        updateReq.setBrand("Toyota");
+        updateReq.setModel("Corolla Cross Updated");
+        updateReq.setOdometer(25000);
+
+        VehicleResponse response = vehicleService.updateVehicle(100L, updateReq);
+        assertNotNull(response);
+        assertEquals("14A-567.89", response.getLicensePlate());
+        assertEquals("Corolla Cross Updated", response.getModel());
+        assertEquals(25000, response.getOdometer());
     }
 
     @Test
@@ -212,7 +239,7 @@ class VehicleServiceTest {
 
         assertNotNull(timeline);
         assertEquals(100L, timeline.getVehicleId());
-        assertEquals("51F12345", timeline.getLicensePlate());
+        assertEquals("51F-123.45", timeline.getLicensePlate());
         assertEquals("Tran Van Chu Xe", timeline.getCurrentCustomerName());
     }
 

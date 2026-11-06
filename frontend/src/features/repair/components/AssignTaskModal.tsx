@@ -6,20 +6,13 @@ import { useOnShiftTechniciansQuery } from '../../scheduling/hooks/useScheduling
 import { SKILL_LABELS, availabilityLabels } from '../../scheduling/types/scheduling';
 import { useAssignTaskMutation } from '../hooks/useRepair';
 import type { AssignmentRole, RepairTask } from '../types/repairTypes';
-
-/** Mặc định một phân công kéo dài 2 giờ nhưng không vượt quá hết ca của thợ. */
-const DEFAULT_ASSIGNMENT_HOURS = 2;
+import { DEFAULT_ASSIGNMENT_HOURS, toLocalInput } from '../utils/assignmentWindow';
 
 const roleLabels: Record<AssignmentRole, string> = {
   MAIN: 'Thợ chính',
   ASSISTANT: 'Thợ phụ',
   QC: 'Kiểm định chất lượng (QC)',
 };
-
-function toLocalInput(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
 
 export function AssignTaskModal({
   task,

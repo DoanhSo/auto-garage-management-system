@@ -1,3 +1,4 @@
+import { formatPlate } from '../../../shared/utils/format';
 import { useMemo, useState } from 'react';
 import {
   CalendarClock,
@@ -109,7 +110,7 @@ export function BookingTimelineBoard({
           </Button>
         </header>
         <div>
-          <span className="plate-badge">{booking.licensePlate}</span>
+          <span className="plate-badge">{formatPlate(booking.licensePlate)}</span>
           {booking.vehicleModel && <span className="muted"> {booking.vehicleModel}</span>}
         </div>
         <p>
@@ -133,7 +134,7 @@ export function BookingTimelineBoard({
           {canManage && booking.status === 'CONFIRMED' && (
             <Button
               variant="primary"
-              aria-label={`Tiếp nhận xe ${booking.licensePlate} vào xưởng`}
+              aria-label={`Tiếp nhận xe ${formatPlate(booking.licensePlate)} vào xưởng`}
               onClick={() => onCheckIn(booking)}
             >
               <LogIn size={14} />
@@ -272,11 +273,11 @@ export function BookingTimelineBoard({
                         }`.trim()}
                         aria-label={`Lịch hẹn ${booking.bookingCode} lúc ${localDateTime(
                           booking.appointmentAt,
-                        ).slice(11, 16)}, xe ${booking.licensePlate}`}
+                        ).slice(11, 16)}, xe ${formatPlate(booking.licensePlate)}`}
                         onClick={() => setFocusedId(booking.id)}
                       >
                         <strong>{localDateTime(booking.appointmentAt).slice(11, 16)}</strong>
-                        <span>{booking.licensePlate}</span>
+                        <span>{formatPlate(booking.licensePlate)}</span>
                         <small>{booking.customerName}</small>
                       </button>
                     ))}

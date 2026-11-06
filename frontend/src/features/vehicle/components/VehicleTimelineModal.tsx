@@ -5,7 +5,7 @@ import { Calendar, CheckCircle2, Clock, Gauge, Lock, Paperclip } from 'lucide-re
 import { Button, FormError, Loading, QueryError, Sheet } from '../../../shared/components/ui';
 import { VehicleWorkHistoryTab } from './VehicleWorkHistoryTab';
 import { useVehicleTimelineQuery } from '../hooks/useVehicles';
-import { money, formatDateTime } from '../../../shared/utils/format';
+import { money, formatDateTime, formatPlate } from '../../../shared/utils/format';
 
 export function VehicleTimelineModal({
   vehicleId,
@@ -47,7 +47,7 @@ export function VehicleTimelineModal({
       title="Dòng thời gian sửa chữa & bảo dưỡng"
       description={
         timeline
-          ? `Phương tiện: ${timeline.licensePlate} (${timeline.brand} ${timeline.model}) • ODO: ${timeline.currentOdometer.toLocaleString('vi-VN')} km`
+          ? `Phương tiện: ${formatPlate(timeline.licensePlate)} (${timeline.brand} ${timeline.model}) • ODO: ${timeline.currentOdometer.toLocaleString('vi-VN')} km`
           : 'Lịch sử bảo dưỡng và sửa chữa kỹ thuật của phương tiện'
       }
     >

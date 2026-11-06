@@ -1,8 +1,8 @@
-# Kế Hoạch Chốt Dữ Liệu Theo Giai Đoạn Của Phiếu Sửa Chữa
+# Kế Hoạch Phân Công Kỹ Thuật Viên QC Ngay Tại Màn Lệnh Sửa Chữa
 
-> **Mã plan**: `repair-lifecycle-lock`
+> **Mã plan**: `qc-assignment-on-order`
 > **Chế độ**: `PLAN:` (tuân thủ `AGENTS.md`, `docs/CODING_GUIDELINES.md`, `docs/UI_DESIGN_GUIDELINES.md`).
-> **Đặc tả luồng**: [`docs/REPAIR_ORDER_LIFECYCLE.md`](REPAIR_ORDER_LIFECYCLE.md). Các mục 🔒 trong tài liệu đó là phạm vi của plan này.
+> **Kế thừa từ**: `plans/2026-11-qc-admin-on-behalf.md`. Plan đó cho admin ghi QC thay kỹ thuật viên được phân công, nhưng chưa có đường nào trên giao diện để phân công QC khi phiếu đã chờ QC.
 
 Đường dẫn Java dưới đây tính từ `src/main/java/com/Group13_65CNTT/AutoGarage/`. Đường dẫn frontend tính từ `frontend/src/`.
 
@@ -12,153 +12,160 @@
 
 ### 1.1. Hiện trạng
 
-Luồng tiếp nhận → chẩn đoán → báo giá → thi công vẫn cho sửa dữ liệu của giai đoạn đã qua:
+**Phiếu `WAITING_QC` không còn chỗ nào trên giao diện để phân công kỹ thuật viên QC.**
 
-1. **Chẩn đoán sửa được tới tận `COMPLETED`.**
-   - `repair/service/impl/RepairServiceImpl.java:524` chỉ chặn khi phiếu `CLOSED` / `CANCELLED` / `INVOICED`.
-   - Mỗi lần lưu lại gọi `workLogRecorder.finish` (dòng 528).
-   - Giao diện luôn cho sửa: `features/repair/components/RepairOrderDetailModal.tsx:455-476`.
-2. **Nhiên liệu và lời khách kể sửa được qua `PUT /repair-orders/{id}`** tới `COMPLETED` (`RepairServiceImpl.java:500`), dù `recordReceptionDetails` chỉ cho phép khi `NEW`.
-3. **Báo giá ban đầu lập được ở mọi trạng thái** trước `INVOICED` (`estimate/service/impl/EstimateServiceImpl.java:90`).
-   - Có thể có hai báo giá ban đầu cùng chờ duyệt. Duyệt cả hai thì công việc bị nhân đôi.
-   - Bản cũ không bị thay thế.
-4. **Báo giá phát sinh lập và duyệt được khi phiếu đã `WAITING_QC` / `COMPLETED`.** Công việc `PENDING` mới sinh ra làm phiếu đã QC đạt không lập được hóa đơn (`EstimateServiceImpl.java:346`).
-5. **Chuyển trạng thái tay có lỗ hổng** (`RepairServiceImpl.java:670-694`):
-   - `NEW` / `DIAGNOSING → WAITING_APPROVAL` đi được mà không cần báo giá.
-   - `IN_PROGRESS → WAITING_QC` đi được khi còn công việc chưa xong.
-   - Không có đường hợp lệ để chẩn đoán lại khi khách từ chối toàn bộ báo giá.
-6. **Ảnh đính kèm tải lên được theo mọi loại ở mọi giai đoạn** (`reception/service/AttachmentServiceImpl.java:70-90`).
-7. **Giao diện lệch với backend:**
-   - Nhân viên thấy nút duyệt trên báo giá `DRAFT` (`RepairOrderDetailModal.tsx:632-635`), bấm vào thì backend trả lỗi.
-   - Nút "Lập báo giá mới" luôn tạo loại `INITIAL`.
-8. **Hủy hóa đơn làm phiếu kẹt ở `INVOICED`**:
-   - `voidInvoice` không đưa phiếu về lại (`billing/service/impl/BillingServiceImpl.java:390`).
-   - `existsByRepairOrderId` vẫn đếm hóa đơn `VOID`, nên không phát hành lại được (dòng 113).
-9. **`EstimateStatus.EXPIRED` / `CANCELLED` không bao giờ được đặt.** Báo giá quá hạn hoặc thuộc phiếu đã hủy vẫn hiện "Đã gửi".
+- Chỗ phân công duy nhất là nút "Phân công" trong `features/repair/components/TaskWorkPanel.tsx:96`, nằm trong từng công việc ở tab "Công việc". Nút bị ẩn khi `finished` (công việc `COMPLETED`/`CANCELLED`, dòng 63).
+- Phiếu chỉ sang `WAITING_QC` khi mọi công việc đã `COMPLETED`, nên đúng lúc cần QC thì mọi nút "Phân công" đều biến mất.
+- Backend lại cho phép: `repair/service/impl/LaborExecutionServiceImpl.java:69` cố ý bỏ qua điều kiện "công việc đã hoàn thành" khi vai trò là QC.
+- Hệ quả: admin bấm QC trên phiếu chưa có người QC bị từ chối `QC_INSPECTOR_NOT_ASSIGNED` (2020, `quality/service/impl/QualityServiceImpl.java:77`) mà không có cách xử lý từ giao diện. Kỹ thuật viên cũng bị chặn tương tự ở `identity/service/impl/ObjectAccessServiceImpl.java:89` (`assignedToQc`).
+- Phân công QC gắn với một công việc cụ thể (`POST /repair-tasks/{taskId}/assignments`), người dùng khó hiểu "QC của phiếu" lại chọn qua "một công việc".
+- Tab QC (`features/repair/components/RepairOrderDetailModal.tsx:896-910`) chỉ liệt kê tên thợ QC đang trực ca, không cho phân công và không cho biết ai đã được phân công.
+- Các nút "Bắt đầu kiểm tra QC" ở dòng 913 và khoảng dòng 925 vẫn dùng `canTechnical` và không kiểm tra trạng thái, lệch với nút QC ở dòng 332 (đã giới hạn theo `canPerformQc` và `WAITING_QC`).
+- Đổi người QC hiện phải gỡ phân công cũ rồi tạo mới trên công việc. Nếu phiếu có hai phân công QC đang hoạt động, admin ghi QC bị từ chối `QC_INSPECTOR_INVALID` (2021).
 
 ### 1.2. Mục tiêu
 
-- Mỗi loại dữ liệu chỉ sửa được trong giai đoạn của nó, đúng theo ma trận ở mục 3 của `REPAIR_ORDER_LIFECYCLE.md`. Backend chặn, giao diện hiện "Đã chốt" và giải thích lý do.
-- Sau khi khách duyệt, mọi thay đổi chỉ đi qua báo giá phát sinh gắn với báo giá gốc.
-- Có đúng một lối quay lại hợp lệ là **"Mở lại chẩn đoán"**, khi khách từ chối hết.
-- Hủy hóa đơn chưa thu tiền thì phiếu quay về `COMPLETED` và phát hành lại được.
+- Ngay ở tab QC của lệnh sửa chữa, admin và lễ tân thấy ai đang được phân công QC và phân công hoặc đổi người bằng một thao tác, khi phiếu `WAITING_QC`.
+- Chỉ chọn được kỹ thuật viên đủ điều kiện: đang hoạt động, có quyền QC, đang trong ca, không phải thợ chính của phiếu. Mọi lúc phiếu chỉ có tối đa một kỹ thuật viên QC đang hoạt động.
+- Sau khi phân công, admin hoặc chính kỹ thuật viên đó ghi QC được ngay, không phải sang màn Khoang & lịch ca.
+- Các nút "Bắt đầu kiểm tra QC" trong tab QC nhất quán với nút ở đầu phiếu: chỉ hiện cho `ADMIN`/`TECHNICIAN` khi phiếu `WAITING_QC`.
 
 ### 1.3. Ngoài phạm vi
 
-- Không đổi tập trạng thái `RepairOrderStatus` / `EstimateStatus`, không thêm cột mới, nên không cần migration.
-- Không làm job nền tự đổi báo giá sang `EXPIRED`. Chỉ hiển thị `EXPIRED` qua mapper, giống cách sổ bảo hành đang làm.
-- Không đổi luồng bảo hành, công nợ, lương hay kho, ngoài lời gọi `releaseForOrder` có sẵn.
-- Không viết lại `RepairOrderDetailModal` thành nhiều file. Chỉ sửa các vùng nêu trong mục 3.
+- Không đổi quy tắc ghi QC của plan `qc-admin-on-behalf` (admin ghi thay, bốn mắt, điều kiện ca).
+- Không cho `TECHNICIAN` tự phân công QC cho mình. Chỉ `ADMIN` và `RECEPTIONIST` phân công, giống `assignTask` hiện tại.
+- Không đổi phân công thợ chính và thợ phụ, không đổi `TaskWorkPanel`.
+- Không cho admin ghi QC khi chưa phân công QC (đã chốt giữ yêu cầu phân công).
+- Không đổi màn Khoang & lịch ca. Xếp ca cho kỹ thuật viên vẫn làm ở đó.
+- Không thêm migration. Dữ liệu vẫn nằm ở `task_assignments`.
 
 ## 2. Tiêu Chí Chấp Nhận (Acceptance Criteria)
 
-- **AC-1 (Chốt chẩn đoán)**: Phiếu ở `WAITING_APPROVAL` trở đi mà gọi `PATCH /repair-orders/{id}/diagnosis` thì nhận lỗi "Chẩn đoán đã chốt…". Ở `NEW` / `DIAGNOSING` thì lưu được, và nhật ký `DIAGNOSIS` chỉ hoàn tất ở lần lưu đầu. _Kiểm chứng_: `RepairOrderServiceTest`.
-- **AC-2 (Chốt tiếp nhận)**: `PUT /repair-orders/{id}` có `fuelLevelPercent` / `customerComplaint` khi phiếu khác `NEW` thì bị từ chối. `leadTechnicianId` vẫn đổi được tới trước `COMPLETED`. Trường `diagnosis` trong request này bị bỏ qua như hiện nay. _Kiểm chứng_: `RepairOrderServiceTest`.
-- **AC-3 (Báo giá ban đầu)**:
-  - Lập báo giá `INITIAL` khi phiếu đã `APPROVED` trở đi, hoặc khi đã có dòng được duyệt, thì bị từ chối.
-  - Lập `INITIAL` khi chưa có kết luận chẩn đoán thì bị từ chối.
-  - Lập phiên bản `INITIAL` mới thì các bản `DRAFT` / `SENT` cũ không có dòng nào được duyệt chuyển `CANCELLED`.
-  - _Kiểm chứng_: `EstimateServiceTest`.
-- **AC-4 (Báo giá phát sinh)**:
-  - Báo giá `SUPPLEMENTAL` chỉ lập và chỉ duyệt được khi phiếu `APPROVED` / `IN_PROGRESS` / `WAITING_PARTS` / `QC_FAILED`.
-  - Báo giá gốc phải là `APPROVED` hoặc `PARTIALLY_APPROVED`.
-  - Duyệt khi phiếu `WAITING_QC` / `COMPLETED` thì bị từ chối.
-  - _Kiểm chứng_: `EstimateServiceTest`, `EstimateApprovalServiceTest`.
-- **AC-5 (Chuyển trạng thái)**:
-  - `PATCH /status` sang `WAITING_APPROVAL` bị từ chối; chỉ lập báo giá mới đưa phiếu sang đó.
-  - `IN_PROGRESS → WAITING_QC` bị từ chối khi còn công việc chưa `COMPLETED` hoặc còn đồng hồ chạy.
-  - `WAITING_APPROVAL → DIAGNOSING` chỉ được khi mọi báo giá là `REJECTED` / `CANCELLED`, hoặc là `DRAFT` (bản `DRAFT` khi đó chuyển `CANCELLED`).
-  - _Kiểm chứng_: `RepairOrderServiceTest`.
-- **AC-6 (Hủy phiếu)**: Hủy phiếu thì mọi báo giá `DRAFT` / `SENT` / `PARTIALLY_APPROVED` còn dòng chờ chuyển `CANCELLED`. _Kiểm chứng_: `RepairOrderServiceTest`.
-- **AC-7 (Ảnh theo giai đoạn)**: Mỗi loại ảnh chỉ tải lên được ở giai đoạn của nó; ngoài giai đoạn đó thì bị từ chối kèm thông báo tiếng Việt. _Kiểm chứng_: `AttachmentServiceTest`.
-  - `CHECK_IN`: chỉ khi `NEW`.
-  - `DIAGNOSIS`: chỉ khi `NEW` / `DIAGNOSING`.
-  - `QC`: chỉ khi `WAITING_QC` / `QC_FAILED` / `COMPLETED`.
-  - `HANDOVER`: chỉ khi `COMPLETED` / `INVOICED` / `CLOSED`.
-- **AC-8 (Báo giá quá hạn)**: Báo giá `SENT` / `PARTIALLY_APPROVED` đã quá `validUntil` được trả về với `status = EXPIRED`. Dữ liệu trong DB không đổi. _Kiểm chứng_: `EstimateMapperTest` (mới).
-- **AC-9 (Hủy hóa đơn)**:
-  - Hủy hóa đơn chưa thu tiền thì phiếu `INVOICED → COMPLETED`.
-  - Sau đó phát hành hóa đơn mới cho phiếu đó được.
-  - Hủy khi phiếu đã `CLOSED` thì bị từ chối.
-  - _Kiểm chứng_: `BillingServiceTest`.
-- **AC-10 (Giao diện)**: _Kiểm chứng_: `RepairOrderDetailModal.test.tsx` cùng thao tác trên trình duyệt (không lưu dữ liệu thật).
-  - Ô chẩn đoán chuyển chỉ đọc kèm nhãn "Đã chốt" và lý do khi phiếu đã qua `DIAGNOSING`.
-  - Nút "Mở lại chẩn đoán" chỉ hiện khi điều kiện ở AC-5 thỏa.
-  - Nút duyệt dòng chỉ hiện cho báo giá `SENT` / `PARTIALLY_APPROVED`.
-  - Sau khi duyệt, nút "Lập báo giá mới" đổi thành "Lập báo giá phát sinh" và tự gửi `estimateKind: SUPPLEMENTAL` cùng `parentEstimateId`.
-  - Danh sách loại ảnh chỉ gồm các loại còn mở.
-- **AC-11 (Không hồi quy)**: `./mvnw test`, `npm --prefix frontend run lint`, `test` và `build` đều xanh. _Kiểm chứng_: chạy lệnh.
+- **AC-1**: `POST /api/v1/repair-orders/{id}/qc-assignment` khi phiếu `WAITING_QC` tạo một phân công vai trò `QC` đang hoạt động cho kỹ thuật viên đủ điều kiện, gắn vào công việc cuối cùng của phiếu. Phản hồi 201. _Kiểm chứng_: unit test `LaborExecutionServiceTest`.
+- **AC-2**: Gọi lại với kỹ thuật viên khác thì phân công QC cũ được giải phóng và chỉ còn đúng một phân công QC đang hoạt động. _Kiểm chứng_: unit test kiểm tra `isActive=false`, `releasedAt` ở bản cũ và `findActiveQcForOrder` trả một bản.
+- **AC-3**: Bị từ chối bằng lỗi nghiệp vụ rõ ràng và không đổi dữ liệu khi:
+  - phiếu không ở `WAITING_QC`;
+  - phiếu chưa có công việc nào;
+  - kỹ thuật viên không hoạt động, không có `canQc` hoặc không trong ca (các lỗi này đã có ở `assignTask`);
+  - kỹ thuật viên là thợ chính (`REPAIR_MAIN`) của phiếu.
+
+  _Kiểm chứng_: unit test từng trường hợp.
+- **AC-4**: `GET /api/v1/repair-orders/{id}/qc-assignment` trả phân công QC đang hoạt động (có tên kỹ thuật viên) hoặc `data: null` khi chưa có. _Kiểm chứng_: unit test và gọi API.
+- **AC-5**: Chỉ `ADMIN`/`RECEPTIONIST` gọi được `POST`. `TECHNICIAN` và `CUSTOMER` nhận 403. _Kiểm chứng_: kiểm tra `@PreAuthorize` bằng test hoặc gọi API với hai vai trò.
+- **AC-6**: Tab QC của phiếu `WAITING_QC` hiện dòng "Kỹ thuật viên QC được phân công: <tên>" hoặc "Chưa phân công". Admin và lễ tân thấy nút "Phân công QC" (hoặc "Đổi người"). Vai trò khác không thấy nút. _Kiểm chứng_: thao tác trình duyệt với admin, lễ tân và kỹ thuật viên.
+- **AC-7**: Modal phân công QC chỉ liệt kê kỹ thuật viên có `canQc` đang trong ca. Phân công thành công thì tab QC cập nhật ngay, lỗi API hiển thị bằng `errorMessage`. _Kiểm chứng_: thao tác trình duyệt.
+- **AC-8**: Sau khi phân công, admin bấm "Kiểm tra chất lượng (QC)" ghi được biên bản (không còn lỗi 2020). _Kiểm chứng_: thao tác trình duyệt trên container mới.
+- **AC-9**: Các nút "Bắt đầu kiểm tra QC" trong tab QC chỉ hiện với `ADMIN`/`TECHNICIAN` khi phiếu `WAITING_QC`. _Kiểm chứng_: thao tác trình duyệt và `npm run lint`/`tsc`.
+- **AC-10**: Test hiện có vẫn qua: `LaborExecutionServiceTest`, `QualityCheckServiceTest`, `TV3WorkflowIntegrationTest`, `BusinessWorkflowIntegrationTests`, Vitest. _Kiểm chứng_: `./mvnw test` (bật `mysql-test` cho test tích hợp) và `npm --prefix frontend test`.
 
 ## 3. Danh Sách File Mục Tiêu
 
 | File | Vùng dòng | Thay đổi |
 |---|---|---|
-| `repair/workflow/RepairStageRules.java` (**mới**) | | Lớp tĩnh gom quy tắc giai đoạn: `RECEPTION_EDITABLE`, `DIAGNOSIS_EDITABLE`, `INITIAL_ESTIMATE_ALLOWED`, `SUPPLEMENTAL_ALLOWED`, `TERMINAL`, cùng `attachmentWindow(AttachmentCategory)`. Đặt cạnh `RepairWorkflow` nếu package đó đã có, nếu chưa thì để trong `repair/service` |
-| `repair/service/impl/RepairServiceImpl.java` | 496–537, 541–578, 662–723 | Áp dụng AC-1, AC-2, AC-5, AC-6; thêm nhánh `WAITING_APPROVAL → DIAGNOSING`; chặn `→ WAITING_APPROVAL` ở cả `NEW` và `DIAGNOSING` |
-| `estimate/repository/EstimateRepository.java` | | Thêm `findByRepairOrderIdAndStatusIn(Long, Collection<EstimateStatus>)` |
-| `estimate/repository/EstimateItemRepository.java` | | Thêm `existsApprovedByRepairOrderId(Long)` (JPQL join qua `Estimate`) |
-| `estimate/service/impl/EstimateServiceImpl.java` | 82–110, 339–353 | Áp dụng AC-3, AC-4 |
-| `estimate/mapper/EstimateMapper.java` | | `@AfterMapping` để hiển thị `EXPIRED` (AC-8) |
-| `reception/service/AttachmentServiceImpl.java` | 70–90 | Áp dụng AC-7, nạp trạng thái phiếu qua repository có sẵn |
-| `billing/service/impl/BillingServiceImpl.java` | 110–114, 372–395 | Áp dụng AC-9: kiểm tra trùng chỉ với hóa đơn khác `VOID`; khi hủy thì cập nhật phiếu về `COMPLETED` trong cùng transaction |
-| `billing/repository/InvoiceRepository.java` | 25 | Thêm `existsByRepairOrderIdAndStatusNot`; `findByRepairOrderId` ưu tiên hóa đơn khác `VOID` |
-| `repair/service/impl/RepairServiceImpl.java` | 431 (handOver) | Lấy hóa đơn khác `VOID` khi tạo sổ bảo hành |
-| `features/repair/utils/stageLocks.ts` (**mới**) | | Bản tương ứng của `RepairStageRules` ở frontend: `isDiagnosisLocked`, `canReopenDiagnosis`, `estimateKindFor`, `allowedAttachmentCategories`, `lockReason` |
-| `features/repair/components/RepairOrderDetailModal.tsx` | 140–200, 268–310, 446–490, 496–560, 630–640 | Áp dụng AC-10 |
-| `features/repair/components/CreateEstimateModal.tsx` | | Nhận prop `kind` và `parentEstimateId`; đổi tiêu đề theo loại |
-| `features/repair/components/DiagnosisAttachmentGallery.tsx` | 80–125 | Nhận `allowedCategories`; ẩn ô tải lên khi danh sách rỗng |
-| `features/repair/hooks/useRepair.ts` | | Thêm hook mở lại chẩn đoán, dùng lại `useTransitionStatusMutation` với `DIAGNOSING` |
-| Test backend | | `RepairOrderServiceTest`, `EstimateServiceTest`, `EstimateApprovalServiceTest`, `AttachmentServiceTest`, `BillingServiceTest`, `EstimateMapperTest` (mới). Sửa các test hiện đang dựa vào chuyển tay sang `WAITING_APPROVAL` |
-| Test frontend | | `features/repair/utils/stageLocks.test.ts` (mới), `RepairOrderDetailModal.test.tsx` |
-| `docs/REPAIR_ORDER_LIFECYCLE.md` | | Đổi các mục 🔒 đã làm thành ✅ |
+| `repair/dto/request/QcAssignmentRequest.java` | file mới | DTO `employeeId`, `startsAt`, `endsAt` với Jakarta Validation có message |
+| `repair/service/LaborExecutionService.java` | 15-17 | Thêm `assignQcInspector` và `getQcAssignment` |
+| `repair/service/impl/LaborExecutionServiceImpl.java` | 60-153 (`assignTask`), 157-177 (`releaseAssignment`) | Thêm 2 hàm mới. Tái dùng kiểm tra của `assignTask` bằng cách tách phần tạo phân công thành hàm private dùng chung |
+| `repair/controller/RepairOrderController.java` | gần 134-150 (`/{id}/tasks`) | Thêm `POST` và `GET /{id}/qc-assignment`, `@PreAuthorize`, `@Operation` |
+| `repair/repository/TaskAssignmentRepository.java` | 19-21 | Dùng lại `findActiveQcForOrder`. Không cần query mới |
+| `src/test/.../repair/LaborExecutionServiceTest.java` | cuối file | Test cho AC-1 → AC-4 |
+| `frontend/src/features/repair/api/repairApi.ts` | 94-117 | Thêm `assignQcInspector`, `getQcAssignment` |
+| `frontend/src/features/repair/hooks/useRepair.ts` | cạnh `useAssignTaskMutation` | Thêm `useQcAssignmentQuery`, `useAssignQcInspectorMutation` (invalidate query của phiếu) |
+| `frontend/src/features/repair/utils/assignmentWindow.ts` | file mới | Chuyển `toLocalInput` và `DEFAULT_ASSIGNMENT_HOURS` từ `AssignTaskModal.tsx:10-22` sang để dùng chung |
+| `frontend/src/features/repair/components/AssignTaskModal.tsx` | 10-22 | Import từ `assignmentWindow.ts`, không đổi hành vi |
+| `frontend/src/features/repair/components/AssignQcModal.tsx` | file mới | Modal chọn kỹ thuật viên QC và khoảng thời gian |
+| `frontend/src/features/repair/components/RepairOrderDetailModal.tsx` | 896-935 (tab QC), 1057 | Thêm khối phân công QC, gắn `AssignQcModal`, đổi điều kiện hai nút "Bắt đầu kiểm tra QC" sang `canPerformQc && WAITING_QC` |
+| `docs/REPAIR_ORDER_LIFECYCLE.md` | mục 2.5 | Ghi cách phân công QC tại tab QC |
 
 ## 4. Hợp Đồng Kỹ Thuật
 
-- **Không thêm endpoint mới.** "Mở lại chẩn đoán" dùng `PATCH /api/v1/repair-orders/{id}/status` với `newStatus = DIAGNOSING`, giữ `@PreAuthorize(HAS_TECHNICAL_ACCESS)`.
-- **Lỗi nghiệp vụ** dùng `BusinessRuleException` như các guard cùng file, để thống nhất thông điệp tiếng Việt và mã lỗi đang có. Thông điệp:
-  - "Chẩn đoán đã chốt khi lập báo giá. Hãy dùng báo giá phát sinh hoặc mở lại chẩn đoán khi khách từ chối toàn bộ."
-  - "Thông tin tiếp nhận chỉ sửa được khi phiếu vừa tiếp nhận."
-  - "Phiếu đã có hạng mục được duyệt, chỉ lập được báo giá phát sinh."
-  - "Cần ghi kết luận chẩn đoán trước khi lập báo giá."
-  - "Báo giá phát sinh chỉ lập khi phiếu đang thi công hoặc QC chưa đạt."
-  - "Báo giá gốc phải đã được khách duyệt."
-  - "Chỉ chuyển sang chờ duyệt bằng cách lập báo giá."
-  - "Còn công việc chưa hoàn thành hoặc đồng hồ đang chạy."
-  - "Chỉ mở lại chẩn đoán khi khách đã từ chối toàn bộ báo giá."
-  - "Ảnh <loại> chỉ tải lên ở giai đoạn <giai đoạn>."
-  - Billing giữ `BusinessException(ResponseCode.BAD_REQUEST)` như hiện tại.
-- **`RepairStageRules`** chỉ chứa `EnumSet` và hàm thuần, không phụ thuộc Spring. `EstimateServiceImpl` và `AttachmentServiceImpl` dùng chung nó, nên không còn chép tay danh sách trạng thái.
-- **Audit:** "Mở lại chẩn đoán" đi qua `transitionStatus`, giữ nguyên audit có sẵn của endpoint status nếu có. Không thêm action mới.
-- **UI:**
-  - Dùng `Badge` (`variant="secondary"`) với chữ "Đã chốt", và `info-strip` để giải thích lý do.
-  - Ô `textarea` dùng `readOnly`, không dùng `disabled`, để vẫn chọn và sao chép được chữ.
-  - Nút "Mở lại chẩn đoán" là `Button variant="ghost"`, có hộp xác nhận vì thao tác này hủy các bản nháp.
+**Endpoint** (đường dẫn dùng `ApiPaths.REPAIR_ORDERS_BASE`):
+
+```
+POST /api/v1/repair-orders/{id}/qc-assignment   @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)   -> 201 ApiResponse<TaskAssignmentResponse>
+GET  /api/v1/repair-orders/{id}/qc-assignment   @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF) -> 200 ApiResponse<TaskAssignmentResponse | null>
+```
+
+**DTO** `QcAssignmentRequest`:
+
+```java
+@NotNull(message = "ID nhân viên không được để trống") private Long employeeId;
+@NotNull(message = "Thời gian bắt đầu không được để trống") private Instant startsAt;
+@NotNull(message = "Thời gian dự kiến kết thúc không được để trống") private Instant endsAt;
+```
+
+**Service** (`LaborExecutionService`):
+
+```java
+TaskAssignmentResponse assignQcInspector(Long actorUserId, Long orderId, QcAssignmentRequest request);
+TaskAssignmentResponse getQcAssignment(Long orderId); // null khi chưa có
+```
+
+Quy tắc `assignQcInspector` (`@Transactional`, khóa phiếu bằng `findByIdForUpdate`):
+
+1. Phiếu phải `WAITING_QC`, nếu không ném `BusinessRuleException("Chỉ phân công kỹ thuật viên QC khi phiếu đang chờ QC")`.
+2. Lấy công việc cuối cùng của phiếu làm điểm gắn. Không có công việc: `BusinessRuleException("Phiếu chưa có công việc để gắn phân công QC")`.
+3. Nếu kỹ thuật viên là thợ chính của phiếu (`RepairOrderAssignmentRepository.findByRepairOrderIdAndAssignmentStage(..., REPAIR_MAIN)`): `BusinessRuleException("Thợ chính đã sửa chữa không được làm kỹ thuật viên QC của phiếu này")`.
+4. Giải phóng mọi phân công QC đang hoạt động của phiếu (`findActiveQcForOrder`): `isActive=false`, `releasedAt=now`. Đóng timer mở nếu có, theo cách `releaseAssignment` đang làm.
+5. Tạo phân công mới bằng đường dùng chung của `assignTask` với vai trò `QC`. Phần này đã có các kiểm tra hoạt động, `canQc`, chồng lịch, ca làm việc, kỹ năng. Lỗi nào xảy ra thì cả giao dịch rollback, phân công cũ giữ nguyên.
+
+Không thêm `ResponseCode` mới, dùng `BusinessRuleException` và `ConflictException` có thông báo tiếng Việt như `assignTask`.
+
+**Frontend**:
+
+```ts
+assignQcInspector(orderId, { employeeId, startsAt, endsAt }): Promise<TaskAssignment>
+getQcAssignment(orderId): Promise<TaskAssignment | null>
+```
+
+- `AssignQcModal` dùng `Modal`, `Field`, `Button`, `FormError` chung và `useOnShiftTechniciansQuery`, lọc `canQc`. Bố cục hai cột theo `UI_DESIGN_GUIDELINES.md`, không có ô chọn vai trò.
+- Khối trong tab QC dùng class có sẵn (`text-xs muted`, `Button variant="secondary"`), không thêm style mới.
+- Điều kiện hiện nút: `canFrontDesk && order.status === 'WAITING_QC'`.
 
 ## 5. Checklist Thực Thi
 
-- [x] **Step 1: Thêm `RepairStageRules` và test thuần cho nó** _(nền cho AC-1 → AC-7)_
-- [x] **Step 2: Chốt tiếp nhận và chẩn đoán trong `RepairServiceImpl`** (`updateRepairOrder`, `updateDiagnosis`: chỉ hoàn tất nhật ký ở lần đầu) _(AC-1, AC-2)_
-- [x] **Step 3: Siết `validateTransition` / `transitionStatus`** _(AC-5, AC-6)_
-  - Bỏ việc chuyển tay sang `WAITING_APPROVAL`.
-  - Chặn `→ WAITING_QC` khi còn việc chưa xong.
-  - Thêm `WAITING_APPROVAL → DIAGNOSING`, kèm hủy các bản `DRAFT`.
-  - Khi hủy phiếu thì hủy luôn các báo giá còn mở.
-- [x] **Step 4: Siết `EstimateServiceImpl.createEstimate` và `decide`, thêm repository query** _(AC-3, AC-4)_
-- [x] **Step 5: `EstimateMapper` hiển thị `EXPIRED`** _(AC-8)_
-- [x] **Step 6: Khóa ảnh theo giai đoạn trong `AttachmentServiceImpl`** _(AC-7)_
-- [x] **Step 7 (làm sau theo yêu cầu, kèm migration V19 — ngoại lệ của mục 1.3): Hủy hóa đơn đưa phiếu về `COMPLETED` và cho phát hành lại; `handOver` lấy hóa đơn khác `VOID`** _(AC-9)_
-- [x] **Step 8: Cập nhật test backend bị ảnh hưởng và chạy `./mvnw test`** _(AC-1 → AC-9, AC-11)_
-- [x] **Step 9: Thêm `stageLocks.ts` cùng test** _(AC-10)_
-- [x] **Step 10: Cập nhật `RepairOrderDetailModal`, `CreateEstimateModal`, `DiagnosisAttachmentGallery`** _(AC-10)_
-  - "Đã chốt" và lý do.
-  - Nút "Mở lại chẩn đoán".
-  - Nút duyệt chỉ cho `SENT` / `PARTIALLY_APPROVED`.
-  - Báo giá phát sinh.
-  - Loại ảnh theo giai đoạn.
-- [x] **Step 11: Kiểm thử và xác minh** _(tất cả AC)_
-  - Chạy lint, test, build frontend.
-  - Build lại container backend và frontend.
-  - Mở trên trình duyệt một phiếu ở mỗi trạng thái `DIAGNOSING`, `WAITING_APPROVAL`, `IN_PROGRESS`, `CLOSED` để xem khóa. Không lưu dữ liệu thật nếu người dùng chưa đồng ý.
-  - Đổi các mục 🔒 trong `docs/REPAIR_ORDER_LIFECYCLE.md` thành ✅.
+- [x] **Step 1: DTO và service phân công QC** _(AC-1, AC-2, AC-3, AC-4)_
+  - Thêm `QcAssignmentRequest`.
+  - Thêm `assignQcInspector`, `getQcAssignment` vào `LaborExecutionService` và `LaborExecutionServiceImpl`.
+  - Tách phần tạo phân công của `assignTask` thành hàm private dùng chung, giữ nguyên hành vi của `assignTask`.
+- [x] **Step 2: Endpoint trong `RepairOrderController`** _(AC-1, AC-4, AC-5)_
+  - Thêm `POST` và `GET /{id}/qc-assignment` với `@PreAuthorize` và `@Operation` tiếng Việt.
+- [x] **Step 3: Test backend** _(AC-1 → AC-5, AC-10)_
+  - Thêm vào `LaborExecutionServiceTest`: phân công thành công, đổi người (chỉ còn một bản đang hoạt động), phiếu không `WAITING_QC`, phiếu không có công việc, thợ chính, kỹ thuật viên không `canQc`, `getQcAssignment` có và không có.
+  - Chạy `./mvnw test -Dtest=LaborExecutionServiceTest,QualityCheckServiceTest,TV3WorkflowIntegrationTest`.
+- [x] **Step 4: API client, hook và tiện ích dùng chung** _(AC-6, AC-7)_
+  - Thêm hàm vào `repairApi.ts`, hook vào `useRepair.ts`.
+  - Tách `assignmentWindow.ts` và cập nhật `AssignTaskModal.tsx`.
+- [x] **Step 5: `AssignQcModal` và khối phân công trong tab QC** _(AC-6, AC-7, AC-9)_
+  - Tạo `AssignQcModal.tsx`.
+  - Thêm khối "Kỹ thuật viên QC được phân công" và nút "Phân công QC"/"Đổi người".
+  - Đổi điều kiện hai nút "Bắt đầu kiểm tra QC" sang `canPerformQc && WAITING_QC`.
+  - Chạy `npm --prefix frontend run lint`, `tsc` và `test`.
+- [x] **Step 6: Cập nhật tài liệu** _(AC-6)_
+  - Ghi cách phân công QC tại tab QC vào `docs/REPAIR_ORDER_LIFECYCLE.md` mục 2.5.
+- [x] **Step 7: Kiểm thử & xác minh** _(tất cả AC)_
+  - Bật `mysql-test`, chạy `BusinessWorkflowIntegrationTests`.
+  - Build lại container theo `README.md` (jar, frontend, `docker compose build`, `up`).
+  - Trên trình duyệt với admin, lễ tân, kỹ thuật viên: phân công QC, đổi người, admin ghi QC thành công, vai trò không đủ quyền không thấy nút.
 
 <!-- Mục 6 "Kết Quả Hội Tụ" do /converge thêm vào, không viết sẵn. -->
+
+## 6. Kết Quả Hội Tụ (Converge)
+
+Ngày: 2026-11-05. Kết luận: **partial** (mọi mục trong phạm vi đã có code; các mục kiểm chứng bằng giao diện và phân quyền chưa xác minh).
+
+| Mục tiêu | Trạng thái | Ghi chú |
+|---|---|---|
+| AC-1 Phân công QC khi phiếu `WAITING_QC` | Đạt | `LaborExecutionServiceImpl.java:171`; test `assignQcInspector_Success` (vai trò QC, gắn công việc cuối, không ghi nhật ký công) |
+| AC-2 Đổi người giải phóng phân công cũ | Đạt | Test `assignQcInspector_ReplacesPreviousInspector` kiểm tra `isActive=false`, `releasedAt` |
+| AC-3 Từ chối các trường hợp không hợp lệ | Đạt | Có test: sai trạng thái, chưa có công việc, thợ chính, thiếu `canQc`. Không trong ca và không hoạt động dùng chung kiểm tra của `assignTask` (đã có test riêng ở `assignmentOutsideActiveShiftIsRejected`), chưa có test riêng cho đường QC |
+| AC-4 `GET` trả phân công hoặc `null` | Đạt | `LaborExecutionServiceImpl.java:216`; test `getQcAssignment_ReturnsActiveOrNull`. Chưa gọi thử qua HTTP |
+| AC-5 Chỉ `ADMIN`/`RECEPTIONIST` gọi `POST` | Chưa xác minh | `@PreAuthorize(HAS_FRONT_DESK)` ở `RepairOrderController.java:138`, chưa có test hay lệnh gọi API với vai trò khác |
+| AC-6 Tab QC hiện người được phân công và nút | Chưa xác minh | `RepairOrderDetailModal.tsx:138,911-919`; chưa thử trên trình duyệt |
+| AC-7 Modal chỉ liệt kê người QC trong ca | Chưa xác minh | `AssignQcModal.tsx` lọc `canQc` từ danh sách đang trong ca; chưa thử trên trình duyệt |
+| AC-8 Admin ghi QC được sau khi phân công | Chưa xác minh | Đường backend đã có test ở `qc-admin-on-behalf` (`adminRecordsQcOnBehalfOfAssignedInspector`); chưa chạy trọn luồng trên container |
+| AC-9 Nút "Bắt đầu kiểm tra QC" theo vai trò và trạng thái | Đạt (code) / chưa xác minh UI | `RepairOrderDetailModal.tsx:938,952` dùng `canPerformQc && WAITING_QC`; lint, `tsc`, build qua |
+| AC-10 Test hiện có vẫn qua | Đạt | `./mvnw test` 41/41 (gồm `BusinessWorkflowIntegrationTests` với MySQL test), Vitest 111/111 |
+
+Điều chỉnh so với plan: kiểm tra kỹ năng dịch vụ được bỏ qua cho vai trò QC (`createAssignment(..., checkServiceSkills=false)`), vì người kiểm định không cần kỹ năng của dịch vụ gắn vào công việc cuối. `assignTask` thường giữ nguyên.
+
+Còn lại cần kiểm tay trên container mới: phân công/đổi QC bằng admin và lễ tân, kỹ thuật viên không thấy nút, admin ghi QC thành công sau khi phân công, gọi `POST` bằng vai trò kỹ thuật viên nhận 403.

@@ -40,6 +40,7 @@ import static org.mockito.Mockito.*;
 class QualityCheckServiceTest {
     @Mock private com.Group13_65CNTT.AutoGarage.identity.service.ObjectAccessService objectAccess;
     @Mock private com.Group13_65CNTT.AutoGarage.common.security.CustomerScope customerScope;
+    @Mock private com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider currentUserProvider;
 
     @Mock
     private VehicleCheckRepository vehicleCheckRepository;
@@ -286,5 +287,119 @@ class QualityCheckServiceTest {
         });
 
         qualityService.performQualityCheck(10L, req);
+    }
+
+    private QualityCheckCreateRequest adminRequest() {
+        return QualityCheckCreateRequest.builder().repairOrderId(100L).result(CheckResult.PASSED).build();
+    }
+
+    private void adminOnReadyOrder() {
+        when(currentUserProvider.role()).thenReturn(com.Group13_65CNTT.AutoGarage.common.enums.Role.ADMIN);
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        when(repairTaskRepository.existsByRepairOrderIdAndStatusNot(100L, TaskStatus.COMPLETED)).thenReturn(false);
+        when(laborSessionRepository.countOpenSessionsByRepairOrderId(100L)).thenReturn(0L);
+    }
+
+    private com.Group13_65CNTT.AutoGarage.repair.entity.TaskAssignment qcAssignment(long employeeId) {
+        return com.Group13_65CNTT.AutoGarage.repair.entity.TaskAssignment.builder().employeeId(employeeId).build();
+    }
+
+    @Test
+    @DisplayName("Admin ghi QC thay kỹ thuật viên được phân công: người kiểm định là kỹ thuật viên, người bấm là admin")
+    void adminRecordsQcOnBehalfOfAssignedInspector() {
+        adminOnReadyOrder();
+        when(assignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of(qcAssignment(1L)));
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(mockEmployee));
+        when(vehicleCheckRepository.findMaxAttemptNo(100L, CheckType.QC)).thenReturn(0);
+        when(vehicleCheckRepository.save(any(VehicleCheck.class))).thenAnswer(inv -> {
+            VehicleCheck vc = inv.getArgument(0);
+            vc.setId(600L);
+            return vc;
+        });
+
+        qualityService.performQualityCheck(99L, adminRequest());
+
+        assertThat(mockOrder.getQcTechnicianId()).isEqualTo(1L);
+        assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.COMPLETED);
+        org.mockito.ArgumentCaptor<VehicleCheck> saved = org.mockito.ArgumentCaptor.forClass(VehicleCheck.class);
+        verify(vehicleCheckRepository).save(saved.capture());
+        assertThat(saved.getValue().getCheckedBy()).isEqualTo(99L);
+        verify(workLogRecorder).start(eq(mockOrder), eq(1L),
+                eq(com.Group13_65CNTT.AutoGarage.repair.entity.AssignmentStage.QC_INSPECTION), any(), any(), any());
+        verify(employeeRepository, never()).findByUserId(any());
+    }
+
+    @Test
+    @DisplayName("Admin ghi QC khi phiếu chưa phân công QC: báo QC_INSPECTOR_NOT_ASSIGNED")
+    void adminCannotRecordQcWithoutAssignedInspector() {
+        adminOnReadyOrder();
+        when(assignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of());
+
+        assertThatThrownBy(() -> qualityService.performQualityCheck(99L, adminRequest()))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode",
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.QC_INSPECTOR_NOT_ASSIGNED)
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException.class)
+                .hasMessageContaining("chưa phân công kỹ thuật viên QC");
+        verifyNoInteractions(vehicleCheckRepository);
+    }
+
+    @Test
+    @DisplayName("Admin ghi QC khi có nhiều kỹ thuật viên QC: báo QC_INSPECTOR_INVALID")
+    void adminCannotRecordQcWithMultipleInspectors() {
+        adminOnReadyOrder();
+        when(assignmentRepository.findActiveQcForOrder(100L))
+                .thenReturn(List.of(qcAssignment(1L), qcAssignment(2L)));
+
+        assertThatThrownBy(() -> qualityService.performQualityCheck(99L, adminRequest()))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode",
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.QC_INSPECTOR_INVALID);
+        verifyNoInteractions(vehicleCheckRepository);
+    }
+
+    @Test
+    @DisplayName("Admin ghi QC khi kỹ thuật viên được phân công không có quyền QC: báo QC_INSPECTOR_INVALID")
+    void adminCannotRecordQcWhenAssignedInspectorLacksCanQc() {
+        adminOnReadyOrder();
+        mockEmployee.setCanQc(false);
+        when(assignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of(qcAssignment(1L)));
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(mockEmployee));
+
+        assertThatThrownBy(() -> qualityService.performQualityCheck(99L, adminRequest()))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.common.exception.BusinessException.class)
+                .hasFieldOrPropertyWithValue("responseCode",
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.QC_INSPECTOR_INVALID);
+        verifyNoInteractions(vehicleCheckRepository);
+    }
+
+    @Test
+    @DisplayName("Admin ghi QC khi kỹ thuật viên QC không trong ca: vẫn bị chặn")
+    void adminCannotRecordQcWhenAssignedInspectorOffShift() {
+        adminOnReadyOrder();
+        when(assignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of(qcAssignment(1L)));
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(mockEmployee));
+        when(workLogRecorder.activeShift(eq(1L), any())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> qualityService.performQualityCheck(99L, adminRequest()))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("trong ca");
+        verifyNoInteractions(vehicleCheckRepository);
+    }
+
+    @Test
+    @DisplayName("Admin ghi QC khi kỹ thuật viên QC là thợ chính của phiếu: vẫn bị chặn")
+    void adminCannotRecordQcWhenAssignedInspectorIsMainRepairer() {
+        adminOnReadyOrder();
+        when(assignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of(qcAssignment(1L)));
+        when(employeeRepository.findById(1L)).thenReturn(Optional.of(mockEmployee));
+        when(workLogRepository.findByRepairOrderIdAndAssignmentStage(
+                100L, com.Group13_65CNTT.AutoGarage.repair.entity.AssignmentStage.REPAIR_MAIN))
+                .thenReturn(List.of(com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrderAssignment.builder()
+                        .employeeId(1L).build()));
+
+        assertThatThrownBy(() -> qualityService.performQualityCheck(99L, adminRequest()))
+                .isInstanceOf(BusinessRuleException.class);
+        verifyNoInteractions(vehicleCheckRepository);
     }
 }

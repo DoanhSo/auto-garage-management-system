@@ -1,3 +1,4 @@
+import { formatPlate } from '../../../shared/utils/format';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '../../../app/providers/ToastProvider';
@@ -143,7 +144,7 @@ export function CheckInModal({
 
   const title = booking ? `Tiếp nhận xe hẹn #${booking.bookingCode}` : 'Tiếp nhận xe vào xưởng';
   const description = booking
-    ? `Khách hàng: ${booking.customerName} • Xe: ${booking.licensePlate}`
+    ? `Khách hàng: ${booking.customerName} • Xe: ${formatPlate(booking.licensePlate)}`
     : 'Ghi nhận hiện trạng xe, số ODO và khởi tạo lệnh sửa chữa mới.';
 
   const generalError = checkIn.error;
@@ -169,7 +170,7 @@ export function CheckInModal({
           <div className="info-strip full-width">
             <Car size={18} />
             <span>
-              <strong>{activeVehicle.licensePlate}</strong> ({activeVehicle.brand}{' '}
+              <strong>{formatPlate(activeVehicle.licensePlate)}</strong> ({activeVehicle.brand}{' '}
               {activeVehicle.model}) &bull; Chủ xe: {activeVehicle.customerName} (
               {activeVehicle.customerPhone}) &bull; ODO trước:{' '}
               {activeVehicle.odometer.toLocaleString('vi-VN')} km
@@ -192,7 +193,7 @@ export function CheckInModal({
                   onChange={(next) => setValue('vehicleId', next, { shouldValidate: true })}
                   options={vehicles.map((v) => ({
                     value: String(v.id),
-                    label: `${v.licensePlate} (${v.brand} ${v.model})`,
+                    label: `${formatPlate(v.licensePlate)} (${v.brand} ${v.model})`,
                     description: `Chủ xe: ${v.customerName}`,
                   }))}
                 />
