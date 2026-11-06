@@ -54,6 +54,12 @@ export function HandoverModal({
       <form onSubmit={handleSubmit} noValidate className="modal-form">
         <FormError message={handover.error ? errorMessage(handover.error) : undefined} />
 
+        {order.status === 'COMPLETED' && (
+          <div className="full-width p-3 bg-muted/20 border rounded-lg text-xs muted">
+            💡 <strong>Quy trình tài chính:</strong> Phiếu sửa chữa cần được phát hành hóa đơn tại màn <em>Tài chính &gt; Hóa đơn</em> và hoàn tất quyết toán chi phí trước khi xe có thể xuất xưởng.
+          </div>
+        )}
+
         <Field label="Số ODO khi vào (km)">
           <input className="input" disabled value={order.odometerIn.toLocaleString('vi-VN')} />
         </Field>

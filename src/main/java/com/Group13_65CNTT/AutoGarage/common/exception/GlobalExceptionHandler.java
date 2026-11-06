@@ -57,11 +57,8 @@ public class GlobalExceptionHandler {
 
     /** Only messages written for users in the service layer are exposed; framework errors stay generic. */
     private String authoredDetail(BusinessException failure) {
-        boolean authored = failure instanceof com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException
-                || failure instanceof com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException
-                || failure instanceof com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
         String message = failure.getMessage();
-        return authored && message != null && !message.equals(failure.getResponseCode().getMessage())
+        return message != null && !message.isBlank() && !message.equals(failure.getResponseCode().getMessage())
                 ? message
                 : null;
     }

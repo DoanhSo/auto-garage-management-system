@@ -33,6 +33,7 @@ import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
 import com.Group13_65CNTT.AutoGarage.identity.entity.User;
 import com.Group13_65CNTT.AutoGarage.identity.repository.UserRepository;
 import com.Group13_65CNTT.AutoGarage.inventory.entity.DocumentStatus;
@@ -600,11 +601,11 @@ public class BillingServiceImpl implements BillingService {
     @Transactional
     public void requireHandoverAllowed(long actorUserId, long repairOrderId) {
         Invoice invoice = invoiceRepository.findActiveByRepairOrderIdWithLock(repairOrderId)
-                .orElseThrow(() -> new BusinessException(ResponseCode.BAD_REQUEST,
-                        "Phiếu chưa có hóa đơn còn hiệu lực, hãy lập hóa đơn trước khi bàn giao"));
+                .orElseThrow(() -> new BusinessRuleException(
+                        "Phiếu chưa có hóa đơn còn hiệu lực. Hãy lập hóa đơn và quyết toán chi phí trước khi bàn giao xe."));
 
         if (invoice.getStatus() == InvoiceStatus.VOID) {
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new BusinessRuleException("Hóa đơn của phiếu sửa chữa đã bị hủy. Cần lập hóa đơn mới trước khi bàn giao xe.");
         }
         if (invoice.getStatus() == InvoiceStatus.PAID) {
             return; // Handover allowed
@@ -623,7 +624,7 @@ public class BillingServiceImpl implements BillingService {
                 invoice.getCustomerId());
 
         if (custRows.isEmpty()) {
-            throw new BusinessException(ResponseCode.RESOURCE_NOT_FOUND);
+            throw new BusinessException(ResponseCode.RESOURCE_NOT_FOUND, "Không tìm thấy hồ sơ khách hàng.");
         }
 
         BigDecimal creditLimit = (BigDecimal) custRows.get(0).get("credit_limit");
@@ -633,12 +634,14 @@ public class BillingServiceImpl implements BillingService {
 
         if (totalCustomerDebt.compareTo(creditLimit) > 0) {
             log.warn("Customer {} total debt {} exceeds credit limit {}", invoice.getCustomerId(), totalCustomerDebt, creditLimit);
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new BusinessRuleException(
+                    "Không thể bàn giao xe: Khách hàng chưa thanh toán đủ và tổng công nợ vượt quá hạn mức cho phép.");
         }
 
         Number term = (Number) custRows.get(0).get("payment_term_days");
         if (term == null || term.intValue() <= 0 || invoice.getDueDate() == null) {
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new BusinessRuleException(
+                    "Không thể bàn giao xe: Hóa đơn chưa thanh toán đủ và khách hàng không có điều khoản công nợ (hạn nợ).");
         }
 
         // Check if customer has overdue invoices
@@ -647,7 +650,8 @@ public class BillingServiceImpl implements BillingService {
         for (InvoiceBalanceView iv : customerInvoices) {
             if (iv.getDueDate() != null && iv.getDueDate().isBefore(today) && iv.getBalanceAmount().compareTo(BigDecimal.ZERO) > 0) {
                 log.warn("Customer {} has overdue invoice {} with balance {}", invoice.getCustomerId(), iv.getInvoiceCode(), iv.getBalanceAmount());
-                throw new BusinessException(ResponseCode.BAD_REQUEST);
+                throw new BusinessRuleException(
+                        "Không thể bàn giao xe: Khách hàng đang có hóa đơn quá hạn chưa thanh toán (#" + iv.getInvoiceCode() + ").");
             }
         }
     }

@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Wrench,
   CheckCircle,
@@ -18,6 +19,7 @@ import {
   ClipboardList,
   Lock,
   RotateCcw,
+  ReceiptText,
 } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -88,6 +90,7 @@ export function RepairOrderDetailModal({
   onClose: () => void;
 }) {
   const notify = useToast();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isCustomer = user?.role === 'CUSTOMER';
   const canTechnical = !!user && TECHNICAL_ROLES.includes(user.role);
@@ -343,6 +346,17 @@ export function RepairOrderDetailModal({
                   </Button>
                 )}
                 {canFrontDesk && order.status === 'COMPLETED' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      onClose();
+                      navigate('/billing/invoices');
+                    }}
+                  >
+                    <ReceiptText size={15} /> Lập hóa đơn
+                  </Button>
+                )}
+                {canFrontDesk && (order.status === 'COMPLETED' || order.status === 'INVOICED') && (
                   <Button variant="primary" onClick={() => setHandoverOpen(true)}>
                     <UserCheck size={15} /> Bàn giao xe
                   </Button>
@@ -1055,6 +1069,25 @@ export function RepairOrderDetailModal({
                     </div>
                   </div>
 
+                  {order.status === 'COMPLETED' && canFrontDesk && (
+                    <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                        <ReceiptText size={16} className="shrink-0" />
+                        <span>Phiếu đã nghiệm thu QC đạt chuẩn. Hãy lập hóa đơn và xác nhận quyết toán trước khi tiến hành bàn giao xe.</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => {
+                          onClose();
+                          navigate('/billing/invoices');
+                        }}
+                      >
+                        <ReceiptText size={13} /> Lập hóa đơn ngay
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="pt-3 border-t flex items-center justify-between">
                     <div>
                       {order.status === 'CLOSED' ? (
@@ -1070,7 +1103,7 @@ export function RepairOrderDetailModal({
                       )}
                     </div>
 
-                    {order.status === 'COMPLETED' && canFrontDesk ? (
+                    {(order.status === 'COMPLETED' || order.status === 'INVOICED') && canFrontDesk ? (
                       <Button variant="primary" onClick={() => setHandoverOpen(true)}>
                         <UserCheck size={15} /> Tiến hành bàn giao xe
                       </Button>
