@@ -28,6 +28,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -69,6 +70,32 @@ public class InvoiceController {
         return ApiResponse.success(
                 ResponseCode.SUCCESS,
                 billingService.getInvoiceReadiness(orderId),
+                http.getRequestURI());
+    }
+
+    @PatchMapping("/{invoiceId}/items/{itemId}/warranty")
+    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTION_OR_ADMIN)
+    @Operation(summary = "Thêm hoặc sửa chính sách bảo hành của một dòng hóa đơn trước khi bàn giao xe")
+    public ApiResponse<InvoiceResponse> updateItemWarranty(
+            @PathVariable Long invoiceId,
+            @PathVariable Long itemId,
+            @Valid @RequestBody com.Group13_65CNTT.AutoGarage.billing.dto.request.InvoiceItemWarrantyRequest request,
+            HttpServletRequest http) {
+        return ApiResponse.success(
+                ResponseCode.SUCCESS,
+                billingService.updateInvoiceItemWarranty(currentUser.userId(), invoiceId, itemId, request),
+                http.getRequestURI());
+    }
+
+    @GetMapping("/order/{orderId}/handover-readiness")
+    @PreAuthorize(SecurityConstants.HAS_ROLE_RECEPTION_OR_ADMIN)
+    @Operation(summary = "Kiểm tra điều kiện thanh toán trước khi bàn giao xe (công nợ, hạn mức, số cần thu tối thiểu)")
+    public ApiResponse<com.Group13_65CNTT.AutoGarage.billing.dto.response.HandoverReadinessResponse> getHandoverReadiness(
+            @PathVariable Long orderId,
+            HttpServletRequest http) {
+        return ApiResponse.success(
+                ResponseCode.SUCCESS,
+                billingService.getHandoverReadiness(orderId),
                 http.getRequestURI());
     }
 

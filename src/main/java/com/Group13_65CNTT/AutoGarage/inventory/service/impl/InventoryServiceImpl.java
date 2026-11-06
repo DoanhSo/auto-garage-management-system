@@ -4,6 +4,8 @@ import com.Group13_65CNTT.AutoGarage.common.util.RequestFingerprint;
 
 import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.inventory.dto.response.IssueCandidateResponse;
+import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.request.InventoryDocumentCreateRequest;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.request.InventoryDocumentItemRequest;
@@ -118,6 +120,12 @@ public class InventoryServiceImpl implements InventoryService {
             }
             if (request.getDocumentType() != DocumentType.ADJUSTMENT && itemReq.getQuantity().compareTo(BigDecimal.ZERO) < 0) {
                 throw new BusinessException(ResponseCode.BAD_REQUEST);
+            }
+
+            if (request.getDocumentType() == DocumentType.OUT && itemReq.getEstimateItemId() == null) {
+                throw new ConflictException(ResponseCode.INVENTORY_ISSUE_BLOCKED,
+                        "Dòng xuất kho phải gắn với phụ tùng đã duyệt trong báo giá của lệnh. "
+                                + "Hãy chọn từ danh sách phụ tùng chờ xuất.");
             }
 
             Part part = partRepository.findById(itemReq.getPartId())
@@ -238,8 +246,12 @@ public class InventoryServiceImpl implements InventoryService {
         if (document.getDocumentType() == DocumentType.OUT || document.getDocumentType() == DocumentType.RETURN) {
             List<Map<String, Object>> orders = jdbcTemplate.queryForList(
                     "SELECT status FROM repair_orders WHERE id = ? FOR UPDATE", document.getRepairOrderId());
-            if (orders.isEmpty() || java.util.Set.of("INVOICED", "CLOSED", "CANCELLED").contains(orders.get(0).get("status"))) {
-                throw new BusinessException(ResponseCode.BAD_REQUEST);
+            if (orders.isEmpty()) {
+                throw new ResourceNotFoundException("Không tìm thấy lệnh sửa chữa của chứng từ");
+            }
+            if (java.util.Set.of("INVOICED", "CLOSED", "CANCELLED").contains(orders.get(0).get("status"))) {
+                throw new ConflictException(ResponseCode.INVENTORY_ISSUE_BLOCKED,
+                        "Lệnh sửa chữa đã lập hóa đơn, đóng hoặc hủy, không thể xuất hoặc trả kho thêm.");
             }
         }
 
@@ -248,20 +260,33 @@ public class InventoryServiceImpl implements InventoryService {
             for (InventoryDocumentItem item : items.stream()
                     .sorted(java.util.Comparator.comparing(InventoryDocumentItem::getEstimateItemId,
                             java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder()))).toList()) {
-                if (item.getEstimateItemId() == null || approvedItems.containsKey(item.getEstimateItemId())) {
-                    throw new BusinessException(ResponseCode.BAD_REQUEST);
+                if (item.getEstimateItemId() == null) {
+                    throw new ConflictException(ResponseCode.INVENTORY_ISSUE_BLOCKED,
+                            "Dòng xuất kho phải gắn với phụ tùng đã duyệt trong báo giá của lệnh. "
+                                    + "Hãy chọn từ danh sách phụ tùng chờ xuất.");
+                }
+                if (approvedItems.containsKey(item.getEstimateItemId())) {
+                    throw new ConflictException(ResponseCode.INVENTORY_ISSUE_BLOCKED,
+                            "Mỗi phụ tùng chỉ xuất một lần trong cùng chứng từ.");
                 }
                 List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                         "SELECT ei.part_id, ei.approval_status, ei.item_type, ei.reserved_quantity, ei.unit_price, e.repair_order_id " +
                         "FROM estimate_items ei JOIN estimates e ON e.id = ei.estimate_id WHERE ei.id = ? FOR UPDATE",
                         item.getEstimateItemId());
-                if (rows.isEmpty()) throw new BusinessException(ResponseCode.RESOURCE_NOT_FOUND);
+                if (rows.isEmpty()) {
+                    throw new ResourceNotFoundException("Không tìm thấy dòng báo giá #" + item.getEstimateItemId());
+                }
                 Map<String, Object> row = rows.get(0);
                 if (!"APPROVED".equals(row.get("approval_status")) || !"PART".equals(row.get("item_type"))
                         || ((Number) row.get("part_id")).longValue() != item.getPart().getId()
-                        || ((Number) row.get("repair_order_id")).longValue() != document.getRepairOrderId()
-                        || ((BigDecimal) row.get("reserved_quantity")).compareTo(item.getQuantity()) < 0) {
-                    throw new BusinessException(ResponseCode.BAD_REQUEST);
+                        || ((Number) row.get("repair_order_id")).longValue() != document.getRepairOrderId()) {
+                    throw new ConflictException(ResponseCode.INVENTORY_ISSUE_BLOCKED,
+                            "Dòng xuất kho không khớp với phụ tùng đã duyệt của lệnh #" + document.getRepairOrderId() + ".");
+                }
+                if (((BigDecimal) row.get("reserved_quantity")).compareTo(item.getQuantity()) < 0) {
+                    throw new ConflictException(ResponseCode.INVENTORY_ISSUE_BLOCKED,
+                            "Số lượng xuất của " + item.getPart().getPartName() + " vượt số đã giữ chỗ ("
+                                    + ((BigDecimal) row.get("reserved_quantity")).stripTrailingZeros().toPlainString() + ").");
                 }
                 approvedItems.put(item.getEstimateItemId(), row);
             }
@@ -312,13 +337,18 @@ public class InventoryServiceImpl implements InventoryService {
                 case OUT -> {
                     if (part.getStockQuantity().compareTo(qty) < 0) {
                         log.warn("Insufficient stock for part {}: stock={}, requested={}", part.getId(), part.getStockQuantity(), qty);
-                        throw new BusinessException(ResponseCode.BAD_REQUEST);
+                        throw new ConflictException(ResponseCode.INVENTORY_ISSUE_BLOCKED,
+                                "Tồn kho không đủ để xuất " + part.getPartName() + ": còn "
+                                        + part.getStockQuantity().stripTrailingZeros().toPlainString() + ", cần "
+                                        + qty.stripTrailingZeros().toPlainString() + ".");
                     }
                     BigDecimal newStock = part.getStockQuantity().subtract(qty);
                     // Deduct reserved quantity up to qty
                     BigDecimal deductReserved = qty;
                     if (part.getReservedQuantity().compareTo(qty) < 0) {
-                        throw new BusinessException(ResponseCode.BAD_REQUEST);
+                        throw new ConflictException(ResponseCode.INVENTORY_ISSUE_BLOCKED,
+                                "Số lượng giữ chỗ của " + part.getPartName()
+                                        + " không đủ để xuất. Hãy kiểm tra đối soát tồn kho.");
                     }
                     cost = part.getPurchasePrice();
                     item.setUnitCost(cost);
@@ -453,17 +483,35 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<IssueCandidateResponse> getIssueCandidates(Long repairOrderId) {
+        Integer exists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM repair_orders WHERE id = ?", Integer.class, repairOrderId);
+        if (exists == null || exists == 0) {
+            throw new ResourceNotFoundException("Không tìm thấy lệnh sửa chữa với ID: " + repairOrderId);
+        }
+        return jdbcTemplate.query(
+                "SELECT ei.id AS estimate_item_id, p.id AS part_id, p.sku, p.part_name, p.unit, "
+                        + "ei.reserved_quantity, p.stock_quantity, p.purchase_price "
+                        + "FROM estimate_items ei JOIN estimates e ON e.id = ei.estimate_id "
+                        + "JOIN parts p ON p.id = ei.part_id "
+                        + "WHERE e.repair_order_id = ? AND ei.item_type = 'PART' "
+                        + "AND ei.approval_status = 'APPROVED' AND ei.reserved_quantity > 0 ORDER BY ei.id",
+                (rs, rowNum) -> {
+                    BigDecimal reserved = rs.getBigDecimal("reserved_quantity");
+                    BigDecimal stock = rs.getBigDecimal("stock_quantity");
+                    return new IssueCandidateResponse(
+                            rs.getLong("estimate_item_id"), rs.getLong("part_id"), rs.getString("sku"),
+                            rs.getString("part_name"), rs.getString("unit"), reserved, stock,
+                            rs.getBigDecimal("purchase_price"), stock.compareTo(reserved) < 0);
+                },
+                repairOrderId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public void requireIssueComplete(long repairOrderId) {
-        List<String> pendingParts = jdbcTemplate.queryForList(
-                "SELECT ei.item_name FROM estimate_items ei JOIN estimates e ON e.id = ei.estimate_id " +
-                "WHERE e.repair_order_id = ? AND ei.reserved_quantity > 0 ORDER BY ei.id",
-                String.class, repairOrderId);
-        if (!pendingParts.isEmpty()) {
-            int shown = Math.min(pendingParts.size(), MAX_PENDING_PARTS_SHOWN);
-            String names = String.join(", ", pendingParts.subList(0, shown));
-            if (pendingParts.size() > shown) {
-                names += " và " + (pendingParts.size() - shown) + " phụ tùng khác";
-            }
+        String names = pendingIssueNames(repairOrderId);
+        if (names != null) {
             throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
                     "Còn phụ tùng đã giữ chỗ nhưng chưa xuất kho: " + names
                             + ". Hãy xuất kho hoặc hủy giữ chỗ trước khi lập hóa đơn.");
@@ -475,6 +523,34 @@ public class InventoryServiceImpl implements InventoryService {
             throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
                     "Còn phiếu kho xuất hoặc trả ở trạng thái nháp. Hãy hoàn tất hoặc hủy phiếu nháp trước khi lập hóa đơn.");
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void requireIssuedForWorkStart(long repairOrderId) {
+        String names = pendingIssueNames(repairOrderId);
+        if (names != null) {
+            throw new ConflictException(ResponseCode.WORK_START_BLOCKED,
+                    "Còn phụ tùng đã giữ chỗ nhưng chưa xuất kho: " + names
+                            + ". Hãy xuất kho trước khi bắt đầu công việc.");
+        }
+    }
+
+    /** Names of parts reserved for the order but not yet issued, or null when none is pending. */
+    private String pendingIssueNames(long repairOrderId) {
+        List<String> pendingParts = jdbcTemplate.queryForList(
+                "SELECT ei.item_name FROM estimate_items ei JOIN estimates e ON e.id = ei.estimate_id " +
+                "WHERE e.repair_order_id = ? AND ei.reserved_quantity > 0 ORDER BY ei.id",
+                String.class, repairOrderId);
+        if (pendingParts.isEmpty()) {
+            return null;
+        }
+        int shown = Math.min(pendingParts.size(), MAX_PENDING_PARTS_SHOWN);
+        String names = String.join(", ", pendingParts.subList(0, shown));
+        if (pendingParts.size() > shown) {
+            names += " và " + (pendingParts.size() - shown) + " phụ tùng khác";
+        }
+        return names;
     }
 
     @Override

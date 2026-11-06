@@ -56,6 +56,10 @@ public final class AuditConstants {
     public static final String LABEL_CODE_SEPARATOR = " - ";
 
     public static final int ACTION_MAX_LENGTH = 100;
+    /** Free-text audit search: longest keyword, most action codes and the LIKE escape character. */
+    public static final int QUERY_MAX_LENGTH = 100;
+    public static final int ACTIONS_MAX_COUNT = 50;
+    public static final char LIKE_ESCAPE = '!';
     public static final int ENTITY_TYPE_MAX_LENGTH = 80;
     public static final int REQUEST_KEY_MAX_LENGTH = 100;
     public static final int REQUEST_HASH_LENGTH = 64;
@@ -93,6 +97,7 @@ public final class AuditConstants {
     public static final String ENTITY_WARRANTY = "WARRANTY";
     public static final String ACTION_WARRANTY_VOIDED = "WARRANTY_VOIDED";
     public static final String ACTION_WARRANTY_ADJUSTED = "WARRANTY_ADJUSTED";
+    public static final String ACTION_INVOICE_WARRANTY_SET = "INVOICE_WARRANTY_SET";
 
     private AuditConstants() {}
 }

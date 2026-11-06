@@ -130,7 +130,10 @@ class InventoryServiceTest {
 
         assertThatThrownBy(() -> service.post(100L, 10L, "REQ-02"))
                 .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.BAD_REQUEST);
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVENTORY_ISSUE_BLOCKED)
+                .hasMessageContaining("Tồn kho không đủ")
+                .hasMessageContaining("còn 5")
+                .hasMessageContaining("cần 10");
     }
 
     @Test
@@ -237,5 +240,208 @@ class InventoryServiceTest {
                 .thenReturn(0);
 
         service.requireIssueComplete(21L);
+    }
+
+    // =========================================================================
+    // Xuất kho cho lệnh sửa chữa
+    // =========================================================================
+
+    private InventoryDocument outDocument(Part part, Long estimateItemId, BigDecimal qty) {
+        InventoryDocument doc = InventoryDocument.builder()
+                .id(10L).repairOrderId(100L).documentCode("DOC-OUT-001").documentType(DocumentType.OUT)
+                .status(DocumentStatus.DRAFT).version(0L).items(new ArrayList<>()).build();
+        InventoryDocumentItem item = InventoryDocumentItem.builder()
+                .id(101L).estimateItemId(estimateItemId).document(doc).part(part).quantity(qty)
+                .unitCost(new BigDecimal("50000")).lineTotal(new BigDecimal("50000")).build();
+        doc.getItems().add(item);
+        lenient().when(documentRepository.findByIdWithLock(10L)).thenReturn(Optional.of(doc));
+        lenient().when(itemRepository.findByDocumentIdOrderByLineNoAsc(10L)).thenReturn(List.of(item));
+        return doc;
+    }
+
+    private Map<String, Object> estimateRow(long partId, long orderId, String approval, String type, String reserved) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("part_id", partId);
+        row.put("repair_order_id", orderId);
+        row.put("approval_status", approval);
+        row.put("item_type", type);
+        row.put("reserved_quantity", new BigDecimal(reserved));
+        row.put("unit_price", new BigDecimal("60000"));
+        return row;
+    }
+
+    @Test
+    @DisplayName("Tạo chứng từ OUT có dòng không gắn báo giá: chặn ngay lúc tạo, 409/INVENTORY_ISSUE_BLOCKED")
+    void createDocument_OutWithoutEstimateItem_Blocked() {
+        InventoryDocumentItemRequest itemReq = InventoryDocumentItemRequest.builder()
+                .partId(1L).quantity(BigDecimal.ONE).unitCost(BigDecimal.TEN).build();
+        InventoryDocumentCreateRequest req = InventoryDocumentCreateRequest.builder()
+                .documentType(DocumentType.OUT).repairOrderId(21L).items(List.of(itemReq)).build();
+
+        assertThatThrownBy(() -> service.createDocument(100L, req))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVENTORY_ISSUE_BLOCKED)
+                .hasMessageContaining("gắn với phụ tùng đã duyệt");
+        verify(documentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Ghi sổ OUT khi lệnh đã hóa đơn: thông điệp riêng")
+    void postDocument_OutForInvoicedOrder_Blocked() {
+        Part part = Part.builder().id(1L).partName("Lốp").stockQuantity(BigDecimal.TEN).reservedQuantity(BigDecimal.ONE)
+                .purchasePrice(BigDecimal.ZERO).build();
+        outDocument(part, 12L, BigDecimal.ONE);
+        when(jdbcTemplate.queryForList(contains("SELECT status FROM repair_orders"), eq(100L)))
+                .thenReturn(List.of(Map.of("status", "INVOICED")));
+
+        assertThatThrownBy(() -> service.post(100L, 10L, null))
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVENTORY_ISSUE_BLOCKED)
+                .hasMessageContaining("đã lập hóa đơn");
+    }
+
+    @Test
+    @DisplayName("Ghi sổ OUT khi dòng không khớp phụ tùng đã duyệt của lệnh: thông điệp riêng")
+    void postDocument_OutLineMismatch_Blocked() {
+        Part part = Part.builder().id(1L).partName("Lốp").stockQuantity(BigDecimal.TEN).reservedQuantity(BigDecimal.ONE)
+                .purchasePrice(BigDecimal.ZERO).build();
+        outDocument(part, 12L, BigDecimal.ONE);
+        when(jdbcTemplate.queryForList(contains("SELECT status FROM repair_orders"), eq(100L)))
+                .thenReturn(List.of(Map.of("status", "COMPLETED")));
+        when(jdbcTemplate.queryForList(contains("SELECT ei.part_id"), eq(12L)))
+                .thenReturn(List.of(estimateRow(1L, 999L, "APPROVED", "PART", "1")));
+
+        assertThatThrownBy(() -> service.post(100L, 10L, null))
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVENTORY_ISSUE_BLOCKED)
+                .hasMessageContaining("không khớp với phụ tùng đã duyệt");
+    }
+
+    @Test
+    @DisplayName("Ghi sổ OUT vượt số giữ chỗ: nêu tên phụ tùng và số giữ chỗ")
+    void postDocument_OutExceedsReserved_Blocked() {
+        Part part = Part.builder().id(1L).partName("Lốp Michelin").stockQuantity(BigDecimal.TEN)
+                .reservedQuantity(BigDecimal.TEN).purchasePrice(BigDecimal.ZERO).build();
+        outDocument(part, 12L, new BigDecimal("3"));
+        when(jdbcTemplate.queryForList(contains("SELECT status FROM repair_orders"), eq(100L)))
+                .thenReturn(List.of(Map.of("status", "COMPLETED")));
+        when(jdbcTemplate.queryForList(contains("SELECT ei.part_id"), eq(12L)))
+                .thenReturn(List.of(estimateRow(1L, 100L, "APPROVED", "PART", "1")));
+
+        assertThatThrownBy(() -> service.post(100L, 10L, null))
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVENTORY_ISSUE_BLOCKED)
+                .hasMessageContaining("Lốp Michelin")
+                .hasMessageContaining("đã giữ chỗ (1)");
+    }
+
+    @Test
+    @DisplayName("Ghi sổ OUT thành công: trừ tồn, trừ giữ chỗ của phụ tùng và dòng báo giá")
+    void postDocument_OutSuccess_ReducesStockAndReservation() {
+        Part part = Part.builder().id(1L).partName("Lốp").stockQuantity(new BigDecimal("5"))
+                .reservedQuantity(new BigDecimal("2")).purchasePrice(new BigDecimal("50000")).build();
+        InventoryDocument doc = outDocument(part, 12L, BigDecimal.ONE);
+        when(jdbcTemplate.queryForList(contains("SELECT status FROM repair_orders"), eq(100L)))
+                .thenReturn(List.of(Map.of("status", "COMPLETED")));
+        when(jdbcTemplate.queryForList(contains("SELECT ei.part_id"), eq(12L)))
+                .thenReturn(List.of(estimateRow(1L, 100L, "APPROVED", "PART", "1")));
+        when(partRepository.findAllByIdInOrderByIdAscWithLock(List.of(1L))).thenReturn(List.of(part));
+
+        service.post(100L, 10L, null);
+
+        assertThat(doc.getStatus()).isEqualTo(DocumentStatus.POSTED);
+        assertThat(part.getStockQuantity()).isEqualByComparingTo("4");
+        assertThat(part.getReservedQuantity()).isEqualByComparingTo("1");
+        verify(jdbcTemplate).update(contains("SET reserved_quantity = reserved_quantity - ?"), eq(BigDecimal.ONE), eq(12L));
+    }
+
+    @Test
+    @DisplayName("Ứng viên xuất kho: trả phụ tùng giữ chỗ của lệnh, đánh dấu thiếu hàng khi tồn nhỏ hơn số cần xuất")
+    @SuppressWarnings("unchecked")
+    void getIssueCandidates_ReturnsReservedPartsWithShortage() throws Exception {
+        when(jdbcTemplate.queryForObject(contains("FROM repair_orders WHERE id"), eq(Integer.class), eq(21L))).thenReturn(1);
+        when(jdbcTemplate.query(contains("FROM estimate_items ei"), any(org.springframework.jdbc.core.RowMapper.class), eq(21L)))
+                .thenAnswer(invocation -> {
+                    org.springframework.jdbc.core.RowMapper<Object> mapper = invocation.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getLong("estimate_item_id")).thenReturn(71L);
+                    when(rs.getLong("part_id")).thenReturn(6L);
+                    when(rs.getString("sku")).thenReturn("TYRE-1");
+                    when(rs.getString("part_name")).thenReturn("Lốp xe Michelin");
+                    when(rs.getString("unit")).thenReturn("cái");
+                    when(rs.getBigDecimal("reserved_quantity")).thenReturn(new BigDecimal("2"));
+                    when(rs.getBigDecimal("stock_quantity")).thenReturn(new BigDecimal("1"));
+                    when(rs.getBigDecimal("purchase_price")).thenReturn(new BigDecimal("1800000"));
+                    return List.of(mapper.mapRow(rs, 0));
+                });
+
+        var result = service.getIssueCandidates(21L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).estimateItemId()).isEqualTo(71L);
+        assertThat(result.get(0).partName()).isEqualTo("Lốp xe Michelin");
+        assertThat(result.get(0).shortage()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Ứng viên xuất kho: lệnh không tồn tại thì báo không tìm thấy")
+    void getIssueCandidates_UnknownOrder() {
+        when(jdbcTemplate.queryForObject(contains("FROM repair_orders WHERE id"), eq(Integer.class), eq(999L))).thenReturn(0);
+
+        assertThatThrownBy(() -> service.getIssueCandidates(999L))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("Ghi sổ OUT có hai dòng cùng một dòng báo giá: chặn, mỗi phụ tùng chỉ xuất một lần")
+    void postDocument_OutDuplicateEstimateItem_Blocked() {
+        Part part = Part.builder().id(1L).partName("Lốp").stockQuantity(BigDecimal.TEN).reservedQuantity(BigDecimal.TEN)
+                .purchasePrice(BigDecimal.ZERO).build();
+        InventoryDocument doc = outDocument(part, 12L, BigDecimal.ONE);
+        InventoryDocumentItem duplicate = InventoryDocumentItem.builder()
+                .id(102L).estimateItemId(12L).document(doc).part(part).quantity(BigDecimal.ONE)
+                .unitCost(new BigDecimal("50000")).lineTotal(new BigDecimal("50000")).build();
+        doc.getItems().add(duplicate);
+        when(itemRepository.findByDocumentIdOrderByLineNoAsc(10L)).thenReturn(List.copyOf(doc.getItems()));
+        when(jdbcTemplate.queryForList(contains("SELECT status FROM repair_orders"), eq(100L)))
+                .thenReturn(List.of(Map.of("status", "COMPLETED")));
+        when(jdbcTemplate.queryForList(contains("SELECT ei.part_id"), eq(12L)))
+                .thenReturn(List.of(estimateRow(1L, 100L, "APPROVED", "PART", "5")));
+
+        assertThatThrownBy(() -> service.post(100L, 10L, null))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException.class)
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVENTORY_ISSUE_BLOCKED)
+                .hasMessageContaining("chỉ xuất một lần");
+    }
+
+    @Test
+    @DisplayName("Ghi sổ OUT khi số giữ chỗ của phụ tùng không đủ dù dòng báo giá còn đủ: thông điệp riêng")
+    void postDocument_OutPartReservationTooSmall_Blocked() {
+        Part part = Part.builder().id(1L).partName("Lốp Michelin").stockQuantity(BigDecimal.TEN)
+                .reservedQuantity(BigDecimal.ZERO).purchasePrice(BigDecimal.ZERO).build();
+        outDocument(part, 12L, BigDecimal.ONE);
+        when(jdbcTemplate.queryForList(contains("SELECT status FROM repair_orders"), eq(100L)))
+                .thenReturn(List.of(Map.of("status", "COMPLETED")));
+        when(jdbcTemplate.queryForList(contains("SELECT ei.part_id"), eq(12L)))
+                .thenReturn(List.of(estimateRow(1L, 100L, "APPROVED", "PART", "1")));
+        when(partRepository.findAllByIdInOrderByIdAscWithLock(List.of(1L))).thenReturn(List.of(part));
+
+        assertThatThrownBy(() -> service.post(100L, 10L, null))
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.INVENTORY_ISSUE_BLOCKED)
+                .hasMessageContaining("Lốp Michelin")
+                .hasMessageContaining("giữ chỗ")
+                .hasMessageContaining("không đủ để xuất");
+    }
+
+    @Test
+    @DisplayName("Ghi sổ OUT khi dòng báo giá không tồn tại: báo không tìm thấy")
+    void postDocument_OutUnknownEstimateItem_NotFound() {
+        Part part = Part.builder().id(1L).partName("Lốp").stockQuantity(BigDecimal.TEN).reservedQuantity(BigDecimal.ONE)
+                .purchasePrice(BigDecimal.ZERO).build();
+        outDocument(part, 999L, BigDecimal.ONE);
+        when(jdbcTemplate.queryForList(contains("SELECT status FROM repair_orders"), eq(100L)))
+                .thenReturn(List.of(Map.of("status", "COMPLETED")));
+        when(jdbcTemplate.queryForList(contains("SELECT ei.part_id"), eq(999L))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.post(100L, 10L, null))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException.class)
+                .hasMessageContaining("#999");
     }
 }

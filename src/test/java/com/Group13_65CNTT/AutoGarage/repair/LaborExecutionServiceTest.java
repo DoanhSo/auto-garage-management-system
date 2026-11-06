@@ -292,6 +292,72 @@ class LaborExecutionServiceTest {
                 .hasMessageContaining("đang có một phiên bấm giờ chưa kết thúc");
     }
 
+    // ---- Cổng bắt đầu công việc: báo giá đã duyệt và phụ tùng đã xuất kho ----
+
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.shared.contracts.InventoryOperations inventoryOperations;
+
+    private void stubTimerBasics() {
+        when(taskAssignmentRepository.findById(1L)).thenReturn(Optional.of(mockAssignment));
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                laborExecutionService, "inventoryOperations", inventoryOperations);
+    }
+
+    @Test
+    @DisplayName("Cổng bắt đầu việc: phiếu chờ duyệt báo giá bị chặn WORK_START_BLOCKED")
+    void startTimer_WaitingApproval_Blocked() {
+        stubTimerBasics();
+        mockOrder.setStatus(RepairOrderStatus.WAITING_APPROVAL);
+
+        assertThatThrownBy(() -> laborExecutionService.startTimer(1L, 1L))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("responseCode",
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.WORK_START_BLOCKED)
+                .hasMessageContaining("duyệt báo giá");
+        verify(laborSessionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Cổng bắt đầu việc: phiếu chờ phụ tùng bị chặn")
+    void startTimer_WaitingParts_Blocked() {
+        stubTimerBasics();
+        mockOrder.setStatus(RepairOrderStatus.WAITING_PARTS);
+
+        assertThatThrownBy(() -> laborExecutionService.startTimer(1L, 1L))
+                .hasFieldOrPropertyWithValue("responseCode",
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.WORK_START_BLOCKED)
+                .hasMessageContaining("chờ phụ tùng");
+    }
+
+    @Test
+    @DisplayName("Cổng bắt đầu việc: còn phụ tùng giữ chỗ chưa xuất kho thì nêu tên và dặn xuất kho")
+    void startTimer_PartsNotIssued_Blocked() {
+        stubTimerBasics();
+        doThrow(new ConflictException(com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.WORK_START_BLOCKED,
+                "Còn phụ tùng đã giữ chỗ nhưng chưa xuất kho: Lọc dầu. Hãy xuất kho trước khi bắt đầu công việc."))
+                .when(inventoryOperations).requireIssuedForWorkStart(100L);
+
+        assertThatThrownBy(() -> laborExecutionService.startTimer(1L, 1L))
+                .hasMessageContaining("Lọc dầu")
+                .hasMessageContaining("xuất kho");
+        verify(laborSessionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Cổng bắt đầu việc: làm lại sau QC trượt vẫn bấm giờ được khi đã xuất đủ")
+    void startTimer_QcFailedRework_Allowed() {
+        stubTimerBasics();
+        mockOrder.setStatus(RepairOrderStatus.QC_FAILED);
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(mockEmployee));
+        when(laborSessionRepository.findTopByEmployeeIdAndEndsAtIsNull(5L)).thenReturn(Optional.empty());
+        LaborSession session = LaborSession.builder().id(99L).assignmentId(1L).employeeId(5L).build();
+        when(laborSessionRepository.save(any(LaborSession.class))).thenReturn(session);
+        when(laborSessionMapper.toResponse(session)).thenReturn(LaborSessionResponse.builder().id(99L).build());
+
+        assertThat(laborExecutionService.startTimer(1L, 1L)).isNotNull();
+        verify(inventoryOperations).requireIssuedForWorkStart(100L);
+    }
+
     @Test
     @DisplayName("TV3-07: Tạm dừng bấm giờ (PAUSE) cập nhật stop_reason và chuyển task sang PAUSED")
     void stopTimer_Pause_Success() {

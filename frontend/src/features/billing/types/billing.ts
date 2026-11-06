@@ -77,6 +77,24 @@ export interface InvoiceReadiness {
   reason?: string | null;
 }
 
+/** Handover payment rule: debt versus credit limit and what must still be collected. */
+export interface HandoverReadiness {
+  allowed: boolean;
+  reasons: string[];
+  invoiceId: number | null;
+  invoiceBalance: number | string;
+  customerDebt: number | string;
+  creditLimit: number | string;
+  minimumPayment: number | string;
+  overdueInvoiceCodes: string[];
+}
+
+export interface InvoiceItemWarrantyInput {
+  warrantyDays: number;
+  warrantyKm: number;
+  warrantyTerms?: string;
+}
+
 export interface InvoiceVoidInput {
   voidReason: string;
 }
@@ -101,12 +119,17 @@ export interface PaymentReceiveInput {
   invoiceId: string | number;
   amount: string | number;
   paymentMethod: PaymentMethod;
+  /** Mã giao dịch của hệ thống; bỏ trống để máy chủ tự sinh. */
+  transactionCode?: string;
+  /** Mã tham chiếu của ngân hàng hoặc cổng thanh toán. */
   providerReference?: string;
   notes?: string;
   requestKey?: string;
 }
 
 export interface SupplierPaymentInput {
+  /** Mã giao dịch của hệ thống; bỏ trống để máy chủ tự sinh. */
+  transactionCode?: string;
   inventoryDocumentId: string | number;
   amount: string | number;
   paymentMethod: PaymentMethod;

@@ -20,6 +20,14 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     boolean existsByTransactionCode(String transactionCode);
 
+    /**
+     * Transaction codes starting with {@code prefix}, highest first. Callers read the first few and ignore
+     * codes whose tail is not a number, so a stray code never hides the real numbering.
+     */
+    @Query("SELECT p.transactionCode FROM Payment p WHERE p.transactionCode LIKE CONCAT(:prefix, '%')"
+            + " ORDER BY p.transactionCode DESC")
+    List<String> findCodesStartingWith(@Param("prefix") String prefix, Pageable pageable);
+
     boolean existsByProviderReference(String providerReference);
 
     Optional<Payment> findByProviderReference(String providerReference);

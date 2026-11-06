@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { billingApi } from '../api/billingApi';
 import type {
+  InvoiceItemWarrantyInput,
   InvoiceIssueInput,
   InvoiceVoidInput,
   PaymentReceiveInput,
@@ -42,6 +43,47 @@ export function useInvoiceReadinessQuery(orderId: string | number | null, enable
     queryKey: ['invoice-readiness', orderId],
     queryFn: () => billingApi.getInvoiceReadiness(orderId as string | number),
     enabled: !!orderId && enabled,
+  });
+}
+
+/** Payment rule for handing the vehicle over; refetched whenever the handover dialog opens. */
+export function useHandoverReadinessQuery(orderId: string | number | null, enabled = true) {
+  return useQuery({
+    queryKey: ['handover-readiness', orderId],
+    queryFn: () => billingApi.getHandoverReadiness(orderId as string | number),
+    enabled: !!orderId && enabled,
+    staleTime: 0,
+  });
+}
+
+export function useInvoiceByOrderQuery(orderId: string | number | null, enabled = true) {
+  return useQuery({
+    queryKey: ['invoice-by-order', orderId],
+    queryFn: () => billingApi.getInvoiceByOrder(orderId as string | number),
+    enabled: !!orderId && enabled,
+    staleTime: 0,
+  });
+}
+
+export function useSetItemWarrantyMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      invoiceId,
+      itemId,
+      data,
+    }: {
+      invoiceId: string | number;
+      itemId: string | number;
+      data: InvoiceItemWarrantyInput;
+    }) => billingApi.setItemWarranty(invoiceId, itemId, data),
+    onSuccess: (invoice) => {
+      queryClient.invalidateQueries({
+        queryKey: ['invoice-by-order', Number(invoice.repairOrderId)],
+      });
+      queryClient.invalidateQueries({ queryKey: ['invoice-by-order', invoice.repairOrderId] });
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+    },
   });
 }
 
@@ -99,6 +141,13 @@ export function useReceivePaymentMutation() {
       queryClient.invalidateQueries({ queryKey: ['invoice', invoiceId] });
       queryClient.invalidateQueries({ queryKey: ['customer-debts'] });
     },
+  });
+}
+
+/** Lấy mã giao dịch gợi ý mới (khi mở form hoặc bấm "Sinh lại"). */
+export function useSuggestPaymentCodeMutation() {
+  return useMutation({
+    mutationFn: (direction: PaymentDirection) => billingApi.suggestPaymentCode(direction),
   });
 }
 

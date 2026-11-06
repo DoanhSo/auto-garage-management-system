@@ -3,7 +3,9 @@ import type { Page } from '../../../shared/types/contracts';
 import { customerApi } from '../../customer/api/customerApi';
 import type { Supplier } from '../../inventory/types/inventory';
 import type {
+  HandoverReadiness,
   Invoice,
+  InvoiceItemWarrantyInput,
   InvoiceIssueInput,
   InvoiceReadiness,
   InvoiceVoidInput,
@@ -78,6 +80,19 @@ export const billingApi = {
   getInvoiceReadiness: (orderId: string | number) =>
     request<InvoiceReadiness>(`/billing/invoices/order/${orderId}/readiness`),
 
+  getHandoverReadiness: (orderId: string | number) =>
+    request<HandoverReadiness>(`/billing/invoices/order/${orderId}/handover-readiness`),
+
+  setItemWarranty: (
+    invoiceId: string | number,
+    itemId: string | number,
+    data: InvoiceItemWarrantyInput,
+  ) =>
+    request<Invoice>(`/billing/invoices/${invoiceId}/items/${itemId}/warranty`, {
+      method: 'PATCH',
+      body: data,
+    }).then(normalizeInvoice),
+
   issueInvoice: (data: InvoiceIssueInput) =>
     request<Invoice>('/billing/invoices/issue', {
       method: 'POST',
@@ -120,6 +135,9 @@ export const billingApi = {
       method: 'POST',
       body: data,
     }),
+
+  suggestPaymentCode: (direction: PaymentDirection) =>
+    request<string>('/billing/payments/suggest-code' + queryString({ direction })),
 
   paySupplier: (data: SupplierPaymentInput) =>
     request<Payment>('/billing/payments/pay-supplier', {

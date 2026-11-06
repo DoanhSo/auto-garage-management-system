@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Ban,
@@ -30,6 +30,7 @@ import {
 import { DataTable } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { formatDate, formatDateTime, money } from '../../../shared/utils/format';
+import { validatePaymentAmount } from '../utils/paymentAmount';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { errorMessage } from '../../../shared/api/errors';
@@ -40,6 +41,7 @@ import {
   useIssueInvoiceMutation,
   useVoidInvoiceMutation,
   useReceivePaymentMutation,
+  useSuggestPaymentCodeMutation,
 } from '../hooks/useBilling';
 import type {
   Invoice,
@@ -57,6 +59,11 @@ const sortOptions = [
   ['issuedAt:desc', 'Ngày phát hành · Mới nhất'],
   ['issuedAt:asc', 'Ngày phát hành · Cũ nhất'],
 ];
+
+/** Số còn nợ của hóa đơn; chưa có số còn nợ thì lấy tổng tiền. */
+function invoiceBalance(inv: Invoice): number {
+  return Number(inv.balanceAmount != null ? inv.balanceAmount : (inv.totalAmount ?? 0));
+}
 
 export function InvoicesPage() {
   const compact = useMediaQuery('(max-width: 640px)');
@@ -84,6 +91,8 @@ export function InvoicesPage() {
   const [payAmount, setPayAmount] = useState<number>(0);
   const [payMethod, setPayMethod] = useState<PaymentMethod>('VIETQR');
   const [payReference, setPayReference] = useState('');
+  const [payCode, setPayCode] = useState('');
+  const [payAmountError, setPayAmountError] = useState('');
   const [payNotes, setPayNotes] = useState('');
 
   const createTrigger = useRef<HTMLButtonElement>(null);
@@ -111,6 +120,7 @@ export function InvoicesPage() {
       : undefined;
   const voidMutation = useVoidInvoiceMutation();
   const receivePaymentMutation = useReceivePaymentMutation();
+  const { mutate: suggestPayCode, isPending: isSuggestingCode } = useSuggestPaymentCodeMutation();
 
   const filterCount = (query.trim() ? 1 : 0) + (selectedStatus !== '' ? 1 : 0);
   const isFiltered =
@@ -162,26 +172,37 @@ export function InvoicesPage() {
     }
   };
 
-  const handleOpenPayment = (inv: Invoice) => {
-    setPayingInvoice(inv);
-    setPayAmount(Number(inv.balanceAmount || inv.totalAmount || 0));
-    setPayMethod('VIETQR');
-    setPayReference('');
-    setPayNotes('');
-  };
+  const refreshPayCode = useCallback(() => {
+    suggestPayCode('IN', { onSuccess: (code) => setPayCode(code) });
+  }, [suggestPayCode]);
+
+  const handleOpenPayment = useCallback(
+    (inv: Invoice) => {
+      setPayingInvoice(inv);
+      setPayAmount(invoiceBalance(inv));
+      setPayAmountError('');
+      setPayMethod('VIETQR');
+      setPayReference('');
+      setPayCode('');
+      setPayNotes('');
+      refreshPayCode();
+    },
+    [refreshPayCode],
+  );
 
   const handleReceivePayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!payingInvoice || payAmount <= 0) {
-      notify('Vui lòng nhập số tiền thanh toán hợp lệ lớn hơn 0.');
-      return;
-    }
+    if (!payingInvoice) return;
+    const problem = validatePaymentAmount(payAmount, invoiceBalance(payingInvoice));
+    setPayAmountError(problem ?? '');
+    if (problem) return;
 
     const input: PaymentReceiveInput = {
       invoiceId: payingInvoice.id,
       amount: payAmount,
       paymentMethod: payMethod,
-      providerReference: payReference || undefined,
+      transactionCode: payCode.trim() || undefined,
+      providerReference: payReference.trim() || undefined,
       notes: payNotes || undefined,
     };
 
@@ -366,7 +387,7 @@ export function InvoicesPage() {
         },
       },
     ],
-    [canCollect, canVoidInvoice],
+    [canCollect, canVoidInvoice, handleOpenPayment],
   );
 
   const invoicesList = data?.content || [];
@@ -738,17 +759,27 @@ export function InvoicesPage() {
         size="lg"
       >
         {payingInvoice && (
-          <form onSubmit={handleReceivePayment} className="modal-form">
+          <form onSubmit={handleReceivePayment} className="modal-form" noValidate>
             <div className="form-section-label">THÔNG TIN PHIẾU THU TIỀN</div>
 
-            <Field label="Số tiền thu (VNĐ)" required>
+            <FormError
+              message={
+                receivePaymentMutation.error
+                  ? errorMessage(receivePaymentMutation.error)
+                  : undefined
+              }
+            />
+
+            <Field label="Số tiền thu (VNĐ)" required error={payAmountError || undefined}>
               <input
                 type="number"
-                min="1"
-                max={Number(payingInvoice.balanceAmount || payingInvoice.totalAmount)}
-                step="1000"
+                inputMode="numeric"
+                step="any"
                 value={payAmount}
-                onChange={(e) => setPayAmount(Number(e.target.value))}
+                onChange={(e) => {
+                  setPayAmount(Number(e.target.value));
+                  setPayAmountError('');
+                }}
                 className="input font-bold"
                 required
                 autoFocus
@@ -768,7 +799,42 @@ export function InvoicesPage() {
               </select>
             </Field>
 
-            <Field label="Mã giao dịch / Mã chuẩn chi">
+            <div className="full-width row-actions">
+              <span className="muted">
+                Còn nợ: <strong>{money(invoiceBalance(payingInvoice))}</strong>
+              </span>
+              <span className="grow" />
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setPayAmount(invoiceBalance(payingInvoice));
+                  setPayAmountError('');
+                }}
+              >
+                Thu đủ số còn lại
+              </Button>
+            </div>
+
+            <Field
+              label="Mã giao dịch"
+              hint={
+                <>
+                  Tự sinh theo ngày, sửa được. Để trống thì hệ thống tự sinh khi lưu.{' '}
+                  <Button variant="ghost" onClick={refreshPayCode} pending={isSuggestingCode}>
+                    Sinh lại
+                  </Button>
+                </>
+              }
+            >
+              <input
+                className="input font-mono"
+                placeholder="VD: PT-20261106-0001"
+                value={payCode}
+                onChange={(e) => setPayCode(e.target.value)}
+              />
+            </Field>
+
+            <Field label="Mã tham chiếu ngân hàng / cổng thanh toán" hint="Không bắt buộc.">
               <input
                 className="input font-mono"
                 placeholder="VD: QR-BIDV-102938"

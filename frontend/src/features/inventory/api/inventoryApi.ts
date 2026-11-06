@@ -9,6 +9,7 @@ import type {
   PartUpdateInput,
   InventoryDocument,
   InventoryDocumentCreateInput,
+  IssueCandidate,
   InventoryTransaction,
   StockReconciliation,
   DocumentType,
@@ -144,6 +145,11 @@ export const inventoryApi = {
       method: 'POST',
       body: data,
     }),
+
+  getIssueCandidates: (repairOrderId: string | number) =>
+    request<IssueCandidate[]>(
+      '/inventory/documents/issue-candidates' + queryString({ repairOrderId }),
+    ),
 
   postDocument: (id: string | number, requestKey?: string) =>
     request<null>(`/inventory/documents/${id}/post`, {

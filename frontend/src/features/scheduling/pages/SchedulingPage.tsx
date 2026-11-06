@@ -12,6 +12,10 @@ import {
   CalendarClock,
   History,
   Hammer,
+  Search,
+  X,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
@@ -30,6 +34,8 @@ import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { useUiPolicy } from '../../../shared/config/policy';
 import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import { formatDate, money } from '../../../shared/utils/format';
+import { shiftDate, todayKey, weekStart } from '../../../shared/utils/weekCalendar';
+import { filterShifts } from '../utils/shiftTimeline';
 import {
   useServiceBaysQuery,
   useDeleteServiceBayMutation,
@@ -41,6 +47,7 @@ import {
 } from '../hooks/useScheduling';
 import { ServiceBayEditor } from '../components/ServiceBayEditor';
 import { ShiftEditor } from '../components/ShiftEditor';
+import { ShiftTimelineBoard } from '../components/ShiftTimelineBoard';
 import { BayMaintenanceModal } from '../components/BayMaintenanceModal';
 import { BayReservationsModal } from '../components/BayReservationsModal';
 import { EmployeeEditor } from '../components/EmployeeEditor';
@@ -101,6 +108,9 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const [shiftEmployee, setShiftEmployee] = useState('');
   const [shiftDay, setShiftDay] = useState('');
   const [shiftStatus, setShiftStatus] = useState<'ALL' | 'ACTIVE' | 'CANCELLED'>('ALL');
+  const [shiftKeyword, setShiftKeyword] = useState('');
+  const [shiftView, setShiftView] = useState<'week' | 'list'>('week');
+  const [shiftWeekDate, setShiftWeekDate] = useState(() => todayKey());
 
   const [bayModalOpen, setBayModalOpen] = useState(false);
   const [editingBay, setEditingBay] = useState<ServiceBay | null>(null);
@@ -112,6 +122,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
   const [shiftPresetEmployee, setShiftPresetEmployee] = useState<string | number | null>(null);
   const [shiftPresetBay, setShiftPresetBay] = useState<string | number | null>(null);
+  const [shiftPresetDate, setShiftPresetDate] = useState<string | null>(null);
   const [cancelingShiftId, setCancelingShiftId] = useState<number | string | null>(null);
 
   const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
@@ -119,6 +130,11 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
 
   const baysQuery = useServiceBaysQuery();
   const shiftsQuery = useShiftsQuery({ size: 100 });
+  const weekFrom = weekStart(shiftWeekDate);
+  const weekShiftsQuery = useShiftsQuery(
+    { from: weekFrom, to: shiftDate(weekFrom, 6), size: policy.paginationMaxSize },
+    activeTab === 'shifts' && shiftView === 'week',
+  );
   const reservationsQuery = useActiveReservationsQuery();
   const employeesQuery = useSchedulingEmployeesQuery();
 
@@ -193,17 +209,30 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
     });
   }, [allBays, bayKeyword, bayFilter, currentByBay]);
 
-  const shifts = useMemo(
-    () =>
-      allShifts.filter((s) => {
+  const bayById = useMemo(() => new Map(allBays.map((b) => [String(b.id), b] as const)), [allBays]);
+  const bayOf = (id?: string | number | null) => (id == null ? undefined : bayById.get(String(id)));
+  const shiftSearch = {
+    employeeOf: (id: string | number) => employeeMap.get(String(id)),
+    nameOf: employeeName,
+    bayOf,
+  };
+
+  const applyShiftFilters = (rows: readonly Shift[], withDay: boolean) =>
+    filterShifts(
+      rows.filter((s) => {
         if (shiftEmployee && String(s.employeeId) !== shiftEmployee) return false;
         if (shiftStatus !== 'ALL' && (s.status === 'CANCELLED') !== (shiftStatus === 'CANCELLED'))
           return false;
-        if (shiftDay && new Date(s.startsAt).toLocaleDateString('en-CA') !== shiftDay) return false;
+        if (withDay && shiftDay && new Date(s.startsAt).toLocaleDateString('en-CA') !== shiftDay)
+          return false;
         return true;
       }),
-    [allShifts, shiftEmployee, shiftStatus, shiftDay],
-  );
+      shiftKeyword,
+      shiftSearch,
+    );
+
+  const shifts = applyShiftFilters(allShifts, true);
+  const weekShifts = applyShiftFilters(weekShiftsQuery.data?.content ?? [], false);
 
   const pageRows = <T,>(rows: T[]) => rows.slice(page * size, page * size + size);
   const pageInfo = (total: number) => ({
@@ -565,7 +594,9 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
     activeTab === 'bays' || activeTab === 'dispatch'
       ? baysQuery
       : activeTab === 'shifts'
-        ? shiftsQuery
+        ? shiftView === 'week'
+          ? weekShiftsQuery
+          : shiftsQuery
         : employeesQuery;
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
@@ -592,6 +623,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
       onClick={() => {
         setShiftPresetEmployee(null);
         setShiftPresetBay(null);
+        setShiftPresetDate(null);
         setShiftModalOpen(true);
       }}
     >
@@ -646,6 +678,36 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
     ) : tab === 'shifts' ? (
       <div className="user-filter-grid">
         <div className="user-filter-field">
+          <label htmlFor="shift-keyword">Tìm kiếm ca làm việc</label>
+          <div className="user-search">
+            <Search size={17} aria-hidden />
+            <input
+              id="shift-keyword"
+              type="search"
+              className="input"
+              placeholder="Tìm theo tên, mã, tài khoản, chuyên môn, loại ca, khoang, ghi chú..."
+              value={shiftKeyword}
+              onChange={(e) => {
+                setShiftKeyword(e.target.value);
+                setPage(0);
+              }}
+            />
+            {shiftKeyword && (
+              <button
+                type="button"
+                className="search-clear"
+                aria-label="Xóa từ khóa tìm kiếm"
+                onClick={() => {
+                  setShiftKeyword('');
+                  setPage(0);
+                }}
+              >
+                <X size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="user-filter-field">
           <label htmlFor="shift-employee">Kỹ thuật viên</label>
           <select
             id="shift-employee"
@@ -664,19 +726,21 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
             ))}
           </select>
         </div>
-        <div className="user-filter-field">
-          <label htmlFor="shift-day">Ngày làm việc</label>
-          <input
-            id="shift-day"
-            type="date"
-            className="input"
-            value={shiftDay}
-            onChange={(e) => {
-              setShiftDay(e.target.value);
-              setPage(0);
-            }}
-          />
-        </div>
+        {shiftView === 'list' && (
+          <div className="user-filter-field">
+            <label htmlFor="shift-day">Ngày làm việc</label>
+            <input
+              id="shift-day"
+              type="date"
+              className="input"
+              value={shiftDay}
+              onChange={(e) => {
+                setShiftDay(e.target.value);
+                setPage(0);
+              }}
+            />
+          </div>
+        )}
         <div className="user-filter-field">
           <label htmlFor="shift-status">Trạng thái ca</label>
           <select
@@ -789,6 +853,25 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
           )}
         </div>
 
+        {activeTab === 'shifts' && (
+          <div className="booking-view-switch" role="group" aria-label="Cách xem ca làm việc">
+            <Button
+              variant={shiftView === 'week' ? 'primary' : 'secondary'}
+              aria-pressed={shiftView === 'week'}
+              onClick={() => setShiftView('week')}
+            >
+              <LayoutGrid size={15} aria-hidden /> Sơ đồ tuần
+            </Button>
+            <Button
+              variant={shiftView === 'list' ? 'primary' : 'secondary'}
+              aria-pressed={shiftView === 'list'}
+              onClick={() => setShiftView('list')}
+            >
+              <List size={15} aria-hidden /> Danh sách
+            </Button>
+          </div>
+        )}
+
         {activeTab !== 'employees' && activeTab !== 'dispatch' && (
           <div className="user-filters" role="search" aria-label="Bộ lọc">
             {filtersFor(activeTab)}
@@ -826,21 +909,58 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
             />
           </>
         ) : activeTab === 'shifts' ? (
-          <>
-            <DataTable<Shift>
-              caption="Danh sách ca làm việc"
-              columns={shiftColumns}
-              data={pageRows(shifts)}
-              busy={shiftsQuery.isFetching}
-            />
-            <Pagination
-              page={page}
-              size={size}
-              data={pageInfo(shifts.length)}
-              policy={policy}
-              onChange={onPageChange}
-            />
-          </>
+          shiftView === 'week' ? (
+            <>
+              <ShiftTimelineBoard
+                shifts={weekShifts}
+                employees={employees}
+                employeeName={employeeName}
+                bayOf={bayOf}
+                selectedDate={shiftWeekDate}
+                onDateChange={setShiftWeekDate}
+                canManage={isAdmin}
+                searching={shiftKeyword.trim() !== '' || shiftEmployee !== ''}
+                onAddShift={(employeeId, day) => {
+                  setShiftPresetEmployee(employeeId);
+                  setShiftPresetBay(null);
+                  setShiftPresetDate(day);
+                  setShiftModalOpen(true);
+                }}
+                onCancelShift={(shift) => setCancelingShiftId(shift.id)}
+              />
+              {weekShiftsQuery.data &&
+                Number(weekShiftsQuery.data.totalElements) >
+                  weekShiftsQuery.data.content.length && (
+                  <p className="timeline-hint" role="status">
+                    Chỉ hiển thị {weekShiftsQuery.data.content.length}/
+                    {weekShiftsQuery.data.totalElements} ca của tuần. Hãy chọn một kỹ thuật viên để
+                    xem đầy đủ.
+                  </p>
+                )}
+            </>
+          ) : (
+            <>
+              <DataTable<Shift>
+                caption="Danh sách ca làm việc"
+                columns={shiftColumns}
+                data={pageRows(shifts)}
+                busy={shiftsQuery.isFetching}
+                emptyTitle={shiftKeyword.trim() ? 'Không có ca nào khớp với từ khóa' : undefined}
+                emptyDescription={
+                  shiftKeyword.trim()
+                    ? 'Thử gõ tên, mã nhân viên, loại ca hoặc khoang khác, hoặc xóa từ khóa.'
+                    : undefined
+                }
+              />
+              <Pagination
+                page={page}
+                size={size}
+                data={pageInfo(shifts.length)}
+                policy={policy}
+                onChange={onPageChange}
+              />
+            </>
+          )
         ) : (
           <>
             <DataTable<Employee>
@@ -894,12 +1014,17 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
           open={shiftModalOpen}
           initialEmployeeId={shiftPresetEmployee}
           initialServiceBayId={shiftPresetBay}
+          initialDate={shiftPresetDate}
           onClose={() => {
             setShiftModalOpen(false);
             setShiftPresetEmployee(null);
             setShiftPresetBay(null);
+            setShiftPresetDate(null);
           }}
-          onSaved={() => shiftsQuery.refetch()}
+          onSaved={() => {
+            void shiftsQuery.refetch();
+            void weekShiftsQuery.refetch();
+          }}
         />
       )}
 

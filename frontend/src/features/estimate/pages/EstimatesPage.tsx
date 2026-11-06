@@ -23,6 +23,7 @@ import { money, formatDate, formatDateTime, formatPlate } from '../../../shared/
 import { useEstimatesQuery, useSendEstimateMutation } from '../hooks/useEstimate';
 import { EstimateEditor } from '../components/EstimateEditor';
 import { EstimateDecisionModal } from '../components/EstimateDecisionModal';
+import { canDecideEstimate } from '../utils/lineDecisions';
 import type { Estimate, EstimateStatus } from '../types/estimate';
 import { estimateStatusLabels } from '../types/estimate';
 
@@ -223,7 +224,11 @@ function ReadyEstimates({
               </Button>
             )}
             <Button variant="ghost" onClick={() => setSelectedEstimate(row.original)}>
-              <Eye size={14} /> Xem & duyệt dòng
+              <Eye size={14} />{' '}
+              {canDecideEstimate(row.original.status) &&
+              (row.original.items ?? []).some((item) => item.approvalStatus === 'PENDING')
+                ? 'Xem & duyệt dòng'
+                : 'Xem chi tiết'}
             </Button>
           </div>
         ),

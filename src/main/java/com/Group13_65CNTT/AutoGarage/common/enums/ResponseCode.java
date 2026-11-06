@@ -58,6 +58,14 @@ public enum ResponseCode {
             2022, "Handover is not allowed in the current state", HttpStatus.CONFLICT),
     INVOICE_BLOCKED(
             2023, "Invoice cannot be issued in the current state", HttpStatus.CONFLICT),
+    INVENTORY_ISSUE_BLOCKED(
+            2024, "Stock cannot be issued in the current state", HttpStatus.CONFLICT),
+    PAYMENT_BLOCKED(
+            2025, "Payment cannot be recorded in the current state", HttpStatus.CONFLICT),
+    WORK_START_BLOCKED(
+            2026, "Work cannot be started in the current state", HttpStatus.CONFLICT),
+    WARRANTY_BLOCKED(
+            2027, "Warranty cannot be changed in the current state", HttpStatus.CONFLICT),
     UNAUTHORIZED(3001, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),
     FORBIDDEN(3002, "You do not have permission for this operation", HttpStatus.FORBIDDEN),
     INVALID_TOKEN(3003, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),

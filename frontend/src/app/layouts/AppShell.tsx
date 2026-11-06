@@ -26,6 +26,12 @@ import {
   DollarSign,
   CreditCard,
   Banknote,
+  UserCog,
+  CalendarClock,
+  Warehouse,
+  HardHat,
+  Calculator,
+  Award,
 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from '../providers/AuthProvider';
@@ -44,14 +50,16 @@ import {
   STAFF_ROLES,
   REPAIR_VIEW_ROLES,
   INVOICE_VIEW_ROLES,
-  PAYROLL_VIEW_ROLES,
+  PAYROLL_MANAGE_ROLES,
   ADMIN_ROLES,
 } from '../access';
 import { initials } from '../../shared/utils/format';
+import { isNavActive, navHref, type NavTarget } from './navMatch';
 
 const sections = [
   'DỊCH VỤ & XƯỞNG',
   'KHO & VẬT TƯ',
+  'NHÂN SỰ & LƯƠNG',
   'TÀI CHÍNH & CÔNG NỢ',
   'QUẢN TRỊ HỆ THỐNG',
   'CÁ NHÂN',
@@ -59,7 +67,7 @@ const sections = [
 
 type NavSection = (typeof sections)[number];
 
-interface NavItem {
+interface NavItem extends NavTarget {
   to: string;
   label: string;
   customerLabel?: string;
@@ -92,13 +100,6 @@ const links: ReadonlyArray<NavItem> = [
     icon: FileText,
     section: 'DỊCH VỤ & XƯỞNG',
     allowedRoles: ESTIMATE_VIEW_ROLES,
-  },
-  {
-    to: '/scheduling',
-    label: 'Khoang & Lịch ca',
-    icon: CalendarCheck,
-    section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: SCHEDULING_ROLES,
   },
   {
     to: '/warranties',
@@ -159,6 +160,72 @@ const links: ReadonlyArray<NavItem> = [
     allowedRoles: ['ADMIN', 'WAREHOUSE_STAFF'],
   },
   {
+    to: '/payroll',
+    tab: 'employees',
+    label: 'Quản lý nhân viên',
+    icon: UserCog,
+    section: 'NHÂN SỰ & LƯƠNG',
+    allowedRoles: PAYROLL_MANAGE_ROLES,
+  },
+  {
+    to: '/scheduling',
+    tab: 'shifts',
+    label: 'Lịch ca làm việc',
+    icon: CalendarClock,
+    section: 'NHÂN SỰ & LƯƠNG',
+    allowedRoles: SCHEDULING_ROLES,
+  },
+  {
+    to: '/scheduling',
+    tab: 'employees',
+    label: 'Đội kỹ thuật viên',
+    icon: HardHat,
+    section: 'NHÂN SỰ & LƯƠNG',
+    allowedRoles: SCHEDULING_ROLES,
+  },
+  {
+    to: '/scheduling',
+    tab: 'dispatch',
+    alsoTabs: ['bays'],
+    defaultTab: true,
+    label: 'Khoang & điều phối',
+    icon: Warehouse,
+    section: 'NHÂN SỰ & LƯƠNG',
+    allowedRoles: SCHEDULING_ROLES,
+  },
+  {
+    to: '/payroll',
+    tab: 'monthly',
+    defaultTab: true,
+    label: 'Bảng lương tháng',
+    icon: Banknote,
+    section: 'NHÂN SỰ & LƯƠNG',
+    allowedRoles: PAYROLL_MANAGE_ROLES,
+  },
+  {
+    to: '/payroll',
+    tab: 'coefficients',
+    label: 'Hệ số & đơn giá lương',
+    icon: Calculator,
+    section: 'NHÂN SỰ & LƯƠNG',
+    allowedRoles: PAYROLL_MANAGE_ROLES,
+  },
+  {
+    to: '/payroll',
+    tab: 'bonus',
+    label: 'Chính sách thưởng ca',
+    icon: Award,
+    section: 'NHÂN SỰ & LƯƠNG',
+    allowedRoles: PAYROLL_MANAGE_ROLES,
+  },
+  {
+    to: '/payroll',
+    label: 'Phiếu lương của tôi',
+    icon: Banknote,
+    section: 'NHÂN SỰ & LƯƠNG',
+    allowedRoles: ['TECHNICIAN'],
+  },
+  {
     to: '/billing/invoices',
     label: 'Hóa đơn dịch vụ',
     customerLabel: 'Hóa đơn của tôi',
@@ -179,14 +246,6 @@ const links: ReadonlyArray<NavItem> = [
     icon: CreditCard,
     section: 'TÀI CHÍNH & CÔNG NỢ',
     allowedRoles: FINANCE_ROLES,
-  },
-  {
-    to: '/payroll',
-    label: 'Bảng lương & Năng suất',
-    technicianLabel: 'Phiếu lương của tôi',
-    icon: Banknote,
-    section: 'TÀI CHÍNH & CÔNG NỢ',
-    allowedRoles: PAYROLL_VIEW_ROLES,
   },
   {
     to: '/admin/reports',
@@ -249,8 +308,8 @@ export function AppShell() {
         : link.label;
 
   const allowed = links.filter((link) => !!user && link.allowedRoles.includes(user.role));
-  const currentLink = links.find(
-    (link) => location.pathname === link.to || location.pathname.startsWith(`${link.to}/`),
+  const currentLink = links.find((link) =>
+    isNavActive(link, location.pathname, location.search, links),
   );
   const title = currentLink ? labelOf(currentLink) : 'Tài khoản cá nhân';
 
@@ -267,13 +326,17 @@ export function AppShell() {
             {items.map((link) => {
               const { to, icon: Icon } = link;
               const label = labelOf(link);
+              const href = navHref(link);
+              // Several entries can open the same page on different tabs, so highlight by tab, not path.
+              const active = isNavActive(link, location.pathname, location.search, links);
               return (
                 <NavLink
-                  key={to}
-                  to={to}
+                  key={href}
+                  to={href}
                   onClick={close}
                   title={collapsed ? label : undefined}
-                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                  aria-current={active ? 'page' : undefined}
+                  className={`nav-item ${active ? 'active' : ''}`}
                 >
                   <Icon size={19} aria-hidden />
                   <span className="nav-item-label">{label}</span>

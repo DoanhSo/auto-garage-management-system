@@ -5,6 +5,7 @@ import com.Group13_65CNTT.AutoGarage.common.util.RequestFingerprint;
 import com.Group13_65CNTT.AutoGarage.billing.dto.request.InvoiceIssueRequest;
 import com.Group13_65CNTT.AutoGarage.billing.dto.request.PaymentReceiveRequest;
 import com.Group13_65CNTT.AutoGarage.billing.dto.request.SupplierPaymentRequest;
+import com.Group13_65CNTT.AutoGarage.billing.dto.response.HandoverReadinessResponse;
 import com.Group13_65CNTT.AutoGarage.billing.dto.response.InvoiceBalanceResponse;
 import com.Group13_65CNTT.AutoGarage.billing.dto.response.InvoiceItemResponse;
 import com.Group13_65CNTT.AutoGarage.billing.dto.response.InvoiceReadinessResponse;
@@ -34,6 +35,7 @@ import com.Group13_65CNTT.AutoGarage.common.enums.Role;
 import com.Group13_65CNTT.AutoGarage.common.security.CurrentUserProvider;
 import com.Group13_65CNTT.AutoGarage.common.security.CustomerScope;
 import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
+import com.Group13_65CNTT.AutoGarage.billing.constant.PaymentCodePolicy;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
@@ -50,6 +52,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -65,6 +68,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Locale;
 
 @Service
 @Slf4j
@@ -408,6 +412,47 @@ public class BillingServiceImpl implements BillingService {
 
     @Override
     @Transactional
+    @com.Group13_65CNTT.AutoGarage.audit.annotation.Audited(
+            action = com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants.ACTION_INVOICE_WARRANTY_SET,
+            entity = com.Group13_65CNTT.AutoGarage.common.constant.AuditConstants.ENTITY_INVOICE,
+            idArgument = 1)
+    public InvoiceResponse updateInvoiceItemWarranty(
+            long actorUserId, Long invoiceId, Long itemId,
+            com.Group13_65CNTT.AutoGarage.billing.dto.request.InvoiceItemWarrantyRequest request) {
+        Invoice invoice = invoiceRepository.findByIdWithLock(invoiceId)
+                .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
+        if (invoice.getStatus() == InvoiceStatus.VOID) {
+            throw new ConflictException(ResponseCode.WARRANTY_BLOCKED,
+                    "Hóa đơn đã bị hủy, không thể thêm bảo hành.");
+        }
+        List<String> orderStatus = jdbcTemplate.queryForList(
+                "SELECT status FROM repair_orders WHERE id = ?", String.class, invoice.getRepairOrderId());
+        if (!orderStatus.isEmpty() && "CLOSED".equals(orderStatus.get(0))) {
+            throw new ConflictException(ResponseCode.WARRANTY_BLOCKED,
+                    "Phiếu đã bàn giao, không thể thêm bảo hành. Bảo hành chỉ thêm được trước khi bàn giao xe.");
+        }
+        InvoiceItem item = invoiceItemRepository.findById(itemId)
+                .filter(found -> found.getInvoice() != null && Objects.equals(found.getInvoice().getId(), invoiceId))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy dòng hóa đơn với ID: " + itemId));
+        Integer books = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM warranties WHERE invoice_item_id = ?", Integer.class, itemId);
+        if (books != null && books > 0) {
+            throw new ConflictException(ResponseCode.WARRANTY_BLOCKED,
+                    "Dòng \"" + item.getItemName() + "\" đã có sổ bảo hành, không thể sửa chính sách. "
+                            + "Hãy điều chỉnh trong màn Bảo hành.");
+        }
+        String terms = request.getWarrantyTerms() == null ? null : request.getWarrantyTerms().trim();
+        item.setWarrantyDays(request.getWarrantyDays());
+        item.setWarrantyKm(request.getWarrantyKm());
+        item.setWarrantyTerms(terms == null || terms.isEmpty() ? null : terms);
+        invoiceItemRepository.save(item);
+        log.info("Invoice {} item {} warranty set to {} days / {} km by {}", invoiceId, itemId,
+                request.getWarrantyDays(), request.getWarrantyKm(), actorUserId);
+        return enrichInvoiceResponse(invoice);
+    }
+
+    @Override
+    @Transactional
     public void voidInvoice(long actorUserId, Long invoiceId, String voidReason) {
         Invoice invoice = invoiceRepository.findByIdWithLock(invoiceId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
@@ -476,28 +521,26 @@ public class BillingServiceImpl implements BillingService {
                 .orElseThrow(() -> new BusinessException(ResponseCode.RESOURCE_NOT_FOUND));
 
         if (invoice.getStatus() == InvoiceStatus.VOID) {
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new ConflictException(ResponseCode.PAYMENT_BLOCKED, "Hóa đơn đã bị hủy, không thể thu tiền.");
         }
         if (invoice.getStatus() == InvoiceStatus.PAID) {
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new ConflictException(ResponseCode.PAYMENT_BLOCKED, "Hóa đơn đã được thu đủ.");
         }
 
         BigDecimal currentPaid = paymentRepository.calculatePaidAmountForInvoice(invoice.getId());
         BigDecimal balance = invoice.getTotalAmount().subtract(currentPaid);
 
-        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0 || request.getAmount().compareTo(balance) > 0) {
-            log.warn("Payment amount {} is invalid for invoice balance {}", request.getAmount(), balance);
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Số tiền thu phải lớn hơn 0.");
+        }
+        if (request.getAmount().compareTo(balance) > 0) {
+            log.warn("Payment amount {} exceeds invoice balance {}", request.getAmount(), balance);
+            throw new ConflictException(ResponseCode.PAYMENT_BLOCKED,
+                    "Số tiền thu vượt số còn nợ (" + formatMoney(balance) + " đ).");
         }
 
-        if (request.getProviderReference() != null && !request.getProviderReference().isBlank()) {
-            if (paymentRepository.existsByProviderReference(request.getProviderReference().trim())) {
-                log.warn("Provider reference already exists: {}", request.getProviderReference());
-                throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
-            }
-        }
-
-        String txCode = "TX-IN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        requireFreeProviderReference(request.getProviderReference());
+        String txCode = resolveTransactionCode(request.getTransactionCode(), PaymentDirection.IN);
         Payment payment = Payment.builder()
                 .transactionCode(txCode)
                 .direction(PaymentDirection.IN)
@@ -590,25 +633,24 @@ public class BillingServiceImpl implements BillingService {
         if (doc.getDocumentType() != DocumentType.IN || doc.getStatus() != DocumentStatus.POSTED || doc.getSupplier() == null) {
             log.warn("Cannot pay document {}: type={}, status={}, supplier={}",
                     doc.getId(), doc.getDocumentType(), doc.getStatus(), doc.getSupplier());
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new ConflictException(ResponseCode.PAYMENT_BLOCKED,
+                    "Chỉ chi trả được cho phiếu nhập kho của nhà cung cấp đã ghi sổ.");
         }
 
         BigDecimal currentPaid = paymentRepository.calculatePaidAmountForDocument(doc.getId());
         BigDecimal balance = doc.getTotalAmount().subtract(currentPaid);
 
-        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0 || request.getAmount().compareTo(balance) > 0) {
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Số tiền chi phải lớn hơn 0.");
+        }
+        if (request.getAmount().compareTo(balance) > 0) {
             log.warn("Payment amount {} exceeds document balance {}", request.getAmount(), balance);
-            throw new BusinessException(ResponseCode.BAD_REQUEST);
+            throw new ConflictException(ResponseCode.PAYMENT_BLOCKED,
+                    "Số tiền chi vượt số còn nợ nhà cung cấp (" + formatMoney(balance) + " đ).");
         }
 
-        if (request.getProviderReference() != null && !request.getProviderReference().isBlank()) {
-            if (paymentRepository.existsByProviderReference(request.getProviderReference().trim())) {
-                log.warn("Provider reference already exists: {}", request.getProviderReference());
-                throw new BusinessException(ResponseCode.DUPLICATE_RESOURCE);
-            }
-        }
-
-        String txCode = "TX-OUT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        requireFreeProviderReference(request.getProviderReference());
+        String txCode = resolveTransactionCode(request.getTransactionCode(), PaymentDirection.OUT);
         Payment payment = Payment.builder()
                 .transactionCode(txCode)
                 .direction(PaymentDirection.OUT)
@@ -632,63 +674,155 @@ public class BillingServiceImpl implements BillingService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public String suggestTransactionCode(PaymentDirection direction) {
+        return generateTransactionCode(direction);
+    }
+
+    /** Uses the typed code when given (normalised and checked), otherwise generates the next one of the day. */
+    private String resolveTransactionCode(String requested, PaymentDirection direction) {
+        String code = requested == null ? "" : requested.trim().toUpperCase(Locale.ROOT);
+        if (code.isEmpty()) {
+            return generateTransactionCode(direction);
+        }
+        if (code.length() > PaymentCodePolicy.MAX_LENGTH || !code.matches(PaymentCodePolicy.ALLOWED_PATTERN)) {
+            throw new BusinessRuleException("Mã giao dịch chỉ gồm chữ, số và các ký tự - _ . (tối đa "
+                    + PaymentCodePolicy.MAX_LENGTH + " ký tự).");
+        }
+        if (paymentRepository.existsByTransactionCode(code)) {
+            throw new ConflictException(ResponseCode.PAYMENT_BLOCKED,
+                    "Mã giao dịch " + code + " đã tồn tại. Hãy nhập mã khác hoặc bấm Sinh lại.");
+        }
+        return code;
+    }
+
+    private String generateTransactionCode(PaymentDirection direction) {
+        String dayPrefix = PaymentCodePolicy.dayPrefix(direction, PaymentCodePolicy.today());
+        long next = paymentRepository
+                .findCodesStartingWith(dayPrefix, PageRequest.of(0, PaymentCodePolicy.NUMBERING_LOOKBACK))
+                .stream()
+                .map(code -> code.substring(dayPrefix.length()))
+                .filter(tail -> !tail.isEmpty() && tail.length() <= 9 && tail.chars().allMatch(Character::isDigit))
+                .mapToLong(Long::parseLong)
+                .max()
+                .orElse(0L) + 1;
+        for (int attempt = 0; attempt < PaymentCodePolicy.GENERATION_ATTEMPTS; attempt++) {
+            String candidate = PaymentCodePolicy.format(dayPrefix, next + attempt);
+            if (!paymentRepository.existsByTransactionCode(candidate)) {
+                return candidate;
+            }
+        }
+        throw new ConflictException(ResponseCode.PAYMENT_BLOCKED,
+                "Không sinh được mã giao dịch mới, hãy thử lại sau ít giây.");
+    }
+
+    private void requireFreeProviderReference(String providerReference) {
+        if (providerReference == null || providerReference.isBlank()) {
+            return;
+        }
+        String reference = providerReference.trim();
+        if (paymentRepository.existsByProviderReference(reference)) {
+            log.warn("Provider reference already exists: {}", reference);
+            throw new ConflictException(ResponseCode.PAYMENT_BLOCKED,
+                    "Mã tham chiếu " + reference + " đã được dùng cho giao dịch khác.");
+        }
+    }
+
+    private static String formatMoney(BigDecimal amount) {
+        return String.format(Locale.forLanguageTag("vi-VN"), "%,.0f", amount);
+    }
+
+    @Override
     @Transactional
     public void requireHandoverAllowed(long actorUserId, long repairOrderId) {
-        Invoice invoice = invoiceRepository.findActiveByRepairOrderIdWithLock(repairOrderId)
-                .orElseThrow(() -> new ConflictException(ResponseCode.HANDOVER_BLOCKED,
-                        "Phiếu chưa có hóa đơn còn hiệu lực. Hãy lập hóa đơn trước khi bàn giao."));
+        HandoverReadinessResponse result = evaluateHandover(repairOrderId, true);
+        if (!result.allowed()) {
+            log.warn("Handover of order {} blocked: {}", repairOrderId, result.reasons());
+            throw new ConflictException(ResponseCode.HANDOVER_BLOCKED, String.join(" ", result.reasons()));
+        }
+    }
 
+    @Override
+    @Transactional(readOnly = true)
+    public HandoverReadinessResponse getHandoverReadiness(Long repairOrderId) {
+        return evaluateHandover(repairOrderId, false);
+    }
+
+    /**
+     * Credit rule: a customer with no credit limit must pay the invoice in full; with a limit the debt
+     * left after this invoice may not exceed it, so at least debt − limit must be collected. Customers with an
+     * overdue invoice are always blocked.
+     */
+    private HandoverReadinessResponse evaluateHandover(long repairOrderId, boolean lock) {
+        Optional<Invoice> found = lock
+                ? invoiceRepository.findActiveByRepairOrderIdWithLock(repairOrderId)
+                : invoiceRepository.findActiveByRepairOrderId(repairOrderId);
+        if (found.isEmpty()) {
+            return blockedHandover(null, "Phiếu chưa có hóa đơn còn hiệu lực. Hãy lập hóa đơn trước khi bàn giao.");
+        }
+        Invoice invoice = found.get();
         if (invoice.getStatus() == InvoiceStatus.VOID) {
-            throw new ConflictException(ResponseCode.HANDOVER_BLOCKED,
+            return blockedHandover(invoice.getId(),
                     "Hóa đơn của phiếu đã bị hủy. Hãy lập lại hóa đơn trước khi bàn giao.");
         }
-        if (invoice.getStatus() == InvoiceStatus.PAID) {
-            return; // Handover allowed
+
+        BigDecimal paid = invoice.getStatus() == InvoiceStatus.PAID
+                ? invoice.getTotalAmount()
+                : paymentRepository.calculatePaidAmountForInvoice(invoice.getId());
+        BigDecimal balance = invoice.getTotalAmount().subtract(paid).max(BigDecimal.ZERO);
+        if (balance.signum() == 0) {
+            // Fully paid: nothing owed on this invoice, so the credit limit is irrelevant.
+            return new HandoverReadinessResponse(true, List.of(), invoice.getId(), balance, BigDecimal.ZERO,
+                    BigDecimal.ZERO, BigDecimal.ZERO, List.of());
         }
 
-        BigDecimal currentPaid = paymentRepository.calculatePaidAmountForInvoice(invoice.getId());
-        BigDecimal balance = invoice.getTotalAmount().subtract(currentPaid);
-
-        if (balance.compareTo(BigDecimal.ZERO) <= 0) {
-            return; // Completely paid
-        }
-
-        // Verify customer credit limits
         List<Map<String, Object>> custRows = jdbcTemplate.queryForList(
-                "SELECT credit_limit, payment_term_days FROM customers WHERE id = ? FOR UPDATE",
+                "SELECT credit_limit FROM customers WHERE id = ?" + (lock ? " FOR UPDATE" : ""),
                 invoice.getCustomerId());
-
         if (custRows.isEmpty()) {
             throw new ResourceNotFoundException("Không tìm thấy khách hàng của hóa đơn");
         }
-
         BigDecimal creditLimit = (BigDecimal) custRows.get(0).get("credit_limit");
-        if (creditLimit == null) creditLimit = BigDecimal.ZERO;
-
-        BigDecimal totalCustomerDebt = invoiceBalanceViewRepository.calculateTotalOutstandingBalanceForCustomer(invoice.getCustomerId());
-
-        if (totalCustomerDebt.compareTo(creditLimit) > 0) {
-            log.warn("Customer {} total debt {} exceeds credit limit {}", invoice.getCustomerId(), totalCustomerDebt, creditLimit);
-            throw new ConflictException(ResponseCode.HANDOVER_BLOCKED,
-                    "Hóa đơn chưa thanh toán đủ và công nợ của khách vượt hạn mức. Hãy thu tiền trước khi bàn giao.");
+        if (creditLimit == null) {
+            creditLimit = BigDecimal.ZERO;
+        }
+        BigDecimal debt = invoiceBalanceViewRepository.calculateTotalOutstandingBalanceForCustomer(invoice.getCustomerId());
+        if (debt == null) {
+            debt = BigDecimal.ZERO;
         }
 
-        Number term = (Number) custRows.get(0).get("payment_term_days");
-        if (term == null || term.intValue() <= 0 || invoice.getDueDate() == null) {
-            throw new ConflictException(ResponseCode.HANDOVER_BLOCKED,
-                    "Hóa đơn chưa thanh toán đủ và khách không được ghi công nợ. Hãy thu tiền trước khi bàn giao.");
-        }
-
-        // Check if customer has overdue invoices
-        LocalDate today = LocalDate.now();
-        List<InvoiceBalanceView> customerInvoices = invoiceBalanceViewRepository.findByCustomerId(invoice.getCustomerId());
-        for (InvoiceBalanceView iv : customerInvoices) {
-            if (iv.getDueDate() != null && iv.getDueDate().isBefore(today) && iv.getBalanceAmount().compareTo(BigDecimal.ZERO) > 0) {
-                log.warn("Customer {} has overdue invoice {} with balance {}", invoice.getCustomerId(), iv.getInvoiceCode(), iv.getBalanceAmount());
-                throw new ConflictException(ResponseCode.HANDOVER_BLOCKED,
-                        "Khách có hóa đơn quá hạn chưa thanh toán. Hãy thu nợ quá hạn trước khi bàn giao.");
+        List<String> reasons = new ArrayList<>();
+        List<String> overdue = new ArrayList<>();
+        BigDecimal minimumPayment = BigDecimal.ZERO;
+        if (balance.signum() > 0) {
+            minimumPayment = debt.subtract(creditLimit).max(BigDecimal.ZERO).min(balance);
+            if (debt.compareTo(creditLimit) > 0) {
+                reasons.add(creditLimit.signum() == 0
+                        ? "Khách chưa có hạn mức nợ nên phải thanh toán đủ. Công nợ hiện tại " + formatMoney(debt)
+                                + " đ, cần thu tối thiểu " + formatMoney(minimumPayment) + " đ trước khi bàn giao."
+                        : "Công nợ của khách là " + formatMoney(debt) + " đ, vượt hạn mức " + formatMoney(creditLimit)
+                                + " đ. Cần thu tối thiểu " + formatMoney(debt.subtract(creditLimit))
+                                + " đ trước khi bàn giao.");
+            }
+            LocalDate today = LocalDate.now();
+            for (InvoiceBalanceView iv : invoiceBalanceViewRepository.findByCustomerId(invoice.getCustomerId())) {
+                if (iv.getDueDate() != null && iv.getDueDate().isBefore(today)
+                        && iv.getBalanceAmount().compareTo(BigDecimal.ZERO) > 0) {
+                    overdue.add(Objects.toString(iv.getInvoiceCode(), "#" + iv.getInvoiceId()));
+                }
+            }
+            if (!overdue.isEmpty()) {
+                reasons.add("Khách có hóa đơn quá hạn chưa thanh toán (" + String.join(", ", overdue)
+                        + "). Hãy thu nợ quá hạn trước khi bàn giao.");
             }
         }
+        return new HandoverReadinessResponse(reasons.isEmpty(), List.copyOf(reasons), invoice.getId(), balance,
+                debt, creditLimit, minimumPayment, List.copyOf(overdue));
+    }
+
+    private static HandoverReadinessResponse blockedHandover(Long invoiceId, String reason) {
+        return new HandoverReadinessResponse(false, List.of(reason), invoiceId, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, List.of());
     }
 
     @Override
