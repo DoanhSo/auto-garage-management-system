@@ -25,3 +25,5 @@
 | 2026-11 | [Sửa thu tiền hóa đơn và mã giao dịch tự sinh](2026-11-payment-receipt-fix.md) | partial | Step 8: chưa xác minh trên trình duyệt (thu hóa đơn #10, sửa/sinh lại mã, mã trùng, phiếu chi NCC) |
 | 2026-11 | [Cổng chặn luồng sửa chữa, bảo hành trước bàn giao, menu nhân sự](2026-11-workflow-gates-warranty-hr-nav.md) | partial | Step 11–12: thiếu test tích hợp MySQL và test 403; AC-6/7/10 chưa xác minh trên trình duyệt; menu nhân sự được thay bởi plan hr-navigation-hubs |
 | 2026-11 | [Điều hướng nhân sự: quản lý nhân viên và khoang & ca làm việc](2026-11-hr-navigation-hubs.md) | partial | Chưa xác minh trên trình duyệt (sidebar tab con, khung chi tiết, liên kết chéo, địa chỉ cũ); container frontend chưa build lại sau thay đổi cuối |
+| 2026-11 | [Sửa lỗi sau review cổng luồng sửa chữa](2026-11-review-fixes-gates-payments.md) | done (chưa /converge) | Step 1 (`GET_LOCK`) bị thay bởi plan payment-code-row-lock; các bước còn lại đã có test |
+| 2026-11 | [Khóa sinh mã giao dịch theo giao dịch](2026-11-payment-code-row-lock.md) | converged | Test đồng thời kiểm tra khóa + đánh số, chưa đi qua `receivePayment` đầy đủ |

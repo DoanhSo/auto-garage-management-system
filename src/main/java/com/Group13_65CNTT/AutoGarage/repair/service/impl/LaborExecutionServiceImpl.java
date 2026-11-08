@@ -58,7 +58,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     private final TaskAssignmentMapper taskAssignmentMapper;
     private final LaborSessionMapper laborSessionMapper;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
     private com.Group13_65CNTT.AutoGarage.shared.contracts.InventoryOperations inventoryOperations;
 
@@ -508,9 +508,7 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
             throw new ConflictException(ResponseCode.WORK_START_BLOCKED,
                     "Phiếu đã xong thi công, không thể bắt đầu thêm công việc.");
         }
-        if (inventoryOperations != null) {
-            inventoryOperations.requireIssuedForWorkStart(order.getId());
-        }
+        inventoryOperations.requireIssuedForWorkStart(order.getId());
     }
 
     private java.util.Set<String> skills(String value) {

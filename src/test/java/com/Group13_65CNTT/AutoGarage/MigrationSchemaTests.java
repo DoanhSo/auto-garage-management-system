@@ -91,7 +91,7 @@ class MigrationSchemaTests extends IntegrationTestSupport {
     @Test
     void allMigrationsAndTablesExist() {
         assertEquals(
-                34,
+                35,
                 jdbc.queryForObject(
                         "SELECT COUNT(*) FROM information_schema.tables WHERE"
                             + " table_schema=DATABASE() AND table_type='BASE TABLE' AND table_name"
@@ -103,7 +103,7 @@ class MigrationSchemaTests extends IntegrationTestSupport {
                         "SELECT COUNT(*) FROM information_schema.views WHERE"
                                 + " table_schema=DATABASE()",
                         Integer.class));
-        assertEquals(19, flyway.info().applied().length);
+        assertEquals(20, flyway.info().applied().length);
         assertEquals(0, flyway.info().pending().length);
         flyway.validate();
     }
