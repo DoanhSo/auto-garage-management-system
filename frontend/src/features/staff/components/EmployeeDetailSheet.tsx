@@ -50,7 +50,7 @@ export function EmployeeDetailSheet({
     <>
       <Sheet
         open
-        placement="side"
+        placement="center"
         size="md"
         onClose={onClose}
         title={employee.fullName ?? employee.employeeCode}

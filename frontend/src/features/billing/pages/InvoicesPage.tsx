@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   Ban,
@@ -20,6 +21,7 @@ import { FRONT_DESK_ROLES } from '../../../app/access';
 import {
   Badge,
   Button,
+  Empty,
   Field,
   FormError,
   Loading,
@@ -72,8 +74,15 @@ export function InvoicesPage() {
   const isCustomer = user?.role === 'CUSTOMER';
   const canCollect = !!user && FRONT_DESK_ROLES.includes(user.role);
   const canVoidInvoice = user?.role === 'ADMIN';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlQuery = searchParams.get('query') ?? '';
+  const urlIssueOrderId = searchParams.get('issueOrderId') ?? '';
 
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(() => urlQuery);
+  useEffect(() => {
+    setQuery(urlQuery);
+    setPage(0);
+  }, [urlQuery]);
   const debouncedQuery = useDebouncedValue(query);
   const [selectedStatus, setSelectedStatus] = useState<InvoiceStatus | ''>('');
   const [sortField, setSortField] = useState('id');
@@ -83,6 +92,15 @@ export function InvoicesPage() {
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [issuing, setIssuing] = useState(false);
   const [issueOrderId, setIssueOrderId] = useState('');
+
+  useEffect(() => {
+    if (!urlIssueOrderId || !canCollect) return;
+    setIssueOrderId(urlIssueOrderId);
+    setIssuing(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('issueOrderId');
+    setSearchParams(next, { replace: true });
+  }, [urlIssueOrderId, canCollect, searchParams, setSearchParams]);
   const [voidingInvoice, setVoidingInvoice] = useState<Invoice | null>(null);
   const [voidReason, setVoidReason] = useState('');
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
@@ -117,7 +135,9 @@ export function InvoicesPage() {
   const issueBlockedReason =
     readiness.data && !readiness.data.ready
       ? (readiness.data.reason ?? 'Chưa lập được hóa đơn cho lệnh này.')
-      : undefined;
+      : readiness.isError
+        ? errorMessage(readiness.error)
+        : undefined;
   const voidMutation = useVoidInvoiceMutation();
   const receivePaymentMutation = useReceivePaymentMutation();
   const { mutate: suggestPayCode, isPending: isSuggestingCode } = useSuggestPaymentCodeMutation();
@@ -132,6 +152,11 @@ export function InvoicesPage() {
     setSortField('id');
     setSortDir('desc');
     setPage(0);
+    if (searchParams.has('query')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('query');
+      setSearchParams(next, { replace: true });
+    }
   };
 
   const handleIssue = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -543,87 +568,104 @@ export function InvoicesPage() {
         ) : isError ? (
           <QueryError error={error} retry={() => refetch()} />
         ) : compact ? (
-          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {invoicesList.map((inv) => (
-              <div
-                key={inv.id}
-                style={{
-                  border: '1px solid var(--border)',
-                  borderRadius: '10px',
-                  padding: '14px',
-                  background: 'white',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                }}
-              >
+          invoicesList.length === 0 ? (
+            <div style={{ padding: '16px' }}>
+              <Empty
+                title={isFiltered ? 'Không tìm thấy hóa đơn phù hợp' : 'Chưa có hóa đơn nào'}
+                description={
+                  isFiltered
+                    ? 'Thử thay đổi từ khóa tìm kiếm hoặc đặt lại bộ lọc.'
+                    : 'Hóa đơn sẽ xuất hiện tại đây sau khi lệnh sửa chữa được nghiệm thu.'
+                }
+              />
+            </div>
+          ) : (
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {invoicesList.map((inv) => (
                 <div
+                  key={inv.id}
                   style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: '10px',
+                    padding: '14px',
+                    background: 'white',
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
+                    flexDirection: 'column',
+                    gap: '8px',
                   }}
                 >
-                  <div>
-                    <strong style={{ fontSize: '15px', fontFamily: 'monospace' }}>
-                      {inv.invoiceCode}
-                    </strong>
-                    <div className="muted" style={{ fontSize: '12px' }}>
-                      {inv.customerSnapshot?.fullName}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: '15px', fontFamily: 'monospace' }}>
+                        {inv.invoiceCode}
+                      </strong>
+                      <div className="muted" style={{ fontSize: '12px' }}>
+                        {inv.customerSnapshot?.fullName}
+                      </div>
                     </div>
+                    {renderStatusBadge(inv.status)}
                   </div>
-                  {renderStatusBadge(inv.status)}
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                  <span>
-                    Tổng tiền: <strong>{Number(inv.totalAmount).toLocaleString('vi-VN')} đ</strong>
-                  </span>
-                  {Number(inv.balanceAmount) > 0 ? (
-                    <span style={{ color: '#b42335' }}>
-                      Nợ: <strong>{Number(inv.balanceAmount).toLocaleString('vi-VN')} đ</strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                    <span>
+                      Tổng tiền: <strong>{Number(inv.totalAmount).toLocaleString('vi-VN')} đ</strong>
                     </span>
-                  ) : (
-                    <span style={{ color: '#059669' }}>Đã thu đủ</span>
-                  )}
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    paddingTop: '8px',
-                    borderTop: '1px solid #f0f2f5',
-                  }}
-                >
-                  <span className="muted" style={{ fontSize: '11px' }}>
-                    Biển số: {inv.vehicleSnapshot?.plateNumber || '—'}
-                  </span>
-                  <div className="row-actions">
-                    <Button variant="ghost" onClick={() => setViewingInvoice(inv)}>
-                      <Eye size={15} /> Xem
-                    </Button>
-                    {canCollect && (inv.status === 'UNPAID' || inv.status === 'PARTIALLY_PAID') && (
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleOpenPayment(inv)}
-                        style={{ color: '#059669' }}
-                      >
-                        <CreditCard size={15} /> Thu
-                      </Button>
+                    {Number(inv.balanceAmount) > 0 ? (
+                      <span style={{ color: '#b42335' }}>
+                        Nợ: <strong>{Number(inv.balanceAmount).toLocaleString('vi-VN')} đ</strong>
+                      </span>
+                    ) : (
+                      <span style={{ color: '#059669' }}>Đã thu đủ</span>
                     )}
                   </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingTop: '8px',
+                      borderTop: '1px solid #f0f2f5',
+                    }}
+                  >
+                    <span className="muted" style={{ fontSize: '11px' }}>
+                      Biển số: {inv.vehicleSnapshot?.plateNumber || '—'}
+                    </span>
+                    <div className="row-actions">
+                      <Button variant="ghost" onClick={() => setViewingInvoice(inv)}>
+                        <Eye size={15} /> Xem
+                      </Button>
+                      {canCollect && (inv.status === 'UNPAID' || inv.status === 'PARTIALLY_PAID') && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleOpenPayment(inv)}
+                          style={{ color: '#059669' }}
+                        >
+                          <CreditCard size={15} /> Thu
+                        </Button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )
         ) : (
           <DataTable
             caption="Danh sách hóa đơn dịch vụ"
             columns={columns}
             data={invoicesList}
             busy={isFetching}
-            emptyTitle="Chưa có hóa đơn nào"
-            emptyDescription="Hóa đơn sẽ xuất hiện tại đây sau khi lệnh sửa chữa được nghiệm thu."
+            emptyTitle={isFiltered ? 'Không tìm thấy hóa đơn phù hợp' : 'Chưa có hóa đơn nào'}
+            emptyDescription={
+              isFiltered
+                ? 'Thử thay đổi từ khóa tìm kiếm hoặc đặt lại bộ lọc.'
+                : 'Hóa đơn sẽ xuất hiện tại đây sau khi lệnh sửa chữa được nghiệm thu.'
+            }
           />
         )}
 
@@ -632,7 +674,7 @@ export function InvoicesPage() {
           <div className="pagination-info">
             Hiển thị{' '}
             <strong>
-              {invoicesList.length > 0 ? 1 : 0}–{invoicesList.length}
+              {totalElements === 0 ? 0 : page * 20 + 1}–{page * 20 + invoicesList.length}
             </strong>{' '}
             trong <strong>{totalElements}</strong> kết quả
             <span style={{ marginLeft: '12px', color: 'var(--muted)' }}>
@@ -704,6 +746,37 @@ export function InvoicesPage() {
               ))}
             </select>
           </Field>
+
+          {issueOrderId &&
+          issueBlockedReason &&
+          (issueBlockedReason.includes('phụ tùng') ||
+            issueBlockedReason.includes('phiếu kho') ||
+            issueBlockedReason.includes('xuất kho')) ? (
+            <div
+              className="full-width-field"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 'var(--space-3)',
+                padding: 'var(--space-3)',
+                borderRadius: 'var(--radius)',
+                background: 'var(--warning-soft)',
+                border: '1px solid var(--border)',
+              }}
+            >
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--warning)' }}>
+                Cần hoàn tất xuất kho phụ tùng đã giữ chỗ trước khi phát hành hóa đơn.
+              </span>
+              <Link
+                className="button button-primary button-sm"
+                to={`/inventory/documents?issueOrderId=${encodeURIComponent(issueOrderId)}`}
+                onClick={() => setIssuing(false)}
+              >
+                Đi tới Xuất kho sửa chữa
+              </Link>
+            </div>
+          ) : null}
 
           <Field
             label="Thuế bổ sung (đ)"

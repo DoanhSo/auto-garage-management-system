@@ -85,7 +85,7 @@ export function useShiftAttendanceMutation() {
       action === 'check-in' ? schedulingApi.checkInShift(id) : schedulingApi.checkOutShift(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['on-shift-technicians'] });
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ['employee-shifts'] });
       queryClient.invalidateQueries({ queryKey: ['shift-reconciliation'] });
     },
   });

@@ -59,12 +59,14 @@ public class ShiftAttendanceServiceImpl implements ShiftAttendanceService {
     public ShiftResponse checkIn(Long actorUserId, Long shiftId) {
         EmployeeShift shift = loadActiveShift(shiftId);
         requireOwnerOrFrontDesk(actorUserId, shift);
-        if (shift.getAttendanceStatus() != AttendanceStatus.SCHEDULED
+        if (shift.getAttendanceStatus() != null
+                && shift.getAttendanceStatus() != AttendanceStatus.SCHEDULED
                 && shift.getAttendanceStatus() != AttendanceStatus.ABSENT) {
             throw new BusinessRuleException("Ca trực này đã được chấm công vào ca");
         }
         Instant now = Instant.now();
-        if (now.isBefore(shift.getStartsAt().minus(ShiftPolicy.EARLY_CHECK_IN_WINDOW))) {
+        boolean isFrontDesk = EnumSet.of(Role.ADMIN, Role.RECEPTIONIST).contains(currentUser.role());
+        if (!isFrontDesk && now.isBefore(shift.getStartsAt().minus(ShiftPolicy.EARLY_CHECK_IN_WINDOW))) {
             throw new BusinessRuleException("Chưa đến giờ vào ca, chỉ được chấm công trước giờ ca tối đa "
                     + ShiftPolicy.EARLY_CHECK_IN_WINDOW.toMinutes() + " phút");
         }

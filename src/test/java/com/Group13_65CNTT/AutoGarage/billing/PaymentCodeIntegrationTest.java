@@ -27,6 +27,8 @@ class PaymentCodeIntegrationTest extends IntegrationTestSupport {
     private final JdbcTemplate jdbc;
     private final BillingService service;
     private final PaymentRepository payments;
+    private final com.Group13_65CNTT.AutoGarage.billing.repository.InvoiceRepository invoices;
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private final LocalDate today = PaymentCodePolicy.today();
     private String receiptPrefix;
@@ -98,5 +100,94 @@ class PaymentCodeIntegrationTest extends IntegrationTestSupport {
 
         assertThat(payments.existsByTransactionCode("pc-case-1")).isTrue();
         assertThat(payments.existsByTransactionCode("PC-CASE-1")).isFalse();
+    }
+
+    @Test
+    @DisplayName("Tìm kiếm hóa đơn theo tên khách hàng, biển số xe, mã lệnh sửa chữa và mã hóa đơn")
+    void searchInvoices_MatchesCustomerVehicleAndOrder() {
+        jdbc.update("INSERT INTO customers(id,customer_code,full_name,phone,credit_limit,is_active) VALUES(930201,'KH-930201','Nguyễn Văn An','0912345678',0,true)");
+        jdbc.update("INSERT INTO vehicles(id,customer_id,license_plate,brand,model,odometer,is_active) VALUES(930201,930201,'30H-889.23','Toyota','Vios 1.5G',30000,true)");
+        jdbc.update("INSERT INTO repair_orders(id,order_code,customer_id,vehicle_id,status,odometer_in,received_by) VALUES(930201,'RO-20261110-001',930201,930201,'COMPLETED',30000,930101)");
+        jdbc.update("INSERT INTO invoices(id,invoice_code,repair_order_id,customer_id,status,customer_snapshot,vehicle_snapshot,subtotal,total_amount,issued_by,issued_at)"
+                + " VALUES(930201,'INV-20261110-001',930201,930201,'UNPAID',CAST('{\"fullName\":\"Nguyễn Văn An\",\"customerCode\":\"KH-930201\"}' AS JSON),CAST('{\"plateNumber\":\"30H-889.23\"}' AS JSON),1000000,1000000,930101,NOW())");
+
+        org.springframework.data.domain.Pageable p = PageRequest.of(0, 10);
+
+        // Khớp theo tên khách hàng (có dấu / không hoa thường)
+        assertThat(invoices.searchInvoices(null, null, null, "Nguyễn Văn An", p).getContent())
+                .extracting(com.Group13_65CNTT.AutoGarage.billing.entity.Invoice::getId)
+                .contains(930201L);
+        assertThat(invoices.searchInvoices(null, null, null, "văn an", p).getContent())
+                .extracting(com.Group13_65CNTT.AutoGarage.billing.entity.Invoice::getId)
+                .contains(930201L);
+
+        // Khớp theo mã khách hàng & số điện thoại
+        assertThat(invoices.searchInvoices(null, null, null, "KH-930201", p).getContent())
+                .extracting(com.Group13_65CNTT.AutoGarage.billing.entity.Invoice::getId)
+                .contains(930201L);
+        assertThat(invoices.searchInvoices(null, null, null, "0912345678", p).getContent())
+                .extracting(com.Group13_65CNTT.AutoGarage.billing.entity.Invoice::getId)
+                .contains(930201L);
+
+        // Khớp theo biển số xe
+        assertThat(invoices.searchInvoices(null, null, null, "30H-889.23", p).getContent())
+                .extracting(com.Group13_65CNTT.AutoGarage.billing.entity.Invoice::getId)
+                .contains(930201L);
+
+        // Khớp theo mã phiếu sửa chữa
+        assertThat(invoices.searchInvoices(null, null, null, "RO-20261110", p).getContent())
+                .extracting(com.Group13_65CNTT.AutoGarage.billing.entity.Invoice::getId)
+                .contains(930201L);
+
+        // Khớp theo mã hóa đơn
+        assertThat(invoices.searchInvoices(null, null, null, "INV-20261110", p).getContent())
+                .extracting(com.Group13_65CNTT.AutoGarage.billing.entity.Invoice::getId)
+                .contains(930201L);
+
+        // Không khớp
+        assertThat(invoices.searchInvoices(null, null, null, "KHONG_CO_AI_TEN_NAY", p).getContent())
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("getInvoiceReadiness trả ready=false kèm lý do và không đánh dấu rollbackOnly khi còn phụ tùng giữ chỗ chưa xuất kho")
+    void invoiceReadiness_WithReservedParts_ReturnsFalseWithoutMarkingTransactionRollbackOnly() {
+        var jwt = org.springframework.security.oauth2.jwt.Jwt.withTokenValue("test-token")
+                .header("alg", "none")
+                .subject("930101")
+                .claim("roles", java.util.List.of("ADMIN"))
+                .build();
+        org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .setAuthentication(new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(
+                        jwt, java.util.List.of()));
+        try {
+            jdbc.update("INSERT INTO customers(id,customer_code,full_name,phone,credit_limit,is_active) VALUES(930301,'KH-930301','Lê Minh Tâm','0988777666',0,true)");
+            jdbc.update("INSERT INTO vehicles(id,customer_id,license_plate,brand,model,odometer,is_active) VALUES(930301,930301,'51G-112.23','Mazda','CX-5',40000,true)");
+            jdbc.update("INSERT INTO repair_orders(id,order_code,customer_id,vehicle_id,status,odometer_in,received_by) VALUES(930301,'RO-20261110-301',930301,930301,'COMPLETED',40000,930101)");
+            jdbc.update("INSERT INTO vehicle_checks(id,repair_order_id,check_type,attempt_no,result,checklist_json,schema_version,checked_by,checked_at)"
+                    + " VALUES(930301,930301,'QC',1,'PASSED',CAST('{}' AS JSON),1,930101,NOW())");
+            jdbc.update("UPDATE repair_orders SET latest_qc_check_id = 930301 WHERE id = 930301");
+            jdbc.update("INSERT INTO estimates(id,estimate_code,repair_order_id,version_no,estimate_kind,status,subtotal,discount_amount,tax_amount,total_amount,created_by,created_at,version)"
+                    + " VALUES(930301,'EST-930301',930301,1,'INITIAL','APPROVED',500000,0,0,500000,930101,NOW(),0)");
+            jdbc.update("INSERT INTO parts(id,sku,part_name,unit,purchase_price,selling_price,stock_quantity,reserved_quantity,reorder_level,warranty_days,warranty_km,is_active,created_at,updated_at,version)"
+                    + " VALUES(930301,'SKU-930301','Dầu nhớt tổng hợp Motul 8100 X-cess 5W40 (Can 4L)','Can',400000,500000,10,1,2,0,0,true,NOW(),NOW(),0)");
+            jdbc.update("INSERT INTO estimate_items(id,estimate_id,line_no,item_type,part_id,item_name,unit,quantity,unit_price,unit_cost,discount_amount,tax_amount,line_total,approval_status,reserved_quantity,warranty_days,warranty_km,created_at,version)"
+                    + " VALUES(930301,930301,1,'PART',930301,'Dầu nhớt tổng hợp Motul 8100 X-cess 5W40 (Can 4L)','Can',1,500000,400000,0,0,500000,'APPROVED',1,0,0,NOW(),0)");
+
+            var txTemplate = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+            var readiness = txTemplate.execute(status -> {
+                var response = service.getInvoiceReadiness(930301L);
+                assertThat(status.isRollbackOnly()).isFalse();
+                return response;
+            });
+
+            assertThat(readiness).isNotNull();
+            assertThat(readiness.ready()).isFalse();
+            assertThat(readiness.reason())
+                    .contains("Còn phụ tùng đã giữ chỗ nhưng chưa xuất kho")
+                    .contains("Dầu nhớt tổng hợp Motul 8100 X-cess 5W40 (Can 4L)");
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
     }
 }

@@ -1,0 +1,53 @@
+@startchen 07-thong-bao-kiem-toan
+title ERD Chen nhóm 7 — Thông báo và nhật ký kiểm toán
+
+' Quy ước: thực thể của nhóm = "NHÃN (bảng)"; thực thể nhóm khác = "NHÃN ‹nhóm N›", không thuộc tính.
+' Bản số (min,max) suy từ schema: cột FK NOT NULL → (1,1), NULL → (0,1); FK UNIQUE → phía cha (0,1), không → (0,N).
+' Khóa ngoại 'người thực hiện' (created_by, approved_by, ...) vẽ riêng ở 09-nguoi-thuc-hien.puml.
+
+entity "THÔNG BÁO (notifications)" as NOTIFICATION {
+  id <<key>>
+  event_key
+  channel
+  recipient_key
+  status
+  subject
+  attempt_count
+  read_at
+}
+
+entity "NHẬT KÝ KIỂM TOÁN (audit_events)" as AUDIT {
+  id <<key>>
+  action
+  entity_type
+  entity_id
+  request_key
+  request_hash
+  created_at
+}
+
+entity "KHÁCH HÀNG ‹nhóm 1›" as CUSTOMER {
+}
+
+entity "NGƯỜI DÙNG ‹nhóm 1›" as USER {
+}
+
+relationship "nhận (web)" as R_NOTIFICATIONS_USER_ID {
+}
+' fk: notifications.user_id
+R_NOTIFICATIONS_USER_ID -(0,N)- USER
+R_NOTIFICATIONS_USER_ID -(0,1)- NOTIFICATION
+
+relationship "nhận (email/sms)" as R_NOTIFICATIONS_CUSTOMER_ID {
+}
+' fk: notifications.customer_id
+R_NOTIFICATIONS_CUSTOMER_ID -(0,N)- CUSTOMER
+R_NOTIFICATIONS_CUSTOMER_ID -(0,1)- NOTIFICATION
+
+relationship "thực hiện" as R_AUDIT_EVENTS_ACTOR_USER_ID {
+}
+' fk: audit_events.actor_user_id
+R_AUDIT_EVENTS_ACTOR_USER_ID -(0,N)- USER
+R_AUDIT_EVENTS_ACTOR_USER_ID -(0,1)- AUDIT
+
+@endchen

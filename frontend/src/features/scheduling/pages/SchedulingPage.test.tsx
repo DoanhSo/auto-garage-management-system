@@ -68,6 +68,9 @@ beforeEach(() => {
     http.get('/api/v1/bay-reservations/active', () => HttpResponse.json(envelope([]))),
     http.get('/api/v1/employees', () => HttpResponse.json(envelope(page([employee])))),
     http.get('/api/v1/employee-shifts', () => HttpResponse.json(envelope(page([])))),
+    http.get('/api/v1/employee-shifts/reconciliation', () => HttpResponse.json(envelope([]))),
+    http.get('/api/v1/scheduling/on-shift-technicians', () => HttpResponse.json(envelope([]))),
+    http.get('/api/v1/employee-shifts/pending-registrations', () => HttpResponse.json(envelope(page([])))),
   );
 });
 
@@ -93,12 +96,35 @@ describe('SchedulingPage address parameters', () => {
     expect(screen.queryByRole('button', { name: /Đội ngũ kỹ thuật viên/ })).toBeNull();
   });
 
-  it('opens the shifts of a bay from its row, searching by the bay code', async () => {
-    const user = renderPage('/scheduling?tab=bays');
+  it('allows Admin to check-in an active shift using employee-shifts check-in endpoint', async () => {
+    let checkedIn = false;
+    const activeShift = {
+      id: 15,
+      employeeId: 5,
+      serviceBayId: 10,
+      shiftType: 'FULL_DAY',
+      status: 'ACTIVE',
+      attendanceStatus: 'SCHEDULED',
+      startsAt: new Date(Date.now() - 3600000).toISOString(),
+      endsAt: new Date(Date.now() + 3600000).toISOString(),
+      notes: 'Test shift',
+    };
+    server.use(
+      http.get('/api/v1/employee-shifts', () => HttpResponse.json(envelope(page([activeShift])))),
+      http.post('/api/v1/employee-shifts/15/check-in', () => {
+        checkedIn = true;
+        return HttpResponse.json(
+          envelope({ ...activeShift, attendanceStatus: 'CHECKED_IN' }),
+        );
+      }),
+    );
+    const user = renderPage('/scheduling?tab=shifts');
+    await user.click(await screen.findByRole('button', { name: /Danh sách/ }));
 
-    await user.click(await screen.findByRole('button', { name: /Ca gán khoang/ }));
+    const checkInBtn = await screen.findByRole('button', { name: /Vào ca/ });
+    expect(checkInBtn).toBeVisible();
+    await user.click(checkInBtn);
 
-    expect(await screen.findByLabelText('Tìm kiếm ca làm việc')).toHaveValue('BAY-01');
-    expect(screen.getByLabelText('địa chỉ')).toHaveTextContent('tab=shifts');
+    await waitFor(() => expect(checkedIn).toBe(true));
   });
 });

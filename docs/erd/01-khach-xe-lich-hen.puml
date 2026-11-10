@@ -1,0 +1,85 @@
+@startchen 01-khach-xe-lich-hen
+title ERD Chen nhóm 1 — Khách hàng, phương tiện, dịch vụ, lịch hẹn và tài khoản
+
+' Quy ước: thực thể của nhóm = "NHÃN (bảng)"; thực thể nhóm khác = "NHÃN ‹nhóm N›", không thuộc tính.
+' Bản số (min,max) suy từ schema: cột FK NOT NULL → (1,1), NULL → (0,1); FK UNIQUE → phía cha (0,1), không → (0,N).
+' Khóa ngoại 'người thực hiện' (created_by, approved_by, ...) vẽ riêng ở 09-nguoi-thuc-hien.puml.
+
+entity "NGƯỜI DÙNG (users)" as USER {
+  id <<key>>
+  username
+  email
+  full_name
+  role
+  is_active
+  identity_id
+}
+
+entity "KHÁCH HÀNG (customers)" as CUSTOMER {
+  id <<key>>
+  customer_code
+  full_name
+  customer_type
+  phone
+  credit_limit
+  payment_term_days
+}
+
+entity "PHƯƠNG TIỆN (vehicles)" as VEHICLE {
+  id <<key>>
+  license_plate
+  vin
+  brand
+  model
+  odometer
+}
+
+entity "DỊCH VỤ (services)" as SERVICE {
+  id <<key>>
+  service_code
+  service_name
+  service_type
+  unit_price
+  interval_km
+  warranty_days
+}
+
+entity "LỊCH HẸN (bookings)" as BOOKING {
+  id <<key>>
+  booking_code
+  appointment_at
+  expected_end_at
+  status
+}
+
+relationship "có hồ sơ" as R_CUSTOMERS_USER_ID {
+}
+' fk: customers.user_id
+R_CUSTOMERS_USER_ID -(0,1)- USER
+R_CUSTOMERS_USER_ID -(0,1)- CUSTOMER
+
+relationship "sở hữu" as R_VEHICLES_CUSTOMER_ID {
+}
+' fk: vehicles.customer_id
+R_VEHICLES_CUSTOMER_ID -(0,N)- CUSTOMER
+R_VEHICLES_CUSTOMER_ID -(1,1)- VEHICLE
+
+relationship "đặt" as R_BOOKINGS_CUSTOMER_ID {
+}
+' fk: bookings.customer_id
+R_BOOKINGS_CUSTOMER_ID -(0,N)- CUSTOMER
+R_BOOKINGS_CUSTOMER_ID -(1,1)- BOOKING
+
+relationship "cho xe" as R_BOOKINGS_VEHICLE_ID {
+}
+' fk: bookings.vehicle_id
+R_BOOKINGS_VEHICLE_ID -(0,N)- VEHICLE
+R_BOOKINGS_VEHICLE_ID -(1,1)- BOOKING
+
+relationship "chọn dịch vụ" as R_BOOKINGS_SERVICE_ID {
+}
+' fk: bookings.service_id
+R_BOOKINGS_SERVICE_ID -(0,N)- SERVICE
+R_BOOKINGS_SERVICE_ID -(0,1)- BOOKING
+
+@endchen

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { EmployeeLink } from '../../staff/components/EmployeeLink';
-import { ChevronLeft, ChevronRight, Plus, X, XCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LogIn, LogOut, Plus, X, XCircle } from 'lucide-react';
 import { Badge, Button } from '../../../shared/components/ui';
 import {
   WEEKDAY_LABELS,
@@ -33,6 +33,9 @@ export interface ShiftTimelineBoardProps {
   readonly searching: boolean;
   readonly onAddShift: (employeeId: string | number, day: string) => void;
   readonly onCancelShift: (shift: Shift) => void;
+  readonly onAttendance?: (shift: Shift, action: 'check-in' | 'check-out') => void;
+  readonly canPunch?: (shift: Shift) => boolean;
+  readonly attendancePending?: boolean;
 }
 
 const dayMonth = (dateKey: string) => `${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
@@ -60,6 +63,9 @@ export function ShiftTimelineBoard({
   searching,
   onAddShift,
   onCancelShift,
+  onAttendance,
+  canPunch,
+  attendancePending,
 }: ShiftTimelineBoardProps) {
   const today = todayKey();
   const firstDay = weekStart(selectedDate || today);
@@ -124,13 +130,37 @@ export function ShiftTimelineBoard({
           {shift.attendanceStatus ? ` · ${attendanceLabels[shift.attendanceStatus]}` : ''}
         </p>
         {shift.notes && <p className="muted">Ghi chú: {shift.notes}</p>}
-        {cancellable && (
-          <div className="row-actions">
+        <div className="row-actions">
+          {onAttendance && canPunch?.(shift) && shift.status === 'ACTIVE' && (
+            <>
+              {(shift.attendanceStatus == null ||
+                shift.attendanceStatus === 'SCHEDULED' ||
+                shift.attendanceStatus === 'ABSENT') && (
+                <Button
+                  variant="secondary"
+                  pending={attendancePending}
+                  onClick={() => onAttendance(shift, 'check-in')}
+                >
+                  <LogIn size={14} /> Vào ca
+                </Button>
+              )}
+              {(shift.attendanceStatus === 'CHECKED_IN' || shift.attendanceStatus === 'LATE') && (
+                <Button
+                  variant="secondary"
+                  pending={attendancePending}
+                  onClick={() => onAttendance(shift, 'check-out')}
+                >
+                  <LogOut size={14} /> Ra ca
+                </Button>
+              )}
+            </>
+          )}
+          {cancellable && (
             <Button variant="ghost" className="delete-action" onClick={() => onCancelShift(shift)}>
               <XCircle size={14} /> Hủy ca
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </aside>
     );
   }

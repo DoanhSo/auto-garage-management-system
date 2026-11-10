@@ -1,0 +1,153 @@
+@startchen 06-hoa-don-bao-hanh
+title ERD Chen nhóm 6 — Hóa đơn, thanh toán thu chi và bảo hành
+
+' Quy ước: thực thể của nhóm = "NHÃN (bảng)"; thực thể nhóm khác = "NHÃN ‹nhóm N›", không thuộc tính.
+' Bản số (min,max) suy từ schema: cột FK NOT NULL → (1,1), NULL → (0,1); FK UNIQUE → phía cha (0,1), không → (0,N).
+' Khóa ngoại 'người thực hiện' (created_by, approved_by, ...) vẽ riêng ở 09-nguoi-thuc-hien.puml.
+
+entity "HÓA ĐƠN (invoices)" as INVOICE {
+  id <<key>>
+  invoice_code
+  status
+  customer_snapshot
+  total_amount
+  balance_amount <<derived>>
+  active_repair_order_id <<derived>>
+}
+
+entity "DÒNG HÓA ĐƠN (invoice_items)" as INVOICE_ITEM <<weak>> {
+  line_no <<key>>
+  item_name
+  quantity
+  unit_price
+  line_total
+  warranty_days
+}
+
+entity "THANH TOÁN (payments)" as PAYMENT {
+  id <<key>>
+  transaction_code
+  direction
+  amount
+  payment_method
+  paid_at
+}
+
+entity "SỔ BẢO HÀNH (warranties)" as WARRANTY {
+  id <<key>>
+  warranty_code
+  starts_at
+  expires_at
+  end_odometer
+  status
+  void_reason
+}
+
+entity "YÊU CẦU BẢO HÀNH (warranty_claims)" as CLAIM {
+  id <<key>>
+  claim_code
+  status
+  current_odometer
+  decision_reason
+}
+
+entity "KHÁCH HÀNG ‹nhóm 1›" as CUSTOMER {
+}
+
+entity "CHỨNG TỪ KHO ‹nhóm 5›" as INV_DOC {
+}
+
+entity "KỲ LƯƠNG ‹nhóm 8›" as PAYROLL_PERIOD {
+}
+
+entity "PHỤ TÙNG CỦA PHIẾU ‹nhóm 5›" as ORDER_PART {
+}
+
+entity "PHIẾU SỬA CHỮA ‹nhóm 2›" as REPAIR_ORDER {
+}
+
+entity "CÔNG VIỆC ‹nhóm 4›" as TASK {
+}
+
+entity "PHƯƠNG TIỆN ‹nhóm 1›" as VEHICLE {
+}
+
+relationship "phát hành" as R_INVOICES_REPAIR_ORDER_ID {
+}
+' fk: invoices.repair_order_id
+R_INVOICES_REPAIR_ORDER_ID -(0,N)- REPAIR_ORDER
+R_INVOICES_REPAIR_ORDER_ID -(1,1)- INVOICE
+
+relationship "xuất cho khách" as R_INVOICES_CUSTOMER_ID {
+}
+' fk: invoices.customer_id
+R_INVOICES_CUSTOMER_ID -(0,N)- CUSTOMER
+R_INVOICES_CUSTOMER_ID -(1,1)- INVOICE
+
+relationship "gồm dòng HĐ" as R_INVOICE_ITEMS_INVOICE_ID <<identifying>> {
+}
+' fk: invoice_items.invoice_id
+R_INVOICE_ITEMS_INVOICE_ID -(0,N)- INVOICE
+R_INVOICE_ITEMS_INVOICE_ID =(1,1)= INVOICE_ITEM
+
+relationship "tính công việc" as R_INVOICE_ITEMS_REPAIR_TASK_ID {
+}
+' fk: invoice_items.repair_task_id
+R_INVOICE_ITEMS_REPAIR_TASK_ID -(0,N)- TASK
+R_INVOICE_ITEMS_REPAIR_TASK_ID -(0,1)- INVOICE_ITEM
+
+relationship "tính phụ tùng" as R_INVOICE_ITEMS_REPAIR_ORDER_PART_ID {
+}
+' fk: invoice_items.repair_order_part_id
+R_INVOICE_ITEMS_REPAIR_ORDER_PART_ID -(0,N)- ORDER_PART
+R_INVOICE_ITEMS_REPAIR_ORDER_PART_ID -(0,1)- INVOICE_ITEM
+
+relationship "thu tiền" as R_PAYMENTS_INVOICE_ID {
+}
+' fk: payments.invoice_id
+R_PAYMENTS_INVOICE_ID -(0,N)- INVOICE
+R_PAYMENTS_INVOICE_ID -(0,1)- PAYMENT
+
+relationship "chi nhà cung cấp" as R_PAYMENTS_INVENTORY_DOCUMENT_ID {
+}
+' fk: payments.inventory_document_id
+R_PAYMENTS_INVENTORY_DOCUMENT_ID -(0,N)- INV_DOC
+R_PAYMENTS_INVENTORY_DOCUMENT_ID -(0,1)- PAYMENT
+
+relationship "chi lương" as R_PAYMENTS_PAYROLL_PERIOD_ID {
+}
+' fk: payments.payroll_period_id
+R_PAYMENTS_PAYROLL_PERIOD_ID -(0,N)- PAYROLL_PERIOD
+R_PAYMENTS_PAYROLL_PERIOD_ID -(0,1)- PAYMENT
+
+relationship "kích hoạt bảo hành" as R_WARRANTIES_INVOICE_ITEM_ID {
+}
+' fk: warranties.invoice_item_id
+R_WARRANTIES_INVOICE_ITEM_ID -(0,1)- INVOICE_ITEM
+R_WARRANTIES_INVOICE_ITEM_ID -(1,1)- WARRANTY
+
+relationship "bảo hành xe" as R_WARRANTIES_VEHICLE_ID {
+}
+' fk: warranties.vehicle_id
+R_WARRANTIES_VEHICLE_ID -(0,N)- VEHICLE
+R_WARRANTIES_VEHICLE_ID -(1,1)- WARRANTY
+
+relationship "bảo hành cho khách" as R_WARRANTIES_CUSTOMER_ID {
+}
+' fk: warranties.customer_id
+R_WARRANTIES_CUSTOMER_ID -(0,N)- CUSTOMER
+R_WARRANTIES_CUSTOMER_ID -(1,1)- WARRANTY
+
+relationship "khiếu nại" as R_WARRANTY_CLAIMS_WARRANTY_ID {
+}
+' fk: warranty_claims.warranty_id
+R_WARRANTY_CLAIMS_WARRANTY_ID -(0,N)- WARRANTY
+R_WARRANTY_CLAIMS_WARRANTY_ID -(1,1)- CLAIM
+
+relationship "xử lý bằng phiếu" as R_WARRANTY_CLAIMS_HANDLING_ORDER_ID {
+}
+' fk: warranty_claims.handling_order_id
+R_WARRANTY_CLAIMS_HANDLING_ORDER_ID -(0,1)- REPAIR_ORDER
+R_WARRANTY_CLAIMS_HANDLING_ORDER_ID -(0,1)- CLAIM
+
+@endchen

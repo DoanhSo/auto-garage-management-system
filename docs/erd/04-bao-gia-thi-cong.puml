@@ -1,0 +1,172 @@
+@startchen 04-bao-gia-thi-cong
+title ERD Chen nhóm 4 — Báo giá, công việc, phân công và giờ công
+
+' Quy ước: thực thể của nhóm = "NHÃN (bảng)"; thực thể nhóm khác = "NHÃN ‹nhóm N›", không thuộc tính.
+' Bản số (min,max) suy từ schema: cột FK NOT NULL → (1,1), NULL → (0,1); FK UNIQUE → phía cha (0,1), không → (0,N).
+' Khóa ngoại 'người thực hiện' (created_by, approved_by, ...) vẽ riêng ở 09-nguoi-thuc-hien.puml.
+
+entity "BÁO GIÁ (estimates)" as ESTIMATE {
+  id <<key>>
+  estimate_code
+  version_no
+  estimate_kind
+  status
+  total_amount
+  valid_until
+}
+
+entity "HẠNG MỤC BÁO GIÁ (estimate_items)" as ESTIMATE_ITEM <<weak>> {
+  line_no <<key>>
+  item_type
+  quantity
+  unit_price
+  approval_status
+  reserved_quantity
+}
+
+entity "CÔNG VIỆC (repair_tasks)" as TASK {
+  id <<key>>
+  task_type
+  task_name
+  status
+  completed_at
+}
+
+entity "PHÂN CÔNG (task_assignments)" as ASSIGNMENT {
+  id <<key>>
+  assignment_role
+  is_active
+  active_main_task_id <<derived>>
+}
+
+entity "PHIÊN LÀM VIỆC (labor_sessions)" as LABOR_SESSION {
+  id <<key>>
+  starts_at
+  ends_at
+  stop_reason
+  active_employee_id <<derived>>
+}
+
+entity "NHẬT KÝ CÔNG ĐOẠN (repair_order_assignments)" as WORK_LOG {
+  id <<key>>
+  assignment_stage
+  started_at
+  actual_seconds
+  result_status
+}
+
+entity "CA LÀM VIỆC ‹nhóm 3›" as SHIFT {
+}
+
+entity "NHÂN VIÊN ‹nhóm 3›" as EMPLOYEE {
+}
+
+entity "PHỤ TÙNG ‹nhóm 5›" as PART {
+}
+
+entity "PHIẾU SỬA CHỮA ‹nhóm 2›" as REPAIR_ORDER {
+}
+
+entity "DỊCH VỤ ‹nhóm 1›" as SERVICE {
+}
+
+entity "PHƯƠNG TIỆN ‹nhóm 1›" as VEHICLE {
+}
+
+relationship "lập báo giá" as R_ESTIMATES_REPAIR_ORDER_ID {
+}
+' fk: estimates.repair_order_id
+R_ESTIMATES_REPAIR_ORDER_ID -(0,N)- REPAIR_ORDER
+R_ESTIMATES_REPAIR_ORDER_ID -(1,1)- ESTIMATE
+
+relationship "phát sinh từ" as R_ESTIMATES_PARENT_ESTIMATE_ID {
+}
+' fk: estimates.parent_estimate_id
+R_ESTIMATES_PARENT_ESTIMATE_ID -(0,N)- ESTIMATE
+R_ESTIMATES_PARENT_ESTIMATE_ID -(0,1)- ESTIMATE
+
+relationship "gồm mục" as R_ESTIMATE_ITEMS_ESTIMATE_ID <<identifying>> {
+}
+' fk: estimate_items.estimate_id
+R_ESTIMATE_ITEMS_ESTIMATE_ID -(0,N)- ESTIMATE
+R_ESTIMATE_ITEMS_ESTIMATE_ID =(1,1)= ESTIMATE_ITEM
+
+relationship "mục dịch vụ" as R_ESTIMATE_ITEMS_SERVICE_ID {
+}
+' fk: estimate_items.service_id
+R_ESTIMATE_ITEMS_SERVICE_ID -(0,N)- SERVICE
+R_ESTIMATE_ITEMS_SERVICE_ID -(0,1)- ESTIMATE_ITEM
+
+relationship "mục phụ tùng" as R_ESTIMATE_ITEMS_PART_ID {
+}
+' fk: estimate_items.part_id
+R_ESTIMATE_ITEMS_PART_ID -(0,N)- PART
+R_ESTIMATE_ITEMS_PART_ID -(0,1)- ESTIMATE_ITEM
+
+relationship "gồm công việc" as R_REPAIR_TASKS_REPAIR_ORDER_ID {
+}
+' fk: repair_tasks.repair_order_id
+R_REPAIR_TASKS_REPAIR_ORDER_ID -(0,N)- REPAIR_ORDER
+R_REPAIR_TASKS_REPAIR_ORDER_ID -(1,1)- TASK
+
+relationship "sinh công việc" as R_REPAIR_TASKS_ESTIMATE_ITEM_ID {
+}
+' fk: repair_tasks.estimate_item_id
+R_REPAIR_TASKS_ESTIMATE_ITEM_ID -(0,1)- ESTIMATE_ITEM
+R_REPAIR_TASKS_ESTIMATE_ITEM_ID -(0,1)- TASK
+
+relationship "theo dịch vụ" as R_REPAIR_TASKS_SERVICE_ID {
+}
+' fk: repair_tasks.service_id
+R_REPAIR_TASKS_SERVICE_ID -(0,N)- SERVICE
+R_REPAIR_TASKS_SERVICE_ID -(0,1)- TASK
+
+relationship "giao việc" as R_TASK_ASSIGNMENTS_TASK_ID {
+}
+' fk: task_assignments.task_id
+R_TASK_ASSIGNMENTS_TASK_ID -(0,N)- TASK
+R_TASK_ASSIGNMENTS_TASK_ID -(1,1)- ASSIGNMENT
+
+relationship "được giao" as R_TASK_ASSIGNMENTS_EMPLOYEE_ID {
+}
+' fk: task_assignments.employee_id
+R_TASK_ASSIGNMENTS_EMPLOYEE_ID -(0,N)- EMPLOYEE
+R_TASK_ASSIGNMENTS_EMPLOYEE_ID -(1,1)- ASSIGNMENT
+
+relationship "bấm giờ" as R_LABOR_SESSIONS_ASSIGNMENT_ID {
+}
+' fk: labor_sessions.assignment_id
+R_LABOR_SESSIONS_ASSIGNMENT_ID -(0,N)- ASSIGNMENT
+R_LABOR_SESSIONS_ASSIGNMENT_ID -(1,1)- LABOR_SESSION
+
+relationship "công đoạn của phiếu" as R_REPAIR_ORDER_ASSIGNMENTS_REPAIR_ORDER_ID {
+}
+' fk: repair_order_assignments.repair_order_id
+R_REPAIR_ORDER_ASSIGNMENTS_REPAIR_ORDER_ID -(0,N)- REPAIR_ORDER
+R_REPAIR_ORDER_ASSIGNMENTS_REPAIR_ORDER_ID -(1,1)- WORK_LOG
+
+relationship "công đoạn trên xe" as R_REPAIR_ORDER_ASSIGNMENTS_VEHICLE_ID {
+}
+' fk: repair_order_assignments.vehicle_id
+R_REPAIR_ORDER_ASSIGNMENTS_VEHICLE_ID -(0,N)- VEHICLE
+R_REPAIR_ORDER_ASSIGNMENTS_VEHICLE_ID -(1,1)- WORK_LOG
+
+relationship "thợ thực hiện" as R_REPAIR_ORDER_ASSIGNMENTS_EMPLOYEE_ID {
+}
+' fk: repair_order_assignments.employee_id
+R_REPAIR_ORDER_ASSIGNMENTS_EMPLOYEE_ID -(0,N)- EMPLOYEE
+R_REPAIR_ORDER_ASSIGNMENTS_EMPLOYEE_ID -(1,1)- WORK_LOG
+
+relationship "trong ca" as R_REPAIR_ORDER_ASSIGNMENTS_SHIFT_ID {
+}
+' fk: repair_order_assignments.shift_id
+R_REPAIR_ORDER_ASSIGNMENTS_SHIFT_ID -(0,N)- SHIFT
+R_REPAIR_ORDER_ASSIGNMENTS_SHIFT_ID -(0,1)- WORK_LOG
+
+relationship "cho công việc" as R_REPAIR_ORDER_ASSIGNMENTS_TASK_ID {
+}
+' fk: repair_order_assignments.task_id
+R_REPAIR_ORDER_ASSIGNMENTS_TASK_ID -(0,N)- TASK
+R_REPAIR_ORDER_ASSIGNMENTS_TASK_ID -(0,1)- WORK_LOG
+
+@endchen

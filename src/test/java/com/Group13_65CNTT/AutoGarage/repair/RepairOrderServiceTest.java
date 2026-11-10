@@ -297,7 +297,9 @@ class RepairOrderServiceTest {
                 .build();
 
         when(repairOrderRepository.findById(100L)).thenReturn(Optional.of(mockOrder));
-        assertThatThrownBy(() -> repairService.createTask(2L, 100L, req)).isInstanceOf(BusinessRuleException.class);
+        assertThatThrownBy(() -> repairService.createTask(2L, 100L, req))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("hạng mục dịch vụ đã duyệt trong báo giá");
         verify(repairTaskRepository, never()).save(any());
     }
 

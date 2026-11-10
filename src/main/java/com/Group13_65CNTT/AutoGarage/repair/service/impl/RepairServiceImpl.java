@@ -49,6 +49,7 @@ import com.Group13_65CNTT.AutoGarage.shared.contracts.InventoryOperations;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.NotificationAudit;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.RepairWorkflow;
 import com.Group13_65CNTT.AutoGarage.shared.contracts.WarrantyOperations;
+import com.Group13_65CNTT.AutoGarage.common.exception.BusinessException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException;
 import com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException;
@@ -318,7 +319,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = BusinessException.class)
     public void requireInvoiceReady(long actorUserId, long repairOrderId) {
         log.info("RepairWorkflow.requireInvoiceReady: actor={}, repairOrderId={}", actorUserId, repairOrderId);
 
@@ -580,6 +581,9 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
             if (repairTaskRepository.existsByRepairOrderIdAndStatusNot(id, TaskStatus.COMPLETED)
                     || laborSessionRepository.countOpenSessionsByRepairOrderId(id) > 0) {
                 throw new BusinessRuleException("Còn công việc chưa hoàn thành hoặc đồng hồ đang chạy, chưa thể chuyển sang chờ QC");
+            }
+            if (inventoryOperations != null) {
+                inventoryOperations.requireIssueComplete(id);
             }
         }
 

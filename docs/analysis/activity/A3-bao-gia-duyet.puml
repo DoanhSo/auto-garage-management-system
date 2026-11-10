@@ -1,0 +1,37 @@
+@startuml A3-bao-gia-duyet
+title A3 — Lập, gửi, duyệt báo giá và báo giá phát sinh (UC13–UC15, UC23)
+|Lễ tân|
+start
+if (Khách đã duyệt dòng nào chưa?) then (chưa)
+  :Lập báo giá ban đầu (INITIAL)\ncần có kết luận chẩn đoán;
+  |Hệ thống|
+  :Tăng version_no dưới khóa phiếu;\nhủy bản DRAFT/SENT cũ chưa quyết;
+else (rồi)
+  |Lễ tân|
+  :Lập báo giá phát sinh (SUPPLEMENTAL)\ntrỏ về báo giá gốc đã duyệt;
+  note right: chỉ khi phiếu APPROVED, IN_PROGRESS,\nWAITING_PARTS hoặc QC_FAILED
+endif
+|Hệ thống|
+:Báo giá DRAFT, phiếu WAITING_APPROVAL (nếu là bản đầu);
+|Lễ tân|
+:Gửi khách;
+|Hệ thống|
+:Báo giá SENT, ghi thông báo cho khách;
+|Khách hàng|
+:Xem từng dòng, chọn Đồng ý / Từ chối;
+|Hệ thống|
+if (Còn hạn valid_until?) then (còn)
+  :Khóa báo giá, ghi người và giờ quyết định;
+  :Dòng dịch vụ APPROVED → sinh công việc;
+  :Dòng phụ tùng APPROVED → giữ hàng (UC23);
+  note right: tồn khả dụng = tồn − giữ (BR14)
+  if (Tất cả dòng đã quyết?) then (có)
+    :APPROVED / REJECTED / PARTIALLY_APPROVED;
+  else (chưa)
+    :PARTIALLY_APPROVED nếu đã có dòng duyệt;
+  endif
+else (hết hạn)
+  :Hiển thị EXPIRED, không cho duyệt;
+endif
+stop
+@enduml

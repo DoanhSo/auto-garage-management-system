@@ -73,7 +73,7 @@ import java.util.Locale;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, noRollbackFor = BusinessException.class)
 public class BillingServiceImpl implements BillingService {
     private final InvoiceRepository invoiceRepository;
     private final InvoiceItemRepository invoiceItemRepository;
@@ -344,7 +344,7 @@ public class BillingServiceImpl implements BillingService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = BusinessException.class)
     public InvoiceReadinessResponse getInvoiceReadiness(Long repairOrderId) {
         try {
             requireIssueReady(currentUser.userId(), repairOrderId, false);

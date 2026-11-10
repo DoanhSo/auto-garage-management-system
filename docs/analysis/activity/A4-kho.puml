@@ -1,0 +1,32 @@
+@startuml A4-kho
+title A4 — Nhập, giữ, xuất, trả và điều chỉnh kho (UC22–UC26)
+|Nhân viên kho|
+start
+switch (Loại nghiệp vụ)
+case (Nhập mua / đầu kỳ)
+  :Lập chứng từ IN (có nhà cung cấp)\nhoặc OPENING;
+case (Xuất cho sửa chữa)
+  :Lập chứng từ OUT theo phiếu,\nchỉ phụ tùng đã được giữ;
+case (Trả chưa dùng)
+  :Lập chứng từ RETURN trỏ về\ndòng xuất gốc;
+case (Điều chỉnh)
+  :Lập chứng từ ADJUSTMENT kèm lý do;
+endswitch
+|Hệ thống|
+:Chứng từ DRAFT — chưa đổi tồn;
+|Nhân viên kho|
+:Ghi sổ chứng từ;
+|Hệ thống|
+:Khóa hàng phụ tùng;
+if (Đủ tồn / không trả vượt lượng đã xuất?) then (đủ)
+  :Mỗi dòng sinh đúng 1 bản ghi sổ kho (BR15);
+  :Cập nhật tồn, lượng giữ, giá vốn bình quân;
+  :Chứng từ POSTED;
+  if (Chứng từ IN có nhà cung cấp?) then (có)
+    :Phát sinh công nợ nhà cung cấp\n(v_supplier_balances);
+  endif
+else (thiếu)
+  :Từ chối ghi sổ, giữ DRAFT;
+endif
+stop
+@enduml

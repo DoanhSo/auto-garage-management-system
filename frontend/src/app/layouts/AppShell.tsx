@@ -8,7 +8,7 @@ import { useUnreadCountQuery } from '../../features/notification/hooks/useNotifi
 import { NotificationPopover } from '../../features/notification/components/NotificationPopover';
 import { Button, RoleBadge } from '../../shared/components/ui';
 import { initials } from '../../shared/utils/format';
-import { isChildActive, isNavActive, navHref } from './navMatch';
+import { isNavActive, navHref } from './navMatch';
 import { navForRole, sections, type NavItem } from './navItems';
 
 export function AppShell() {
@@ -75,29 +75,6 @@ export function AppShell() {
                         </span>
                       )}
                   </NavLink>
-                  {active && link.children && !collapsed && (
-                    <div className="nav-children" role="group" aria-label={label}>
-                      {link.children.map((child) => {
-                        const childActive = isChildActive(
-                          link,
-                          child,
-                          location.pathname,
-                          location.search,
-                        );
-                        return (
-                          <NavLink
-                            key={child.tab}
-                            to={`${link.to}?tab=${child.tab}`}
-                            onClick={close}
-                            aria-current={childActive ? 'page' : undefined}
-                            className={`nav-subitem ${childActive ? 'active' : ''}`}
-                          >
-                            {child.label}
-                          </NavLink>
-                        );
-                      })}
-                    </div>
-                  )}
                 </Fragment>
               );
             })}

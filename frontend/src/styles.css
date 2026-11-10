@@ -4659,50 +4659,89 @@ button.notification-card-title:hover {
 /* Handover dialog: payment rule and per-line warranty */
 .handover-section {
   display: grid;
-  gap: 10px;
-  padding: 12px 0;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+.handover-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
 .handover-section h4 {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #172338;
 }
 .handover-payment {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   justify-items: start;
 }
 .handover-metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px 16px;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 10px;
   margin: 0;
   width: 100%;
 }
+.handover-metric-card {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #f8fafc;
+}
 .handover-metrics dt {
   color: var(--muted);
-  font-size: 0.8125rem;
+  font-size: 12px;
 }
 .handover-metrics dd {
-  margin: 2px 0 0;
-  font-weight: 600;
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: #172338;
   font-variant-numeric: tabular-nums;
+}
+.handover-metrics dd.handover-metric-danger {
+  color: var(--danger);
 }
 .handover-reasons {
   margin: 0;
-  padding-left: 18px;
-  color: var(--danger);
+  padding-left: 16px;
+  color: inherit;
 }
 .handover-payment-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+.handover-empty-note {
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 .handover-warranty-row {
   display: grid;
   gap: 8px;
-  padding: 10px 0;
-  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #f8fafc;
 }
 .handover-warranty-name {
   display: flex;

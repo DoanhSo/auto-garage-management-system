@@ -96,13 +96,13 @@ export const schedulingApi = {
     ),
 
   checkInShift: (id: string | number) =>
-    request<Shift>(`/shifts/${id}/check-in`, { method: 'POST' }),
+    request<Shift>(`/employee-shifts/${id}/check-in`, { method: 'POST' }),
 
   checkOutShift: (id: string | number) =>
-    request<Shift>(`/shifts/${id}/check-out`, { method: 'POST' }),
+    request<Shift>(`/employee-shifts/${id}/check-out`, { method: 'POST' }),
 
   getShiftReconciliation: (date?: string) =>
-    request<ShiftReconciliation[]>('/shifts/reconciliation' + queryString({ date })),
+    request<ShiftReconciliation[]>('/employee-shifts/reconciliation' + queryString({ date })),
 
   getBayDayRoster: (bayId: string | number, date?: string) =>
     request<BayShiftTechnician[]>(`/scheduling/bays-roster/${bayId}` + queryString({ date })),

@@ -58,7 +58,7 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, noRollbackFor = BusinessException.class)
 public class InventoryServiceImpl implements InventoryService {
     /** Pending parts named in the invoice-blocked message before summarising the rest. */
     private static final int MAX_PENDING_PARTS_SHOWN = 5;
@@ -508,7 +508,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = BusinessException.class)
     public void requireIssueComplete(long repairOrderId) {
         String names = pendingIssueNames(repairOrderId);
         if (names != null) {
@@ -526,7 +526,7 @@ public class InventoryServiceImpl implements InventoryService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = BusinessException.class)
     public void requireIssuedForWorkStart(long repairOrderId) {
         String names = pendingIssueNames(repairOrderId);
         if (names != null) {

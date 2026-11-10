@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -89,6 +90,19 @@ export function InventoryDocumentsPage() {
   const [lines, setLines] = useState<InventoryDocumentItemInput[]>([
     { partId: 0, quantity: 1, unitCost: 0, notes: '' },
   ]);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlIssueOrderId = searchParams.get('issueOrderId') ?? '';
+
+  useEffect(() => {
+    if (!urlIssueOrderId || !canManage) return;
+    setDocType('OUT');
+    setOrderId(urlIssueOrderId);
+    setCreating(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('issueOrderId');
+    setSearchParams(next, { replace: true });
+  }, [urlIssueOrderId, canManage, searchParams, setSearchParams]);
 
   // Xuất kho sửa chữa: chọn lệnh, nạp phụ tùng đã giữ chỗ, chọn dòng và số lượng cần xuất.
   const [issuePick, setIssuePick] = useState<
