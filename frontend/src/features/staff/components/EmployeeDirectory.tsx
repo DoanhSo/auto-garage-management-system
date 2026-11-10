@@ -49,7 +49,7 @@ export function EmployeeDirectory({ canCreate }: { canCreate: boolean }) {
   const [editing, setEditing] = useState<Employee | null>(null);
   const [selectedId, selectEmployee] = useStaffEmployee();
   const employeesQuery = useSchedulingEmployeesQuery();
-  const activeShifts = useShiftsQuery({ status: 'ACTIVE', from: todayKey(), size: 200 });
+  const activeShifts = useShiftsQuery({ status: 'ACTIVE', from: todayKey(), size: 100 });
   const shiftCounts = useMemo(() => {
     const counts = new Map<string, number>();
     (activeShifts.data?.content ?? [])

@@ -1,0 +1,87 @@
+@startchen 03-nhan-su-ca-khoang
+title ERD Chen nhóm 3 — Nhân viên, ca làm việc và khoang sửa chữa
+
+' Quy ước: thực thể của nhóm = "NHÃN (bảng)"; thực thể nhóm khác = "NHÃN ‹nhóm N›", không thuộc tính.
+' Bản số (min,max) suy từ schema: cột FK NOT NULL → (1,1), NULL → (0,1); FK UNIQUE → phía cha (0,1), không → (0,N).
+' Khóa ngoại 'người thực hiện' (created_by, approved_by, ...) vẽ riêng ở 09-nguoi-thuc-hien.puml.
+
+entity "NHÂN VIÊN (employees)" as EMPLOYEE {
+  id <<key>>
+  employee_code
+  skills_json
+  can_qc
+  hourly_cost
+  salary_coefficient
+}
+
+entity "CA LÀM VIỆC (employee_shifts)" as SHIFT {
+  id <<key>>
+  shift_type
+  starts_at
+  ends_at
+  status
+  attendance_status
+}
+
+entity "KHOANG SỬA CHỮA (service_bays)" as BAY {
+  id <<key>>
+  bay_code
+  bay_name
+  bay_type
+  is_active
+}
+
+entity "LỊCH KHOANG (bay_reservations)" as BAY_RESERVATION {
+  id <<key>>
+  reservation_type
+  starts_at
+  ends_at
+  status
+}
+
+entity "LỊCH HẸN ‹nhóm 1›" as BOOKING {
+}
+
+entity "PHIẾU SỬA CHỮA ‹nhóm 2›" as REPAIR_ORDER {
+}
+
+entity "NGƯỜI DÙNG ‹nhóm 1›" as USER {
+}
+
+relationship "là nhân viên" as R_EMPLOYEES_USER_ID {
+}
+' fk: employees.user_id
+R_EMPLOYEES_USER_ID -(0,1)- USER
+R_EMPLOYEES_USER_ID -(1,1)- EMPLOYEE
+
+relationship "trực ca" as R_EMPLOYEE_SHIFTS_EMPLOYEE_ID {
+}
+' fk: employee_shifts.employee_id
+R_EMPLOYEE_SHIFTS_EMPLOYEE_ID -(0,N)- EMPLOYEE
+R_EMPLOYEE_SHIFTS_EMPLOYEE_ID -(1,1)- SHIFT
+
+relationship "ca tại khoang" as R_EMPLOYEE_SHIFTS_SERVICE_BAY_ID {
+}
+' fk: employee_shifts.service_bay_id
+R_EMPLOYEE_SHIFTS_SERVICE_BAY_ID -(0,N)- BAY
+R_EMPLOYEE_SHIFTS_SERVICE_BAY_ID -(0,1)- SHIFT
+
+relationship "giữ khoang" as R_BAY_RESERVATIONS_BAY_ID {
+}
+' fk: bay_reservations.bay_id
+R_BAY_RESERVATIONS_BAY_ID -(0,N)- BAY
+R_BAY_RESERVATIONS_BAY_ID -(1,1)- BAY_RESERVATION
+
+relationship "giữ cho lịch hẹn" as R_BAY_RESERVATIONS_BOOKING_ID {
+}
+' fk: bay_reservations.booking_id
+R_BAY_RESERVATIONS_BOOKING_ID -(0,N)- BOOKING
+R_BAY_RESERVATIONS_BOOKING_ID -(0,1)- BAY_RESERVATION
+
+relationship "giữ cho phiếu" as R_BAY_RESERVATIONS_REPAIR_ORDER_ID {
+}
+' fk: bay_reservations.repair_order_id
+R_BAY_RESERVATIONS_REPAIR_ORDER_ID -(0,N)- REPAIR_ORDER
+R_BAY_RESERVATIONS_REPAIR_ORDER_ID -(0,1)- BAY_RESERVATION
+
+@endchen

@@ -73,7 +73,7 @@ import java.util.Locale;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(readOnly = true, noRollbackFor = BusinessException.class)
 public class BillingServiceImpl implements BillingService {
     private final InvoiceRepository invoiceRepository;
     private final InvoiceItemRepository invoiceItemRepository;
@@ -344,7 +344,7 @@ public class BillingServiceImpl implements BillingService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = BusinessException.class)
     public InvoiceReadinessResponse getInvoiceReadiness(Long repairOrderId) {
         try {
             requireIssueReady(currentUser.userId(), repairOrderId, false);
@@ -427,7 +427,11 @@ public class BillingServiceImpl implements BillingService {
         }
         List<String> orderStatus = jdbcTemplate.queryForList(
                 "SELECT status FROM repair_orders WHERE id = ?", String.class, invoice.getRepairOrderId());
-        if (!orderStatus.isEmpty() && "CLOSED".equals(orderStatus.get(0))) {
+        if (orderStatus.isEmpty()) {
+            throw new ConflictException(ResponseCode.WARRANTY_BLOCKED,
+                    "Không tìm thấy phiếu sửa chữa của hóa đơn, không thể thêm bảo hành.");
+        }
+        if ("CLOSED".equals(orderStatus.get(0))) {
             throw new ConflictException(ResponseCode.WARRANTY_BLOCKED,
                     "Phiếu đã bàn giao, không thể thêm bảo hành. Bảo hành chỉ thêm được trước khi bàn giao xe.");
         }
@@ -681,6 +685,7 @@ public class BillingServiceImpl implements BillingService {
 
     /** Uses the typed code when given (normalised and checked), otherwise generates the next one of the day. */
     private String resolveTransactionCode(String requested, PaymentDirection direction) {
+        lockPaymentCodes();
         String code = requested == null ? "" : requested.trim().toUpperCase(Locale.ROOT);
         if (code.isEmpty()) {
             return generateTransactionCode(direction);
@@ -694,6 +699,14 @@ public class BillingServiceImpl implements BillingService {
                     "Mã giao dịch " + code + " đã tồn tại. Hãy nhập mã khác hoặc bấm Sinh lại.");
         }
         return code;
+    }
+
+    /**
+     * Serialises code allocation: the row lock is held until the surrounding transaction commits or rolls back,
+     * so two concurrent payments never pick or check against the same not-yet-committed code.
+     */
+    private void lockPaymentCodes() {
+        jdbcTemplate.queryForObject("SELECT id FROM payment_code_lock WHERE id = 1 FOR UPDATE", Integer.class);
     }
 
     private String generateTransactionCode(PaymentDirection direction) {
@@ -793,28 +806,25 @@ public class BillingServiceImpl implements BillingService {
 
         List<String> reasons = new ArrayList<>();
         List<String> overdue = new ArrayList<>();
-        BigDecimal minimumPayment = BigDecimal.ZERO;
-        if (balance.signum() > 0) {
-            minimumPayment = debt.subtract(creditLimit).max(BigDecimal.ZERO).min(balance);
-            if (debt.compareTo(creditLimit) > 0) {
-                reasons.add(creditLimit.signum() == 0
-                        ? "Khách chưa có hạn mức nợ nên phải thanh toán đủ. Công nợ hiện tại " + formatMoney(debt)
-                                + " đ, cần thu tối thiểu " + formatMoney(minimumPayment) + " đ trước khi bàn giao."
-                        : "Công nợ của khách là " + formatMoney(debt) + " đ, vượt hạn mức " + formatMoney(creditLimit)
-                                + " đ. Cần thu tối thiểu " + formatMoney(debt.subtract(creditLimit))
-                                + " đ trước khi bàn giao.");
+        // balance > 0 here: the fully-paid case returned above.
+        BigDecimal minimumPayment = debt.subtract(creditLimit).max(BigDecimal.ZERO).min(balance);
+        if (debt.compareTo(creditLimit) > 0) {
+            reasons.add(creditLimit.signum() == 0
+                    ? "Khách chưa có hạn mức nợ nên phải thanh toán đủ. Công nợ hiện tại " + formatMoney(debt)
+                            + " đ, cần thu tối thiểu " + formatMoney(minimumPayment) + " đ trước khi bàn giao."
+                    : "Công nợ của khách là " + formatMoney(debt) + " đ, vượt hạn mức " + formatMoney(creditLimit)
+                            + " đ. Cần thu tối thiểu " + formatMoney(minimumPayment) + " đ trước khi bàn giao.");
+        }
+        LocalDate today = LocalDate.now();
+        for (InvoiceBalanceView iv : invoiceBalanceViewRepository.findByCustomerId(invoice.getCustomerId())) {
+            if (iv.getDueDate() != null && iv.getDueDate().isBefore(today)
+                    && iv.getBalanceAmount().compareTo(BigDecimal.ZERO) > 0) {
+                overdue.add(Objects.toString(iv.getInvoiceCode(), "#" + iv.getInvoiceId()));
             }
-            LocalDate today = LocalDate.now();
-            for (InvoiceBalanceView iv : invoiceBalanceViewRepository.findByCustomerId(invoice.getCustomerId())) {
-                if (iv.getDueDate() != null && iv.getDueDate().isBefore(today)
-                        && iv.getBalanceAmount().compareTo(BigDecimal.ZERO) > 0) {
-                    overdue.add(Objects.toString(iv.getInvoiceCode(), "#" + iv.getInvoiceId()));
-                }
-            }
-            if (!overdue.isEmpty()) {
-                reasons.add("Khách có hóa đơn quá hạn chưa thanh toán (" + String.join(", ", overdue)
-                        + "). Hãy thu nợ quá hạn trước khi bàn giao.");
-            }
+        }
+        if (!overdue.isEmpty()) {
+            reasons.add("Khách có hóa đơn quá hạn chưa thanh toán (" + String.join(", ", overdue)
+                    + "). Hãy thu nợ quá hạn trước khi bàn giao.");
         }
         return new HandoverReadinessResponse(reasons.isEmpty(), List.copyOf(reasons), invoice.getId(), balance,
                 debt, creditLimit, minimumPayment, List.copyOf(overdue));

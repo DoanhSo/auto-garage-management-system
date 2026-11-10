@@ -525,3 +525,30 @@ Các FK/CHECK/index xem trực tiếp tám file SQL trong `src/main/resources/db
 - `handling_order_id`: `bigint`; NULL; DEFAULT `<none>`.
 - `closed_at`: `datetime(6)`; NULL; DEFAULT `<none>`.
 - `version`: `bigint`; NOT NULL; DEFAULT `0`.
+
+## Bổ sung V9–V19
+
+> Mục này bổ sung các bảng và cột thêm sau V8 (plan `system-analysis-erd`). Danh sách đầy đủ, luôn khớp migration, ở [`erd/schema-inventory.md`](erd/schema-inventory.md) (sinh bằng `scripts/analysis/schema_inventory.py`).
+
+### Cột thêm vào bảng có sẵn
+
+| Bảng | Cột | Migration | Ý nghĩa |
+|---|---|---|---|
+| users | identity_id | V9 | Định danh Keycloak (UNIQUE) |
+| bookings | service_id | V11 | Cho phép NULL |
+| customers | phone | V11 | UNIQUE |
+| employees | base_salary, overtime_multiplier, default_commission_rate, salary_coefficient, joined_at, bank_name, bank_account_number, bank_account_holder | V12–V17 | Lương, hệ số, hồ sơ ngân hàng |
+| employee_shifts | shift_type, service_bay_id, actual_starts_at, actual_ends_at, attendance_status, registered_at, approved_by, rejection_reason | V13–V17 | Khung ca, khoang, chấm công, đăng ký và duyệt ca |
+| payments | payroll_period_id | V12 | Khoản chi lương |
+| warranties | void_reason, voided_by, voided_at, adjustment_note, adjusted_by, adjusted_at | V18 | Hủy sổ, điều chỉnh sổ (chưa có FK tới users, xem phát hiện F4) |
+| invoices | active_repair_order_id | V19 | Cột sinh: `repair_order_id` khi hóa đơn khác VOID; UNIQUE |
+
+### Bảng mới
+
+| Bảng | Migration | Ý nghĩa | Khóa và ràng buộc chính |
+|---|---|---|---|
+| payment_code_lock | V20 | Dòng khóa duy nhất (id=1) giữ trong lúc sinh/kiểm tra mã giao dịch | PK `id`; chỉ dùng `SELECT ... FOR UPDATE`, không có dữ liệu nghiệp vụ |
+| payroll_periods | V12 | Kỳ lương tháng: tổng giờ, tổng lương, trạng thái, người duyệt, khoản chi | UNIQUE `period_code`, `period_month`; FK `approved_by → users`, `payment_id → payments` |
+| payroll_items | V12 | Bảng lương từng nhân viên trong kỳ: giờ thường, tăng ca, hoa hồng, phụ cấp, khấu trừ, thực lĩnh | UNIQUE `(payroll_period_id, employee_id)` |
+| order_commissions | V12, V14, V15 | Hoa hồng theo phiếu/công việc, kèm ca và khoang; nối vào bảng lương | FK tới repair_orders, repair_tasks, employees, payroll_items, employee_shifts, service_bays |
+| repair_order_assignments | V13 | Nhật ký công đoạn (chẩn đoán, sửa chính, sửa phụ, QC) theo xe và ca, thời gian thực tế, kết quả | FK tới repair_orders, vehicles, employees, employee_shifts, repair_tasks |

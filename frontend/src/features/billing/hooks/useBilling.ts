@@ -140,6 +140,8 @@ export function useReceivePaymentMutation() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice', invoiceId] });
       queryClient.invalidateQueries({ queryKey: ['customer-debts'] });
+      queryClient.invalidateQueries({ queryKey: ['handover-readiness'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-by-order'] });
     },
   });
 }

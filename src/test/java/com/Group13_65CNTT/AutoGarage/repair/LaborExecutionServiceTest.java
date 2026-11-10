@@ -105,6 +105,8 @@ class LaborExecutionServiceTest {
 
     @BeforeEach
     void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                laborExecutionService, "inventoryOperations", inventoryOperations);
         mockOrder = RepairOrder.builder()
                 .id(100L)
                 .orderCode("RO-20261023-00001")
@@ -299,8 +301,6 @@ class LaborExecutionServiceTest {
 
     private void stubTimerBasics() {
         when(taskAssignmentRepository.findById(1L)).thenReturn(Optional.of(mockAssignment));
-        org.springframework.test.util.ReflectionTestUtils.setField(
-                laborExecutionService, "inventoryOperations", inventoryOperations);
     }
 
     @Test

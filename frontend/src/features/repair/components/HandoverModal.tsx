@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AlertCircle, ArrowRight, CheckCircle2, Receipt, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { errorMessage } from '../../../shared/api/errors';
 import { Badge, Button, Field, FormError, Loading, Sheet } from '../../../shared/components/ui';
@@ -120,13 +121,26 @@ export function HandoverModal({
   const notify = useToast();
   const handover = useHandoverMutation();
   const readiness = useHandoverReadinessQuery(order.id, open);
-  const invoice = useInvoiceByOrderQuery(order.id, open);
+  const shouldFetchInvoice =
+    open &&
+    (order.status === 'INVOICED' ||
+      order.status === 'CLOSED' ||
+      readiness.data?.invoiceId != null);
+  const invoice = useInvoiceByOrderQuery(order.id, shouldFetchInvoice);
 
   const [odometerOut, setOdometerOut] = useState<number>(order.odometerIn);
   const [notes, setNotes] = useState('');
   const [warrantyError, setWarrantyError] = useState('');
 
   const blocked = readiness.data?.allowed === false;
+  const missingInvoice = readiness.data != null && readiness.data.invoiceId == null && !invoice.data;
+  const hasUnpaidBalance = Number(readiness.data?.invoiceBalance ?? 0) > 0;
+  const invoiceCode = invoice.data?.invoiceCode;
+  const invoiceTarget = invoiceCode
+    ? `/billing/invoices?query=${encodeURIComponent(invoiceCode)}`
+    : missingInvoice
+      ? `/billing/invoices?issueOrderId=${encodeURIComponent(String(order.id))}`
+      : '/billing/invoices';
   const warrantyItems = (invoice.data?.items ?? []).filter((item) =>
     WARRANTY_ITEM_TYPES.has(item.itemType),
   );
@@ -167,7 +181,25 @@ export function HandoverModal({
         <FormError message={handover.error ? errorMessage(handover.error) : undefined} />
 
         <section className="full-width handover-section" aria-label="Điều kiện thanh toán">
-          <h4>Điều kiện thanh toán</h4>
+          <div className="handover-section-header">
+            <h4>
+              <Receipt size={16} className="text-primary" />
+              <span>Điều kiện thanh toán &amp; quyết toán hóa đơn</span>
+            </h4>
+            {readiness.data && (
+              <Badge variant={readiness.data.allowed ? 'success' : 'danger'}>
+                {readiness.data.allowed ? (
+                  <>
+                    <CheckCircle2 size={12} /> Đủ điều kiện bàn giao
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle size={12} /> Chưa đủ điều kiện bàn giao
+                  </>
+                )}
+              </Badge>
+            )}
+          </div>
           {readiness.isLoading && <Loading />}
           {readiness.isError && (
             <FormError message="Không kiểm tra được điều kiện thanh toán. Hệ thống vẫn kiểm tra lại khi bàn giao." />
@@ -175,43 +207,81 @@ export function HandoverModal({
           {readiness.data && (
             <div className="handover-payment">
               <dl className="handover-metrics">
-                <div>
+                <div className="handover-metric-card">
                   <dt>Còn nợ hóa đơn này</dt>
-                  <dd>{money(readiness.data.invoiceBalance)}</dd>
+                  <dd className={hasUnpaidBalance ? 'handover-metric-danger' : ''}>
+                    {money(readiness.data.invoiceBalance)}
+                  </dd>
                 </div>
-                <div>
+                <div className="handover-metric-card">
                   <dt>Tổng công nợ của khách</dt>
                   <dd>{money(readiness.data.customerDebt)}</dd>
                 </div>
-                <div>
+                <div className="handover-metric-card">
                   <dt>Hạn mức nợ</dt>
                   <dd>{money(readiness.data.creditLimit)}</dd>
                 </div>
-                <div>
+                <div className="handover-metric-card">
                   <dt>Cần thu tối thiểu</dt>
-                  <dd>{money(readiness.data.minimumPayment)}</dd>
+                  <dd
+                    className={
+                      Number(readiness.data.minimumPayment) > 0 ? 'handover-metric-danger' : ''
+                    }
+                  >
+                    {money(readiness.data.minimumPayment)}
+                  </dd>
                 </div>
               </dl>
               {readiness.data.allowed ? (
-                <Badge variant="success">Đủ điều kiện bàn giao</Badge>
+                hasUnpaidBalance ? (
+                  <div className="handover-payment-actions">
+                    <Link className="button" to={invoiceTarget} onClick={onClose}>
+                      <Receipt size={15} />
+                      <span>
+                        {invoiceCode
+                          ? `Đến hóa đơn ${invoiceCode} để thu tiền`
+                          : 'Mở Hóa đơn dịch vụ để thu tiền'}
+                      </span>
+                      <ArrowRight size={14} />
+                    </Link>
+                  </div>
+                ) : null
               ) : (
                 <>
-                  <Badge variant="danger">Chưa đủ điều kiện bàn giao</Badge>
-                  <ul className="handover-reasons">
-                    {readiness.data.reasons.map((reason) => (
-                      <li key={reason}>{reason}</li>
-                    ))}
-                  </ul>
+                  <div className="alert alert-error full-width">
+                    <AlertCircle size={16} />
+                    <ul className="handover-reasons">
+                      {readiness.data.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
                   <div className="handover-payment-actions">
-                    <Link to="/billing/invoices" onClick={onClose}>
-                      Mở Hóa đơn dịch vụ để thu tiền
+                    <Link
+                      className="button button-primary"
+                      to={invoiceTarget}
+                      onClick={onClose}
+                    >
+                      <Receipt size={15} />
+                      <span>
+                        {missingInvoice
+                          ? 'Mở Hóa đơn dịch vụ để lập hóa đơn & thu tiền'
+                          : invoiceCode
+                            ? `Mở hóa đơn ${invoiceCode} để thu tiền`
+                            : 'Mở Hóa đơn dịch vụ để thu tiền'}
+                      </span>
+                      <ArrowRight size={14} />
                     </Link>
                     <Button
                       type="button"
                       variant="secondary"
                       pending={readiness.isFetching}
-                      onClick={() => void readiness.refetch()}
+                      onClick={() => {
+                        void readiness.refetch();
+                        void invoice.refetch();
+                      }}
                     >
+                      <RefreshCw size={14} />
                       Kiểm tra lại
                     </Button>
                   </div>
@@ -222,15 +292,29 @@ export function HandoverModal({
         </section>
 
         <section className="full-width handover-section" aria-label="Bảo hành">
-          <h4>Bảo hành theo dòng hóa đơn</h4>
-          <p className="muted">
+          <div className="handover-section-header">
+            <h4>
+              <ShieldCheck size={16} className="text-primary" />
+              <span>Bảo hành theo dòng hóa đơn</span>
+            </h4>
+            {invoiceCode && <Badge variant="secondary">{invoiceCode}</Badge>}
+          </div>
+          <p className="field-hint">
             Dòng chưa có bảo hành có thể bổ sung ngay bây giờ. Sổ bảo hành được tạo khi xác nhận bàn
             giao, tính từ ngày và số ODO bàn giao.
           </p>
           <FormError message={warrantyError || undefined} />
           {invoice.isLoading && <Loading />}
+          {!invoice.isLoading && !invoice.data && (
+            <p className="handover-empty-note">
+              Chưa có hóa đơn hiệu lực cho phiếu sửa chữa này. Hãy phát hành hóa đơn tại màn Hóa đơn
+              dịch vụ trước khi thiết lập bảo hành và bàn giao xe.
+            </p>
+          )}
           {invoice.data && warrantyItems.length === 0 && (
-            <p className="muted">Hóa đơn không có dòng dịch vụ hoặc phụ tùng để bảo hành.</p>
+            <p className="handover-empty-note">
+              Hóa đơn không có dòng dịch vụ hoặc phụ tùng để bảo hành.
+            </p>
           )}
           {invoice.data &&
             warrantyItems.map((item) => (

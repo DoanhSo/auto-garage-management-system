@@ -1,0 +1,41 @@
+@startuml A5-hoa-don-thanh-toan
+title A5 — Hóa đơn, thu tiền, hủy và lập lại, chi nhà cung cấp (UC28–UC31)
+|Lễ tân|
+start
+:Chọn phiếu đã sửa xong, nhập thuế bổ sung / giảm giá;
+|Hệ thống|
+if (QC mới nhất PASSED, việc xong, không còn timer?\nChưa có hóa đơn còn hiệu lực?) then (đủ)
+  :Chụp snapshot khách, xe, giá, giá vốn (BR18);
+  :Hóa đơn UNPAID, phiếu INVOICED;
+else (chưa đủ)
+  :Từ chối phát hành;
+  stop
+endif
+|Quản trị viên|
+if (Hóa đơn lập sai và chưa thu tiền?) then (hủy)
+  |Hệ thống|
+  :Hóa đơn VOID (giữ lại để tra cứu),\nphiếu về COMPLETED;
+  note right: V19 — chỉ hóa đơn khác VOID\nmới tính "một hóa đơn mỗi phiếu"
+  |Lễ tân|
+  :Lập lại hóa đơn;
+  |Hệ thống|
+  :Hóa đơn mới UNPAID, phiếu INVOICED;
+else (giữ)
+endif
+|Lễ tân|
+repeat
+  :Ghi nhận khoản thu (IN);
+  |Hệ thống|
+  :Khóa hóa đơn, không thu vượt dư nợ;
+  :PARTIALLY_PAID hoặc PAID;
+repeat while (Còn dư nợ và khách trả tiếp?) is (có)
+|Lễ tân|
+:Bàn giao xe (A2);
+|Hệ thống|
+if (Đã PAID hoặc dư nợ trong hạn mức, không quá hạn?) then (đạt)
+  :Cho bàn giao;
+else (không)
+  :Chặn bàn giao;
+endif
+stop
+@enduml

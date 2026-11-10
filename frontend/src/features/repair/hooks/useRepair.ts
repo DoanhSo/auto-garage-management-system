@@ -99,29 +99,6 @@ export function useHandoverMutation() {
   });
 }
 
-export function useCreateTaskMutation() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      orderId,
-      data,
-    }: {
-      orderId: string | number;
-      data: {
-        taskName: string;
-        description?: string;
-        taskType?: string;
-        quantity?: number;
-        unitPrice?: number;
-      };
-    }) => repairApi.createTask(orderId, data),
-    onSuccess: (_, { orderId }) => {
-      void qc.invalidateQueries({ queryKey: ['repair-tasks', orderId] });
-      void qc.invalidateQueries({ queryKey: ['repair-order', orderId] });
-    },
-  });
-}
-
 function useRefreshTaskWork() {
   const qc = useQueryClient();
   return () => {

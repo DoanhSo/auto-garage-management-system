@@ -1,0 +1,144 @@
+@startchen 05-kho
+title ERD Chen nhóm 5 — Nhà cung cấp, phụ tùng, chứng từ kho và sổ kho
+
+' Quy ước: thực thể của nhóm = "NHÃN (bảng)"; thực thể nhóm khác = "NHÃN ‹nhóm N›", không thuộc tính.
+' Bản số (min,max) suy từ schema: cột FK NOT NULL → (1,1), NULL → (0,1); FK UNIQUE → phía cha (0,1), không → (0,N).
+' Khóa ngoại 'người thực hiện' (created_by, approved_by, ...) vẽ riêng ở 09-nguoi-thuc-hien.puml.
+
+entity "NHÀ CUNG CẤP (suppliers)" as SUPPLIER {
+  id <<key>>
+  supplier_code
+  supplier_name
+  payment_term_days
+}
+
+entity "PHỤ TÙNG (parts)" as PART {
+  id <<key>>
+  sku
+  part_name
+  stock_quantity
+  reserved_quantity
+  selling_price
+  available_quantity <<derived>>
+}
+
+entity "PHỤ TÙNG CỦA PHIẾU (repair_order_parts)" as ORDER_PART {
+  id <<key>>
+  quantity
+  unit_cost
+}
+
+entity "CHỨNG TỪ KHO (inventory_documents)" as INV_DOC {
+  id <<key>>
+  document_code
+  document_type
+  status
+  total_amount
+  posted_at
+}
+
+entity "DÒNG CHỨNG TỪ (inventory_document_items)" as INV_DOC_ITEM <<weak>> {
+  line_no <<key>>
+  quantity
+  unit_cost
+  line_total
+}
+
+entity "SỔ KHO (inventory_transactions)" as INV_TXN {
+  id <<key>>
+  transaction_type
+  quantity_change
+  stock_after
+}
+
+entity "HẠNG MỤC BÁO GIÁ ‹nhóm 4›" as ESTIMATE_ITEM {
+}
+
+entity "PHIẾU SỬA CHỮA ‹nhóm 2›" as REPAIR_ORDER {
+}
+
+relationship "ưu tiên cung ứng" as R_PARTS_PREFERRED_SUPPLIER_ID {
+}
+' fk: parts.preferred_supplier_id
+R_PARTS_PREFERRED_SUPPLIER_ID -(0,N)- SUPPLIER
+R_PARTS_PREFERRED_SUPPLIER_ID -(0,1)- PART
+
+relationship "dùng cho phiếu" as R_REPAIR_ORDER_PARTS_REPAIR_ORDER_ID {
+}
+' fk: repair_order_parts.repair_order_id
+R_REPAIR_ORDER_PARTS_REPAIR_ORDER_ID -(0,N)- REPAIR_ORDER
+R_REPAIR_ORDER_PARTS_REPAIR_ORDER_ID -(1,1)- ORDER_PART
+
+relationship "từ mục duyệt" as R_REPAIR_ORDER_PARTS_ESTIMATE_ITEM_ID {
+}
+' fk: repair_order_parts.estimate_item_id
+R_REPAIR_ORDER_PARTS_ESTIMATE_ITEM_ID -(0,1)- ESTIMATE_ITEM
+R_REPAIR_ORDER_PARTS_ESTIMATE_ITEM_ID -(1,1)- ORDER_PART
+
+relationship "là phụ tùng" as R_REPAIR_ORDER_PARTS_PART_ID {
+}
+' fk: repair_order_parts.part_id
+R_REPAIR_ORDER_PARTS_PART_ID -(0,N)- PART
+R_REPAIR_ORDER_PARTS_PART_ID -(1,1)- ORDER_PART
+
+relationship "mua của" as R_INVENTORY_DOCUMENTS_SUPPLIER_ID {
+}
+' fk: inventory_documents.supplier_id
+R_INVENTORY_DOCUMENTS_SUPPLIER_ID -(0,N)- SUPPLIER
+R_INVENTORY_DOCUMENTS_SUPPLIER_ID -(0,1)- INV_DOC
+
+relationship "xuất cho phiếu" as R_INVENTORY_DOCUMENTS_REPAIR_ORDER_ID {
+}
+' fk: inventory_documents.repair_order_id
+R_INVENTORY_DOCUMENTS_REPAIR_ORDER_ID -(0,N)- REPAIR_ORDER
+R_INVENTORY_DOCUMENTS_REPAIR_ORDER_ID -(0,1)- INV_DOC
+
+relationship "trả theo chứng từ" as R_INVENTORY_DOCUMENTS_SOURCE_DOCUMENT_ID {
+}
+' fk: inventory_documents.source_document_id
+R_INVENTORY_DOCUMENTS_SOURCE_DOCUMENT_ID -(0,N)- INV_DOC
+R_INVENTORY_DOCUMENTS_SOURCE_DOCUMENT_ID -(0,1)- INV_DOC
+
+relationship "gồm dòng" as R_INVENTORY_DOCUMENT_ITEMS_DOCUMENT_ID <<identifying>> {
+}
+' fk: inventory_document_items.document_id
+R_INVENTORY_DOCUMENT_ITEMS_DOCUMENT_ID -(0,N)- INV_DOC
+R_INVENTORY_DOCUMENT_ITEMS_DOCUMENT_ID =(1,1)= INV_DOC_ITEM
+
+relationship "dòng phụ tùng" as R_INVENTORY_DOCUMENT_ITEMS_PART_ID {
+}
+' fk: inventory_document_items.part_id
+R_INVENTORY_DOCUMENT_ITEMS_PART_ID -(0,N)- PART
+R_INVENTORY_DOCUMENT_ITEMS_PART_ID -(1,1)- INV_DOC_ITEM
+
+relationship "giữ theo mục" as R_INVENTORY_DOCUMENT_ITEMS_ESTIMATE_ITEM_ID {
+}
+' fk: inventory_document_items.estimate_item_id
+R_INVENTORY_DOCUMENT_ITEMS_ESTIMATE_ITEM_ID -(0,N)- ESTIMATE_ITEM
+R_INVENTORY_DOCUMENT_ITEMS_ESTIMATE_ITEM_ID -(0,1)- INV_DOC_ITEM
+
+relationship "xuất cho dòng phiếu" as R_INVENTORY_DOCUMENT_ITEMS_REPAIR_ORDER_PART_ID {
+}
+' fk: inventory_document_items.repair_order_part_id
+R_INVENTORY_DOCUMENT_ITEMS_REPAIR_ORDER_PART_ID -(0,N)- ORDER_PART
+R_INVENTORY_DOCUMENT_ITEMS_REPAIR_ORDER_PART_ID -(0,1)- INV_DOC_ITEM
+
+relationship "trả từ dòng" as R_INVENTORY_DOCUMENT_ITEMS_SOURCE_ITEM_ID {
+}
+' fk: inventory_document_items.source_item_id
+R_INVENTORY_DOCUMENT_ITEMS_SOURCE_ITEM_ID -(0,N)- INV_DOC_ITEM
+R_INVENTORY_DOCUMENT_ITEMS_SOURCE_ITEM_ID -(0,1)- INV_DOC_ITEM
+
+relationship "ghi sổ" as R_INVENTORY_TRANSACTIONS_DOCUMENT_ITEM_ID {
+}
+' fk: inventory_transactions.document_item_id
+R_INVENTORY_TRANSACTIONS_DOCUMENT_ITEM_ID -(0,1)- INV_DOC_ITEM
+R_INVENTORY_TRANSACTIONS_DOCUMENT_ITEM_ID -(1,1)- INV_TXN
+
+relationship "biến động" as R_INVENTORY_TRANSACTIONS_PART_ID {
+}
+' fk: inventory_transactions.part_id
+R_INVENTORY_TRANSACTIONS_PART_ID -(0,N)- PART
+R_INVENTORY_TRANSACTIONS_PART_ID -(1,1)- INV_TXN
+
+@endchen

@@ -473,6 +473,32 @@ class BillingServiceTest {
     }
 
     @Test
+    @DisplayName("Không thêm bảo hành khi không tìm thấy phiếu của hóa đơn")
+    void updateInvoiceItemWarranty_MissingOrder_Blocked() {
+        Invoice invoice = Invoice.builder().id(1L).repairOrderId(500L).customerId(100L)
+                .status(InvoiceStatus.UNPAID).totalAmount(new BigDecimal("100000")).build();
+        when(invoiceRepository.findByIdWithLock(1L)).thenReturn(Optional.of(invoice));
+        when(jdbcTemplate.queryForList(contains("SELECT status FROM repair_orders"), eq(String.class), eq(500L)))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.updateInvoiceItemWarranty(10L, 1L, 7L, warrantyRequest(30, 0, null)))
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.WARRANTY_BLOCKED);
+        verify(invoiceItemRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Nợ nơi khác vượt xa: thông báo nêu đúng số tối thiểu bằng minimumPayment, không vượt số còn nợ")
+    void handoverReadiness_MessageMatchesCappedMinimum() {
+        // balance 4,000,000 (5M total - 1M paid); debt 9M vs limit 3M => uncapped 6M, capped 4M
+        stubUnpaid(unpaidInvoice(), new BigDecimal("3000000"), 15, new BigDecimal("9000000"));
+
+        var result = service.getHandoverReadiness(500L);
+
+        assertThat(result.minimumPayment()).isEqualByComparingTo("4000000");
+        assertThat(result.reasons().get(0)).contains("tối thiểu 4.000.000").doesNotContain("6.000.000");
+    }
+
+    @Test
     @DisplayName("Không thêm bảo hành cho hóa đơn đã hủy")
     void updateInvoiceItemWarranty_VoidInvoice_Blocked() {
         warrantyInvoice(InvoiceStatus.VOID, "INVOICED", 0);
@@ -809,6 +835,48 @@ class BillingServiceTest {
         when(paymentRepository.existsByTransactionCode(prefix + "0001")).thenReturn(true);
 
         assertThat(service.suggestTransactionCode(direction)).isEqualTo(prefix + "0002");
+    }
+
+    private static final String CODE_LOCK_SQL = "SELECT id FROM payment_code_lock WHERE id = 1 FOR UPDATE";
+
+    @Test
+    @DisplayName("Thu tiền lấy khóa mã trước khi kiểm tra mã nhập tay và trước khi ghi")
+    void receivePayment_TypedCode_LocksBeforeChecking() {
+        stubInvoice(unpaid(500_000), 0);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentMapper.toResponse(any(Payment.class))).thenReturn(PaymentResponse.builder().id(1L).build());
+
+        service.receivePayment(10L, receipt(100_000).transactionCode("pt-lock").build());
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(jdbcTemplate, paymentRepository);
+        order.verify(jdbcTemplate).queryForObject(CODE_LOCK_SQL, Integer.class);
+        order.verify(paymentRepository).existsByTransactionCode("PT-LOCK");
+        order.verify(paymentRepository).save(any(Payment.class));
+    }
+
+    @Test
+    @DisplayName("Thu tiền tự sinh mã cũng lấy khóa mã trước khi tìm mã lớn nhất")
+    void receivePayment_GeneratedCode_LocksBeforeNumbering() {
+        stubInvoice(unpaid(500_000), 0);
+        when(paymentRepository.findCodesStartingWith(anyString(), any())).thenReturn(List.of());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentMapper.toResponse(any(Payment.class))).thenReturn(PaymentResponse.builder().id(1L).build());
+
+        service.receivePayment(10L, receipt(100_000).build());
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(jdbcTemplate, paymentRepository);
+        order.verify(jdbcTemplate).queryForObject(CODE_LOCK_SQL, Integer.class);
+        order.verify(paymentRepository).findCodesStartingWith(anyString(), any());
+    }
+
+    @Test
+    @DisplayName("Gợi ý mã chỉ đọc nên không lấy khóa mã")
+    void suggestTransactionCode_DoesNotLock() {
+        when(paymentRepository.findCodesStartingWith(anyString(), any())).thenReturn(List.of());
+
+        service.suggestTransactionCode(com.Group13_65CNTT.AutoGarage.billing.entity.PaymentDirection.IN);
+
+        verify(jdbcTemplate, never()).queryForObject(CODE_LOCK_SQL, Integer.class);
     }
 
     @Test

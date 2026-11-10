@@ -149,10 +149,6 @@ export const links: ReadonlyArray<NavItem> = [
     icon: UserCog,
     section: 'NHÂN SỰ & LƯƠNG',
     allowedRoles: STAFF_MANAGE_ROLES,
-    children: [
-      { tab: 'profiles', label: 'Hồ sơ nhân viên', defaultTab: true },
-      { tab: 'salary', label: 'Hệ số & đơn giá lương' },
-    ],
   },
   {
     to: '/scheduling',
@@ -160,11 +156,6 @@ export const links: ReadonlyArray<NavItem> = [
     icon: CalendarClock,
     section: 'NHÂN SỰ & LƯƠNG',
     allowedRoles: SCHEDULING_ROLES,
-    children: [
-      { tab: 'dispatch', label: 'Điều phối xưởng', defaultTab: true },
-      { tab: 'bays', label: 'Khoang sửa chữa' },
-      { tab: 'shifts', label: 'Lịch ca làm việc' },
-    ],
   },
   {
     to: '/payroll',
@@ -172,10 +163,6 @@ export const links: ReadonlyArray<NavItem> = [
     icon: Banknote,
     section: 'NHÂN SỰ & LƯƠNG',
     allowedRoles: PAYROLL_MANAGE_ROLES,
-    children: [
-      { tab: 'monthly', label: 'Bảng lương tháng', defaultTab: true },
-      { tab: 'bonus', label: 'Chính sách thưởng ca' },
-    ],
   },
   {
     to: '/payroll',

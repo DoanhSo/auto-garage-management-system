@@ -1,0 +1,37 @@
+@startuml A7-ca-lam-luong
+title A7 — Ca làm, chấm công, giờ công và lương (UC37, V12–V17)
+|Kỹ thuật viên|
+start
+:Đăng ký ca (ngày, khung ca, khoang mong muốn);
+|Hệ thống|
+if (Không trùng ca khác, đủ nghỉ giữa 2 ca,\nkhông vượt giới hạn giờ ngày/tuần?) then (hợp lệ)
+  :Ca chờ duyệt;
+else (vi phạm)
+  :Từ chối đăng ký;
+  stop
+endif
+|Quản trị viên|
+if (Duyệt ca?) then (duyệt)
+  |Hệ thống|
+  :Ca được xếp, gắn khoang;
+else (từ chối)
+  |Hệ thống|
+  :Ca bị từ chối kèm lý do;
+  stop
+endif
+|Kỹ thuật viên|
+:Vào ca, làm việc, bấm giờ (A2);
+|Hệ thống|
+:Ghi chấm công thực tế, nhật ký công đoạn;
+:Khi phiếu CLOSED: ghi hoa hồng theo phiếu,\ntheo ca và khoang;
+|Quản trị viên|
+:Mở kỳ lương tháng;
+|Hệ thống|
+:Tổng hợp giờ thường, tăng ca, số ca,\nhoa hồng, phụ cấp, khấu trừ;
+:Bảng lương từng nhân viên;
+|Quản trị viên|
+:Duyệt kỳ lương và chi lương;
+|Hệ thống|
+:Ghi thanh toán OUT cho kỳ lương;
+stop
+@enduml

@@ -17,6 +17,8 @@ import {
   X,
   LayoutGrid,
   List,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
@@ -44,6 +46,7 @@ import {
   useCancelShiftMutation,
   useSchedulingEmployeesQuery,
   useActiveReservationsQuery,
+  useShiftAttendanceMutation,
 } from '../hooks/useScheduling';
 import { ServiceBayEditor } from '../components/ServiceBayEditor';
 import { ShiftEditor } from '../components/ShiftEditor';
@@ -56,7 +59,7 @@ import { PAYROLL_MANAGE_ROLES, STAFF_MANAGE_ROLES } from '../../../app/access';
 import { LiveDispatchBoard } from '../components/LiveDispatchBoard';
 import { ShiftRegistrationModal } from '../components/ShiftRegistrationModal';
 import type { BayReservation, Employee, ServiceBay, Shift } from '../types/scheduling';
-import { bayTypeLabels, parseSkills, SKILL_LABELS, shiftStatusLabels } from '../types/scheduling';
+import { bayTypeLabels, parseSkills, SKILL_LABELS, shiftStatusLabels, attendanceLabels } from '../types/scheduling';
 import type { UiPolicy } from '../../../shared/types/contracts';
 
 const TABS = ['dispatch', 'bays', 'shifts'] as const;
@@ -141,6 +144,25 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
 
   const deleteBayMutation = useDeleteServiceBayMutation();
   const cancelShiftMutation = useCancelShiftMutation();
+  const attendanceMutation = useShiftAttendanceMutation();
+
+  const isFrontDesk = isAdmin || user?.role === 'RECEPTIONIST';
+  const ownEmployeeId = useMemo(
+    () => employeesQuery.data?.find((e) => String(e.userId) === String(user?.id))?.id,
+    [employeesQuery.data, user?.id],
+  );
+  const canPunch = (shift: Shift) =>
+    isFrontDesk || String(shift.employeeId) === String(ownEmployeeId);
+
+  const handlePunch = (shift: Shift, action: 'check-in' | 'check-out') =>
+    attendanceMutation.mutate(
+      { id: shift.id, action },
+      {
+        onSuccess: () =>
+          notify(action === 'check-in' ? 'Đã chấm công vào ca' : 'Đã chấm công ra ca'),
+        onError: (err: unknown) => notify(errorMessage(err)),
+      },
+    );
 
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
   const employeeMap = useMemo(
@@ -415,7 +437,16 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
         cell: ({ row }) => {
           const s = liveShiftState(row.original, Date.now());
           return (
-            <Badge variant={s.variant}>{s.label || shiftStatusLabels[row.original.status]}</Badge>
+            <div className="account-cell">
+              <div>
+                <Badge variant={s.variant}>{s.label || shiftStatusLabels[row.original.status]}</Badge>
+                {row.original.attendanceStatus && (
+                  <span className="muted" style={{ fontSize: 'var(--text-xs)' }}>
+                    {attendanceLabels[row.original.attendanceStatus]}
+                  </span>
+                )}
+              </div>
+            </div>
           );
         },
       },
@@ -431,13 +462,40 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
           row.original.status !== 'CANCELLED' &&
           new Date(row.original.endsAt).getTime() >= Date.now() && (
             <div className="row-actions">
-              <Button
-                variant="ghost"
-                className="delete-action"
-                onClick={() => setCancelingShiftId(row.original.id)}
-              >
-                <XCircle size={14} /> Hủy ca
-              </Button>
+              {canPunch(row.original) && (
+                <>
+                  {(row.original.attendanceStatus == null ||
+                    row.original.attendanceStatus === 'SCHEDULED' ||
+                    row.original.attendanceStatus === 'ABSENT') && (
+                    <Button
+                      variant="ghost"
+                      pending={attendanceMutation.isPending}
+                      onClick={() => handlePunch(row.original, 'check-in')}
+                    >
+                      <LogIn size={14} /> Vào ca
+                    </Button>
+                  )}
+                  {(row.original.attendanceStatus === 'CHECKED_IN' ||
+                    row.original.attendanceStatus === 'LATE') && (
+                    <Button
+                      variant="ghost"
+                      pending={attendanceMutation.isPending}
+                      onClick={() => handlePunch(row.original, 'check-out')}
+                    >
+                      <LogOut size={14} /> Ra ca
+                    </Button>
+                  )}
+                </>
+              )}
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  className="delete-action"
+                  onClick={() => setCancelingShiftId(row.original.id)}
+                >
+                  <XCircle size={14} /> Hủy ca
+                </Button>
+              )}
             </div>
           ),
       },
@@ -797,6 +855,9 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
                   setShiftModalOpen(true);
                 }}
                 onCancelShift={(shift) => setCancelingShiftId(shift.id)}
+                onAttendance={handlePunch}
+                canPunch={canPunch}
+                attendancePending={attendanceMutation.isPending}
               />
               {weekShiftsQuery.data &&
                 Number(weekShiftsQuery.data.totalElements) >

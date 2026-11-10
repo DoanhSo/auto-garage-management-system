@@ -3,7 +3,6 @@ import { Pause, Play, UserMinus, UserPlus } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { errorMessage } from '../../../shared/api/errors';
 import { Badge, Button, Loading, QueryError } from '../../../shared/components/ui';
-import { money } from '../../../shared/utils/format';
 import {
   useReleaseAssignmentMutation,
   useStartTimerMutation,
@@ -88,10 +87,7 @@ export function TaskWorkPanel({
         <strong className="text-sm">Phân công & bấm giờ</strong>
         <span className="grow" />
         {data && (
-          <span className="muted tabular">
-            Tổng {clock(data.totalActualSeconds)} · Chi phí giờ công{' '}
-            {money(String(data.totalLaborCost))}
-          </span>
+          <span className="muted tabular">Tổng {clock(data.totalActualSeconds)}</span>
         )}
         {canAssign && !finished && (
           <Button variant="secondary" onClick={() => onAssign(task)}>

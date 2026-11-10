@@ -2,7 +2,9 @@
 
 Nguồn: `BaoCao_PhanTich_Va_ThietKe_HeThong_QuanLy_GaraOto.docx`, ngày 14/10/2026. Báo cáo cung cấp tên 30 bảng, ERD Chen với một phần thuộc tính, BR01–BR24 và đặc tả 38 use case. Phần thân tài liệu không có data dictionary 373 cột hay DDL 71 FK như giới thiệu. Vì vậy V1–V4 là schema khởi tạo được suy ra từ luồng nghiệp vụ và có các quyết định bổ sung dưới đây; không khẳng định khớp chính xác 373 cột/71 FK.
 
-Schema V1–V8 hiện gồm **30 bảng nghiệp vụ, 431 cột (kể cả hai cột generated), 76 khóa ngoại, 77 CHECK và hai view**. V1–V4 ban đầu có 423 cột/75 CHECK; V5 thêm auth_version và CHECK không âm. Không tính `flyway_schema_history` hoặc cột của view. Danh sách cột trong `DATA_DICTIONARY.md`; SQL là nguồn thực thi chính thức.
+> **Cập nhật V19 (plan `system-analysis-erd`):** schema hiện gồm **34 bảng nghiệp vụ, 540 cột, 98 khóa ngoại và hai view**. Số liệu sinh tự động ở [`erd/schema-inventory.md`](erd/schema-inventory.md); ERD Chen ở [`erd/`](erd/README.md); phân tích nghiệp vụ, DFD và luồng hoạt động ở [`analysis/`](analysis/). Đoạn dưới giữ mô tả gốc của V1–V8.
+
+Schema V1–V8 gồm **30 bảng nghiệp vụ, 431 cột (kể cả hai cột generated), 76 khóa ngoại, 77 CHECK và hai view**. V1–V4 ban đầu có 423 cột/75 CHECK; V5 thêm auth_version và CHECK không âm. Không tính `flyway_schema_history` hoặc cột của view. Danh sách cột trong `DATA_DICTIONARY.md`; SQL là nguồn thực thi chính thức.
 
 ## Nội dung V1–V8
 
@@ -17,20 +19,32 @@ Schema V1–V8 hiện gồm **30 bảng nghiệp vụ, 431 cột (kể cả hai 
 
 - **V8 separate_user_deletion_from_locking:** users.deleted_at, index deleted_at/is_active, CHECK tài khoản đã xóa không được active. Khóa dùng is_active=false và có thể mở lại; DELETE ghi deleted_at và loại khỏi quản trị, giữ FK/lịch sử.
 
+## Nội dung V9–V19
+
+- **V9:** `users.identity_id` liên kết Keycloak (OIDC).
+- **V10:** khách hàng tạo theo JIT khi đăng nhập lần đầu; cột quản lý thông báo.
+- **V11:** `bookings.service_id` cho phép NULL; số điện thoại khách UNIQUE.
+- **V12:** `payroll_periods`, `payroll_items`, `order_commissions`; `payments.payroll_period_id`.
+- **V13:** `repair_order_assignments` (nhật ký công đoạn theo xe), điều phối theo ca.
+- **V14–V17:** chấm công theo ca, hoa hồng theo hiệu suất, ngữ cảnh ca/khoang của hoa hồng, hệ số lương, hồ sơ nhân sự và đăng ký ca.
+- **V18:** hủy sổ và điều chỉnh sổ bảo hành (`void_*`, `adjust*`).
+- **V20:** `payment_code_lock` (một dòng id=1) để khóa `SELECT ... FOR UPDATE` khi sinh hoặc kiểm tra mã giao dịch, tránh hai khoản thu/chi cùng lúc chọn trùng mã.
+- **V19:** bỏ `uq_invoices_order`; cột sinh `active_repair_order_id` + UNIQUE để chỉ một hóa đơn **còn hiệu lực** mỗi phiếu; bỏ UNIQUE trên `invoice_items.repair_task_id/repair_order_part_id` để lập lại hóa đơn sau khi hủy.
+
 ## Quyết định bổ sung để triển khai
 
 1. Mọi PK dùng BIGINT tự tăng, tên bảng/cột snake_case; InnoDB, utf8mb4_0900_ai_ci. Request key, hash, event key và mã giao dịch dùng so sánh binary để không nhập nhằng hoa/thường hoặc dấu. Chuẩn hóa username/email/biển số ở service trước khi ghi.
 2. Giá và tiền dùng DECIMAL(18,2), số lượng DECIMAL(14,3); Java BigDecimal. HALF_UP tại từng dòng, header cộng các dòng đã làm tròn. CHECK xác thực công thức dòng/header, còn đối soát tổng các dòng với header thuộc service.
 3. DATETIME(6) lưu UTC; JDBC ép timezone session UTC. Cột `version` là optimistic lock, map `@Version`; một số bảng append-only không có version/updated_at.
 4. `customers.user_id` NULL và UNIQUE để hỗ trợ khách trực tiếp; employees.user_id NOT NULL và UNIQUE. Không thêm bảng roles; users.role là một trong năm role cố định.
-5. Booking yêu cầu một service chính. ERD nhóm 1 ghi quan hệ service 0..1 nhưng BR05 nêu một dịch vụ chính; chọn NOT NULL theo BR05. Nếu muốn lịch chẩn đoán chung, tạo một dịch vụ danh mục phù hợp, không thêm dòng service rỗng.
+5. Booking yêu cầu một service chính (**từ V11 cho phép NULL** khi khách chỉ mô tả triệu chứng; xem `analysis/06-phat-hien.md` F2). ERD nhóm 1 ghi quan hệ service 0..1 nhưng BR05 nêu một dịch vụ chính; chọn NOT NULL theo BR05. Nếu muốn lịch chẩn đoán chung, tạo một dịch vụ danh mục phù hợp, không thêm dòng service rỗng.
 6. `repair_tasks.task_type=DIAGNOSIS` cho phép phân công trước báo giá, không có estimate_item_id; REPAIR bắt buộc dòng dịch vụ được duyệt. Điều này giải quyết UC12 cần phân công chẩn đoán nhưng BR13 cấm sửa chưa duyệt. Service xác thực approval_status và cùng phiếu; FK một cột chưa kiểm tra mọi quan hệ nghiệp vụ.
 7. Một booking sinh tối đa một repair_order; một estimate_item sinh tối đa một repair_task; version_no duy nhất trong phiếu. Parent estimate được FK composite đảm bảo cùng phiếu; service kiểm tra INITIAL/SUPPLEMENTAL, tăng version và chống self/cycle.
 8. `active_main_task_id` là generated column + UNIQUE để chỉ một MAIN active; `active_employee_id` tương tự để chỉ một timer mở mỗi thợ. FK composite labor session đảm bảo đúng employee của assignment. Không ghi trực tiếp vào hai cột generated.
 9. Khoang dùng HELD/IN_USE/RELEASED/EXPIRED/CANCELLED. Reservation có đúng một nguồn BOOKING/REPAIR hoặc không nguồn cho MAINTENANCE. Index hỗ trợ truy vấn giao nhau, nhưng chống chồng lịch cần khóa hàng bay ở service. Ca/thợ cũng cần khóa và kiểm tra thời gian.
 10. Tách `inventory_documents.document_type=OPENING` khỏi IN mua hàng để tránh chi tiền tồn đầu kỳ. DRAFT không đổi tồn; POSTED phải có posted_by/posted_at. quantity của ADJUSTMENT signed, loại khác dương; OUT lưu quantity_change âm ở ledger. UNIQUE document_item_id chống ghi sổ hai lần. Chỉ service được sửa số tồn; ledger phải append-only.
 11. `repair_order_parts` giữ số lượng ròng, kể cả zero sau trả toàn bộ. Giá vốn là snapshot bình quân của lượng thực dùng cho dòng; cập nhật theo xuất/trả và ledger, không đọc lại giá danh mục khi phát hành hóa đơn. RETURN trỏ cả document/dòng nguồn để truy vết và giới hạn lượng trả.
-12. Hóa đơn duy nhất trên mỗi phiếu; snapshot customer/vehicle JSON, item_name/unit/price/cost/warranty policy độc lập danh mục. Trạng thái UNPAID/PARTIALLY_PAID/PAID/VOID. Một invoice VOID không tạo hóa đơn thứ hai cho cùng phiếu trong khung này; quy trình phát hành lại/hoàn tiền chưa thuộc phạm vi báo cáo và cần migration/nghiệp vụ riêng.
+12. **Từ V19:** mỗi phiếu chỉ có một hóa đơn **còn hiệu lực** (khác VOID); hủy hóa đơn chưa thu tiền khi xe chưa bàn giao đưa phiếu về COMPLETED để lập lại. Bản gốc: Hóa đơn duy nhất trên mỗi phiếu; snapshot customer/vehicle JSON, item_name/unit/price/cost/warranty policy độc lập danh mục. Trạng thái UNPAID/PARTIALLY_PAID/PAID/VOID. Một invoice VOID không tạo hóa đơn thứ hai cho cùng phiếu trong khung này; quy trình phát hành lại/hoàn tiền chưa thuộc phạm vi báo cáo và cần migration/nghiệp vụ riêng.
 13. payments IN chỉ có invoice_id; OUT chỉ có inventory_document_id; amount>0 và mã giao dịch UNIQUE. Service kiểm tra nguồn OUT là IN/POSTED có NCC, chặn vượt nợ và kiểm tra role. Không có CHECK xuyên bảng để tự bảo đảm điều kiện này.
 14. latest_qc_check_id dùng FK composite để trỏ check cùng phiếu. Service phải kiểm tra check_type QC, PASSED, lần mới nhất, task hoàn thành và không timer mở. Constraint không thể thay thế điều kiện BR17.
 15. Bảo hành snapshot từ invoice_item. Policy 0 ở chiều ngày/km nghĩa là không có giới hạn chiều đó, cột hạn tương ứng NULL; cần ít nhất một giới hạn. Chạm hạn ngày hoặc km là hết hiệu lực theo UC32. Claim APPROVED/IN_PROGRESS/CLOSED có người duyệt, thời gian, lý do và handling_order_id duy nhất. Service bảo đảm phiếu xử lý mới khác phiếu gốc và đúng xe.

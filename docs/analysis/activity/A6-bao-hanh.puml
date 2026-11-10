@@ -1,0 +1,35 @@
+@startuml A6-bao-hanh
+title A6 — Sổ bảo hành, khiếu nại, quyết định và xử lý (UC31–UC33, V18)
+|Hệ thống|
+start
+:Khi bàn giao: mỗi dòng hóa đơn có ngày > 0 hoặc km > 0\nsinh một sổ bảo hành (BR21);
+|Khách hàng|
+:Gửi yêu cầu bảo hành, ODO hiện tại, ảnh;
+|Hệ thống|
+if (Sổ còn hiệu lực theo ngày VÀ theo km?) then (còn)
+  :Yêu cầu OPEN, báo quản trị viên;
+else (hết)
+  :Từ chối tiếp nhận;
+  stop
+endif
+|Quản trị viên|
+if (Duyệt?) then (duyệt)
+  |Hệ thống|
+  :Yêu cầu APPROVED;\ntạo phiếu sửa chữa WARRANTY mới (BR22);
+  :Phiếu mới đi lại từ tiếp nhận (A2);
+  :Hoàn tất → yêu cầu CLOSED;
+else (từ chối)
+  |Hệ thống|
+  :Yêu cầu REJECTED kèm lý do;
+endif
+|Quản trị viên|
+if (Cần sửa sổ?) then (điều chỉnh)
+  |Hệ thống|
+  :Tính lại hạn từ ngày và ODO bàn giao;\nghi lý do, người, thời điểm;
+else if (hủy sổ) then
+  |Hệ thống|
+  :Chỉ khi không còn khiếu nại đang xử lý;\nsổ VOID, giữ lại để tra cứu;
+else (không)
+endif
+stop
+@enduml

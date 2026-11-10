@@ -1,0 +1,105 @@
+@startchen 08-luong-hoa-hong
+title ERD Chen nhóm 8 — Kỳ lương, bảng lương và hoa hồng (bổ sung V12–V17)
+
+' Quy ước: thực thể của nhóm = "NHÃN (bảng)"; thực thể nhóm khác = "NHÃN ‹nhóm N›", không thuộc tính.
+' Bản số (min,max) suy từ schema: cột FK NOT NULL → (1,1), NULL → (0,1); FK UNIQUE → phía cha (0,1), không → (0,N).
+' Khóa ngoại 'người thực hiện' (created_by, approved_by, ...) vẽ riêng ở 09-nguoi-thuc-hien.puml.
+
+entity "KỲ LƯƠNG (payroll_periods)" as PAYROLL_PERIOD {
+  id <<key>>
+  period_code
+  period_month
+  status
+  total_net_pay
+}
+
+entity "BẢNG LƯƠNG NHÂN VIÊN (payroll_items)" as PAYROLL_ITEM {
+  id <<key>>
+  regular_hours
+  overtime_hours
+  commission_amount
+  net_pay
+}
+
+entity "HOA HỒNG THEO PHIẾU (order_commissions)" as COMMISSION {
+  id <<key>>
+  commission_type
+  base_amount
+  rate_percent
+  commission_amount
+  status
+}
+
+entity "CA LÀM VIỆC ‹nhóm 3›" as SHIFT {
+}
+
+entity "NHÂN VIÊN ‹nhóm 3›" as EMPLOYEE {
+}
+
+entity "THANH TOÁN ‹nhóm 6›" as PAYMENT {
+}
+
+entity "PHIẾU SỬA CHỮA ‹nhóm 2›" as REPAIR_ORDER {
+}
+
+entity "CÔNG VIỆC ‹nhóm 4›" as TASK {
+}
+
+entity "KHOANG SỬA CHỮA ‹nhóm 3›" as BAY {
+}
+
+relationship "gồm bảng lương" as R_PAYROLL_ITEMS_PAYROLL_PERIOD_ID {
+}
+' fk: payroll_items.payroll_period_id
+R_PAYROLL_ITEMS_PAYROLL_PERIOD_ID -(0,N)- PAYROLL_PERIOD
+R_PAYROLL_ITEMS_PAYROLL_PERIOD_ID -(1,1)- PAYROLL_ITEM
+
+relationship "lương của" as R_PAYROLL_ITEMS_EMPLOYEE_ID {
+}
+' fk: payroll_items.employee_id
+R_PAYROLL_ITEMS_EMPLOYEE_ID -(0,N)- EMPLOYEE
+R_PAYROLL_ITEMS_EMPLOYEE_ID -(1,1)- PAYROLL_ITEM
+
+relationship "chi bằng" as R_PAYROLL_PERIODS_PAYMENT_ID {
+}
+' fk: payroll_periods.payment_id
+R_PAYROLL_PERIODS_PAYMENT_ID -(0,N)- PAYMENT
+R_PAYROLL_PERIODS_PAYMENT_ID -(0,1)- PAYROLL_PERIOD
+
+relationship "hoa hồng phiếu" as R_ORDER_COMMISSIONS_REPAIR_ORDER_ID {
+}
+' fk: order_commissions.repair_order_id
+R_ORDER_COMMISSIONS_REPAIR_ORDER_ID -(0,N)- REPAIR_ORDER
+R_ORDER_COMMISSIONS_REPAIR_ORDER_ID -(1,1)- COMMISSION
+
+relationship "hoa hồng việc" as R_ORDER_COMMISSIONS_TASK_ID {
+}
+' fk: order_commissions.task_id
+R_ORDER_COMMISSIONS_TASK_ID -(0,N)- TASK
+R_ORDER_COMMISSIONS_TASK_ID -(0,1)- COMMISSION
+
+relationship "hưởng hoa hồng" as R_ORDER_COMMISSIONS_EMPLOYEE_ID {
+}
+' fk: order_commissions.employee_id
+R_ORDER_COMMISSIONS_EMPLOYEE_ID -(0,N)- EMPLOYEE
+R_ORDER_COMMISSIONS_EMPLOYEE_ID -(1,1)- COMMISSION
+
+relationship "đưa vào lương" as R_ORDER_COMMISSIONS_PAYROLL_ITEM_ID {
+}
+' fk: order_commissions.payroll_item_id
+R_ORDER_COMMISSIONS_PAYROLL_ITEM_ID -(0,N)- PAYROLL_ITEM
+R_ORDER_COMMISSIONS_PAYROLL_ITEM_ID -(0,1)- COMMISSION
+
+relationship "trong ca làm" as R_ORDER_COMMISSIONS_SHIFT_ID {
+}
+' fk: order_commissions.shift_id
+R_ORDER_COMMISSIONS_SHIFT_ID -(0,N)- SHIFT
+R_ORDER_COMMISSIONS_SHIFT_ID -(0,1)- COMMISSION
+
+relationship "tại khoang" as R_ORDER_COMMISSIONS_SERVICE_BAY_ID {
+}
+' fk: order_commissions.service_bay_id
+R_ORDER_COMMISSIONS_SERVICE_BAY_ID -(0,N)- BAY
+R_ORDER_COMMISSIONS_SERVICE_BAY_ID -(0,1)- COMMISSION
+
+@endchen

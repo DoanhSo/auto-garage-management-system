@@ -12,6 +12,7 @@ import com.Group13_65CNTT.AutoGarage.estimate.service.impl.EstimateServiceImpl;
 import com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrder;
 import com.Group13_65CNTT.AutoGarage.repair.entity.RepairOrderStatus;
 import com.Group13_65CNTT.AutoGarage.repair.entity.RepairTask;
+import com.Group13_65CNTT.AutoGarage.repair.entity.TaskStatus;
 import com.Group13_65CNTT.AutoGarage.repair.entity.TaskType;
 import com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderRepository;
 import com.Group13_65CNTT.AutoGarage.repair.repository.RepairTaskRepository;
@@ -192,6 +193,31 @@ class EstimateApprovalServiceTest {
 
         // 5. Kiểm tra audit
         verify(notificationAudit).recordCompletedRequest(eq(1L), eq("DECIDE_ESTIMATE"), eq("ESTIMATE"), eq(1L), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("Duyệt báo giá phát sinh khi QC không đạt sinh công việc mới PENDING, phiếu giữ QC_FAILED")
+    void decide_SupplementalWhileQcFailed_CreatesPendingTask() {
+        mockOrder.setStatus(RepairOrderStatus.QC_FAILED);
+        mockEstimate.setEstimateKind(EstimateKind.SUPPLEMENTAL);
+        mockEstimate.setParentEstimateId(99L);
+        when(estimateRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(mockEstimate));
+        when(repairOrderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(mockOrder));
+        when(estimateItemRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(itemService));
+        when(estimateItemRepository.findByEstimateIdOrderByLineNoAsc(1L)).thenReturn(List.of(itemService));
+        when(repairTaskRepository.findByEstimateItemId(10L)).thenReturn(Optional.empty());
+
+        estimateService.decide(1L, 1L,
+                List.of(new EstimateApproval.LineDecision(10L, EstimateApproval.Decision.APPROVED, null)),
+                "REQ-QC-FAILED-SUPP");
+
+        assertThat(itemService.getApprovalStatus()).isEqualTo(ApprovalStatus.APPROVED);
+        verify(repairTaskRepository).save(argThat(task ->
+                task.getEstimateItemId() == 10L
+                        && task.getRepairOrderId() == 100L
+                        && task.getTaskType() == TaskType.REPAIR
+                        && task.getStatus() == TaskStatus.PENDING));
+        assertThat(mockOrder.getStatus()).isEqualTo(RepairOrderStatus.QC_FAILED);
     }
 
     @Test

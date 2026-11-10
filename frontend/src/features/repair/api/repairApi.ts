@@ -76,22 +76,6 @@ export const repairApi = {
     return request<RepairTask[]>(`/repair-orders/${orderId}/tasks`);
   },
 
-  async createTask(
-    orderId: string | number,
-    data: {
-      taskName: string;
-      description?: string;
-      taskType?: string;
-      quantity?: number;
-      unitPrice?: number;
-    },
-  ): Promise<RepairTask> {
-    return request<RepairTask>(`/repair-orders/${orderId}/tasks`, {
-      method: 'POST',
-      body: data,
-    });
-  },
-
   async assignTask(
     taskId: string | number,
     data: {

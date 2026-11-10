@@ -1,0 +1,174 @@
+@startchen 09-nguoi-thuc-hien
+title ERD Chen — Người thực hiện: 20 khóa ngoại trỏ về NGƯỜI DÙNG
+
+' Mỗi quan hệ ghi lại ai đã làm thao tác; bản số theo cùng quy ước với các nhóm khác.
+
+entity "NGƯỜI DÙNG ‹nhóm 1›" as USER {
+}
+
+entity "TỆP ĐÍNH KÈM ‹nhóm 2›" as ATTACHMENT {
+}
+
+entity "LỊCH KHOANG ‹nhóm 3›" as BAY_RESERVATION {
+}
+
+entity "LỊCH HẸN ‹nhóm 1›" as BOOKING {
+}
+
+entity "CA LÀM VIỆC ‹nhóm 3›" as SHIFT {
+}
+
+entity "HẠNG MỤC BÁO GIÁ ‹nhóm 4›" as ESTIMATE_ITEM {
+}
+
+entity "BÁO GIÁ ‹nhóm 4›" as ESTIMATE {
+}
+
+entity "CHỨNG TỪ KHO ‹nhóm 5›" as INV_DOC {
+}
+
+entity "SỔ KHO ‹nhóm 5›" as INV_TXN {
+}
+
+entity "HÓA ĐƠN ‹nhóm 6›" as INVOICE {
+}
+
+entity "THANH TOÁN ‹nhóm 6›" as PAYMENT {
+}
+
+entity "KỲ LƯƠNG ‹nhóm 8›" as PAYROLL_PERIOD {
+}
+
+entity "PHIẾU SỬA CHỮA ‹nhóm 2›" as REPAIR_ORDER {
+}
+
+entity "PHÂN CÔNG ‹nhóm 4›" as ASSIGNMENT {
+}
+
+entity "BIÊN BẢN KIỂM TRA ‹nhóm 2›" as VEHICLE_CHECK {
+}
+
+entity "YÊU CẦU BẢO HÀNH ‹nhóm 6›" as CLAIM {
+}
+
+relationship "tải lên" as P_ATTACHMENTS_UPLOADED_BY {
+}
+' fk: attachments.uploaded_by
+P_ATTACHMENTS_UPLOADED_BY -(0,N)- USER
+P_ATTACHMENTS_UPLOADED_BY -(1,1)- ATTACHMENT
+
+relationship "tạo lịch khoang" as P_BAY_RESERVATIONS_CREATED_BY {
+}
+' fk: bay_reservations.created_by
+P_BAY_RESERVATIONS_CREATED_BY -(0,N)- USER
+P_BAY_RESERVATIONS_CREATED_BY -(0,1)- BAY_RESERVATION
+
+relationship "tạo lịch hẹn" as P_BOOKINGS_CREATED_BY {
+}
+' fk: bookings.created_by
+P_BOOKINGS_CREATED_BY -(0,N)- USER
+P_BOOKINGS_CREATED_BY -(0,1)- BOOKING
+
+relationship "xếp ca" as P_EMPLOYEE_SHIFTS_CREATED_BY {
+}
+' fk: employee_shifts.created_by
+P_EMPLOYEE_SHIFTS_CREATED_BY -(0,N)- USER
+P_EMPLOYEE_SHIFTS_CREATED_BY -(1,1)- SHIFT
+
+relationship "duyệt ca" as P_EMPLOYEE_SHIFTS_APPROVED_BY {
+}
+' fk: employee_shifts.approved_by
+P_EMPLOYEE_SHIFTS_APPROVED_BY -(0,N)- USER
+P_EMPLOYEE_SHIFTS_APPROVED_BY -(0,1)- SHIFT
+
+relationship "quyết định mục" as P_ESTIMATE_ITEMS_APPROVED_BY {
+}
+' fk: estimate_items.approved_by
+P_ESTIMATE_ITEMS_APPROVED_BY -(0,N)- USER
+P_ESTIMATE_ITEMS_APPROVED_BY -(0,1)- ESTIMATE_ITEM
+
+relationship "lập báo giá" as P_ESTIMATES_CREATED_BY {
+}
+' fk: estimates.created_by
+P_ESTIMATES_CREATED_BY -(0,N)- USER
+P_ESTIMATES_CREATED_BY -(1,1)- ESTIMATE
+
+relationship "lập chứng từ" as P_INVENTORY_DOCUMENTS_CREATED_BY {
+}
+' fk: inventory_documents.created_by
+P_INVENTORY_DOCUMENTS_CREATED_BY -(0,N)- USER
+P_INVENTORY_DOCUMENTS_CREATED_BY -(1,1)- INV_DOC
+
+relationship "ghi sổ chứng từ" as P_INVENTORY_DOCUMENTS_POSTED_BY {
+}
+' fk: inventory_documents.posted_by
+P_INVENTORY_DOCUMENTS_POSTED_BY -(0,N)- USER
+P_INVENTORY_DOCUMENTS_POSTED_BY -(0,1)- INV_DOC
+
+relationship "ghi sổ kho" as P_INVENTORY_TRANSACTIONS_CREATED_BY {
+}
+' fk: inventory_transactions.created_by
+P_INVENTORY_TRANSACTIONS_CREATED_BY -(0,N)- USER
+P_INVENTORY_TRANSACTIONS_CREATED_BY -(1,1)- INV_TXN
+
+relationship "phát hành HĐ" as P_INVOICES_ISSUED_BY {
+}
+' fk: invoices.issued_by
+P_INVOICES_ISSUED_BY -(0,N)- USER
+P_INVOICES_ISSUED_BY -(1,1)- INVOICE
+
+relationship "hủy HĐ" as P_INVOICES_VOIDED_BY {
+}
+' fk: invoices.voided_by
+P_INVOICES_VOIDED_BY -(0,N)- USER
+P_INVOICES_VOIDED_BY -(0,1)- INVOICE
+
+relationship "ghi thanh toán" as P_PAYMENTS_RECORDED_BY {
+}
+' fk: payments.recorded_by
+P_PAYMENTS_RECORDED_BY -(0,N)- USER
+P_PAYMENTS_RECORDED_BY -(1,1)- PAYMENT
+
+relationship "duyệt kỳ lương" as P_PAYROLL_PERIODS_APPROVED_BY {
+}
+' fk: payroll_periods.approved_by
+P_PAYROLL_PERIODS_APPROVED_BY -(0,N)- USER
+P_PAYROLL_PERIODS_APPROVED_BY -(0,1)- PAYROLL_PERIOD
+
+relationship "tiếp nhận" as P_REPAIR_ORDERS_RECEIVED_BY {
+}
+' fk: repair_orders.received_by
+P_REPAIR_ORDERS_RECEIVED_BY -(0,N)- USER
+P_REPAIR_ORDERS_RECEIVED_BY -(1,1)- REPAIR_ORDER
+
+relationship "bàn giao" as P_REPAIR_ORDERS_HANDED_OVER_BY {
+}
+' fk: repair_orders.handed_over_by
+P_REPAIR_ORDERS_HANDED_OVER_BY -(0,N)- USER
+P_REPAIR_ORDERS_HANDED_OVER_BY -(0,1)- REPAIR_ORDER
+
+relationship "phân công" as P_TASK_ASSIGNMENTS_ASSIGNED_BY {
+}
+' fk: task_assignments.assigned_by
+P_TASK_ASSIGNMENTS_ASSIGNED_BY -(0,N)- USER
+P_TASK_ASSIGNMENTS_ASSIGNED_BY -(1,1)- ASSIGNMENT
+
+relationship "kiểm tra xe" as P_VEHICLE_CHECKS_CHECKED_BY {
+}
+' fk: vehicle_checks.checked_by
+P_VEHICLE_CHECKS_CHECKED_BY -(0,N)- USER
+P_VEHICLE_CHECKS_CHECKED_BY -(1,1)- VEHICLE_CHECK
+
+relationship "gửi yêu cầu BH" as P_WARRANTY_CLAIMS_REQUESTED_BY {
+}
+' fk: warranty_claims.requested_by
+P_WARRANTY_CLAIMS_REQUESTED_BY -(0,N)- USER
+P_WARRANTY_CLAIMS_REQUESTED_BY -(0,1)- CLAIM
+
+relationship "quyết định BH" as P_WARRANTY_CLAIMS_DECIDED_BY {
+}
+' fk: warranty_claims.decided_by
+P_WARRANTY_CLAIMS_DECIDED_BY -(0,N)- USER
+P_WARRANTY_CLAIMS_DECIDED_BY -(0,1)- CLAIM
+
+@endchen
