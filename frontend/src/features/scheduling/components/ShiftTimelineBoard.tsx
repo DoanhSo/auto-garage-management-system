@@ -35,7 +35,7 @@ export interface ShiftTimelineBoardProps {
   readonly onCancelShift: (shift: Shift) => void;
   readonly onAttendance?: (shift: Shift, action: 'check-in' | 'check-out') => void;
   readonly canPunch?: (shift: Shift) => boolean;
-  readonly attendancePending?: boolean;
+  readonly isAttendancePending?: (shift: Shift) => boolean;
 }
 
 const dayMonth = (dateKey: string) => `${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
@@ -65,7 +65,7 @@ export function ShiftTimelineBoard({
   onCancelShift,
   onAttendance,
   canPunch,
-  attendancePending,
+  isAttendancePending,
 }: ShiftTimelineBoardProps) {
   const today = todayKey();
   const firstDay = weekStart(selectedDate || today);
@@ -138,7 +138,7 @@ export function ShiftTimelineBoard({
                 shift.attendanceStatus === 'ABSENT') && (
                 <Button
                   variant="secondary"
-                  pending={attendancePending}
+                  pending={isAttendancePending?.(shift)}
                   onClick={() => onAttendance(shift, 'check-in')}
                 >
                   <LogIn size={14} /> Vào ca
@@ -147,7 +147,7 @@ export function ShiftTimelineBoard({
               {(shift.attendanceStatus === 'CHECKED_IN' || shift.attendanceStatus === 'LATE') && (
                 <Button
                   variant="secondary"
-                  pending={attendancePending}
+                  pending={isAttendancePending?.(shift)}
                   onClick={() => onAttendance(shift, 'check-out')}
                 >
                   <LogOut size={14} /> Ra ca

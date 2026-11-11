@@ -51,6 +51,7 @@ import com.Group13_65CNTT.AutoGarage.shared.contracts.RepairWorkflow;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -73,7 +74,7 @@ import java.util.Locale;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-@Transactional(readOnly = true, noRollbackFor = BusinessException.class)
+@Transactional(readOnly = true)
 public class BillingServiceImpl implements BillingService {
     private final InvoiceRepository invoiceRepository;
     private final InvoiceItemRepository invoiceItemRepository;
@@ -509,6 +510,7 @@ public class BillingServiceImpl implements BillingService {
     @Override
     @Transactional
     public PaymentResponse receivePayment(long actorUserId, PaymentReceiveRequest request) {
+        lockPaymentCodes();
         String requestKey = request.getRequestKey();
         String requestHash = RequestFingerprint.of("RECEIVE_PAYMENT", actorUserId, request.getInvoiceId(), request.getAmount(), request.getPaymentMethod(), request.getProviderReference(), request.getNotes());
         if (requestKey != null && !requestKey.isBlank() && notificationAudit.isPresent()) {
@@ -611,6 +613,7 @@ public class BillingServiceImpl implements BillingService {
     @Override
     @Transactional
     public PaymentResponse paySupplier(long actorUserId, SupplierPaymentRequest request) {
+        lockPaymentCodes();
         // Enforce BR01: only ADMIN can make outgoing payments
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new BusinessException(ResponseCode.UNAUTHORIZED));
@@ -685,7 +688,6 @@ public class BillingServiceImpl implements BillingService {
 
     /** Uses the typed code when given (normalised and checked), otherwise generates the next one of the day. */
     private String resolveTransactionCode(String requested, PaymentDirection direction) {
-        lockPaymentCodes();
         String code = requested == null ? "" : requested.trim().toUpperCase(Locale.ROOT);
         if (code.isEmpty()) {
             return generateTransactionCode(direction);
@@ -702,11 +704,17 @@ public class BillingServiceImpl implements BillingService {
     }
 
     /**
-     * Serialises code allocation: the row lock is held until the surrounding transaction commits or rolls back,
-     * so two concurrent payments never pick or check against the same not-yet-committed code.
+     * Serialises code allocation: the row lock is held until the surrounding transaction commits or rolls back.
+     * Must be the first statement of the transaction: under REPEATABLE READ an earlier plain read would fix the
+     * snapshot before the wait, and the code just committed by the previous holder would stay invisible.
      */
     private void lockPaymentCodes() {
-        jdbcTemplate.queryForObject("SELECT id FROM payment_code_lock WHERE id = 1 FOR UPDATE", Integer.class);
+        try {
+            jdbcTemplate.queryForObject("SELECT id FROM payment_code_lock WHERE id = 1 FOR UPDATE", Integer.class);
+        } catch (EmptyResultDataAccessException missingRow) {
+            throw new ConflictException(ResponseCode.PAYMENT_BLOCKED,
+                    "Thiếu dữ liệu khóa sinh mã giao dịch (bảng payment_code_lock). Hãy kiểm tra migration của hệ thống.");
+        }
     }
 
     private String generateTransactionCode(PaymentDirection direction) {

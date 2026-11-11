@@ -58,7 +58,7 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-@Transactional(readOnly = true, noRollbackFor = BusinessException.class)
+@Transactional(readOnly = true)
 public class InventoryServiceImpl implements InventoryService {
     /** Pending parts named in the invoice-blocked message before summarising the rest. */
     private static final int MAX_PENDING_PARTS_SHOWN = 5;
@@ -510,18 +510,40 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     @Transactional(readOnly = true, noRollbackFor = BusinessException.class)
     public void requireIssueComplete(long repairOrderId) {
+        requirePartsIssued(repairOrderId, ResponseCode.INVOICE_BLOCKED, "lập hóa đơn");
+        requireNoDraftDocuments(repairOrderId, ResponseCode.INVOICE_BLOCKED, "lập hóa đơn");
+    }
+
+    @Override
+    @Transactional(readOnly = true, noRollbackFor = BusinessException.class)
+    public void requireIssuedBeforeCompletion(long repairOrderId) {
+        requirePartsIssued(repairOrderId, ResponseCode.PARTS_PENDING_ISSUE, "hoàn thành công việc");
+    }
+
+    @Override
+    @Transactional(readOnly = true, noRollbackFor = BusinessException.class)
+    public void requireIssuedBeforeQc(long repairOrderId) {
+        requirePartsIssued(repairOrderId, ResponseCode.PARTS_PENDING_ISSUE, "chuyển sang chờ QC");
+        requireNoDraftDocuments(repairOrderId, ResponseCode.PARTS_PENDING_ISSUE, "chuyển sang chờ QC");
+    }
+
+    private void requirePartsIssued(long repairOrderId, ResponseCode code, String nextStep) {
         String names = pendingIssueNames(repairOrderId);
         if (names != null) {
-            throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
+            throw new ConflictException(code,
                     "Còn phụ tùng đã giữ chỗ nhưng chưa xuất kho: " + names
-                            + ". Hãy xuất kho hoặc hủy giữ chỗ trước khi lập hóa đơn.");
+                            + ". Hãy xuất kho hoặc hủy giữ chỗ trước khi " + nextStep + ".");
         }
+    }
+
+    private void requireNoDraftDocuments(long repairOrderId, ResponseCode code, String nextStep) {
         Integer drafts = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM inventory_documents WHERE repair_order_id = ? " +
                 "AND document_type IN ('OUT','RETURN') AND status = 'DRAFT'", Integer.class, repairOrderId);
         if (drafts != null && drafts > 0) {
-            throw new ConflictException(ResponseCode.INVOICE_BLOCKED,
-                    "Còn phiếu kho xuất hoặc trả ở trạng thái nháp. Hãy hoàn tất hoặc hủy phiếu nháp trước khi lập hóa đơn.");
+            throw new ConflictException(code,
+                    "Còn phiếu kho xuất hoặc trả ở trạng thái nháp. Hãy hoàn tất hoặc hủy phiếu nháp trước khi "
+                            + nextStep + ".");
         }
     }
 

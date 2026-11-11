@@ -66,6 +66,8 @@ public enum ResponseCode {
             2026, "Work cannot be started in the current state", HttpStatus.CONFLICT),
     WARRANTY_BLOCKED(
             2027, "Warranty cannot be changed in the current state", HttpStatus.CONFLICT),
+    PARTS_PENDING_ISSUE(
+            2028, "Reserved parts of the order have not been issued", HttpStatus.CONFLICT),
     UNAUTHORIZED(3001, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),
     FORBIDDEN(3002, "You do not have permission for this operation", HttpStatus.FORBIDDEN),
     INVALID_TOKEN(3003, "A valid bearer token is required", HttpStatus.UNAUTHORIZED),

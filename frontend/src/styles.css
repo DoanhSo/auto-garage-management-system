@@ -4761,32 +4761,6 @@ button.notification-card-title:hover {
   }
 }
 
-/* Sidebar hub tabs: shown under the open page's entry */
-.nav-children {
-  display: grid;
-  gap: 2px;
-  margin: 2px 0 6px 28px;
-  padding-left: 10px;
-  border-left: 1px solid var(--border);
-}
-.nav-subitem {
-  display: block;
-  padding: 6px 10px;
-  border-radius: 6px;
-  color: inherit;
-  font-size: 0.875rem;
-  text-decoration: none;
-  opacity: 0.8;
-}
-.nav-subitem:hover,
-.nav-subitem.active {
-  opacity: 1;
-}
-.nav-subitem.active {
-  font-weight: 600;
-  background: rgba(127, 127, 127, 0.14);
-}
-
 /* Strip of links to dependent screens, under a page header */
 .related-links {
   display: flex;

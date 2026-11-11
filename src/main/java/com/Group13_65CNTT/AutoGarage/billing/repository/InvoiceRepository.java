@@ -44,8 +44,6 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
             AND (:orderId IS NULL OR i.repairOrderId = :orderId)
             AND (:query IS NULL OR :query = ''
                  OR LOWER(i.invoiceCode) LIKE LOWER(CONCAT('%', :query, '%'))
-                 OR LOWER(CAST(i.customerSnapshot AS string)) LIKE LOWER(CONCAT('%', :query, '%'))
-                 OR LOWER(CAST(i.vehicleSnapshot AS string)) LIKE LOWER(CONCAT('%', :query, '%'))
                  OR EXISTS (
                      SELECT 1 FROM Customer c
                      WHERE c.id = i.customerId
