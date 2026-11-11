@@ -77,13 +77,44 @@ class ShiftAttendanceServiceTest {
     }
 
     @Test
-    @DisplayName("Không cho chấm công quá sớm hoặc khi ca đã kết thúc")
+    @DisplayName("Lễ tân/admin chỉ chấm công hộ trong ngày của ca")
+    void frontDeskCanCheckInEarlyOnlyOnTheShiftDay() {
+        stubSave();
+        when(currentUser.role()).thenReturn(Role.ADMIN);
+
+        Duration early = com.Group13_65CNTT.AutoGarage.scheduling.constant.ShiftPolicy.EARLY_CHECK_IN_WINDOW.plusMinutes(1);
+        var zone = com.Group13_65CNTT.AutoGarage.scheduling.constant.ShiftPolicy.ZONE;
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                Instant.now().plus(early).atZone(zone).toLocalDate().equals(Instant.now().atZone(zone).toLocalDate()),
+                "Ca sớm phải còn trong ngày hiện tại");
+        when(shiftRepository.findById(3L)).thenReturn(Optional.of(shiftStarting(early, Duration.ofHours(4))));
+        assertThat(service.checkIn(10L, 3L).getAttendanceStatus()).isEqualTo(AttendanceStatus.CHECKED_IN);
+    }
+
+    @Test
+    @DisplayName("Kỹ thuật viên không được chấm công sớm hơn cửa sổ cho phép")
+    void technicianCannotCheckInBeforeTheWindow() {
+        when(currentUser.role()).thenReturn(Role.TECHNICIAN);
+        when(employeeRepository.findById(1L))
+                .thenReturn(Optional.of(Employee.builder().id(1L).userId(10L).build()));
+        when(shiftRepository.findById(3L))
+                .thenReturn(Optional.of(shiftStarting(Duration.ofHours(3), Duration.ofHours(4))));
+
+        assertThatThrownBy(() -> service.checkIn(10L, 3L))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Chưa đến giờ vào ca");
+    }
+
+    @Test
+    @DisplayName("Không cho chấm công trước ngày của ca hoặc khi ca đã kết thúc")
     void checkInRejectsOutsideTheShiftWindow() {
         when(currentUser.role()).thenReturn(Role.ADMIN);
 
         when(shiftRepository.findById(3L))
-                .thenReturn(Optional.of(shiftStarting(Duration.ofHours(3), Duration.ofHours(4))));
-        assertThatThrownBy(() -> service.checkIn(10L, 3L)).isInstanceOf(BusinessRuleException.class);
+                .thenReturn(Optional.of(shiftStarting(Duration.ofDays(2), Duration.ofHours(4))));
+        assertThatThrownBy(() -> service.checkIn(10L, 3L))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("trong ngày của ca");
 
         when(shiftRepository.findById(3L))
                 .thenReturn(Optional.of(shiftStarting(Duration.ofHours(-6), Duration.ofHours(4))));

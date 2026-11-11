@@ -422,8 +422,8 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         }
 
         requireOpenOrder(task.getRepairOrderId());
-        if (task.getTaskType() == TaskType.REPAIR && inventoryOperations != null) {
-            inventoryOperations.requireIssuedForWorkStart(task.getRepairOrderId());
+        if (task.getTaskType() == TaskType.REPAIR) {
+            inventoryOperations.requireIssuedBeforeCompletion(task.getRepairOrderId());
         }
 
         Instant now = Instant.now();

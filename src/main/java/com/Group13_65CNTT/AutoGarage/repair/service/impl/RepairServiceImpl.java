@@ -583,7 +583,7 @@ public class RepairServiceImpl implements RepairService, RepairWorkflow {
                 throw new BusinessRuleException("Còn công việc chưa hoàn thành hoặc đồng hồ đang chạy, chưa thể chuyển sang chờ QC");
             }
             if (inventoryOperations != null) {
-                inventoryOperations.requireIssueComplete(id);
+                inventoryOperations.requireIssuedBeforeQc(id);
             }
         }
 

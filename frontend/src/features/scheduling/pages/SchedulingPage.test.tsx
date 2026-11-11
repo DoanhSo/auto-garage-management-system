@@ -70,7 +70,9 @@ beforeEach(() => {
     http.get('/api/v1/employee-shifts', () => HttpResponse.json(envelope(page([])))),
     http.get('/api/v1/employee-shifts/reconciliation', () => HttpResponse.json(envelope([]))),
     http.get('/api/v1/scheduling/on-shift-technicians', () => HttpResponse.json(envelope([]))),
-    http.get('/api/v1/employee-shifts/pending-registrations', () => HttpResponse.json(envelope(page([])))),
+    http.get('/api/v1/employee-shifts/pending-registrations', () =>
+      HttpResponse.json(envelope(page([]))),
+    ),
   );
 });
 
@@ -113,9 +115,7 @@ describe('SchedulingPage address parameters', () => {
       http.get('/api/v1/employee-shifts', () => HttpResponse.json(envelope(page([activeShift])))),
       http.post('/api/v1/employee-shifts/15/check-in', () => {
         checkedIn = true;
-        return HttpResponse.json(
-          envelope({ ...activeShift, attendanceStatus: 'CHECKED_IN' }),
-        );
+        return HttpResponse.json(envelope({ ...activeShift, attendanceStatus: 'CHECKED_IN' }));
       }),
     );
     const user = renderPage('/scheduling?tab=shifts');
@@ -126,5 +126,44 @@ describe('SchedulingPage address parameters', () => {
     await user.click(checkInBtn);
 
     await waitFor(() => expect(checkedIn).toBe(true));
+  });
+
+  it('shows the pending state only on the shift being punched', async () => {
+    const shift = {
+      id: 15,
+      employeeId: 5,
+      serviceBayId: 10,
+      shiftType: 'FULL_DAY',
+      status: 'ACTIVE',
+      attendanceStatus: 'SCHEDULED',
+      startsAt: new Date(Date.now() - 3600000).toISOString(),
+      endsAt: new Date(Date.now() + 3600000).toISOString(),
+      notes: 'Test shift',
+    };
+    let release = () => {};
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get('/api/v1/employee-shifts', () =>
+        HttpResponse.json(envelope(page([shift, { ...shift, id: 16 }]))),
+      ),
+      http.post('/api/v1/employee-shifts/15/check-in', async () => {
+        await held;
+        return HttpResponse.json(envelope({ ...shift, attendanceStatus: 'CHECKED_IN' }));
+      }),
+    );
+    const user = renderPage('/scheduling?tab=shifts');
+    await user.click(await screen.findByRole('button', { name: /Danh sách/ }));
+
+    const [first] = await screen.findAllByRole('button', { name: /Vào ca/ });
+    await user.click(first);
+
+    await waitFor(() => {
+      const buttons = screen.getAllByRole('button', { name: /Vào ca/ });
+      expect(buttons[0]).toBeDisabled();
+      expect(buttons[1]).toBeEnabled();
+    });
+    release();
   });
 });

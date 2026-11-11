@@ -390,6 +390,21 @@ class LaborExecutionServiceTest {
     // =========================================================================
 
     @Test
+    @DisplayName("Hoàn thành công việc sửa chữa khi còn phụ tùng chưa xuất kho: báo đúng bước đang làm")
+    void completeTask_PartsPending_UsesCompletionGate() {
+        org.mockito.Mockito.doThrow(new ConflictException(
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.PARTS_PENDING_ISSUE,
+                        "Hãy xuất kho hoặc hủy giữ chỗ trước khi hoàn thành công việc."))
+                .when(inventoryOperations).requireIssuedBeforeCompletion(100L);
+
+        assertThatThrownBy(() -> laborExecutionService.completeTask(1L, 10L, new TaskCompletionRequest("Xong")))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("responseCode",
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.PARTS_PENDING_ISSUE);
+        verify(inventoryOperations, org.mockito.Mockito.never()).requireIssuedForWorkStart(100L);
+    }
+
+    @Test
     @DisplayName("TV3-08: Hoàn thành công việc đóng timer, giải phóng phân công và chuyển phiếu sang WAITING_QC khi hết việc")
     void completeTask_Success() {
         LaborSession openSession = LaborSession.builder().id(99L).assignmentId(1L).employeeId(5L).startsAt(Instant.now().minus(1, ChronoUnit.HOURS)).build();

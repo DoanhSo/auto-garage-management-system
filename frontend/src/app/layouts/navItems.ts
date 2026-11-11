@@ -36,7 +36,7 @@ import {
   STAFF_MANAGE_ROLES,
   ADMIN_ROLES,
 } from '../access';
-import type { NavChild, NavTarget } from './navMatch';
+import type { NavTarget } from './navMatch';
 
 export const sections = [
   'DỊCH VỤ & XƯỞNG',
@@ -57,8 +57,6 @@ export interface NavItem extends NavTarget {
   icon: typeof Bell;
   section: NavSection;
   allowedRoles: readonly Role[];
-  /** Tabs of the page, shown under the entry while the page is open. */
-  children?: ReadonlyArray<NavChild>;
 }
 
 export const links: ReadonlyArray<NavItem> = [

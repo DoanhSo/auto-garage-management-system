@@ -232,6 +232,31 @@ class InventoryServiceTest {
     }
 
     @Test
+    @DisplayName("Hoàn thành công việc: còn giữ chỗ thì PARTS_PENDING_ISSUE và nêu đúng bước")
+    void requireIssuedBeforeCompletion_NamesTheStep() {
+        when(jdbcTemplate.queryForList(contains("reserved_quantity > 0"), eq(String.class), eq(21L)))
+                .thenReturn(List.of("Lọc dầu"));
+
+        assertThatThrownBy(() -> service.requireIssuedBeforeCompletion(21L))
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.PARTS_PENDING_ISSUE)
+                .hasMessageContaining("Lọc dầu")
+                .hasMessageContaining("trước khi hoàn thành công việc");
+    }
+
+    @Test
+    @DisplayName("Chuyển chờ QC: phiếu kho nháp cũng chặn và nêu đúng bước")
+    void requireIssuedBeforeQc_DraftDocument_NamesTheStep() {
+        when(jdbcTemplate.queryForList(contains("reserved_quantity > 0"), eq(String.class), eq(21L)))
+                .thenReturn(List.of());
+        when(jdbcTemplate.queryForObject(contains("inventory_documents"), eq(Integer.class), eq(21L)))
+                .thenReturn(1);
+
+        assertThatThrownBy(() -> service.requireIssuedBeforeQc(21L))
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.PARTS_PENDING_ISSUE)
+                .hasMessageContaining("trước khi chuyển sang chờ QC");
+    }
+
+    @Test
     @DisplayName("Xuất kho đủ: không còn giữ chỗ và không có phiếu nháp thì qua")
     void requireIssueComplete_Clean_Passes() {
         when(jdbcTemplate.queryForList(contains("reserved_quantity > 0"), eq(String.class), eq(21L)))

@@ -147,6 +147,13 @@ class PaymentCodeIntegrationTest extends IntegrationTestSupport {
         // Không khớp
         assertThat(invoices.searchInvoices(null, null, null, "KHONG_CO_AI_TEN_NAY", p).getContent())
                 .isEmpty();
+
+        // Tên trường trong snapshot JSON không phải dữ liệu để tìm
+        for (String jsonKey : java.util.List.of("fullName", "plateNumber", "customerCode")) {
+            assertThat(invoices.searchInvoices(null, null, null, jsonKey, p).getContent())
+                    .extracting(com.Group13_65CNTT.AutoGarage.billing.entity.Invoice::getId)
+                    .doesNotContain(930201L);
+        }
     }
 
     @Test

@@ -855,6 +855,34 @@ class BillingServiceTest {
     }
 
     @Test
+    @DisplayName("Khóa mã được lấy trước mọi lần đọc dữ liệu của giao dịch thu tiền")
+    void receivePayment_LocksBeforeAnyRead() {
+        stubInvoice(unpaid(500_000), 0);
+        when(paymentRepository.findCodesStartingWith(anyString(), any())).thenReturn(List.of());
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentMapper.toResponse(any(Payment.class))).thenReturn(PaymentResponse.builder().id(1L).build());
+
+        service.receivePayment(10L, receipt(100_000).build());
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(jdbcTemplate, invoiceRepository, paymentRepository);
+        order.verify(jdbcTemplate).queryForObject(CODE_LOCK_SQL, Integer.class);
+        order.verify(invoiceRepository).findByIdWithLock(1L);
+        order.verify(paymentRepository).calculatePaidAmountForInvoice(1L);
+    }
+
+    @Test
+    @DisplayName("Thiếu dòng khóa sinh mã: báo PAYMENT_BLOCKED rõ ràng thay vì lỗi 500")
+    void receivePayment_MissingLockRow_Blocked() {
+        when(jdbcTemplate.queryForObject(CODE_LOCK_SQL, Integer.class))
+                .thenThrow(new org.springframework.dao.EmptyResultDataAccessException(1));
+
+        assertThatThrownBy(() -> service.receivePayment(10L, receipt(100_000).build()))
+                .hasFieldOrPropertyWithValue("responseCode", ResponseCode.PAYMENT_BLOCKED)
+                .hasMessageContaining("payment_code_lock");
+        verify(paymentRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Thu tiền tự sinh mã cũng lấy khóa mã trước khi tìm mã lớn nhất")
     void receivePayment_GeneratedCode_LocksBeforeNumbering() {
         stubInvoice(unpaid(500_000), 0);

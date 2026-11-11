@@ -59,7 +59,13 @@ import { PAYROLL_MANAGE_ROLES, STAFF_MANAGE_ROLES } from '../../../app/access';
 import { LiveDispatchBoard } from '../components/LiveDispatchBoard';
 import { ShiftRegistrationModal } from '../components/ShiftRegistrationModal';
 import type { BayReservation, Employee, ServiceBay, Shift } from '../types/scheduling';
-import { bayTypeLabels, parseSkills, SKILL_LABELS, shiftStatusLabels, attendanceLabels } from '../types/scheduling';
+import {
+  bayTypeLabels,
+  parseSkills,
+  SKILL_LABELS,
+  shiftStatusLabels,
+  attendanceLabels,
+} from '../types/scheduling';
 import type { UiPolicy } from '../../../shared/types/contracts';
 
 const TABS = ['dispatch', 'bays', 'shifts'] as const;
@@ -153,6 +159,9 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
   );
   const canPunch = (shift: Shift) =>
     isFrontDesk || String(shift.employeeId) === String(ownEmployeeId);
+
+  const isPunching = (shift: Shift) =>
+    attendanceMutation.isPending && String(attendanceMutation.variables?.id) === String(shift.id);
 
   const handlePunch = (shift: Shift, action: 'check-in' | 'check-out') =>
     attendanceMutation.mutate(
@@ -439,7 +448,9 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
           return (
             <div className="account-cell">
               <div>
-                <Badge variant={s.variant}>{s.label || shiftStatusLabels[row.original.status]}</Badge>
+                <Badge variant={s.variant}>
+                  {s.label || shiftStatusLabels[row.original.status]}
+                </Badge>
                 {row.original.attendanceStatus && (
                   <span className="muted" style={{ fontSize: 'var(--text-xs)' }}>
                     {attendanceLabels[row.original.attendanceStatus]}
@@ -469,7 +480,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
                     row.original.attendanceStatus === 'ABSENT') && (
                     <Button
                       variant="ghost"
-                      pending={attendanceMutation.isPending}
+                      pending={isPunching(row.original)}
                       onClick={() => handlePunch(row.original, 'check-in')}
                     >
                       <LogIn size={14} /> Vào ca
@@ -479,7 +490,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
                     row.original.attendanceStatus === 'LATE') && (
                     <Button
                       variant="ghost"
-                      pending={attendanceMutation.isPending}
+                      pending={isPunching(row.original)}
                       onClick={() => handlePunch(row.original, 'check-out')}
                     >
                       <LogOut size={14} /> Ra ca
@@ -501,7 +512,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [employeeMap, userMap],
+    [employeeMap, userMap, attendanceMutation.isPending, attendanceMutation.variables?.id],
   );
 
   const handleDeleteBay = async () => {
@@ -857,7 +868,7 @@ function ReadyScheduling({ policy }: { policy: UiPolicy }) {
                 onCancelShift={(shift) => setCancelingShiftId(shift.id)}
                 onAttendance={handlePunch}
                 canPunch={canPunch}
-                attendancePending={attendanceMutation.isPending}
+                isAttendancePending={isPunching}
               />
               {weekShiftsQuery.data &&
                 Number(weekShiftsQuery.data.totalElements) >

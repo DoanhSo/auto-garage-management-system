@@ -66,7 +66,13 @@ public class ShiftAttendanceServiceImpl implements ShiftAttendanceService {
         }
         Instant now = Instant.now();
         boolean isFrontDesk = EnumSet.of(Role.ADMIN, Role.RECEPTIONIST).contains(currentUser.role());
-        if (!isFrontDesk && now.isBefore(shift.getStartsAt().minus(ShiftPolicy.EARLY_CHECK_IN_WINDOW))) {
+        if (isFrontDesk) {
+            Instant shiftDayStart = shift.getStartsAt().atZone(ShiftPolicy.ZONE).toLocalDate()
+                    .atStartOfDay(ShiftPolicy.ZONE).toInstant();
+            if (now.isBefore(shiftDayStart)) {
+                throw new BusinessRuleException("Chưa đến ngày của ca, chỉ được chấm công hộ trong ngày của ca");
+            }
+        } else if (now.isBefore(shift.getStartsAt().minus(ShiftPolicy.EARLY_CHECK_IN_WINDOW))) {
             throw new BusinessRuleException("Chưa đến giờ vào ca, chỉ được chấm công trước giờ ca tối đa "
                     + ShiftPolicy.EARLY_CHECK_IN_WINDOW.toMinutes() + " phút");
         }
