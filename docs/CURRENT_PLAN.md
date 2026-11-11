@@ -1,114 +1,99 @@
-# Kế Hoạch Sửa Lỗi Sau Khi Rà Soát Commit `7fd0865`
+# Kế Hoạch Lễ Tân Tạo Hoặc Nối Tài Khoản Đăng Nhập Cho Khách Có Sẵn
 
-> **Mã plan**: `review-7fd0865-fixes`
+> **Mã plan**: `customer-account-linking`
 > **Chế độ**: `PLAN:` (tuân thủ `AGENTS.md`, `docs/CODING_GUIDELINES.md`, `docs/UI_DESIGN_GUIDELINES.md`).
-> **Kế thừa từ**: `plans/2026-11-fix-shift-endpoints-and-flat-sidebar-nav.md`, `plans/2026-11-invoice-search-customer-vehicle.md`, `plans/2026-11-fix-invoice-readiness-and-part-issue-flow.md`, `plans/2026-11-payment-code-row-lock.md` (lỗi tìm thấy khi rà soát commit `7fd0865` và các gợi ý còn mở của lần review trước).
+> **Kế thừa từ**: `plans/2026-11-account-status-visibility.md` (mục "Ngoài phạm vi": lễ tân tạo/mời tài khoản cho khách; điều chỉnh sau hội tụ: khách tự đăng ký tạo hồ sơ trùng).
 
 ---
 
 ## 1. Mục Tiêu & Phạm Vi
 
 ### 1.1. Hiện trạng
-Phạm vi rà soát: toàn bộ phần code của commit `7fd0865` (backend `src/main`, test, frontend). Frontend: `tsc -b`, `eslint`, 192 test đều qua. Các lỗi tìm thấy:
-
-1. **Tìm hóa đơn khớp cả tên khóa JSON.** `InvoiceRepository.searchInvoices` so `LIKE` trên `CAST(i.customerSnapshot AS string)` và `vehicleSnapshot`. Chuỗi này chứa tên khóa (`fullName`, `phone`, `email`, `address`, `plateNumber`, `model`, `color`…), nên gõ "name", "phone", "model", "color" trả về **mọi** hóa đơn.
-2. **Sai mã lỗi và câu chữ khi chặn vì chưa xuất kho.**
-   - `LaborExecutionServiceImpl.completeTask` gọi `requireIssuedForWorkStart` → trả `WORK_START_BLOCKED` với câu "…trước khi bắt đầu công việc" trong lúc người dùng đang **hoàn thành** công việc.
-   - `RepairServiceImpl` khi chuyển `IN_PROGRESS → WAITING_QC` gọi `requireIssueComplete` → trả `INVOICE_BLOCKED` với câu "…trước khi lập hóa đơn".
-   - `completeTask` còn kiểm tra `inventoryOperations != null` dù trường này đã bắt buộc (`startTimer` không kiểm tra).
-3. **Lễ tân/Admin chấm công vào ca sớm không giới hạn.** `ShiftAttendanceServiceImpl.checkIn` bỏ hẳn giới hạn "trước giờ ca tối đa N phút" cho ADMIN/RECEPTIONIST, nên có thể chấm vào một ca của tuần sau; `actualStartsAt` bị ghi sớm nhiều ngày và ca được coi là đúng giờ. Thay đổi này cũng làm **test đơn vị `ShiftAttendanceServiceTest.checkInRejectsOutsideTheShiftWindow` đang fail** (dòng 86) trên nhánh hiện tại.
-4. **`noRollbackFor = BusinessException.class` đặt ở mức lớp** của `BillingServiceImpl` và `InventoryServiceImpl`. Mục đích chỉ là để `getInvoiceReadiness` không đánh dấu rollback-only; đặt ở mức lớp làm mọi phương thức chỉ đọc khác cũng đổi hành vi và dễ hiểu nhầm là áp dụng cho phương thức ghi (phương thức có `@Transactional` riêng thì không thừa hưởng).
-5. **File rác đã commit:** `scripts/analysis/__pycache__/schema_inventory.cpython-310.pyc`; `.gitignore` chưa có `__pycache__`.
-6. **Code chết sau khi bỏ cây điều hướng:** `isChildActive`, `NavChild`, trường `children` của `NavItem` (`navMatch.ts`, `navItems.ts`) và CSS `.nav-children`, `.nav-subitem`.
-7. **Nút Vào ca/Ra ca:** mọi dòng cùng hiện trạng thái đang xử lý khi chỉ một dòng được bấm (`pending={attendanceMutation.isPending}` ở `SchedulingPage.tsx`, `ShiftTimelineBoard.tsx`).
-8. **Còn mở từ review trước:** `lockPaymentCodes()` ném lỗi 500 khó hiểu nếu thiếu dòng `payment_code_lock`; `PaymentCodeConcurrencyIntegrationTest` dùng `sleep` và khẳng định số tuyệt đối `0001`/`0002`, sai nếu DB test đã có phiếu chi trong ngày.
-
-9. **(Phát hiện khi code Step 9) Khóa mã giao dịch lấy quá muộn.** `receivePayment`/`paySupplier` đọc dữ liệu thường trước khi gọi `lockPaymentCodes()`. Với REPEATABLE READ mặc định của MySQL, ảnh đọc đã cố định trước lúc chờ khóa, nên giao dịch sau không thấy mã vừa commit và vẫn có thể sinh trùng. Cách sửa: lấy khóa ở câu lệnh đầu tiên của giao dịch; test tích hợp đi qua `receivePayment` thật.
+- Khách do lễ tân tạo tại quầy (`customers.user_id` trống) không có cách nào để có tài khoản gắn với hồ sơ đó.
+- Khi khách tự đăng ký (`RegistrationServiceImpl.register`), Keycloak tạo tài khoản với `emailVerified=false` (`KeycloakIdentityServiceImpl.createOrLinkUser`). Ở lần đăng nhập đầu, `AuthServiceImpl.me()` → `ensureCustomerProfileLinked` chỉ nối vào hồ sơ có sẵn khi email **đã xác thực** (`linkExistingCustomerByVerifiedEmail`); nếu không thì tạo **hồ sơ mới** mã `CUS-OIDC-…`. Kết quả: một người có hai hồ sơ, xe và lịch sử sửa chữa nằm ở hồ sơ cũ, tài khoản nằm ở hồ sơ mới.
+- Realm Keycloak không bật xác thực email và không có máy chủ gửi mail (`docker/keycloak/realm-export.json`), nên con đường "xác thực email để tự nối" hiện không thể xảy ra.
+- Nhân viên đã có tiền lệ: quản trị viên tạo tài khoản kèm mật khẩu ban đầu (`UserServiceImpl.createUser` → `createOrLinkUser(..., password)`, mật khẩu không phải tạm thời vì form đăng nhập dùng password grant, không xử lý được "required action").
 
 ### 1.2. Mục tiêu
-- Tìm hóa đơn chỉ khớp theo giá trị, không khớp theo tên trường.
-- Người dùng thấy đúng lý do và đúng bước cần làm khi bị chặn vì phụ tùng chưa xuất kho.
-- Lễ tân chỉ chấm công hộ được trong ngày của ca.
-- Dọn file rác và code chết; test đồng thời ổn định.
+- **A. Tạo tài khoản cho khách có sẵn:** ở màn Khách hàng, khách "Chưa có tài khoản" có nút **Tạo tài khoản**. Lễ tân nhập tên đăng nhập, email (điền sẵn từ hồ sơ), mật khẩu ban đầu (có nút sinh ngẫu nhiên). Hệ thống tạo tài khoản Keycloak vai trò CUSTOMER, dòng `users`, và nối ngay vào hồ sơ. Khách đăng nhập lần đầu thấy đúng xe và lịch sử của mình, không phát sinh hồ sơ mới.
+- **B. Gộp hồ sơ trùng:** khách đã lỡ tự đăng ký (có hồ sơ `CUS-OIDC-…` riêng) thì lễ tân mở hồ sơ cũ, bấm **Nối tài khoản**, chọn hồ sơ đã có tài khoản. Hệ thống chuyển tài khoản sang hồ sơ cũ và ngừng hoạt động hồ sơ trùng. Chỉ cho gộp khi hồ sơ trùng chưa có xe, lịch hẹn, phiếu sửa chữa, hóa đơn hay bảo hành; nếu có thì báo rõ lý do.
+- Gợi ý ở cột "Tài khoản" đổi thành hướng dẫn dùng hai nút trên.
 
 ### 1.3. Ngoài phạm vi
-- Bỏ việc chặn hoàn thành công việc khi chưa xuất kho (giữ quy tắc của plan `fix-invoice-readiness-and-part-issue-flow`, chỉ sửa mã lỗi và câu chữ).
-- Escape ký tự `%`/`_` trong ô tìm kiếm.
-- Tối ưu hiệu năng tìm kiếm (LIKE có `%` đầu, 3 truy vấn con `EXISTS`).
-- Sắp lại thứ tự V19/V20 trong `docs/DATABASE.md`.
+- **Bật xác thực email để tự nối.** Cần máy chủ gửi mail (SMTP hoặc Mailpit cho môi trường dev), bật `verifyEmail` trong realm, và đổi `ensureCustomerProfileLinked` để chưa tạo hồ sơ mới cho tới khi email được xác thực. Nên làm thành plan riêng sau khi A và B chạy ổn.
+- Gửi mật khẩu cho khách qua email/SMS; khách tự đổi mật khẩu trong ứng dụng (hiện đổi qua trang tài khoản Keycloak).
+- Gộp hồ sơ khi hồ sơ trùng đã có dữ liệu nghiệp vụ (chuyển xe, phiếu, hóa đơn giữa hai hồ sơ).
+- Chặn đăng ký khi email trùng hồ sơ có sẵn (email chưa xác thực nên không đủ tin cậy, và làm lộ việc email đã tồn tại).
 
 ## 2. Tiêu Chí Chấp Nhận
 
-- **AC-1**: Tìm hóa đơn với "fullName", "phone", "model" không trả về hóa đơn nào chỉ vì tên khóa JSON; tìm theo tên khách, mã khách, số điện thoại, biển số, mã phiếu, mã hóa đơn vẫn khớp. _Kiểm chứng_: thêm khẳng định vào `PaymentCodeIntegrationTest.searchInvoices_MatchesCustomerVehicleAndOrder`.
-- **AC-2**: Hoàn thành công việc khi còn phụ tùng giữ chỗ trả mã `PARTS_PENDING_ISSUE` với câu "…trước khi hoàn thành công việc"; chuyển sang chờ QC trả cùng mã với câu "…trước khi chuyển sang chờ QC". `startTimer` giữ `WORK_START_BLOCKED`, lập hóa đơn giữ `INVOICE_BLOCKED`. _Kiểm chứng_: `LaborExecutionServiceTest`, `RepairOrderServiceTest`/`RepairWorkflowServiceTest`, `InventoryServiceTest`.
-- **AC-3**: ADMIN/RECEPTIONIST chấm công vào ca trước ngày của ca (theo `ShiftPolicy.ZONE`) bị từ chối; trong ngày của ca thì được dù còn sớm hơn cửa sổ của kỹ thuật viên. _Kiểm chứng_: test `ShiftAttendanceServiceTest`.
-- **AC-4**: `noRollbackFor` chỉ còn ở các phương thức cần (`getInvoiceReadiness`, `requireIssueComplete`, `requireIssuedForWorkStart`, phương thức mới của AC-2, `requireInvoiceReady`); test `invoiceReadiness_WithReservedParts_…` vẫn xanh. _Kiểm chứng_: grep + test tích hợp.
-- **AC-5**: `git ls-files | grep __pycache__` rỗng; `.gitignore` có `__pycache__/`. _Kiểm chứng_: lệnh.
-- **AC-6**: Không còn `isChildActive`, `NavChild`, `.nav-children`, `.nav-subitem` trong `frontend/src`; `tsc -b`, `eslint`, vitest xanh. _Kiểm chứng_: grep + lệnh.
-- **AC-7**: Bấm Vào ca/Ra ca chỉ dòng đó hiện đang xử lý. _Kiểm chứng_: test RTL trong `SchedulingPage.test.tsx`.
-- **AC-8**: Thiếu dòng `payment_code_lock` trả `PAYMENT_BLOCKED` kèm thông báo cấu hình; test đồng thời so `mã thứ hai = mã thứ nhất + 1` và dùng latch thay `sleep`. _Kiểm chứng_: `BillingServiceTest`, `PaymentCodeConcurrencyIntegrationTest`.
-- **AC-10**: Khóa mã được lấy trước mọi lần đọc trong `receivePayment`/`paySupplier`; nhiều khoản thu đồng thời qua `receivePayment` đều thành công với mã khác nhau. _Kiểm chứng_: `receivePayment_LocksBeforeAnyRead`, `PaymentCodeConcurrencyIntegrationTest.concurrentReceiptsAllSucceedWithDistinctCodes`.
-- **AC-9**: `./mvnw test` và test frontend xanh toàn bộ.
+- **AC-1**: `POST /api/v1/customers/{id}/account` (lễ tân, quản trị viên) với khách đang hoạt động, chưa có tài khoản: tạo người dùng Keycloak vai trò CUSTOMER, dòng `users` có `identity_id`, gán `customers.user_id`; trả khách hàng kèm `account.status = PENDING`. Ghi nhật ký `CUSTOMER_ACCOUNT_CREATED`. _Kiểm chứng_: test service với `KeycloakIdentityService` giả.
+- **AC-2**: Từ chối với lý do tiếng Việt khi: khách đã có tài khoản, khách ngừng hoạt động, tên đăng nhập hoặc email đã dùng, mật khẩu không đạt chính sách. Keycloak không được gọi trong các trường hợp này. _Kiểm chứng_: test service.
+- **AC-3**: Sau AC-1, lần gọi `GET /auth/me` đầu tiên của khách không tạo hồ sơ mới. _Kiểm chứng_: test tích hợp MySQL đi qua `me()` với JWT giả của tài khoản vừa tạo.
+- **AC-4**: `POST /api/v1/customers/{id}/account/link` với `{ "sourceCustomerId": … }`: chuyển `user_id` từ hồ sơ nguồn sang hồ sơ đích, hồ sơ nguồn bị bỏ `user_id` và ngừng hoạt động, trong một giao dịch; ghi nhật ký `CUSTOMER_ACCOUNT_LINKED`. _Kiểm chứng_: test tích hợp MySQL.
+- **AC-5**: AC-4 bị từ chối khi hồ sơ đích đã có tài khoản, hồ sơ nguồn không có tài khoản, hai hồ sơ trùng nhau, hoặc hồ sơ nguồn còn xe, lịch hẹn, phiếu sửa chữa, hóa đơn, bảo hành; thông báo nêu đúng loại dữ liệu đang chặn. _Kiểm chứng_: test service/tích hợp.
+- **AC-6**: Màn Khách hàng: khách "Chưa có tài khoản" có nút **Tạo tài khoản** (Modal giữa màn hình, 2 cột trên máy tính, 1 cột trên điện thoại) và **Nối tài khoản** (Modal chọn hồ sơ đã có tài khoản, tìm theo tên/SĐT/email). Thành công thì danh sách cập nhật trạng thái. _Kiểm chứng_: test RTL; kiểm tra trên trình duyệt.
+- **AC-7**: Toàn bộ test backend và frontend xanh.
 
 ## 3. Danh Sách File Mục Tiêu
 
 | File | Thay đổi |
 |---|---|
-| `billing/repository/InvoiceRepository.java` | bỏ 2 dòng `CAST(...Snapshot AS string) LIKE` |
-| `common/enums/ResponseCode.java` | thêm `PARTS_PENDING_ISSUE(2028)` (409) |
-| `shared/contracts/InventoryOperations.java` | thêm `requireIssuedBeforeCompletion(long)`, `requireIssuedBeforeQc(long)` |
-| `inventory/service/impl/InventoryServiceImpl.java` | hai phương thức mới dùng `pendingIssueNames`; chuyển `noRollbackFor` về mức phương thức |
-| `repair/service/impl/LaborExecutionServiceImpl.java` | `completeTask` gọi phương thức mới, bỏ kiểm tra null |
-| `repair/service/impl/RepairServiceImpl.java` | chuyển `WAITING_QC` gọi `requireIssuedBeforeQc` |
-| `billing/service/impl/BillingServiceImpl.java` | `noRollbackFor` về mức phương thức; `lockPaymentCodes` báo lỗi rõ |
-| `scheduling/service/impl/ShiftAttendanceServiceImpl.java` | giới hạn lễ tân theo ngày của ca |
-| `frontend/src/app/layouts/navMatch.ts`, `navItems.ts`, `styles.css` | xóa code chết |
-| `frontend/src/features/scheduling/pages/SchedulingPage.tsx`, `components/ShiftTimelineBoard.tsx` | pending theo dòng |
-| `.gitignore`, `scripts/analysis/__pycache__/` | bỏ theo dõi file rác |
-| Test: `PaymentCodeIntegrationTest`, `PaymentCodeConcurrencyIntegrationTest`, `BillingServiceTest`, `LaborExecutionServiceTest`, `InventoryServiceTest`, `ShiftAttendanceServiceTest`, `SchedulingPage.test.tsx`, `navMatch.test.ts` | theo từng AC |
-| `docs/REPAIR_ORDER_LIFECYCLE.md`, `docs/CONFIGURATION_AND_ERRORS.md` | mã lỗi mới |
+| `customer/dto/CreateCustomerAccountRequest.java` (mới) | `username`, `email`, `password` + validation |
+| `customer/dto/LinkCustomerAccountRequest.java` (mới) | `sourceCustomerId` |
+| `customer/service/CustomerService.java`, `CustomerServiceImpl.java` | `createAccount`, `linkAccount` |
+| `customer/controller/CustomerController.java` | hai endpoint, `HAS_FRONT_DESK` |
+| `customer/repository/CustomerRepository.java` | khóa dòng khi gộp (`findByIdForUpdate`) |
+| `common/constant/ApiPaths.java`, `AuditConstants.java` | đường dẫn `/{id}/account`, `/{id}/account/link`; hai hành động nhật ký |
+| `identity/repository/UserRepository.java` | dùng lại `existsByUsername`, `existsByEmail` |
+| `identity/service/KeycloakIdentityService.java` | dùng lại `createOrLinkUser` |
+| `frontend/src/features/customer/api/customerApi.ts`, `hooks/useCustomers.ts` | `createAccount`, `linkAccount` + mutation |
+| `frontend/src/features/customer/components/CustomerAccountModal.tsx` (mới) | form tạo tài khoản |
+| `frontend/src/features/customer/components/LinkAccountModal.tsx` (mới) | chọn hồ sơ có tài khoản (dùng `GET /customers?hasAccount=true&search=`) |
+| `frontend/src/features/customer/pages/CustomersPage.tsx`, `components/CustomerCards.tsx` | nút, gợi ý mới |
+| Test: `CustomerServiceTest`, `CustomerAccountIntegrationTest` (mới), `CustomersPage.test.tsx` | theo AC |
+| `docs/api/SECURITY.md` | mô tả hai endpoint |
 
 ## 4. Hợp Đồng Kỹ Thuật
 
-- `ResponseCode.PARTS_PENDING_ISSUE(2028, HttpStatus.CONFLICT)`.
-- `InventoryOperations`:
-  - `void requireIssuedBeforeCompletion(long repairOrderId)` → "Còn phụ tùng đã giữ chỗ nhưng chưa xuất kho: … Hãy xuất kho hoặc hủy giữ chỗ trước khi hoàn thành công việc."
-  - `void requireIssuedBeforeQc(long repairOrderId)` → cùng mã, câu kết "…trước khi chuyển sang chờ QC."; kiểm tra thêm phiếu kho nháp như `requireIssueComplete`.
-- Chấm công hộ: lễ tân/admin được chấm khi `now >= đầu ngày của shift.startsAt theo ShiftPolicy.ZONE`; kỹ thuật viên giữ `EARLY_CHECK_IN_WINDOW`.
-- Frontend: `pending={attendanceMutation.isPending && attendanceMutation.variables?.id === shift.id}`.
+- `POST /api/v1/customers/{id}/account` — `@PreAuthorize(HAS_FRONT_DESK)`, body:
+  ```json
+  { "username": "an.nguyen", "email": "an@example.com", "password": "…" }
+  ```
+  `username` theo `SecurityConstants.USERNAME_PATTERN`; `email` tùy chọn, mặc định email hồ sơ; `password` qua `PasswordPolicy.validateNewPassword`. Trả `200` + `CustomerResponse`.
+- `POST /api/v1/customers/{id}/account/link` — `@PreAuthorize(HAS_FRONT_DESK)`, body `{ "sourceCustomerId": 12 }`. Trả `200` + `CustomerResponse` của hồ sơ đích.
+- Lỗi: `DUPLICATE_RESOURCE` (tên đăng nhập/email trùng), `BusinessRuleException` cho các điều kiện nghiệp vụ, `AUTHENTICATION_UNAVAILABLE` khi Keycloak lỗi.
+- Thứ tự tạo tài khoản: kiểm tra đầy đủ trong MySQL → `createOrLinkUser` → lưu `users` và `customers.user_id` trong cùng giao dịch. Giống `UserServiceImpl.createUser`: nếu lưu MySQL thất bại sau khi Keycloak đã tạo thì còn tài khoản Keycloak mồ côi; ghi log cảnh báo kèm tên đăng nhập để quản trị viên xử lý.
+- Gộp: khóa cả hai hồ sơ theo thứ tự id tăng dần; đặt `user_id` của nguồn về `NULL` và `flush` trước khi gán cho đích (ràng buộc `uq_customers_user`).
+- UI: `Modal` trong `shared/components/ui`, `Field`, `FormError`; mật khẩu sinh ngẫu nhiên đạt `policy.passwordMinLength`.
 
 ## 5. Checklist Thực Thi
 
-- [x] **Step 1: Bỏ khớp theo chuỗi JSON trong `searchInvoices`, thêm khẳng định test** _(AC-1)_
-- [x] **Step 2: Thêm `PARTS_PENDING_ISSUE` và hai phương thức hợp đồng kho** _(AC-2)_
-- [x] **Step 3: `completeTask` và chuyển `WAITING_QC` dùng phương thức mới, bỏ kiểm tra null** _(AC-2)_
-- [x] **Step 4: Giới hạn chấm công hộ theo ngày của ca + test** _(AC-3)_
-- [x] **Step 5: Đưa `noRollbackFor` về mức phương thức** _(AC-4)_
-- [x] **Step 6: Bỏ theo dõi `__pycache__`, thêm `.gitignore`** _(AC-5)_
-- [x] **Step 7: Xóa code chết của cây điều hướng** _(AC-6)_
-- [x] **Step 8: Pending theo dòng cho nút Vào ca/Ra ca + test** _(AC-7)_
-- [x] **Step 9: `lockPaymentCodes` báo lỗi rõ; làm ổn định test đồng thời** _(AC-8)_
-- [x] **Step 10: Cập nhật docs mã lỗi** _(AC-2)_
-- [x] **Step 11: Chạy toàn bộ test backend và frontend** _(AC-9)_
+- [x] **Step 1: DTO, hằng số đường dẫn và hành động nhật ký** _(AC-1, AC-4)_
+- [x] **Step 2: `createAccount` + các điều kiện từ chối + test** _(AC-1, AC-2)_
+- [x] **Step 3: Test tích hợp: tài khoản vừa tạo đăng nhập lần đầu không sinh hồ sơ mới** _(AC-3)_
+- [x] **Step 4: `linkAccount` + điều kiện chặn theo dữ liệu nghiệp vụ + test tích hợp** _(AC-4, AC-5)_
+- [x] **Step 5: Hai endpoint trong `CustomerController`** _(AC-1, AC-4)_
+- [x] **Step 6: API client, hook, `CustomerAccountModal`, `LinkAccountModal`** _(AC-6)_
+- [x] **Step 7: Nút và gợi ý ở màn Khách hàng (bảng và thẻ) + test RTL** _(AC-6)_
+- [x] **Step 8: Cập nhật tài liệu API** _(AC-1, AC-4)_
+- [x] **Step 9: Chạy toàn bộ test; build lại container; kiểm tra trên trình duyệt nếu có phiên đăng nhập** _(AC-7)_
 
 ## 6. Kết Quả Hội Tụ (Converge)
 
-Ngày: 2026-11-11. Kết luận: **converged**. Các mục giao diện được kiểm chứng bằng test RTL, chưa thao tác trên trình duyệt.
+Ngày: 2026-11-11. Kết luận: **partial** — mọi tiêu chí có bằng chứng bằng test; chưa thao tác trên trình duyệt (chưa có phiên đăng nhập trong trình duyệt của phiên làm việc). Container đã build lại với code mới.
 
 | Mục tiêu | Trạng thái | Ghi chú |
 |---|---|---|
-| AC-1 Tìm hóa đơn không khớp tên khóa JSON | Đạt | Không còn `CAST(i.` trong `InvoiceRepository`; `searchInvoices_MatchesCustomerVehicleAndOrder` xanh trên MySQL |
-| AC-2 Mã `PARTS_PENDING_ISSUE` và câu báo đúng bước | Đạt | `requireIssuedBeforeCompletion`, `requireIssuedBeforeQc`; test ở `InventoryServiceTest`, `LaborExecutionServiceTest`, `RepairWorkflowServiceTest` |
-| AC-3 Chấm công hộ trong ngày của ca | Đạt | 3 test ở `ShiftAttendanceServiceTest`; test admin chấm sớm được bỏ qua khi chạy sát nửa đêm |
-| AC-4 `noRollbackFor` chỉ ở phương thức cần | Đạt | grep còn 6 chỗ đúng danh sách; `invoiceReadiness_WithReservedParts_…` xanh |
-| AC-5 Bỏ theo dõi `__pycache__` | Đạt | `git ls-files` không còn; `.gitignore` đã có |
-| AC-6 Xóa code chết điều hướng | Đạt | grep 0 kết quả; `tsc -b`, `eslint` xanh |
-| AC-7 Pending theo dòng | Đạt | Test RTL `shows the pending state only on the shift being punched`; chưa xác minh trên trình duyệt |
-| AC-8 Báo lỗi thiếu dòng khóa; test đồng thời ổn định | Đạt | `receivePayment_MissingLockRow_Blocked`; test so số liền kề và dùng latch để sắp thứ tự, còn 200 ms chờ chỉ ảnh hưởng độ mạnh của test |
-| AC-9 Toàn bộ test | Đạt | `./mvnw test` 612/612 trên MySQL; vitest 193/193 (`--maxWorkers=3 --testTimeout=30000`) |
-| AC-10 Khóa mã lấy đầu giao dịch | Đạt | `receivePayment_LocksBeforeAnyRead`; `concurrentReceiptsAllSucceedWithDistinctCodes` xanh, và fail với `Duplicate entry` khi tạm đưa khóa về vị trí cũ |
+| AC-1 Tạo tài khoản cho khách có sẵn | Đạt | `CustomerServiceTest.createAccount_CreatesIdentityAndLinksProfile`; `CustomerAccountIntegrationTest` kiểm `users.identity_id`, email mặc định từ hồ sơ |
+| AC-2 Các điều kiện từ chối, không gọi Keycloak | Đạt | 3 test: đã có tài khoản, trùng tên đăng nhập/email, khách ngừng hoạt động (`verifyNoInteractions`) |
+| AC-3 Đăng nhập lần đầu không sinh hồ sơ mới | Đạt | `createdAccountSignsIntoTheExistingProfile` đi qua `AuthService.me()` thật trên MySQL |
+| AC-4 Nối tài khoản | Đạt | `linkMovesTheAccountAndRetiresTheDuplicate` |
+| AC-5 Chặn gộp khi còn dữ liệu nghiệp vụ | Đạt | `linkRefusesWhenTheDuplicateHasBusinessData` (thông báo "1 xe"); các điều kiện còn lại nằm trong `linkAccount` |
+| AC-6 Giao diện | Đạt (chưa xác minh trình duyệt) | `CustomersPage.test.tsx`: nút chỉ hiện với khách chưa có tài khoản, tạo tài khoản gửi tên gợi ý, email hồ sơ, mật khẩu sinh ngẫu nhiên; thẻ di động cũng có hai nút |
+| AC-7 Toàn bộ test | Đạt | `./mvnw test` 627/627; vitest 198/198 (`--maxWorkers=3 --testTimeout=30000`); `tsc -b`, `eslint` xanh |
 
-Lỗi phát hiện và đã sửa khi code: khóa mã giao dịch lấy sau lần đọc đầu tiên (REPEATABLE READ) nên vẫn sinh trùng mã; cột bảng ca được ghi nhớ thiếu trạng thái chấm công nên nút không bao giờ hiện đang xử lý.
+**Điều chỉnh kèm theo:** quy tắc trạng thái tài khoản (`AccountSummary.statusOf`, plan `account-status-visibility`) đổi thành "Đang hoạt động" chỉ khi đã có `last_login_at`. Trước đó chỉ cần có `identity_id`, nên tài khoản do lễ tân/quản trị viên vừa tạo hiện "Đang hoạt động" dù chưa đăng nhập. Hệ quả: các tài khoản cũ chưa từng ghi `last_login_at` hiện "Chưa đăng nhập lần nào" cho tới lần đăng nhập kế tiếp.
 
-Ghi chú: `docs/CONFIGURATION_AND_ERRORS.md` không có danh sách các mã `*_BLOCKED` nên không sửa; mã mới ghi ở `docs/REPAIR_ORDER_LIFECYCLE.md`. Vitest với cấu hình mặc định có thể hết giờ khi máy quá tải.
+**Còn lại:** nếu lưu MySQL thất bại sau khi Keycloak đã tạo tài khoản thì còn tài khoản Keycloak mồ côi (giống `UserServiceImpl.createUser`); chỉ ghi log cảnh báo. Bật xác thực email để tự nối vẫn ngoài phạm vi.
 

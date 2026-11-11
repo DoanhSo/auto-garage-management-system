@@ -15,6 +15,7 @@ import { Badge, Button, PageHeader, Loading, QueryError } from '../../../shared/
 import { DataTable, Pagination } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { useToast } from '../../../app/providers/ToastProvider';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import { errorMessage } from '../../../shared/api/errors';
 import { useRepairOrdersQuery } from '../../repair/hooks/useRepair';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
@@ -42,6 +43,8 @@ function ReadyEstimates({
   policy: NonNullable<ReturnType<typeof useUiPolicy>['data']>;
 }) {
   const notify = useToast();
+  const { user } = useAuth();
+  const isCustomer = user?.role === 'CUSTOMER';
   const [status, setStatus] = useState<EstimateStatus | 'ALL'>('ALL');
   const [kind, setKind] = useState<'ALL' | 'INITIAL' | 'SUPPLEMENTAL'>('ALL');
   const [keyword, setKeyword] = useState('');
@@ -218,7 +221,7 @@ function ReadyEstimates({
         header: 'Thao tác',
         cell: ({ row }) => (
           <div className="row-actions">
-            {row.original.status === 'DRAFT' && (
+            {!isCustomer && row.original.status === 'DRAFT' && (
               <Button variant="ghost" onClick={() => sendQuick(row.original.id)}>
                 <Send size={14} /> Gửi khách
               </Button>
@@ -235,7 +238,7 @@ function ReadyEstimates({
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orderMap, vehicleMap],
+    [orderMap, vehicleMap, isCustomer],
   );
 
   return (
@@ -249,9 +252,11 @@ function ReadyEstimates({
             <Button variant="secondary" onClick={() => refetch()} pending={isFetching}>
               <RefreshCw size={15} /> Làm mới
             </Button>
-            <Button variant="primary" onClick={() => setCreateOpen(true)}>
-              <Plus size={18} /> Lập báo giá mới
-            </Button>
+            {!isCustomer && (
+              <Button variant="primary" onClick={() => setCreateOpen(true)}>
+                <Plus size={18} /> Lập báo giá mới
+              </Button>
+            )}
           </>
         }
       />

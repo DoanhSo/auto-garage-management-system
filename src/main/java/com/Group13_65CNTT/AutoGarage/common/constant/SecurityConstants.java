@@ -63,6 +63,8 @@ public final class SecurityConstants {
     public static final String POSITIVE_LONG_ID_PATTERN = "[1-9][0-9]{0,18}";
 
     public static final int IDENTITY_ID_MAX_LENGTH = 36;
+    /** Minimum gap between two updates of users.last_login_at, so loading a page does not write every time. */
+    public static final java.time.Duration LAST_LOGIN_REFRESH_INTERVAL = java.time.Duration.ofHours(1);
     public static final String IDENTITY_ID_PATTERN = "[A-Za-z0-9-]{1,36}";
     public static final int USERNAME_MAX_LENGTH = 100;
     public static final String USERNAME_PATTERN = "[A-Za-z0-9._-]{3,100}";

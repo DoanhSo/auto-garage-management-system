@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { roles, customerTypes } from './contracts';
 export const idSchema = z.string().regex(/^[1-9]\d*$/);
+const accountStatusSchema = z.enum(['NONE', 'PENDING', 'ACTIVE', 'LOCKED']);
+const accountSummarySchema = z.object({
+  status: accountStatusSchema,
+  username: z.string().nullable(),
+  lastLoginAt: z.string().nullable(),
+});
 export const userSchema = z.object({
   id: idSchema,
   identityId: z.string().nullable().optional(),
@@ -11,6 +17,8 @@ export const userSchema = z.object({
   active: z.boolean(),
   version: z.string().regex(/^\d+$/),
   createdAt: z.string(),
+  lastLoginAt: z.string().nullable().optional(),
+  accountStatus: accountStatusSchema.optional(),
 });
 export const browserSessionSchema = z.object({
   accessToken: z.string().min(1),
@@ -114,6 +122,7 @@ export const customerSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   version: z.string().regex(/^\d+$/),
+  account: accountSummarySchema.nullable().optional(),
 });
 
 export const vehicleSchema = z.object({

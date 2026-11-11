@@ -6,22 +6,29 @@ export function CustomerFilters({
   search,
   customerType,
   isActive,
+  hasAccount,
   onSearchChange,
   onTypeChange,
   onStatusChange,
+  onAccountChange,
   onReset,
 }: {
   search: string;
   customerType: string;
   isActive: string;
+  hasAccount: string;
   onSearchChange: (value: string) => void;
   onTypeChange: (value: string) => void;
   onStatusChange: (value: string) => void;
+  onAccountChange: (value: string) => void;
   onReset: () => void;
 }) {
   const id = useId();
   const filterCount =
-    (search.trim() ? 1 : 0) + (customerType !== 'ALL' ? 1 : 0) + (isActive !== 'ALL' ? 1 : 0);
+    (search.trim() ? 1 : 0) +
+    (customerType !== 'ALL' ? 1 : 0) +
+    (isActive !== 'ALL' ? 1 : 0) +
+    (hasAccount !== 'ALL' ? 1 : 0);
 
   return (
     <section className="user-filters" aria-label="Bộ lọc khách hàng">
@@ -93,6 +100,20 @@ export function CustomerFilters({
             <option value="ALL">Tất cả trạng thái</option>
             <option value="true">Đang hoạt động</option>
             <option value="false">Đã ngừng hoạt động</option>
+          </select>
+        </div>
+
+        <div className="user-filter-field">
+          <label htmlFor={`${id}-account`}>Tài khoản đăng nhập</label>
+          <select
+            id={`${id}-account`}
+            className="select"
+            value={hasAccount}
+            onChange={(e) => onAccountChange(e.target.value)}
+          >
+            <option value="ALL">Tất cả</option>
+            <option value="true">Đã có tài khoản</option>
+            <option value="false">Chưa có tài khoản</option>
           </select>
         </div>
       </div>

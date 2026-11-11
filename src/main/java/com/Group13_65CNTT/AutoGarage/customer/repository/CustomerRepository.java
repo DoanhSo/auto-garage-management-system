@@ -22,6 +22,10 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     boolean existsByCustomerCode(String customerCode);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Customer c WHERE c.id = :id")
+    Optional<Customer> findByIdForUpdate(@Param("id") Long id);
+
     boolean existsByPhone(String phone);
 
     boolean existsByPhoneAndIdNot(String phone, Long id);
@@ -31,6 +35,9 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
            "OR c.phone LIKE CONCAT('%', :search, '%') " +
            "OR LOWER(c.customerCode) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:isActive IS NULL OR c.isActive = :isActive) " +
+           "AND (:hasAccount IS NULL OR (:hasAccount = true AND c.userId IS NOT NULL) " +
+           "OR (:hasAccount = false AND c.userId IS NULL)) " +
            "ORDER BY c.id DESC")
-    List<Customer> searchCustomers(@Param("search") String search, @Param("isActive") Boolean isActive);
+    List<Customer> searchCustomers(@Param("search") String search, @Param("isActive") Boolean isActive,
+            @Param("hasAccount") Boolean hasAccount);
 }

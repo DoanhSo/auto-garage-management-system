@@ -46,6 +46,29 @@ export function useCreateCustomerMutation() {
   });
 }
 
+export function useCreateCustomerAccountMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      values,
+    }: {
+      id: string;
+      values: { username: string; email: string | null; password: string };
+    }) => customerApi.createAccount(id, values),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.all }),
+  });
+}
+
+export function useLinkCustomerAccountMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, sourceCustomerId }: { id: string; sourceCustomerId: string }) =>
+      customerApi.linkAccount(id, sourceCustomerId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: customerKeys.all }),
+  });
+}
+
 export function useUpdateCustomerMutation() {
   const queryClient = useQueryClient();
   return useMutation({

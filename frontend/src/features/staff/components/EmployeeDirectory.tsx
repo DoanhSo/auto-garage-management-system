@@ -6,6 +6,7 @@ import { errorMessage } from '../../../shared/api/errors';
 import { DataTable } from '../../../shared/components/DataTable';
 import { Badge, Button, Loading, QueryError } from '../../../shared/components/ui';
 import { formatDate, money } from '../../../shared/utils/format';
+import { AccountStatusBadge } from '../../../shared/components/AccountStatusBadge';
 import { EmployeeEditor } from '../../scheduling/components/EmployeeEditor';
 import { todayKey } from '../../../shared/utils/weekCalendar';
 import { useStaffEmployee } from '../hooks/useStaffEmployee';
@@ -113,6 +114,16 @@ export function EmployeeDirectory({ canCreate }: { canCreate: boolean }) {
           <div className="description">
             {row.original.employeeCode} · {row.original.isActive ? 'Đang làm việc' : 'Tạm nghỉ'}
           </div>
+        </div>
+      ),
+    },
+    {
+      id: 'account',
+      header: 'Tài khoản đăng nhập',
+      cell: ({ row }) => (
+        <div className="account-status">
+          <span>{row.original.account?.username ?? row.original.username ?? '—'}</span>
+          <AccountStatusBadge account={row.original.account} />
         </div>
       ),
     },

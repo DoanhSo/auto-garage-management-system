@@ -33,6 +33,10 @@ public interface UserMapper {
     @Mapping(target = "active", source = "active")
     @Mapping(target = "version", source = "version")
     @Mapping(target = "createdAt", source = "createdAt")
+    @Mapping(target = "lastLoginAt", source = "lastLoginAt")
+    @Mapping(
+            target = "accountStatus",
+            expression = "java(com.Group13_65CNTT.AutoGarage.identity.dto.response.AccountSummary.statusOf(user))")
     UserResponse toResponse(User user);
 
     @BeanMapping(ignoreByDefault = true)

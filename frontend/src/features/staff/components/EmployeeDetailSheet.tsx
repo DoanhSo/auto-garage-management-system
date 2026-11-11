@@ -4,6 +4,7 @@ import { CalendarClock, SquarePen } from 'lucide-react';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { Badge, Button, Loading, Sheet } from '../../../shared/components/ui';
 import { formatDate, formatDateTime, money } from '../../../shared/utils/format';
+import { AccountStatusBadge } from '../../../shared/components/AccountStatusBadge';
 import { todayKey } from '../../../shared/utils/weekCalendar';
 import { ShiftEditor } from '../../scheduling/components/ShiftEditor';
 import { useShiftsQuery } from '../../scheduling/hooks/useScheduling';
@@ -60,6 +61,11 @@ export function EmployeeDetailSheet({
           <section aria-label="Hồ sơ">
             <h4>Hồ sơ</h4>
             <dl>
+              <dt>Tài khoản đăng nhập</dt>
+              <dd className="account-status">
+                <span>{employee.account?.username ?? employee.username ?? '—'}</span>
+                <AccountStatusBadge account={employee.account} />
+              </dd>
               <dt>Chuyên môn</dt>
               <dd className="row-actions">
                 {skills.map((s) => (

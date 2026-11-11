@@ -7,8 +7,11 @@ import {
   UserX,
   CreditCard,
   RotateCcw,
+  KeyRound,
+  Link2,
 } from 'lucide-react';
 import type { Customer } from '../../../shared/types/contracts';
+import { AccountStatusBadge } from '../../../shared/components/AccountStatusBadge';
 import { Button, Empty, StatusBadge } from '../../../shared/components/ui';
 import { initials } from '../../../shared/utils/format';
 
@@ -17,12 +20,16 @@ export function CustomerCards({
   onEdit,
   onDeactivate,
   onActivate,
+  onCreateAccount,
+  onLinkAccount,
   activatingId,
 }: {
   customers: Customer[];
   onEdit: (id: string, trigger: HTMLElement) => void;
   onDeactivate: (customer: Customer) => void;
   onActivate: (customer: Customer) => void;
+  onCreateAccount?: (customer: Customer) => void;
+  onLinkAccount?: (customer: Customer) => void;
   activatingId?: string | null;
 }) {
   if (!customers.length) {
@@ -79,6 +86,10 @@ export function CustomerCards({
               </div>
             )}
 
+            <div className="info-row">
+              <AccountStatusBadge account={cust.account} />
+            </div>
+
             {cust.address && (
               <div className="info-row">
                 <MapPin size={14} aria-hidden />
@@ -114,6 +125,26 @@ export function CustomerCards({
                 >
                   <UserX size={17} />
                   Ngừng hoạt động
+                </Button>
+              )}
+              {cust.isActive && cust.account?.status === 'NONE' && onCreateAccount && (
+                <Button
+                  variant="ghost"
+                  aria-label={`Tạo tài khoản cho ${cust.fullName}`}
+                  onClick={() => onCreateAccount(cust)}
+                >
+                  <KeyRound size={17} />
+                  Tạo tài khoản
+                </Button>
+              )}
+              {cust.isActive && cust.account?.status === 'NONE' && onLinkAccount && (
+                <Button
+                  variant="ghost"
+                  aria-label={`Nối tài khoản cho ${cust.fullName}`}
+                  onClick={() => onLinkAccount(cust)}
+                >
+                  <Link2 size={17} />
+                  Nối tài khoản
                 </Button>
               )}
               {!cust.isActive && (

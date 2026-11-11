@@ -234,6 +234,16 @@ const byDomain: Record<AuditDomain, Record<string, Entry>> = {
       'Chuyển hồ sơ khách hàng sang trạng thái ngừng hoạt động.',
       'danger',
     ],
+    CUSTOMER_ACCOUNT_CREATED: [
+      'Tạo tài khoản cho khách',
+      'Lễ tân tạo tài khoản đăng nhập và gắn vào hồ sơ khách có sẵn.',
+      'success',
+    ],
+    CUSTOMER_ACCOUNT_LINKED: [
+      'Nối tài khoản khách',
+      'Chuyển tài khoản từ hồ sơ khách tự đăng ký sang hồ sơ có sẵn.',
+      'info',
+    ],
     CUSTOMER_ACTIVATED: [
       'Mở lại khách hàng',
       'Mở lại hồ sơ khách hàng đã ngừng theo dõi.',

@@ -37,4 +37,5 @@ public class EmployeeResponse {
     private Instant createdAt;
     private Instant updatedAt;
     private Long version;
+    private com.Group13_65CNTT.AutoGarage.identity.dto.response.AccountSummary account;
 }

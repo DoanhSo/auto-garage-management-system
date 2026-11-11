@@ -18,6 +18,7 @@ vi.mock('../../../app/providers/AuthProvider', () => ({
 const employee = {
   id: 5,
   userId: 50,
+  account: { status: 'PENDING', username: 'an.nguyen', lastLoginAt: null },
   employeeCode: 'EMP-005',
   fullName: 'Nguyễn Văn An',
   joinedAt: '2024-01-10',
@@ -68,6 +69,8 @@ describe('StaffPage', () => {
 
     expect(await screen.findByRole('button', { name: 'Nguyễn Văn An' })).toBeVisible();
     expect(screen.getByText('Quyền QC')).toBeVisible();
+    expect(screen.getByText('an.nguyen')).toBeVisible();
+    expect(screen.getByText('Chưa đăng nhập lần nào')).toBeVisible();
     expect(screen.getByText(/VCB · 0011223344/)).toBeVisible();
     expect(screen.getByRole('button', { name: /Thêm nhân viên/ })).toBeVisible();
     expect(screen.getByRole('button', { name: /Hệ số & đơn giá lương/ })).toBeVisible();

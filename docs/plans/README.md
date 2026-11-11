@@ -32,3 +32,5 @@
 | 2026-11 | [Sửa lỗi kiểm tra điều kiện lập hóa đơn (4001/500), lỗi 404 tra hóa đơn và chặn thi công khi chưa xuất kho](2026-11-fix-invoice-readiness-and-part-issue-flow.md) | done (chưa /converge) | 3/3 bước hoàn thành; lưu trước khi ghi đè bằng plan `fix-shift-endpoints-and-flat-sidebar-nav` |
 | 2026-11 | [Bỏ cây thanh điều hướng nhân sự và sửa lỗi 2004/3002 ở ca làm việc, chấm công](2026-11-fix-shift-endpoints-and-flat-sidebar-nav.md) | done (chưa /converge) | Lưu trước khi ghi đè bằng plan `review-7fd0865-fixes`; lỗi còn lại nằm trong plan đó |
 | 2026-11 | [Sửa lỗi sau rà soát commit 7fd0865](2026-11-review-7fd0865-fixes.md) | converged | Nút Vào ca/Ra ca chưa xác minh trên trình duyệt |
+| 2026-11 | [Hiển thị trạng thái tài khoản đăng nhập của nhân viên và khách hàng](2026-11-account-status-visibility.md) | partial | Chưa xác minh trên trình duyệt; chưa có luồng lễ tân mời/tạo tài khoản cho khách |
+| 2026-11 | [Lễ tân tạo hoặc nối tài khoản cho khách có sẵn](2026-11-customer-account-linking.md) | partial | Chưa xác minh trên trình duyệt; chưa bật xác thực email để tự nối |

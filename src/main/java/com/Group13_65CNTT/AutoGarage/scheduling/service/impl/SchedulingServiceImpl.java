@@ -135,6 +135,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
     private EmployeeResponse toEmployeeResponse(Employee employee, Map<Long, User> accounts) {
         EmployeeResponse response = employeeMapper.toResponse(employee);
         User account = accounts.get(employee.getUserId());
+        response.setAccount(com.Group13_65CNTT.AutoGarage.identity.dto.response.AccountSummary.of(account));
         if (account != null) {
             response.setFullName(account.getFullName());
             response.setUsername(account.getUsername());
