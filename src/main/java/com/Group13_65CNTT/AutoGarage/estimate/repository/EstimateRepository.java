@@ -35,8 +35,13 @@ public interface EstimateRepository extends JpaRepository<Estimate, Long> {
 
     @Query("SELECT e FROM Estimate e WHERE " +
            "(:repairOrderId IS NULL OR e.repairOrderId = :repairOrderId) AND " +
-           "(:status IS NULL OR e.status = :status)")
+           "(:status IS NULL OR e.status = :status) AND " +
+           "(:customerId IS NULL OR EXISTS (SELECT 1 FROM RepairOrder ro WHERE ro.id = e.repairOrderId " +
+           "AND ro.customerId = :customerId)) AND " +
+           "(:hideDrafts = false OR e.status <> com.Group13_65CNTT.AutoGarage.estimate.entity.EstimateStatus.DRAFT)")
     Page<Estimate> searchEstimates(@Param("repairOrderId") Long repairOrderId,
                                   @Param("status") EstimateStatus status,
+                                  @Param("customerId") Long customerId,
+                                  @Param("hideDrafts") boolean hideDrafts,
                                   Pageable pageable);
 }

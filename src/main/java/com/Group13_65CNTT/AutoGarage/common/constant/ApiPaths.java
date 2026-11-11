@@ -18,6 +18,8 @@ public final class ApiPaths {
     public static final String USERS_WILDCARD = USERS_BASE + "/**";
     public static final String BY_ID = "/{id}";
     public static final String ACTIVATE = "/{id}/activate";
+    public static final String CUSTOMER_ACCOUNT = "/{id}/account";
+    public static final String CUSTOMER_ACCOUNT_LINK = "/{id}/account/link";
 
     public static final String NOTIFICATIONS_BASE = "/api/v1/notifications";
     public static final String NOTIFICATIONS_WILDCARD = NOTIFICATIONS_BASE + "/**";

@@ -4825,3 +4825,37 @@ button.notification-card-title:hover {
   color: var(--primary);
   text-decoration: underline;
 }
+
+/* Sign-in account state next to a customer, employee or user */
+.account-status {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: var(--text-xs);
+}
+
+/* Front desk account dialogs */
+.inline-input-action {
+  display: flex;
+  gap: 8px;
+}
+.inline-input-action .input {
+  flex: 1;
+}
+.link-account-options {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+.link-account-options label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}

@@ -21,9 +21,19 @@ export const customerTypeLabels: Record<CustomerType, string> = {
   BUSINESS: 'Doanh nghiệp',
 };
 
+export type AccountStatus = 'NONE' | 'PENDING' | 'ACTIVE' | 'LOCKED';
+
+/** Sign-in account behind a customer or an employee. */
+export interface AccountSummary {
+  status: AccountStatus;
+  username: string | null;
+  lastLoginAt: string | null;
+}
+
 export interface Customer {
   id: string;
   userId: string | null;
+  account?: AccountSummary | null;
   customerCode: string;
   fullName: string;
   customerType: CustomerType;
@@ -365,6 +375,8 @@ export interface User {
   active: boolean;
   version: string;
   createdAt: string;
+  lastLoginAt?: string | null;
+  accountStatus?: AccountStatus;
 }
 export interface OidcTokenBundle {
   accessToken: string;

@@ -48,8 +48,9 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<List<CustomerResponse>>> getCustomers(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) Boolean hasAccount,
             HttpServletRequest httpRequest) {
-        List<CustomerResponse> customers = customerService.searchCustomers(search, isActive);
+        List<CustomerResponse> customers = customerService.searchCustomers(search, isActive, hasAccount);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, customers, httpRequest.getRequestURI()));
     }
 
@@ -100,6 +101,28 @@ public class CustomerController {
             HttpServletRequest httpRequest) {
         customerService.deactivateCustomer(id);
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.DELETED, null, httpRequest.getRequestURI()));
+    }
+
+    @PostMapping(ApiPaths.CUSTOMER_ACCOUNT)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
+    @Operation(summary = "Create a sign-in account for an existing customer")
+    public ResponseEntity<ApiResponse<CustomerResponse>> createAccount(
+            @PathVariable Long id,
+            @Valid @RequestBody com.Group13_65CNTT.AutoGarage.customer.dto.CreateCustomerAccountRequest request,
+            HttpServletRequest httpRequest) {
+        CustomerResponse response = customerService.createAccount(id, request);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
+    }
+
+    @PostMapping(ApiPaths.CUSTOMER_ACCOUNT_LINK)
+    @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)
+    @Operation(summary = "Move the sign-in account of a duplicate profile onto this customer")
+    public ResponseEntity<ApiResponse<CustomerResponse>> linkAccount(
+            @PathVariable Long id,
+            @Valid @RequestBody com.Group13_65CNTT.AutoGarage.customer.dto.LinkCustomerAccountRequest request,
+            HttpServletRequest httpRequest) {
+        CustomerResponse response = customerService.linkAccount(id, request);
+        return ResponseEntity.ok(ApiResponse.success(ResponseCode.UPDATED, response, httpRequest.getRequestURI()));
     }
 
     @PostMapping(ApiPaths.ACTIVATE)

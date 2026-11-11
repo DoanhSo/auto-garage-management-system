@@ -74,6 +74,8 @@ public final class AuditConstants {
     public static final String ACTION_BOOKING_RESCHEDULED = "BOOKING_RESCHEDULED";
     public static final String ACTION_CUSTOMER_CREATED = "CUSTOMER_CREATED";
     public static final String ACTION_CUSTOMER_DEACTIVATED = "CUSTOMER_DEACTIVATED";
+    public static final String ACTION_CUSTOMER_ACCOUNT_CREATED = "CUSTOMER_ACCOUNT_CREATED";
+    public static final String ACTION_CUSTOMER_ACCOUNT_LINKED = "CUSTOMER_ACCOUNT_LINKED";
     public static final String ACTION_CUSTOMER_ACTIVATED = "CUSTOMER_ACTIVATED";
     public static final String ACTION_CUSTOMER_UPDATED = "CUSTOMER_UPDATED";
     public static final String ACTION_SERVICE_CREATED = "SERVICE_CREATED";

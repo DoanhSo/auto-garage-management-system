@@ -39,6 +39,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -329,5 +331,34 @@ class EstimateServiceTest {
         assertThatThrownBy(() -> estimateService.sendEstimate(1L, 1L))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Chỉ báo giá ở trạng thái DRAFT mới có thể gửi");
+    }
+
+    @Test
+    @DisplayName("Khách xem danh sách báo giá: chỉ báo giá của mình và ẩn bản nháp, không cần quyền kỹ thuật")
+    void searchEstimates_CustomerSeesOwnSentEstimatesOnly() {
+        org.springframework.data.domain.PageRequest pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        when(customerScope.customerIdForQuery(null)).thenReturn(9L);
+        when(pagination.page(anyInt(), anyInt(), anyString(), anyString(), any())).thenReturn(pageable);
+        when(estimateRepository.searchEstimates(null, null, 9L, true, pageable))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+
+        estimateService.searchEstimates(null, null, 0, 10, "createdAt", "desc");
+
+        verify(customerScope, never()).requireTechnical();
+        verify(estimateRepository).searchEstimates(null, null, 9L, true, pageable);
+    }
+
+    @Test
+    @DisplayName("Nhân viên xem danh sách báo giá: cần quyền kỹ thuật, thấy cả bản nháp")
+    void searchEstimates_StaffSeesEverything() {
+        org.springframework.data.domain.PageRequest pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        when(customerScope.customerIdForQuery(null)).thenReturn(null);
+        when(pagination.page(anyInt(), anyInt(), anyString(), anyString(), any())).thenReturn(pageable);
+        when(estimateRepository.searchEstimates(null, null, null, false, pageable))
+                .thenReturn(org.springframework.data.domain.Page.empty());
+
+        estimateService.searchEstimates(null, null, 0, 10, "createdAt", "desc");
+
+        verify(customerScope).requireTechnical();
     }
 }

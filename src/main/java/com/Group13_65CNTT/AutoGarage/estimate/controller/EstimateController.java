@@ -67,8 +67,8 @@ public class EstimateController {
     }
 
     @GetMapping
-    @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF)
-    @Operation(summary = "Tìm kiếm và phân trang danh sách báo giá")
+    @PreAuthorize(SecurityConstants.HAS_ANY_ROLE)
+    @Operation(summary = "Tìm kiếm và phân trang danh sách báo giá (khách hàng chỉ thấy báo giá đã gửi của mình)")
     public ResponseEntity<ApiResponse<Page<EstimateResponse>>> searchEstimates(
             @RequestParam(required = false) Long repairOrderId,
             @RequestParam(required = false) EstimateStatus status,
