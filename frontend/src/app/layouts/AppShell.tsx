@@ -1,229 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import {
-  Bell,
-  CalendarCheck,
-  Car,
-  ChartNoAxesCombined,
-  Contact,
-  Globe,
-  History,
-  House,
-  Layers,
-  LogOut,
-  Menu,
-  PanelLeftClose,
-  PanelLeftOpen,
-  ShieldCheck,
-  Users,
-  Wrench,
-  X,
-  Package,
-  Building2,
-  FileText,
-  Scale,
-  Receipt,
-  DollarSign,
-  CreditCard,
-  Banknote,
-} from 'lucide-react';
+import { Globe, House, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Wrench, X } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useAuth } from '../providers/AuthProvider';
 import { useMeQuery, useLogoutMutation } from '../../features/auth/hooks/useAuthQueries';
 import { useUnreadCountQuery } from '../../features/notification/hooks/useNotifications';
 import { NotificationPopover } from '../../features/notification/components/NotificationPopover';
 import { Button, RoleBadge } from '../../shared/components/ui';
-import { roles, type Role } from '../../shared/types/contracts';
-import {
-  FRONT_DESK_ROLES,
-  BOOKING_ROLES,
-  ESTIMATE_VIEW_ROLES,
-  SCHEDULING_ROLES,
-  WARRANTY_ROLES,
-  FINANCE_ROLES,
-  STAFF_ROLES,
-  REPAIR_VIEW_ROLES,
-  INVOICE_VIEW_ROLES,
-  PAYROLL_VIEW_ROLES,
-  ADMIN_ROLES,
-} from '../access';
 import { initials } from '../../shared/utils/format';
-
-const sections = [
-  'DỊCH VỤ & XƯỞNG',
-  'KHO & VẬT TƯ',
-  'TÀI CHÍNH & CÔNG NỢ',
-  'QUẢN TRỊ HỆ THỐNG',
-  'CÁ NHÂN',
-] as const;
-
-type NavSection = (typeof sections)[number];
-
-interface NavItem {
-  to: string;
-  label: string;
-  customerLabel?: string;
-  technicianLabel?: string;
-  icon: typeof Bell;
-  section: NavSection;
-  allowedRoles: readonly Role[];
-}
-
-const links: ReadonlyArray<NavItem> = [
-  {
-    to: '/reception',
-    label: 'Tiếp nhận & Lịch hẹn',
-    customerLabel: 'Lịch hẹn của tôi',
-    icon: CalendarCheck,
-    section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: BOOKING_ROLES,
-  },
-  {
-    to: '/repair-orders',
-    label: 'Lệnh sửa chữa',
-    customerLabel: 'Tiến độ sửa xe',
-    icon: Wrench,
-    section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: REPAIR_VIEW_ROLES,
-  },
-  {
-    to: '/estimates',
-    label: 'Báo giá',
-    icon: FileText,
-    section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: ESTIMATE_VIEW_ROLES,
-  },
-  {
-    to: '/scheduling',
-    label: 'Khoang & Lịch ca',
-    icon: CalendarCheck,
-    section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: SCHEDULING_ROLES,
-  },
-  {
-    to: '/warranties',
-    label: 'Bảo hành',
-    customerLabel: 'Sổ bảo hành của tôi',
-    icon: ShieldCheck,
-    section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: WARRANTY_ROLES,
-  },
-  {
-    to: '/customers',
-    label: 'Khách hàng',
-    icon: Contact,
-    section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: FRONT_DESK_ROLES,
-  },
-  {
-    to: '/vehicles',
-    label: 'Phương tiện',
-    customerLabel: 'Xe của tôi',
-    icon: Car,
-    section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: BOOKING_ROLES,
-  },
-  {
-    to: '/services',
-    label: 'Dịch vụ',
-    icon: Layers,
-    section: 'DỊCH VỤ & XƯỞNG',
-    allowedRoles: roles,
-  },
-  {
-    to: '/inventory/parts',
-    label: 'Kho & Phụ tùng',
-    icon: Package,
-    section: 'KHO & VẬT TƯ',
-    allowedRoles: STAFF_ROLES,
-  },
-  {
-    to: '/inventory/suppliers',
-    label: 'Nhà cung cấp',
-    icon: Building2,
-    section: 'KHO & VẬT TƯ',
-    allowedRoles: ['ADMIN', 'WAREHOUSE_STAFF'],
-  },
-  {
-    to: '/inventory/documents',
-    label: 'Chứng từ kho',
-    icon: FileText,
-    section: 'KHO & VẬT TƯ',
-    allowedRoles: STAFF_ROLES,
-  },
-  {
-    to: '/inventory/reconciliation',
-    label: 'Đối soát kho',
-    icon: Scale,
-    section: 'KHO & VẬT TƯ',
-    allowedRoles: ['ADMIN', 'WAREHOUSE_STAFF'],
-  },
-  {
-    to: '/billing/invoices',
-    label: 'Hóa đơn dịch vụ',
-    customerLabel: 'Hóa đơn của tôi',
-    icon: Receipt,
-    section: 'TÀI CHÍNH & CÔNG NỢ',
-    allowedRoles: INVOICE_VIEW_ROLES,
-  },
-  {
-    to: '/billing/payments',
-    label: 'Sổ quỹ Thu / Chi',
-    icon: DollarSign,
-    section: 'TÀI CHÍNH & CÔNG NỢ',
-    allowedRoles: FINANCE_ROLES,
-  },
-  {
-    to: '/billing/debt-ledger',
-    label: 'Sổ nợ & Tín dụng',
-    icon: CreditCard,
-    section: 'TÀI CHÍNH & CÔNG NỢ',
-    allowedRoles: FINANCE_ROLES,
-  },
-  {
-    to: '/payroll',
-    label: 'Bảng lương & Năng suất',
-    technicianLabel: 'Phiếu lương của tôi',
-    icon: Banknote,
-    section: 'TÀI CHÍNH & CÔNG NỢ',
-    allowedRoles: PAYROLL_VIEW_ROLES,
-  },
-  {
-    to: '/admin/reports',
-    label: 'Báo cáo',
-    icon: ChartNoAxesCombined,
-    section: 'QUẢN TRỊ HỆ THỐNG',
-    allowedRoles: ADMIN_ROLES,
-  },
-  {
-    to: '/admin/users',
-    label: 'Tài khoản',
-    icon: Users,
-    section: 'QUẢN TRỊ HỆ THỐNG',
-    allowedRoles: ['ADMIN'],
-  },
-  {
-    to: '/admin/audit',
-    label: 'Nhật ký',
-    icon: History,
-    section: 'QUẢN TRỊ HỆ THỐNG',
-    allowedRoles: ['ADMIN'],
-  },
-  {
-    to: '/notifications',
-    label: 'Thông báo',
-    icon: Bell,
-    section: 'CÁ NHÂN',
-    allowedRoles: roles,
-  },
-  {
-    to: '/account/security',
-    label: 'Tài khoản của tôi',
-    icon: ShieldCheck,
-    section: 'CÁ NHÂN',
-    allowedRoles: roles,
-  },
-];
+import { isNavActive, navHref } from './navMatch';
+import { navForRole, sections, type NavItem } from './navItems';
 
 export function AppShell() {
   const { user, setCurrentUser } = useAuth();
@@ -241,16 +27,16 @@ export function AppShell() {
     if (me.data) setCurrentUser(me.data);
   }, [me.data, setCurrentUser]);
 
-  const labelOf = (link: (typeof links)[number]) =>
+  const labelOf = (link: NavItem) =>
     user?.role === 'CUSTOMER' && link.customerLabel
       ? link.customerLabel
       : user?.role === 'TECHNICIAN' && link.technicianLabel
         ? link.technicianLabel
         : link.label;
 
-  const allowed = links.filter((link) => !!user && link.allowedRoles.includes(user.role));
-  const currentLink = links.find(
-    (link) => location.pathname === link.to || location.pathname.startsWith(`${link.to}/`),
+  const allowed = navForRole(user?.role);
+  const currentLink = allowed.find((link) =>
+    isNavActive(link, location.pathname, location.search, allowed),
   );
   const title = currentLink ? labelOf(currentLink) : 'Tài khoản cá nhân';
 
@@ -267,24 +53,29 @@ export function AppShell() {
             {items.map((link) => {
               const { to, icon: Icon } = link;
               const label = labelOf(link);
+              const href = navHref(link);
+              // Several entries can open the same page on different tabs, so highlight by tab, not path.
+              const active = isNavActive(link, location.pathname, location.search, allowed);
               return (
-                <NavLink
-                  key={to}
-                  to={to}
-                  onClick={close}
-                  title={collapsed ? label : undefined}
-                  className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                >
-                  <Icon size={19} aria-hidden />
-                  <span className="nav-item-label">{label}</span>
-                  {to === '/notifications' &&
-                    unread.data !== undefined &&
-                    BigInt(unread.data) > 0n && (
-                      <span className="nav-count">
-                        {BigInt(unread.data) > 99n ? '99+' : unread.data}
-                      </span>
-                    )}
-                </NavLink>
+                <Fragment key={href}>
+                  <NavLink
+                    to={href}
+                    onClick={close}
+                    title={collapsed ? label : undefined}
+                    aria-current={active ? 'page' : undefined}
+                    className={`nav-item ${active ? 'active' : ''}`}
+                  >
+                    <Icon size={19} aria-hidden />
+                    <span className="nav-item-label">{label}</span>
+                    {to === '/notifications' &&
+                      unread.data !== undefined &&
+                      BigInt(unread.data) > 0n && (
+                        <span className="nav-count">
+                          {BigInt(unread.data) > 99n ? '99+' : unread.data}
+                        </span>
+                      )}
+                  </NavLink>
+                </Fragment>
               );
             })}
           </div>

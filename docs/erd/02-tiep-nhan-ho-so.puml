@@ -1,0 +1,124 @@
+@startchen 02-tiep-nhan-ho-so
+title ERD Chen nhóm 2 — Tiếp nhận, biên bản hiện trạng và hồ sơ sửa chữa
+
+' Quy ước: thực thể của nhóm = "NHÃN (bảng)"; thực thể nhóm khác = "NHÃN ‹nhóm N›", không thuộc tính.
+' Bản số (min,max) suy từ schema: cột FK NOT NULL → (1,1), NULL → (0,1); FK UNIQUE → phía cha (0,1), không → (0,N).
+' Khóa ngoại 'người thực hiện' (created_by, approved_by, ...) vẽ riêng ở 09-nguoi-thuc-hien.puml.
+
+entity "PHIẾU SỬA CHỮA (repair_orders)" as REPAIR_ORDER {
+  id <<key>>
+  order_code
+  order_type
+  status
+  odometer_in
+  customer_complaint
+  diagnosis
+}
+
+entity "BIÊN BẢN KIỂM TRA (vehicle_checks)" as VEHICLE_CHECK <<weak>> {
+  check_type <<key>>
+  attempt_no <<key>>
+  result
+  checklist_json
+  odometer
+}
+
+entity "TỆP ĐÍNH KÈM (attachments)" as ATTACHMENT {
+  id <<key>>
+  category
+  storage_key
+  content_type
+  sha256
+}
+
+entity "LỊCH HẸN ‹nhóm 1›" as BOOKING {
+}
+
+entity "KHÁCH HÀNG ‹nhóm 1›" as CUSTOMER {
+}
+
+entity "NHÂN VIÊN ‹nhóm 3›" as EMPLOYEE {
+}
+
+entity "KHOANG SỬA CHỮA ‹nhóm 3›" as BAY {
+}
+
+entity "PHƯƠNG TIỆN ‹nhóm 1›" as VEHICLE {
+}
+
+entity "YÊU CẦU BẢO HÀNH ‹nhóm 6›" as CLAIM {
+}
+
+relationship "chuyển thành" as R_REPAIR_ORDERS_BOOKING_ID {
+}
+' fk: repair_orders.booking_id
+R_REPAIR_ORDERS_BOOKING_ID -(0,1)- BOOKING
+R_REPAIR_ORDERS_BOOKING_ID -(0,1)- REPAIR_ORDER
+
+relationship "của khách" as R_REPAIR_ORDERS_CUSTOMER_ID {
+}
+' fk: repair_orders.customer_id
+R_REPAIR_ORDERS_CUSTOMER_ID -(0,N)- CUSTOMER
+R_REPAIR_ORDERS_CUSTOMER_ID -(1,1)- REPAIR_ORDER
+
+relationship "tiếp nhận xe" as R_REPAIR_ORDERS_VEHICLE_ID {
+}
+' fk: repair_orders.vehicle_id
+R_REPAIR_ORDERS_VEHICLE_ID -(0,N)- VEHICLE
+R_REPAIR_ORDERS_VEHICLE_ID -(1,1)- REPAIR_ORDER
+
+relationship "ghi biên bản" as R_VEHICLE_CHECKS_REPAIR_ORDER_ID <<identifying>> {
+}
+' fk: vehicle_checks.repair_order_id
+R_VEHICLE_CHECKS_REPAIR_ORDER_ID -(0,N)- REPAIR_ORDER
+R_VEHICLE_CHECKS_REPAIR_ORDER_ID =(1,1)= VEHICLE_CHECK
+
+relationship "QC mới nhất" as R_REPAIR_ORDERS_LATEST_QC_CHECK_ID {
+}
+' fk: repair_orders.latest_qc_check_id
+R_REPAIR_ORDERS_LATEST_QC_CHECK_ID -(0,N)- VEHICLE_CHECK
+R_REPAIR_ORDERS_LATEST_QC_CHECK_ID -(0,1)- REPAIR_ORDER
+
+relationship "ảnh của phiếu" as R_ATTACHMENTS_REPAIR_ORDER_ID {
+}
+' fk: attachments.repair_order_id
+R_ATTACHMENTS_REPAIR_ORDER_ID -(0,N)- REPAIR_ORDER
+R_ATTACHMENTS_REPAIR_ORDER_ID -(0,1)- ATTACHMENT
+
+relationship "ảnh của biên bản" as R_ATTACHMENTS_VEHICLE_CHECK_ID {
+}
+' fk: attachments.vehicle_check_id
+R_ATTACHMENTS_VEHICLE_CHECK_ID -(0,N)- VEHICLE_CHECK
+R_ATTACHMENTS_VEHICLE_CHECK_ID -(0,1)- ATTACHMENT
+
+relationship "bằng chứng bảo hành" as R_ATTACHMENTS_WARRANTY_CLAIM_ID {
+}
+' fk: attachments.warranty_claim_id
+R_ATTACHMENTS_WARRANTY_CLAIM_ID -(0,N)- CLAIM
+R_ATTACHMENTS_WARRANTY_CLAIM_ID -(0,1)- ATTACHMENT
+
+relationship "thợ trưởng" as R_REPAIR_ORDERS_LEAD_TECHNICIAN_ID {
+}
+' fk: repair_orders.lead_technician_id
+R_REPAIR_ORDERS_LEAD_TECHNICIAN_ID -(0,N)- EMPLOYEE
+R_REPAIR_ORDERS_LEAD_TECHNICIAN_ID -(0,1)- REPAIR_ORDER
+
+relationship "thợ chẩn đoán" as R_REPAIR_ORDERS_DIAGNOSTIC_TECHNICIAN_ID {
+}
+' fk: repair_orders.diagnostic_technician_id
+R_REPAIR_ORDERS_DIAGNOSTIC_TECHNICIAN_ID -(0,N)- EMPLOYEE
+R_REPAIR_ORDERS_DIAGNOSTIC_TECHNICIAN_ID -(0,1)- REPAIR_ORDER
+
+relationship "thợ QC" as R_REPAIR_ORDERS_QC_TECHNICIAN_ID {
+}
+' fk: repair_orders.qc_technician_id
+R_REPAIR_ORDERS_QC_TECHNICIAN_ID -(0,N)- EMPLOYEE
+R_REPAIR_ORDERS_QC_TECHNICIAN_ID -(0,1)- REPAIR_ORDER
+
+relationship "đặt tại khoang" as R_REPAIR_ORDERS_SERVICE_BAY_ID {
+}
+' fk: repair_orders.service_bay_id
+R_REPAIR_ORDERS_SERVICE_BAY_ID -(0,N)- BAY
+R_REPAIR_ORDERS_SERVICE_BAY_ID -(0,1)- REPAIR_ORDER
+
+@endchen

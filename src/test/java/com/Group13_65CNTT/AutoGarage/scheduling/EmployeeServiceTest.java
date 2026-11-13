@@ -219,6 +219,9 @@ class EmployeeServiceTest {
         EmployeeResponse actual = schedulingService.getEmployeeById(1L);
 
         assertThat(actual.getFullName()).isEqualTo("Lê Hoàng Minh");
+        assertThat(actual.getAccount().status())
+                .isEqualTo(com.Group13_65CNTT.AutoGarage.identity.dto.response.AccountStatus.PENDING);
+        assertThat(actual.getAccount().username()).isEqualTo("ktv1");
         assertThat(actual.getBankAccountNumber()).isNull();
         assertThat(actual.getBaseSalary()).isNull();
         assertThat(actual.getHourlyCost()).isNull();

@@ -99,29 +99,6 @@ export function useHandoverMutation() {
   });
 }
 
-export function useCreateTaskMutation() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      orderId,
-      data,
-    }: {
-      orderId: string | number;
-      data: {
-        taskName: string;
-        description?: string;
-        taskType?: string;
-        quantity?: number;
-        unitPrice?: number;
-      };
-    }) => repairApi.createTask(orderId, data),
-    onSuccess: (_, { orderId }) => {
-      void qc.invalidateQueries({ queryKey: ['repair-tasks', orderId] });
-      void qc.invalidateQueries({ queryKey: ['repair-order', orderId] });
-    },
-  });
-}
-
 function useRefreshTaskWork() {
   const qc = useQueryClient();
   return () => {
@@ -166,6 +143,15 @@ export function useQcAssignmentQuery(orderId: string | number | null | undefined
   });
 }
 
+export function useQcCandidatesQuery(orderId: string | number | null | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['qc-candidates', orderId],
+    queryFn: () => repairApi.getQcCandidates(orderId as string | number),
+    enabled: !!orderId && enabled,
+    refetchInterval: 60_000,
+  });
+}
+
 export function useAssignQcInspectorMutation() {
   const qc = useQueryClient();
   return useMutation({
@@ -180,6 +166,7 @@ export function useAssignQcInspectorMutation() {
     }) => repairApi.assignQcInspector(orderId, data),
     onSuccess: (_, { orderId }) => {
       void qc.invalidateQueries({ queryKey: ['qc-assignment', orderId] });
+      void qc.invalidateQueries({ queryKey: ['qc-candidates', orderId] });
       void qc.invalidateQueries({ queryKey: ['on-shift-technicians'] });
       void qc.invalidateQueries({ queryKey: ['repair-order', orderId] });
     },

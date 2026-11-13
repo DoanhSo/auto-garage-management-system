@@ -19,9 +19,33 @@ public interface InvoiceBalanceViewRepository extends JpaRepository<InvoiceBalan
 
     List<InvoiceBalanceView> findByCustomerId(Long customerId);
 
-    @Query("SELECT v FROM InvoiceBalanceView v WHERE (:customerId IS NULL OR v.customerId = :customerId) " +
-           "AND (:hasBalance IS NULL OR (:hasBalance = true AND v.balanceAmount > 0) OR (:hasBalance = false AND v.balanceAmount = 0)) " +
-           "AND (:query IS NULL OR :query = '' OR LOWER(v.invoiceCode) LIKE LOWER(CONCAT('%', :query, '%')))")
+    @Query("""
+            SELECT v FROM InvoiceBalanceView v WHERE (:customerId IS NULL OR v.customerId = :customerId)
+            AND (:hasBalance IS NULL OR (:hasBalance = true AND v.balanceAmount > 0) OR (:hasBalance = false AND v.balanceAmount = 0))
+            AND (:query IS NULL OR :query = ''
+                 OR LOWER(v.invoiceCode) LIKE LOWER(CONCAT('%', :query, '%'))
+                 OR EXISTS (
+                     SELECT 1 FROM Customer c
+                     WHERE c.id = v.customerId
+                       AND (LOWER(c.fullName) LIKE LOWER(CONCAT('%', :query, '%'))
+                            OR LOWER(c.customerCode) LIKE LOWER(CONCAT('%', :query, '%'))
+                            OR (c.phone IS NOT NULL AND c.phone LIKE CONCAT('%', :query, '%'))
+                            OR (c.companyName IS NOT NULL AND LOWER(c.companyName) LIKE LOWER(CONCAT('%', :query, '%'))))
+                 )
+                 OR EXISTS (
+                     SELECT 1 FROM RepairOrder ro
+                     WHERE ro.id = v.repairOrderId
+                       AND LOWER(ro.orderCode) LIKE LOWER(CONCAT('%', :query, '%'))
+                 )
+                 OR EXISTS (
+                     SELECT 1 FROM RepairOrder ro, Vehicle veh
+                     WHERE ro.id = v.repairOrderId AND veh.id = ro.vehicleId
+                       AND ((veh.licensePlate IS NOT NULL AND LOWER(veh.licensePlate) LIKE LOWER(CONCAT('%', :query, '%')))
+                            OR (veh.vin IS NOT NULL AND LOWER(veh.vin) LIKE LOWER(CONCAT('%', :query, '%')))
+                            OR (veh.brand IS NOT NULL AND LOWER(veh.brand) LIKE LOWER(CONCAT('%', :query, '%')))
+                            OR (veh.model IS NOT NULL AND LOWER(veh.model) LIKE LOWER(CONCAT('%', :query, '%'))))
+                 ))
+            """)
     Page<InvoiceBalanceView> searchInvoiceBalances(
             @Param("customerId") Long customerId,
             @Param("hasBalance") Boolean hasBalance,

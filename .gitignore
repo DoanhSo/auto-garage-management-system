@@ -53,3 +53,7 @@ scripts/backups/
 
 # Ảnh đính kèm lưu cục bộ khi chạy backend ngoài Docker
 /data/
+
+### Python ###
+__pycache__/
+*.pyc

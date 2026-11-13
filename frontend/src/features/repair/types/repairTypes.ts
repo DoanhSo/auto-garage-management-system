@@ -78,6 +78,26 @@ export interface TaskAssignment {
   releasedAt?: string | null;
 }
 
+export type QcIneligibleReason = 'MAIN_REPAIRER';
+
+export const QC_INELIGIBLE_LABELS: Record<QcIneligibleReason, string> = {
+  MAIN_REPAIRER: 'Thợ chính của phiếu này',
+};
+
+/** Kỹ thuật viên có quyền QC đang trong ca; `eligible=false` thì không chọn được cho phiếu này. */
+export interface QcCandidate {
+  employeeId: string;
+  employeeCode: string;
+  fullName: string;
+  shiftEndsAt: string;
+  serviceBayId?: string | null;
+  bayCode?: string | null;
+  bayName?: string | null;
+  skills: string[];
+  eligible: boolean;
+  reason?: QcIneligibleReason | null;
+}
+
 export type StopReason = 'PAUSE' | 'COMPLETE' | 'CANCEL';
 
 export interface LaborSession {

@@ -128,9 +128,24 @@ export interface InventoryDocument {
 
 export interface InventoryDocumentItemInput {
   partId: string | number;
+  /** Dòng báo giá đã duyệt; bắt buộc với chứng từ xuất kho cho lệnh sửa chữa. */
+  estimateItemId?: string | number;
   quantity: string | number;
   unitCost: string | number;
   notes?: string;
+}
+
+/** Phụ tùng đã duyệt và giữ chỗ của một lệnh sửa chữa, đang chờ xuất kho. */
+export interface IssueCandidate {
+  estimateItemId: number;
+  partId: number;
+  partCode: string;
+  partName: string;
+  unit: string;
+  reservedQuantity: number;
+  stockQuantity: number;
+  unitCost: number;
+  shortage: boolean;
 }
 
 export interface InventoryDocumentCreateInput {

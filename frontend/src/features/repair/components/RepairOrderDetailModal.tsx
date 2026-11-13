@@ -18,17 +18,14 @@ import {
   ArrowRight,
   ClipboardList,
   Lock,
+  Receipt,
   RotateCcw,
-  ReceiptText,
 } from 'lucide-react';
 import { useToast } from '../../../app/providers/ToastProvider';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { FRONT_DESK_ROLES, QC_ROLES, TECHNICAL_ROLES } from '../../../app/access';
 import { useVehicleQuery } from '../../vehicle/hooks/useVehicles';
-import {
-  useOnShiftTechniciansQuery,
-  useSchedulingEmployeesQuery,
-} from '../../scheduling/hooks/useScheduling';
+import { useSchedulingEmployeesQuery } from '../../scheduling/hooks/useScheduling';
 import { errorMessage } from '../../../shared/api/errors';
 import {
   Badge,
@@ -45,6 +42,7 @@ import {
   useRepairOrderQuery,
   useRepairTasksQuery,
   useQcAssignmentQuery,
+  useQcCandidatesQuery,
   useUpdateDiagnosisMutation,
   useUpdateRepairOrderMutation,
   useTransitionStatusMutation,
@@ -58,7 +56,7 @@ import {
 import { useQualityChecksQuery } from '../../quality/hooks/useQuality';
 import { RepairOrderStatusBadge } from './RepairOrderCards';
 import { REPAIR_STATUS_LABELS } from './RepairOrderFilters';
-import { CreateTaskModal } from './CreateTaskModal';
+import { useHandoverReadinessQuery, useInvoicesQuery } from '../../billing/hooks/useBilling';
 import { AssignQcModal } from './AssignQcModal';
 import { AssignTaskModal } from './AssignTaskModal';
 import { TaskWorkPanel } from './TaskWorkPanel';
@@ -101,13 +99,11 @@ export function RepairOrderDetailModal({
   const updateOrder = useUpdateRepairOrderMutation();
   const [assigningTask, setAssigningTask] = useState<RepairTask | null>(null);
   const { data: staff = [] } = useSchedulingEmployeesQuery({ active: true }, canTechnical);
-  const onShift = useOnShiftTechniciansQuery(open && canTechnical);
   const ownEmployeeId = staff.find((e) => String(e.userId) === String(user?.id))?.id;
   const staffName = (employee: { fullName?: string | null; employeeCode: string }) =>
     employee.fullName ?? employee.employeeCode;
 
   // Sub-modals
-  const [createTaskOpen, setCreateTaskOpen] = useState(false);
   const [createEstimateOpen, setCreateEstimateOpen] = useState(false);
   const [reopenConfirmOpen, setReopenConfirmOpen] = useState(false);
   const [performQCOpen, setPerformQCOpen] = useState(false);
@@ -138,6 +134,37 @@ export function RepairOrderDetailModal({
   const { data: qcChecks = [], isLoading: isLoadingQC } = useQualityChecksQuery(
     open ? orderId : null,
   );
+  const qcCandidates = useQcCandidatesQuery(
+    open ? orderId : null,
+    canTechnical && order?.status === 'WAITING_QC',
+  );
+  const canHandoverStage = order?.status === 'COMPLETED' || order?.status === 'INVOICED';
+  const handoverInvoices = useInvoicesQuery(
+    { orderId: orderId ?? undefined, size: 20 },
+    open && canFrontDesk && (canHandoverStage || order?.status === 'CLOSED'),
+  );
+  const handoverInvoice = (handoverInvoices.data?.content ?? []).find(
+    (invoice) => invoice.status !== 'VOID',
+  );
+  const handoverReadiness = useHandoverReadinessQuery(
+    orderId,
+    open && canFrontDesk && canHandoverStage && !!handoverInvoice,
+  );
+  const invoiceBalanceAmount = Number(
+    handoverInvoice?.balanceAmount ?? handoverInvoice?.totalAmount ?? 0,
+  );
+  const isInvoiceUnpaid =
+    !!handoverInvoice && handoverInvoice.status !== 'PAID' && invoiceBalanceAmount > 0;
+  const isHandoverBlocked = handoverReadiness.data?.allowed === false;
+  const invoiceHref = handoverInvoice
+    ? `/billing/invoices?query=${encodeURIComponent(handoverInvoice.invoiceCode)}`
+    : order
+      ? `/billing/invoices?issueOrderId=${encodeURIComponent(String(order.id))}`
+      : '/billing/invoices';
+  const handleGoToInvoice = () => {
+    onClose();
+    navigate(invoiceHref);
+  };
   const { data: qcAssignment } = useQcAssignmentQuery(
     open ? orderId : null,
     !isCustomer && order?.status === 'WAITING_QC',
@@ -345,21 +372,22 @@ export function RepairOrderDetailModal({
                     <ShieldCheck size={15} /> Kiểm tra chất lượng (QC)
                   </Button>
                 )}
-                {canFrontDesk && order.status === 'COMPLETED' && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      onClose();
-                      navigate('/billing/invoices');
-                    }}
-                  >
-                    <ReceiptText size={15} /> Lập hóa đơn
-                  </Button>
-                )}
-                {canFrontDesk && (order.status === 'COMPLETED' || order.status === 'INVOICED') && (
-                  <Button variant="primary" onClick={() => setHandoverOpen(true)}>
-                    <UserCheck size={15} /> Bàn giao xe
-                  </Button>
+                {canFrontDesk && canHandoverStage && (
+                  <>
+                    {!handoverInvoices.isLoading && !handoverInvoice && (
+                      <Button variant="secondary" onClick={handleGoToInvoice}>
+                        <Receipt size={15} /> Lập hóa đơn
+                      </Button>
+                    )}
+                    {(isInvoiceUnpaid || isHandoverBlocked) && (
+                      <Button variant="secondary" onClick={handleGoToInvoice}>
+                        <Receipt size={15} /> Đến hóa đơn thanh toán
+                      </Button>
+                    )}
+                    <Button variant="primary" onClick={() => setHandoverOpen(true)}>
+                      <UserCheck size={15} /> Bàn giao xe
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -800,23 +828,29 @@ export function RepairOrderDetailModal({
                   <span className="text-sm font-semibold">
                     Danh sách công việc sửa chữa ({tasks.length})
                   </span>
-                  {canTechnical && tasks.length > 0 && (
-                    <Button variant="primary" onClick={() => setCreateTaskOpen(true)}>
-                      <Plus size={15} /> Thêm công việc
+                  {estimateMode?.kind === 'SUPPLEMENTAL' && tasks.length > 0 && (
+                    <Button variant="primary" onClick={() => setCreateEstimateOpen(true)}>
+                      <Plus size={15} /> Lập báo giá phát sinh
                     </Button>
                   )}
                 </div>
+                {order.status === 'QC_FAILED' && (
+                  <p className="text-xs muted">
+                    QC không đạt: làm lại các công việc được đánh dấu, hoặc lập báo giá phát sinh nếu
+                    cần thêm hạng mục.
+                  </p>
+                )}
 
                 {isLoadingTasks ? (
                   <Loading label="Đang tải danh sách công việc…" />
                 ) : tasks.length === 0 ? (
                   <Empty
                     title="Chưa có công việc nào trong phiếu sửa chữa"
-                    description="Công việc được tạo tự động khi khách duyệt báo giá hoặc bạn có thể bổ sung thủ công."
+                    description="Công việc được tạo tự động khi khách duyệt báo giá. Cần thêm việc thì lập báo giá phát sinh."
                     action={
-                      canTechnical ? (
-                        <Button variant="primary" onClick={() => setCreateTaskOpen(true)}>
-                          <Plus size={15} /> Thêm công việc đầu tiên
+                      estimateMode?.kind === 'SUPPLEMENTAL' ? (
+                        <Button variant="primary" onClick={() => setCreateEstimateOpen(true)}>
+                          <Plus size={15} /> Lập báo giá phát sinh
                         </Button>
                       ) : undefined
                     }
@@ -869,22 +903,14 @@ export function RepairOrderDetailModal({
                                         ? 'badge-success'
                                         : task.status === 'IN_PROGRESS'
                                           ? 'badge-primary'
-                                          : task.status === 'ASSIGNED'
-                                            ? 'badge-info'
-                                            : task.status === 'PAUSED'
-                                              ? 'badge-warning'
-                                              : 'badge-secondary'
+                                          : 'badge-warning'
                                     }`}
                                   >
                                     {task.status === 'COMPLETED'
                                       ? '✓ Đã hoàn thành'
                                       : task.status === 'IN_PROGRESS'
                                         ? 'Đang thực hiện'
-                                        : task.status === 'ASSIGNED'
-                                          ? 'Đã phân công'
-                                          : task.status === 'PAUSED'
-                                            ? 'Tạm dừng'
-                                            : 'Chờ thực hiện'}
+                                        : 'Chờ thực hiện'}
                                   </span>
                                 </td>
                                 <td className="text-right">
@@ -945,9 +971,9 @@ export function RepairOrderDetailModal({
                 )}
                 {canTechnical && (
                   <p className="text-xs muted" aria-label="Thợ QC đủ điều kiện">
-                    Thợ QC đủ điều kiện đang trực ca:{' '}
-                    {(onShift.data ?? [])
-                      .filter((tech) => tech.canQc)
+                    Thợ QC đủ điều kiện, theo ca đang trực lúc này:{' '}
+                    {(qcCandidates.data ?? [])
+                      .filter((tech) => tech.eligible)
                       .map((tech) => tech.fullName)
                       .join(', ') || 'chưa có'}
                     . Thợ chính đã sửa chữa phiếu này không được tự kiểm định.
@@ -1054,6 +1080,19 @@ export function RepairOrderDetailModal({
                       <p className="text-xs muted">
                         Khách hàng thanh toán hóa đơn dịch vụ hoặc xác nhận ghi sổ công nợ hợp lệ.
                       </p>
+                      {(canHandoverStage || order.status === 'CLOSED') &&
+                        canFrontDesk &&
+                        !handoverInvoices.isLoading && (
+                          <p className="text-xs font-semibold" aria-label="Trạng thái hóa đơn">
+                            {handoverInvoice
+                              ? `Hóa đơn ${handoverInvoice.invoiceCode} · ${
+                                  handoverInvoice.status === 'PAID' || invoiceBalanceAmount <= 0
+                                    ? 'đã thanh toán'
+                                    : `còn nợ ${money(handoverInvoice.balanceAmount ?? handoverInvoice.totalAmount)}`
+                                }`
+                              : 'Chưa có hóa đơn'}
+                          </p>
+                        )}
                     </div>
 
                     <div className="p-3 ro-summary-banner border rounded-lg space-y-1">
@@ -1069,25 +1108,7 @@ export function RepairOrderDetailModal({
                     </div>
                   </div>
 
-                  {order.status === 'COMPLETED' && canFrontDesk && (
-                    <div className="p-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg flex items-center justify-between gap-3 text-xs">
-                      <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                        <ReceiptText size={16} className="shrink-0" />
-                        <span>Phiếu đã nghiệm thu QC đạt chuẩn. Hãy lập hóa đơn và xác nhận quyết toán trước khi tiến hành bàn giao xe.</span>
-                      </div>
-                      <Button
-                        variant="primary"
-                        onClick={() => {
-                          onClose();
-                          navigate('/billing/invoices');
-                        }}
-                      >
-                        <ReceiptText size={13} /> Lập hóa đơn ngay
-                      </Button>
-                    </div>
-                  )}
-
-                  <div className="pt-3 border-t flex items-center justify-between">
+                  <div className="pt-3 border-t flex flex-wrap items-center justify-between gap-3">
                     <div>
                       {order.status === 'CLOSED' ? (
                         <div className="text-success font-semibold text-sm flex items-center gap-1.5">
@@ -1102,10 +1123,31 @@ export function RepairOrderDetailModal({
                       )}
                     </div>
 
-                    {(order.status === 'COMPLETED' || order.status === 'INVOICED') && canFrontDesk ? (
-                      <Button variant="primary" onClick={() => setHandoverOpen(true)}>
-                        <UserCheck size={15} /> Tiến hành bàn giao xe
-                      </Button>
+                    {canHandoverStage && canFrontDesk ? (
+                      <div className="flex flex-wrap items-center gap-3">
+                        {!handoverInvoices.isLoading && !handoverInvoice && (
+                          <>
+                            <span className="text-xs muted italic">
+                              Cần lập hóa đơn trước khi bàn giao.
+                            </span>
+                            <Button variant="secondary" onClick={handleGoToInvoice}>
+                              <Receipt size={15} /> Lập hóa đơn
+                            </Button>
+                          </>
+                        )}
+                        {(isInvoiceUnpaid || isHandoverBlocked) && (
+                          <Button variant="secondary" onClick={handleGoToInvoice}>
+                            <Receipt size={15} /> Đến hóa đơn thanh toán
+                          </Button>
+                        )}
+                        <Button
+                          variant="primary"
+                          onClick={() => setHandoverOpen(true)}
+                          disabled={handoverInvoices.isLoading || !handoverInvoice}
+                        >
+                          <UserCheck size={15} /> Tiến hành bàn giao xe
+                        </Button>
+                      </div>
                     ) : order.status !== 'CLOSED' && canFrontDesk ? (
                       <span className="text-xs muted italic">
                         Cần hoàn thành sửa chữa và kiểm định QC đạt chuẩn trước khi bàn giao xe.
@@ -1121,11 +1163,6 @@ export function RepairOrderDetailModal({
 
       {/* Sub-modals */}
       <AssignTaskModal task={assigningTask} onClose={() => setAssigningTask(null)} />
-      <CreateTaskModal
-        orderId={order?.id || ''}
-        open={createTaskOpen}
-        onClose={() => setCreateTaskOpen(false)}
-      />
       <CreateEstimateModal
         orderId={order?.id || ''}
         open={createEstimateOpen}

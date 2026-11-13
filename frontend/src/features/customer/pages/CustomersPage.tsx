@@ -1,5 +1,16 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Plus, SquarePen, UserX, Phone, Mail, Building2, Contact, RotateCcw } from 'lucide-react';
+import {
+  Plus,
+  SquarePen,
+  UserX,
+  Phone,
+  Mail,
+  Building2,
+  Contact,
+  RotateCcw,
+  KeyRound,
+  Link2,
+} from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useToast } from '../../../app/providers/ToastProvider';
 import {
@@ -13,6 +24,7 @@ import {
 import { DataTable } from '../../../shared/components/DataTable';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { initials } from '../../../shared/utils/format';
+import { AccountStatusBadge } from '../../../shared/components/AccountStatusBadge';
 import { errorMessage } from '../../../shared/api/errors';
 import type { Customer } from '../../../shared/types/contracts';
 import {
@@ -23,6 +35,8 @@ import {
 import { CustomerEditor } from '../components/CustomerEditor';
 import { CustomerFilters } from '../components/CustomerFilters';
 import { CustomerCards } from '../components/CustomerCards';
+import { CustomerAccountModal } from '../components/CustomerAccountModal';
+import { LinkAccountModal } from '../components/LinkAccountModal';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 
 export function CustomersPage() {
@@ -32,6 +46,9 @@ export function CustomersPage() {
   const [search, setSearch] = useState('');
   const [customerType, setCustomerType] = useState('ALL');
   const [isActive, setIsActive] = useState('ALL');
+  const [hasAccount, setHasAccount] = useState('ALL');
+  const [accountFor, setAccountFor] = useState<Customer | null>(null);
+  const [linkFor, setLinkFor] = useState<Customer | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -46,8 +63,9 @@ export function CustomersPage() {
     return {
       search: debouncedSearch.trim() || undefined,
       isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      hasAccount: hasAccount === 'true' ? true : hasAccount === 'false' ? false : undefined,
     };
-  }, [debouncedSearch, isActive]);
+  }, [debouncedSearch, isActive, hasAccount]);
 
   const { data: allCustomers, isLoading, isError, error, refetch } = useCustomersQuery(queryParams);
   const deleteMutation = useDeleteCustomerMutation();
@@ -163,6 +181,20 @@ export function CustomersPage() {
         ),
       },
       {
+        id: 'account',
+        header: 'Tài khoản',
+        cell: ({ row }) => (
+          <div className="account-status">
+            <AccountStatusBadge account={row.original.account} />
+            {row.original.account?.status === 'NONE' && (
+              <span className="field-hint">
+                Tạo tài khoản cho khách, hoặc Nối tài khoản nếu khách đã tự đăng ký
+              </span>
+            )}
+          </div>
+        ),
+      },
+      {
         id: 'credit',
         header: 'Hạn mức nợ',
         cell: ({ row }) => (
@@ -200,6 +232,26 @@ export function CustomersPage() {
                 <UserX size={16} />
                 Ngừng HĐ
               </Button>
+            )}
+            {row.original.isActive && row.original.account?.status === 'NONE' && (
+              <>
+                <Button
+                  variant="ghost"
+                  aria-label={`Tạo tài khoản cho ${row.original.fullName}`}
+                  onClick={() => setAccountFor(row.original)}
+                >
+                  <KeyRound size={16} />
+                  Tạo tài khoản
+                </Button>
+                <Button
+                  variant="ghost"
+                  aria-label={`Nối tài khoản cho ${row.original.fullName}`}
+                  onClick={() => setLinkFor(row.original)}
+                >
+                  <Link2 size={16} />
+                  Nối tài khoản
+                </Button>
+              </>
             )}
             {!row.original.isActive && (
               <Button
@@ -246,13 +298,16 @@ export function CustomersPage() {
           search={search}
           customerType={customerType}
           isActive={isActive}
+          hasAccount={hasAccount}
           onSearchChange={setSearch}
           onTypeChange={setCustomerType}
           onStatusChange={setIsActive}
+          onAccountChange={setHasAccount}
           onReset={() => {
             setSearch('');
             setCustomerType('ALL');
             setIsActive('ALL');
+            setHasAccount('ALL');
           }}
         />
 
@@ -268,6 +323,8 @@ export function CustomersPage() {
               onEdit={handleOpenEdit}
               onDeactivate={setDeactivatingCustomer}
               onActivate={handleActivate}
+              onCreateAccount={setAccountFor}
+              onLinkAccount={setLinkFor}
               activatingId={activatingId}
             />
           ) : (
@@ -278,6 +335,9 @@ export function CustomersPage() {
             />
           ))}
       </section>
+
+      <CustomerAccountModal customer={accountFor} onClose={() => setAccountFor(null)} />
+      <LinkAccountModal customer={linkFor} onClose={() => setLinkFor(null)} />
 
       <CustomerEditor
         customerId={editingId}

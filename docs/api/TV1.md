@@ -8,7 +8,7 @@ GET `/api/v1/public/ui-policy`: anonymous, 200/code1000, data gồm passwordMinL
 
 ## Audit và I08
 
-GET `/api/v1/admin/audit-events`: ADMIN, actorId/action/page/size; Page AuditEventResponse, không trả requestHash/replay result/credential. Mutation identity dùng @Audited và cùng commit; audit fail rollback mutation. Failed-login ghi event độc lập, không lưu identifier/password/JWT.
+GET `/api/v1/admin/audit-events`: ADMIN, actorId/action/page/size và tìm tự do `query` (tối đa 100 ký tự) kèm `actions` (lặp lại, tối đa 50 mã): khớp mã hành động, loại đối tượng, mã đối tượng (khi là số), tên hoặc tài khoản người thực hiện, hoặc mã nằm trong `actions` (client suy từ nhãn tiếng Việt); `%` và `_` khớp theo nghĩa đen; kết hợp VÀ với actorId/action; Page AuditEventResponse, không trả requestHash/replay result/credential. Mutation identity dùng @Audited và cùng commit; audit fail rollback mutation. Failed-login ghi event độc lập, không lưu identifier/password/JWT.
 
 NotificationAuditServiceImpl implement shared.contracts.NotificationAudit. Các method I08 yêu cầu transaction hiện có (MANDATORY):
 

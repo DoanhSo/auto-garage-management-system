@@ -35,7 +35,9 @@ export function AuthGuard({ allowedRoles }: { allowedRoles: readonly Role[] }) {
   const { user } = useAuth();
   const location = useLocation();
   if (!user)
-    return <Navigate to="/login" replace state={{ returnTo: location.pathname + location.search }} />;
+    return (
+      <Navigate to="/login" replace state={{ returnTo: location.pathname + location.search }} />
+    );
   return allowedRoles.includes(user.role) ? <Outlet /> : <RoleHomeRedirect role={user.role} />;
 }
 

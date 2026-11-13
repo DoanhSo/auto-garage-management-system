@@ -25,4 +25,6 @@ public class UserResponse {
     private boolean active;
     private long version;
     private Instant createdAt;
+    private Instant lastLoginAt;
+    private AccountStatus accountStatus;
 }

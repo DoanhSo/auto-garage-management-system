@@ -15,6 +15,7 @@ import { Badge, Button, PageHeader, Loading, QueryError } from '../../../shared/
 import { DataTable, Pagination } from '../../../shared/components/DataTable';
 import { MetricGrid } from '../../../shared/components/MetricGrid';
 import { useToast } from '../../../app/providers/ToastProvider';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import { errorMessage } from '../../../shared/api/errors';
 import { useRepairOrdersQuery } from '../../repair/hooks/useRepair';
 import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
@@ -23,6 +24,7 @@ import { money, formatDate, formatDateTime, formatPlate } from '../../../shared/
 import { useEstimatesQuery, useSendEstimateMutation } from '../hooks/useEstimate';
 import { EstimateEditor } from '../components/EstimateEditor';
 import { EstimateDecisionModal } from '../components/EstimateDecisionModal';
+import { canDecideEstimate } from '../utils/lineDecisions';
 import type { Estimate, EstimateStatus } from '../types/estimate';
 import { estimateStatusLabels } from '../types/estimate';
 
@@ -41,6 +43,8 @@ function ReadyEstimates({
   policy: NonNullable<ReturnType<typeof useUiPolicy>['data']>;
 }) {
   const notify = useToast();
+  const { user } = useAuth();
+  const isCustomer = user?.role === 'CUSTOMER';
   const [status, setStatus] = useState<EstimateStatus | 'ALL'>('ALL');
   const [kind, setKind] = useState<'ALL' | 'INITIAL' | 'SUPPLEMENTAL'>('ALL');
   const [keyword, setKeyword] = useState('');
@@ -217,20 +221,24 @@ function ReadyEstimates({
         header: 'Thao tác',
         cell: ({ row }) => (
           <div className="row-actions">
-            {row.original.status === 'DRAFT' && (
+            {!isCustomer && row.original.status === 'DRAFT' && (
               <Button variant="ghost" onClick={() => sendQuick(row.original.id)}>
                 <Send size={14} /> Gửi khách
               </Button>
             )}
             <Button variant="ghost" onClick={() => setSelectedEstimate(row.original)}>
-              <Eye size={14} /> Xem & duyệt dòng
+              <Eye size={14} />{' '}
+              {canDecideEstimate(row.original.status) &&
+              (row.original.items ?? []).some((item) => item.approvalStatus === 'PENDING')
+                ? 'Xem & duyệt dòng'
+                : 'Xem chi tiết'}
             </Button>
           </div>
         ),
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [orderMap, vehicleMap],
+    [orderMap, vehicleMap, isCustomer],
   );
 
   return (
@@ -244,9 +252,11 @@ function ReadyEstimates({
             <Button variant="secondary" onClick={() => refetch()} pending={isFetching}>
               <RefreshCw size={15} /> Làm mới
             </Button>
-            <Button variant="primary" onClick={() => setCreateOpen(true)}>
-              <Plus size={18} /> Lập báo giá mới
-            </Button>
+            {!isCustomer && (
+              <Button variant="primary" onClick={() => setCreateOpen(true)}>
+                <Plus size={18} /> Lập báo giá mới
+              </Button>
+            )}
           </>
         }
       />

@@ -18,6 +18,8 @@ public final class ApiPaths {
     public static final String USERS_WILDCARD = USERS_BASE + "/**";
     public static final String BY_ID = "/{id}";
     public static final String ACTIVATE = "/{id}/activate";
+    public static final String CUSTOMER_ACCOUNT = "/{id}/account";
+    public static final String CUSTOMER_ACCOUNT_LINK = "/{id}/account/link";
 
     public static final String NOTIFICATIONS_BASE = "/api/v1/notifications";
     public static final String NOTIFICATIONS_WILDCARD = NOTIFICATIONS_BASE + "/**";
@@ -85,6 +87,7 @@ public final class ApiPaths {
 
     public static final String INVENTORY_DOCUMENTS_BASE = "/api/v1/inventory/documents";
     public static final String INVENTORY_DOCUMENTS_WILDCARD = INVENTORY_DOCUMENTS_BASE + "/**";
+    public static final String INVENTORY_ISSUE_CANDIDATES = "/issue-candidates";
     public static final String INVENTORY_DOCUMENT_POST = "/{id}/post";
     public static final String INVENTORY_DOCUMENT_CANCEL = "/{id}/cancel";
 
@@ -100,6 +103,7 @@ public final class ApiPaths {
     public static final String PAYMENTS_WILDCARD = PAYMENTS_BASE + "/**";
     public static final String PAYMENTS_RECEIVE = "/receive";
     public static final String PAYMENTS_PAY_SUPPLIER = "/pay-supplier";
+    public static final String PAYMENTS_SUGGEST_CODE = "/suggest-code";
 
     public static final String DEBTS_BASE = "/api/v1/billing/debts";
     public static final String DEBTS_WILDCARD = DEBTS_BASE + "/**";

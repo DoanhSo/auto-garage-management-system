@@ -74,6 +74,14 @@ export function useDeactivateSupplierMutation() {
   });
 }
 
+export function useIssueCandidatesQuery(repairOrderId: string | number | null, enabled = true) {
+  return useQuery({
+    queryKey: ['inventory-issue-candidates', repairOrderId],
+    queryFn: () => inventoryApi.getIssueCandidates(repairOrderId as string | number),
+    enabled: !!repairOrderId && enabled,
+  });
+}
+
 export function usePartsQuery(params: {
   query?: string;
   supplierId?: string | number;
@@ -190,6 +198,8 @@ export function usePostDocumentMutation() {
       queryClient.invalidateQueries({ queryKey: ['inventory-documents'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-document', id] });
       queryClient.invalidateQueries({ queryKey: ['parts'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-issue-candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-readiness'] });
     },
   });
 }

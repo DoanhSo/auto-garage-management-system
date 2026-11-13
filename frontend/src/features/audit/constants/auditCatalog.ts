@@ -1,3 +1,5 @@
+import { normalizeSearchText } from '../../../shared/utils/text';
+
 export type AuditDomain =
   | 'security'
   | 'hr'
@@ -231,6 +233,16 @@ const byDomain: Record<AuditDomain, Record<string, Entry>> = {
       'Ngừng theo dõi khách hàng',
       'Chuyển hồ sơ khách hàng sang trạng thái ngừng hoạt động.',
       'danger',
+    ],
+    CUSTOMER_ACCOUNT_CREATED: [
+      'Tạo tài khoản cho khách',
+      'Lễ tân tạo tài khoản đăng nhập và gắn vào hồ sơ khách có sẵn.',
+      'success',
+    ],
+    CUSTOMER_ACCOUNT_LINKED: [
+      'Nối tài khoản khách',
+      'Chuyển tài khoản từ hồ sơ khách tự đăng ký sang hồ sơ có sẵn.',
+      'info',
     ],
     CUSTOMER_ACTIVATED: [
       'Mở lại khách hàng',
@@ -510,4 +522,20 @@ export function formatAuditEntity(type: string, id: string | null, label?: strin
 
 export function auditActionsOf(domain: AuditDomain | '') {
   return Object.entries(auditCatalog).filter(([, meta]) => !domain || meta.domain === domain);
+}
+
+/** Số mã hành động tối đa gửi kèm một lần tìm (khớp giới hạn của máy chủ). */
+export const AUDIT_SEARCH_ACTIONS_LIMIT = 50;
+
+/** Mã hành động có nhãn hoặc mô tả tiếng Việt chứa từ khóa (không phân biệt hoa thường và dấu). */
+export function auditActionCodesMatching(
+  term: string,
+  limit = AUDIT_SEARCH_ACTIONS_LIMIT,
+): string[] {
+  const needle = normalizeSearchText(term);
+  if (!needle) return [];
+  return Object.entries(auditCatalog)
+    .filter(([, meta]) => normalizeSearchText(`${meta.label} ${meta.description}`).includes(needle))
+    .map(([code]) => code)
+    .slice(0, limit);
 }

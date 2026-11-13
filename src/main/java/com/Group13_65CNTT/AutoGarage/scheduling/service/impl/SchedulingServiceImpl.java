@@ -135,6 +135,7 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
     private EmployeeResponse toEmployeeResponse(Employee employee, Map<Long, User> accounts) {
         EmployeeResponse response = employeeMapper.toResponse(employee);
         User account = accounts.get(employee.getUserId());
+        response.setAccount(com.Group13_65CNTT.AutoGarage.identity.dto.response.AccountSummary.of(account));
         if (account != null) {
             response.setFullName(account.getFullName());
             response.setUsername(account.getUsername());
@@ -406,9 +407,21 @@ public class SchedulingServiceImpl implements SchedulingService, BayScheduling {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ShiftResponse> getShifts(Long employeeId, ShiftStatus status, Pageable pageable) {
+    public Page<ShiftResponse> getShifts(
+            Long employeeId, ShiftStatus status, LocalDate from, LocalDate to, Pageable pageable) {
         Page<EmployeeShift> page;
-        if (employeeId != null && status != null) {
+        if (from != null || to != null) {
+            if (from != null && to != null && to.isBefore(from)) {
+                throw new BusinessRuleException("Ngày kết thúc không được trước ngày bắt đầu");
+            }
+            Instant start = from == null
+                    ? Instant.EPOCH
+                    : from.atStartOfDay(ShiftPolicy.ZONE).toInstant();
+            Instant end = to == null
+                    ? Instant.parse("9999-01-01T00:00:00Z")
+                    : to.plusDays(1).atStartOfDay(ShiftPolicy.ZONE).toInstant();
+            page = employeeShiftRepository.searchShifts(employeeId, status, start, end, pageable);
+        } else if (employeeId != null && status != null) {
             page = employeeShiftRepository.findByEmployeeIdAndStatus(employeeId, status, pageable);
         } else if (employeeId != null) {
             page = employeeShiftRepository.findByEmployeeId(employeeId, pageable);

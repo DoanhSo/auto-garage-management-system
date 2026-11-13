@@ -16,6 +16,7 @@ export const ESTIMATE_VIEW_ROLES: readonly Role[] = [...TECHNICAL_ROLES, 'CUSTOM
 export const SCHEDULING_ROLES: readonly Role[] = TECHNICAL_ROLES;
 export const WARRANTY_ROLES: readonly Role[] = [...TECHNICAL_ROLES, 'CUSTOMER'];
 export const PAYROLL_MANAGE_ROLES: readonly Role[] = FRONT_DESK_ROLES;
+export const STAFF_MANAGE_ROLES: readonly Role[] = FRONT_DESK_ROLES;
 export const PAYROLL_VIEW_ROLES: readonly Role[] = TECHNICAL_ROLES;
 export const BOOKING_ROLES: readonly Role[] = ['ADMIN', 'RECEPTIONIST', 'CUSTOMER'];
 export const REPAIR_VIEW_ROLES: readonly Role[] = [...STAFF_ROLES, 'CUSTOMER'];

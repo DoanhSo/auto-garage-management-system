@@ -1,0 +1,33 @@
+@startuml A8-thong-bao-nhac
+title A8 — Thông báo, hàng đợi gửi và nhắc bảo dưỡng (UC34, UC35)
+|Nghiệp vụ|
+start
+:Một sự kiện xảy ra (gửi báo giá, xe xong, hóa đơn...);
+|Hệ thống|
+:Ghi thông báo PENDING cùng giao dịch nghiệp vụ;\nchống trùng (event_key, channel, recipient_key);
+if (Giao dịch commit?) then (có)
+else (rollback)
+  :Thông báo cũng không tồn tại;
+  stop
+endif
+|Tác vụ nền|
+repeat
+  :Nhận lô PENDING có lease;
+  if (Kênh WEB?) then (có)
+    :Hiện trong hộp thư người dùng;
+  else (EMAIL/SMS)
+    :Gửi qua nhà cung cấp kênh;
+  endif
+  if (Gửi được?) then (được)
+    :SENT;
+  else (lỗi)
+    :Tăng attempt_count, hẹn thử lại;
+  endif
+repeat while (Còn lượt thử và chưa gửi được?) is (còn)
+|Tác vụ nền|
+:Định kỳ quét chu kỳ bảo dưỡng (km/tháng)\nvà sổ bảo hành sắp hết hạn;
+:Tạo thông báo nhắc với event_key ổn định\n(chạy lại không tạo trùng);
+|Lễ tân|
+:Theo dõi, gọi chăm sóc khách;
+stop
+@enduml

@@ -33,12 +33,15 @@ export function ShiftEditor({
   open,
   initialEmployeeId,
   initialServiceBayId,
+  initialDate,
   onClose,
   onSaved,
 }: {
   open: boolean;
   initialEmployeeId?: string | number | null;
   initialServiceBayId?: string | number | null;
+  /** Ngày xếp ca gợi ý (YYYY-MM-DD); mặc định hôm nay. */
+  initialDate?: string | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -74,7 +77,8 @@ export function ShiftEditor({
       // Mặc định ca hôm nay theo giờ địa phương 08:00 đến 17:00
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
-      const localToday = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const localToday =
+        initialDate || `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
       setStartsAt(`${localToday}T08:00`);
       setEndsAt(`${localToday}T17:00`);
       setNotes('');
@@ -87,7 +91,7 @@ export function ShiftEditor({
       setServiceBayId('');
       setDiscard(false);
     }
-  }, [open, initialEmployeeId, initialServiceBayId]);
+  }, [open, initialEmployeeId, initialServiceBayId, initialDate]);
 
   const isDirty = initialEmployeeId
     ? employeeId !== String(initialEmployeeId) ||

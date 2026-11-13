@@ -38,10 +38,34 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     @Query("SELECT i FROM Invoice i WHERE i.id = :id")
     Optional<Invoice> findByIdWithLock(@Param("id") Long id);
 
-    @Query("SELECT i FROM Invoice i WHERE (:status IS NULL OR i.status = :status) " +
-           "AND (:customerId IS NULL OR i.customerId = :customerId) " +
-           "AND (:orderId IS NULL OR i.repairOrderId = :orderId) " +
-           "AND (:query IS NULL OR :query = '' OR LOWER(i.invoiceCode) LIKE LOWER(CONCAT('%', :query, '%')))")
+    @Query("""
+            SELECT i FROM Invoice i WHERE (:status IS NULL OR i.status = :status)
+            AND (:customerId IS NULL OR i.customerId = :customerId)
+            AND (:orderId IS NULL OR i.repairOrderId = :orderId)
+            AND (:query IS NULL OR :query = ''
+                 OR LOWER(i.invoiceCode) LIKE LOWER(CONCAT('%', :query, '%'))
+                 OR EXISTS (
+                     SELECT 1 FROM Customer c
+                     WHERE c.id = i.customerId
+                       AND (LOWER(c.fullName) LIKE LOWER(CONCAT('%', :query, '%'))
+                            OR LOWER(c.customerCode) LIKE LOWER(CONCAT('%', :query, '%'))
+                            OR (c.phone IS NOT NULL AND c.phone LIKE CONCAT('%', :query, '%'))
+                            OR (c.companyName IS NOT NULL AND LOWER(c.companyName) LIKE LOWER(CONCAT('%', :query, '%'))))
+                 )
+                 OR EXISTS (
+                     SELECT 1 FROM RepairOrder ro
+                     WHERE ro.id = i.repairOrderId
+                       AND LOWER(ro.orderCode) LIKE LOWER(CONCAT('%', :query, '%'))
+                 )
+                 OR EXISTS (
+                     SELECT 1 FROM RepairOrder ro, Vehicle v
+                     WHERE ro.id = i.repairOrderId AND v.id = ro.vehicleId
+                       AND ((v.licensePlate IS NOT NULL AND LOWER(v.licensePlate) LIKE LOWER(CONCAT('%', :query, '%')))
+                            OR (v.vin IS NOT NULL AND LOWER(v.vin) LIKE LOWER(CONCAT('%', :query, '%')))
+                            OR (v.brand IS NOT NULL AND LOWER(v.brand) LIKE LOWER(CONCAT('%', :query, '%')))
+                            OR (v.model IS NOT NULL AND LOWER(v.model) LIKE LOWER(CONCAT('%', :query, '%'))))
+                 ))
+            """)
     Page<Invoice> searchInvoices(
             @Param("status") InvoiceStatus status,
             @Param("customerId") Long customerId,

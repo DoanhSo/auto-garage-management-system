@@ -6,9 +6,14 @@ import { errorMessage } from '../../../shared/api/errors';
 import { DataTable } from '../../../shared/components/DataTable';
 import { Badge, Button, Loading, QueryError } from '../../../shared/components/ui';
 import { formatDate, money } from '../../../shared/utils/format';
+import { AccountStatusBadge } from '../../../shared/components/AccountStatusBadge';
 import { EmployeeEditor } from '../../scheduling/components/EmployeeEditor';
+import { todayKey } from '../../../shared/utils/weekCalendar';
+import { useStaffEmployee } from '../hooks/useStaffEmployee';
+import { EmployeeDetailSheet } from './EmployeeDetailSheet';
 import {
   useSchedulingEmployeesQuery,
+  useShiftsQuery,
   useUpdateEmployeeMutation,
 } from '../../scheduling/hooks/useScheduling';
 import { SKILL_LABELS, parseSkills, type Employee } from '../../scheduling/types/scheduling';
@@ -36,14 +41,25 @@ function seniorityText(joinedAt?: string | null): string {
     .join(' ');
 }
 
-export function EmployeePayrollDirectory({ canCreate }: { canCreate: boolean }) {
+export function EmployeeDirectory({ canCreate }: { canCreate: boolean }) {
   const notify = useToast();
   const [keyword, setKeyword] = useState('');
   const [skill, setSkill] = useState('ALL');
   const [status, setStatus] = useState<StatusFilter>('ACTIVE');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [selectedId, selectEmployee] = useStaffEmployee();
   const employeesQuery = useSchedulingEmployeesQuery();
+  const activeShifts = useShiftsQuery({ status: 'ACTIVE', from: todayKey(), size: 100 });
+  const shiftCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    (activeShifts.data?.content ?? [])
+      .filter((shift) => new Date(shift.endsAt).getTime() >= Date.now())
+      .forEach((shift) =>
+        counts.set(String(shift.employeeId), (counts.get(String(shift.employeeId)) ?? 0) + 1),
+      );
+    return counts;
+  }, [activeShifts.data]);
   const updateEmployee = useUpdateEmployeeMutation();
 
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
@@ -88,10 +104,26 @@ export function EmployeePayrollDirectory({ canCreate }: { canCreate: boolean }) 
       header: 'Mã & Họ tên',
       cell: ({ row }) => (
         <div>
-          <strong>{row.original.fullName ?? '—'}</strong>
+          <button
+            type="button"
+            className="link-button"
+            onClick={() => selectEmployee(row.original.id)}
+          >
+            {row.original.fullName ?? '—'}
+          </button>
           <div className="description">
             {row.original.employeeCode} · {row.original.isActive ? 'Đang làm việc' : 'Tạm nghỉ'}
           </div>
+        </div>
+      ),
+    },
+    {
+      id: 'account',
+      header: 'Tài khoản đăng nhập',
+      cell: ({ row }) => (
+        <div className="account-status">
+          <span>{row.original.account?.username ?? row.original.username ?? '—'}</span>
+          <AccountStatusBadge account={row.original.account} />
         </div>
       ),
     },
@@ -125,6 +157,11 @@ export function EmployeePayrollDirectory({ canCreate }: { canCreate: boolean }) 
         ) : (
           <span className="muted">Chưa cập nhật</span>
         ),
+    },
+    {
+      id: 'shifts',
+      header: 'Ca hiệu lực',
+      cell: ({ row }) => <span>{shiftCounts.get(String(row.original.id)) ?? 0} ca</span>,
     },
     {
       id: 'bank',
@@ -231,6 +268,11 @@ export function EmployeePayrollDirectory({ canCreate }: { canCreate: boolean }) 
           emptyDescription="Thử đổi bộ lọc trạng thái hoặc chuyên môn."
         />
       )}
+      <EmployeeDetailSheet
+        employee={employees.find((e) => String(e.id) === selectedId) ?? null}
+        onClose={() => selectEmployee(null)}
+        onEdit={(employee) => openEditor(employee)}
+      />
       <EmployeeEditor
         employee={editing}
         takenUserIds={takenUserIds}

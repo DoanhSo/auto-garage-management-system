@@ -23,6 +23,8 @@ Backend theo 7 tầng: `AuthController`/`AuthServiceImpl` và `UserController`/`
 
 - `GET /api/v1/auth/me`: Yêu cầu Bearer JWT hợp lệ từ Keycloak. Trả về `200 UserResponse` của chính người dùng đang đăng nhập; tự động liên kết `identity_id` (Keycloak `sub` UUID) và cập nhật `last_login_at` trong lần truy cập đầu tiên.
 - `POST /api/v1/auth/logout`: Yêu cầu Bearer JWT hợp lệ. Tăng `auth_version` của tài khoản và ghi audit `AUTH_LOGOUT_ALL`, thu hồi tức thì mọi token đã cấp của người dùng đó trên Resource Server.
+- `POST /api/v1/customers/{id}/account`: `ADMIN` hoặc `RECEPTIONIST`, body `username`, `email` (tùy chọn, mặc định email hồ sơ), `password` (theo `PasswordPolicy`). Tạo người dùng Keycloak vai trò CUSTOMER, dòng `users` có `identity_id` và gán `customers.user_id`. Từ chối khi khách ngừng hoạt động hoặc đã có tài khoản; trùng tên đăng nhập/email trả `DUPLICATE_RESOURCE`. Nhật ký `CUSTOMER_ACCOUNT_CREATED`.
+- `POST /api/v1/customers/{id}/account/link`: `ADMIN` hoặc `RECEPTIONIST`, body `sourceCustomerId`. Chuyển tài khoản của hồ sơ nguồn (thường là hồ sơ `CUS-OIDC-…` do khách tự đăng ký) sang hồ sơ `{id}` và ngừng hoạt động hồ sơ nguồn. Từ chối khi hồ sơ nguồn còn xe, lịch hẹn, phiếu sửa chữa, hóa đơn hoặc bảo hành. Nhật ký `CUSTOMER_ACCOUNT_LINKED`.
 - `POST /api/v1/admin/users`: `ADMIN`, body `username`, `email`, `fullName`, `role`, và `identityId` (tùy chọn). Trả `201/1001` và header `Location`.
 - `GET /api/v1/admin/users`: `ADMIN`, hỗ trợ `keyword`, `active`, `page`, `size`, `sortBy`, `sortDir` với allowlist sort (`id`, `username`, `fullName`, `role`, `active`, `createdAt`).
 - `GET /api/v1/admin/users/{id}`: `ADMIN`, trả `200 UserResponse` hoặc `404`.

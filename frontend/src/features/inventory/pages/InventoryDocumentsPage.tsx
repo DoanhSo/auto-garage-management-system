@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -20,6 +21,7 @@ import { WAREHOUSE_ROLES } from '../../../app/access';
 import {
   Badge,
   Button,
+  Combobox,
   ConfirmDialog,
   Field,
   Loading,
@@ -31,11 +33,15 @@ import { DataTable } from '../../../shared/components/DataTable';
 import { useMediaQuery } from '../../../shared/hooks/useMediaQuery';
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue';
 import { errorMessage } from '../../../shared/api/errors';
+import { useRepairOrdersQuery } from '../../repair/hooks/useRepair';
+import { useVehiclesQuery } from '../../vehicle/hooks/useVehicles';
+import { formatPlate } from '../../../shared/utils/format';
 import {
   useDocumentsQuery,
   useCreateDocumentMutation,
   usePostDocumentMutation,
   useCancelDocumentMutation,
+  useIssueCandidatesQuery,
   usePartsQuery,
   useSuppliersQuery,
 } from '../hooks/useInventory';
@@ -85,10 +91,62 @@ export function InventoryDocumentsPage() {
     { partId: 0, quantity: 1, unitCost: 0, notes: '' },
   ]);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlIssueOrderId = searchParams.get('issueOrderId') ?? '';
+
+  useEffect(() => {
+    if (!urlIssueOrderId || !canManage) return;
+    setDocType('OUT');
+    setOrderId(urlIssueOrderId);
+    setCreating(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('issueOrderId');
+    setSearchParams(next, { replace: true });
+  }, [urlIssueOrderId, canManage, searchParams, setSearchParams]);
+
+  // Xuất kho sửa chữa: chọn lệnh, nạp phụ tùng đã giữ chỗ, chọn dòng và số lượng cần xuất.
+  const [issuePick, setIssuePick] = useState<
+    Record<string, { checked: boolean; quantity: number }>
+  >({});
+
   const createTrigger = useRef<HTMLButtonElement>(null);
 
   const { data: suppliersData } = useSuppliersQuery({ size: 100, active: true });
   const suppliers = suppliersData?.content || [];
+
+  const { data: ordersData } = useRepairOrdersQuery({ size: 100, sortBy: 'id', sortDir: 'desc' });
+  const { data: vehiclesData = [] } = useVehiclesQuery();
+  const issueOrderOptions = useMemo(() => {
+    const plateOf = new Map(vehiclesData.map((v) => [String(v.id), v.licensePlate] as const));
+    return (ordersData?.content ?? [])
+      .filter(
+        (order) => !['INVOICED', 'CLOSED', 'CANCELLED', 'NEW', 'DIAGNOSING'].includes(order.status),
+      )
+      .map((order) => {
+        const plate = plateOf.get(String(order.vehicleId));
+        return {
+          value: String(order.id),
+          label: `#${order.orderCode}${plate ? ` · ${formatPlate(plate)}` : ''}`,
+          description: new Date(order.receivedAt).toLocaleDateString('vi-VN'),
+        };
+      });
+  }, [ordersData, vehiclesData]);
+  const issueCandidatesQuery = useIssueCandidatesQuery(
+    docType === 'OUT' && orderId ? orderId : null,
+    creating,
+  );
+  const issueCandidates = useMemo(
+    () => issueCandidatesQuery.data ?? [],
+    [issueCandidatesQuery.data],
+  );
+
+  useEffect(() => {
+    const next: Record<string, { checked: boolean; quantity: number }> = {};
+    issueCandidates.forEach((c) => {
+      next[String(c.estimateItemId)] = { checked: !c.shortage, quantity: c.reservedQuantity };
+    });
+    setIssuePick(next);
+  }, [issueCandidates]);
 
   const { data: partsData } = usePartsQuery({ size: 100, active: true });
   const parts = partsData?.content || [];
@@ -153,9 +211,45 @@ export function InventoryDocumentsPage() {
 
   const handleCreateDocument = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (lines.some((l) => !l.partId || Number(l.quantity) <= 0)) {
-      notify('Vui lòng chọn phụ tùng và nhập số lượng lớn hơn 0 cho tất cả các dòng.');
-      return;
+
+    let items: InventoryDocumentItemInput[];
+    if (docType === 'OUT') {
+      if (!orderId) {
+        notify('Chọn lệnh sửa chữa cần xuất kho.');
+        return;
+      }
+      const picked = issueCandidates.filter((c) => issuePick[String(c.estimateItemId)]?.checked);
+      if (picked.length === 0) {
+        notify('Chọn ít nhất một phụ tùng để xuất kho.');
+        return;
+      }
+      const invalid = picked.find((c) => {
+        const qty = Number(issuePick[String(c.estimateItemId)]?.quantity);
+        return !(qty > 0) || qty > c.reservedQuantity;
+      });
+      if (invalid) {
+        notify(
+          `Số lượng xuất của ${invalid.partName} phải lớn hơn 0 và không vượt số đã giữ chỗ (${invalid.reservedQuantity}).`,
+        );
+        return;
+      }
+      items = picked.map((c) => ({
+        partId: c.partId,
+        estimateItemId: c.estimateItemId,
+        quantity: Number(issuePick[String(c.estimateItemId)].quantity),
+        unitCost: c.unitCost,
+      }));
+    } else {
+      if (lines.some((l) => !l.partId || Number(l.quantity) <= 0)) {
+        notify('Vui lòng chọn phụ tùng và nhập số lượng lớn hơn 0 cho tất cả các dòng.');
+        return;
+      }
+      items = lines.map((l) => ({
+        partId: l.partId,
+        quantity: Number(l.quantity),
+        unitCost: Number(l.unitCost),
+        notes: l.notes || undefined,
+      }));
     }
 
     const payload: InventoryDocumentCreateInput = {
@@ -165,12 +259,7 @@ export function InventoryDocumentsPage() {
         (docType === 'OUT' || docType === 'RETURN') && orderId ? Number(orderId) : undefined,
       supplierInvoiceNumber: referenceNumber || undefined,
       reason: notes || undefined,
-      items: lines.map((l) => ({
-        partId: l.partId,
-        quantity: Number(l.quantity),
-        unitCost: Number(l.unitCost),
-        notes: l.notes || undefined,
-      })),
+      items,
     };
 
     try {
@@ -387,10 +476,13 @@ export function InventoryDocumentsPage() {
   const totalElements = data?.totalElements || 0;
   const totalPages = data?.totalPages || 1;
 
-  const totalCalculated = lines.reduce(
-    (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitCost) || 0),
-    0,
-  );
+  const totalCalculated =
+    docType === 'OUT'
+      ? issueCandidates.reduce((sum, c) => {
+          const pick = issuePick[String(c.estimateItemId)];
+          return pick?.checked ? sum + (Number(pick.quantity) || 0) * c.unitCost : sum;
+        }, 0)
+      : lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitCost) || 0), 0);
 
   return (
     <>
@@ -701,7 +793,21 @@ export function InventoryDocumentsPage() {
                 ))}
               </select>
             </Field>
-          ) : docType === 'OUT' || docType === 'RETURN' ? (
+          ) : docType === 'OUT' ? (
+            <Field
+              label="Lệnh sửa chữa cần xuất kho"
+              required
+              hint="Gõ mã lệnh hoặc biển số để tìm. Chỉ lệnh còn xuất kho được mới hiện."
+            >
+              <Combobox
+                value={orderId}
+                onChange={setOrderId}
+                options={issueOrderOptions}
+                placeholder="Gõ mã lệnh hoặc biển số…"
+                aria-required
+              />
+            </Field>
+          ) : docType === 'RETURN' ? (
             <Field label="Mã lệnh sửa chữa" required>
               <input
                 className="input font-mono"
@@ -737,154 +843,276 @@ export function InventoryDocumentsPage() {
             </Field>
           </div>
 
-          {/* Danh sách mặt hàng chi tiết */}
-          <div className="full-width" style={{ marginTop: '4px' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '8px',
-              }}
-            >
+          {docType === 'OUT' && (
+            <div className="full-width" style={{ marginTop: '4px' }}>
               <span className="form-section-label" style={{ margin: 0, padding: 0 }}>
-                CHI TIẾT DANH MỤC PHỤ TÙNG
+                PHỤ TÙNG CHỜ XUẤT CỦA LỆNH
               </span>
-              <Button
-                variant="secondary"
-                onClick={handleAddLine}
-                style={{ minHeight: '30px', padding: '3px 10px', fontSize: '12px' }}
-              >
-                <Plus size={14} /> Thêm dòng
-              </Button>
-            </div>
-
-            <div
-              style={{
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                maxHeight: '180px',
-                overflowY: 'auto',
-              }}
-            >
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                <thead
+              {!orderId ? (
+                <p className="muted" style={{ margin: '8px 0 0' }}>
+                  Chọn lệnh sửa chữa để xem các phụ tùng đã duyệt và giữ chỗ chờ xuất kho.
+                </p>
+              ) : issueCandidatesQuery.isLoading ? (
+                <Loading label="Đang tải phụ tùng chờ xuất…" />
+              ) : issueCandidatesQuery.isError ? (
+                <p className="field-error" role="alert">
+                  {errorMessage(issueCandidatesQuery.error)}
+                </p>
+              ) : issueCandidates.length === 0 ? (
+                <p className="muted" style={{ margin: '8px 0 0' }}>
+                  Lệnh này không còn phụ tùng nào chờ xuất kho.
+                </p>
+              ) : (
+                <div
                   style={{
-                    background: '#f8fafc',
-                    borderBottom: '1px solid var(--border)',
-                    color: '#526278',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 1,
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    marginTop: '8px',
                   }}
                 >
-                  <tr>
-                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>Phụ tùng</th>
-                    <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>
-                      Số lượng
-                    </th>
-                    <th style={{ padding: '8px 12px', width: '150px', textAlign: 'right' }}>
-                      Đơn giá (đ)
-                    </th>
-                    <th style={{ padding: '8px 12px', width: '150px', textAlign: 'right' }}>
-                      Thành tiền
-                    </th>
-                    <th style={{ padding: '8px 12px', width: '50px', textAlign: 'center' }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((line, idx) => {
-                    const rowTotal = (Number(line.quantity) || 0) * (Number(line.unitCost) || 0);
-                    return (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '6px 12px' }}>
-                          <select
-                            className="input"
-                            value={line.partId}
-                            onChange={(e) =>
-                              handleLineChange(idx, 'partId', Number(e.target.value))
-                            }
-                            required
-                          >
-                            <option value={0}>Chọn phụ tùng...</option>
-                            {parts.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.partName} ({p.sku})
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td style={{ padding: '6px 12px' }}>
-                          <input
-                            type="number"
-                            min="1"
-                            className="input"
-                            style={{ textAlign: 'right' }}
-                            value={line.quantity}
-                            onChange={(e) =>
-                              handleLineChange(idx, 'quantity', Number(e.target.value))
-                            }
-                            required
-                          />
-                        </td>
-                        <td style={{ padding: '6px 12px' }}>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1000"
-                            className="input"
-                            style={{ textAlign: 'right' }}
-                            value={line.unitCost}
-                            onChange={(e) =>
-                              handleLineChange(idx, 'unitCost', Number(e.target.value))
-                            }
-                            required
-                          />
-                        </td>
-                        <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600 }}>
-                          {rowTotal.toLocaleString('vi-VN')} đ
-                        </td>
-                        <td style={{ padding: '6px 12px', textAlign: 'center' }}>
-                          {lines.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveLine(idx)}
-                              style={{
-                                background: 'transparent',
-                                border: 0,
-                                color: 'var(--danger)',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </td>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead
+                      style={{
+                        background: '#f8fafc',
+                        borderBottom: '1px solid var(--border)',
+                        color: '#526278',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <tr>
+                        <th style={{ padding: '8px 12px', width: '40px' }}></th>
+                        <th style={{ padding: '8px 12px', textAlign: 'left' }}>Phụ tùng</th>
+                        <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>
+                          Đã giữ chỗ
+                        </th>
+                        <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>
+                          Tồn kho
+                        </th>
+                        <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>
+                          Số lượng xuất
+                        </th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {issueCandidates.map((c) => {
+                        const key = String(c.estimateItemId);
+                        const pick = issuePick[key] ?? {
+                          checked: false,
+                          quantity: c.reservedQuantity,
+                        };
+                        return (
+                          <tr key={key} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                              <input
+                                type="checkbox"
+                                aria-label={`Chọn xuất ${c.partName}`}
+                                checked={pick.checked}
+                                disabled={c.shortage}
+                                onChange={(e) =>
+                                  setIssuePick((prev) => ({
+                                    ...prev,
+                                    [key]: { ...pick, checked: e.target.checked },
+                                  }))
+                                }
+                              />
+                            </td>
+                            <td style={{ padding: '6px 12px' }}>
+                              <strong>{c.partName}</strong>{' '}
+                              <span className="muted">({c.partCode})</span>
+                              {c.shortage && (
+                                <div>
+                                  <Badge variant="danger">
+                                    Thiếu hàng, tồn còn {c.stockQuantity} {c.unit}
+                                  </Badge>
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '6px 12px', textAlign: 'right' }}>
+                              {c.reservedQuantity} {c.unit}
+                            </td>
+                            <td style={{ padding: '6px 12px', textAlign: 'right' }}>
+                              {c.stockQuantity} {c.unit}
+                            </td>
+                            <td style={{ padding: '6px 12px' }}>
+                              <input
+                                type="number"
+                                min="1"
+                                max={c.reservedQuantity}
+                                className="input"
+                                style={{ textAlign: 'right' }}
+                                aria-label={`Số lượng xuất ${c.partName}`}
+                                value={pick.quantity}
+                                disabled={c.shortage || !pick.checked}
+                                onChange={(e) =>
+                                  setIssuePick((prev) => ({
+                                    ...prev,
+                                    [key]: { ...pick, quantity: Number(e.target.value) },
+                                  }))
+                                }
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
+          )}
 
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                marginTop: '10px',
-                gap: '12px',
-              }}
-            >
-              <span style={{ fontSize: '13px', color: '#526278' }}>Tổng cộng ước tính:</span>
-              <strong style={{ fontSize: '17px', color: '#245bdb' }}>
-                {totalCalculated.toLocaleString('vi-VN')} đ
-              </strong>
+          {/* Danh sách mặt hàng chi tiết */}
+          {docType !== 'OUT' && (
+            <div className="full-width" style={{ marginTop: '4px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '8px',
+                }}
+              >
+                <span className="form-section-label" style={{ margin: 0, padding: 0 }}>
+                  CHI TIẾT DANH MỤC PHỤ TÙNG
+                </span>
+                <Button
+                  variant="secondary"
+                  onClick={handleAddLine}
+                  style={{ minHeight: '30px', padding: '3px 10px', fontSize: '12px' }}
+                >
+                  <Plus size={14} /> Thêm dòng
+                </Button>
+              </div>
+
+              <div
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  maxHeight: '180px',
+                  overflowY: 'auto',
+                }}
+              >
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead
+                    style={{
+                      background: '#f8fafc',
+                      borderBottom: '1px solid var(--border)',
+                      color: '#526278',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 1,
+                    }}
+                  >
+                    <tr>
+                      <th style={{ padding: '8px 12px', textAlign: 'left' }}>Phụ tùng</th>
+                      <th style={{ padding: '8px 12px', width: '110px', textAlign: 'right' }}>
+                        Số lượng
+                      </th>
+                      <th style={{ padding: '8px 12px', width: '150px', textAlign: 'right' }}>
+                        Đơn giá (đ)
+                      </th>
+                      <th style={{ padding: '8px 12px', width: '150px', textAlign: 'right' }}>
+                        Thành tiền
+                      </th>
+                      <th style={{ padding: '8px 12px', width: '50px', textAlign: 'center' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.map((line, idx) => {
+                      const rowTotal = (Number(line.quantity) || 0) * (Number(line.unitCost) || 0);
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '6px 12px' }}>
+                            <select
+                              className="input"
+                              value={line.partId}
+                              onChange={(e) =>
+                                handleLineChange(idx, 'partId', Number(e.target.value))
+                              }
+                              required
+                            >
+                              <option value={0}>Chọn phụ tùng...</option>
+                              {parts.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.partName} ({p.sku})
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td style={{ padding: '6px 12px' }}>
+                            <input
+                              type="number"
+                              min="1"
+                              className="input"
+                              style={{ textAlign: 'right' }}
+                              value={line.quantity}
+                              onChange={(e) =>
+                                handleLineChange(idx, 'quantity', Number(e.target.value))
+                              }
+                              required
+                            />
+                          </td>
+                          <td style={{ padding: '6px 12px' }}>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1000"
+                              className="input"
+                              style={{ textAlign: 'right' }}
+                              value={line.unitCost}
+                              onChange={(e) =>
+                                handleLineChange(idx, 'unitCost', Number(e.target.value))
+                              }
+                              required
+                            />
+                          </td>
+                          <td style={{ padding: '6px 12px', textAlign: 'right', fontWeight: 600 }}>
+                            {rowTotal.toLocaleString('vi-VN')} đ
+                          </td>
+                          <td style={{ padding: '6px 12px', textAlign: 'center' }}>
+                            {lines.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveLine(idx)}
+                                style={{
+                                  background: 'transparent',
+                                  border: 0,
+                                  color: 'var(--danger)',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  alignItems: 'center',
+                  marginTop: '10px',
+                  gap: '12px',
+                }}
+              >
+                <span style={{ fontSize: '13px', color: '#526278' }}>Tổng cộng ước tính:</span>
+                <strong style={{ fontSize: '17px', color: '#245bdb' }}>
+                  {totalCalculated.toLocaleString('vi-VN')} đ
+                </strong>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="modal-form-actions full-width">
             <Button

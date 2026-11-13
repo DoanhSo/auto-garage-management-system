@@ -5,12 +5,16 @@ import { errorMessage } from '../../../shared/api/errors';
 import { money, formatDateTime } from '../../../shared/utils/format';
 import { Badge, Button, Field, Sheet } from '../../../shared/components/ui';
 import { useDecideEstimateMutation, useSendEstimateMutation } from '../hooks/useEstimate';
-import type { Estimate, LineDecisionInput } from '../types/estimate';
+import type { Estimate } from '../types/estimate';
 import { estimateStatusLabels } from '../types/estimate';
 import type { Vehicle } from '../../../shared/types/contracts';
 import type { RepairOrder } from '../../repair/types/repairTypes';
-
-type Decision = LineDecisionInput['decision'];
+import {
+  buildLineDecisions,
+  canDecideEstimate,
+  pendingItems,
+  type Decision,
+} from '../utils/lineDecisions';
 
 export function EstimateDecisionModal({
   estimate,
@@ -64,12 +68,11 @@ export function EstimateDecisionModal({
 
   const handleSubmit = async (sendFirst = false) => {
     const note = decisionNote.trim() || undefined;
-    const pending = new Set(
-      estimate.items.filter((it) => it.approvalStatus === 'PENDING').map((it) => it.id),
-    );
-    const lines: LineDecisionInput[] = Object.entries(decisions)
-      .filter(([itemId]) => pending.has(itemId))
-      .map(([itemId, decision]) => ({ estimateItemId: Number(itemId), decision, note }));
+    const lines = buildLineDecisions(estimate.items, decisions, note);
+    if (lines.length === 0) {
+      notify('Báo giá không còn dòng nào chờ quyết định.');
+      return;
+    }
 
     try {
       if (sendFirst) await sendMutation.mutateAsync(estimate.id);
@@ -81,9 +84,16 @@ export function EstimateDecisionModal({
     }
   };
 
+  const pendingCount = pendingItems(estimate.items).length;
+  const decidable = canDecideEstimate(estimate.status);
+  const canSubmit = decidable && pendingCount > 0;
+
   const approvedTotal = estimate.items
     .filter((it) => decisions[it.id] === 'APPROVED')
-    .reduce((sum, it) => sum + (Number(it.lineTotal) || Number(it.quantity) * Number(it.unitPrice)), 0);
+    .reduce(
+      (sum, it) => sum + (Number(it.lineTotal) || Number(it.quantity) * Number(it.unitPrice)),
+      0,
+    );
 
   return (
     <Sheet
@@ -106,7 +116,8 @@ export function EstimateDecisionModal({
             <span>
               <strong>{vehicle?.licensePlate ?? 'Chưa rõ biển số'}</strong>
               {vehicle && ` · ${vehicle.brand} ${vehicle.model}`}
-              {repairOrder && ` · ODO vào xưởng ${repairOrder.odometerIn.toLocaleString('vi-VN')} km`}
+              {repairOrder &&
+                ` · ODO vào xưởng ${repairOrder.odometerIn.toLocaleString('vi-VN')} km`}
               {repairOrder?.orderCode && ` · Lệnh #${repairOrder.orderCode}`}
             </span>
           </div>
@@ -147,12 +158,14 @@ export function EstimateDecisionModal({
         )}
 
         <div className="estimate-lines-head">
-          <span>Duyệt từng dòng — dòng được duyệt sẽ tạo việc sửa chữa và giữ phụ tùng trong kho</span>
+          <span>
+            Duyệt từng dòng — dòng được duyệt sẽ tạo việc sửa chữa và giữ phụ tùng trong kho
+          </span>
           <div className="row-actions">
-            <Button variant="secondary" onClick={() => setAll('APPROVED')}>
+            <Button variant="secondary" disabled={!canSubmit} onClick={() => setAll('APPROVED')}>
               Duyệt tất cả
             </Button>
-            <Button variant="secondary" onClick={() => setAll('REJECTED')}>
+            <Button variant="secondary" disabled={!canSubmit} onClick={() => setAll('REJECTED')}>
               Từ chối tất cả
             </Button>
           </div>
@@ -226,15 +239,29 @@ export function EstimateDecisionModal({
           />
         </Field>
 
+        {!canSubmit && (
+          <div className="info-strip">
+            <span>
+              {!decidable
+                ? `Báo giá đang ở trạng thái "${estimateStatusLabels[estimate.status] ?? estimate.status}" nên không thể duyệt thêm.`
+                : 'Báo giá đã được quyết định hết, không thể đổi. Cần thêm hạng mục, hãy lập báo giá phát sinh.'}
+            </span>
+          </div>
+        )}
+
         <div className="form-actions account-editor-actions">
           <Button onClick={onClose}>Đóng</Button>
-          <Button
-            variant="primary"
-            pending={decideMutation.isPending || sendMutation.isPending}
-            onClick={() => handleSubmit(estimate.status === 'DRAFT')}
-          >
-            {estimate.status === 'DRAFT' ? 'Gửi khách & lưu phê duyệt' : 'Lưu quyết định phê duyệt'}
-          </Button>
+          {canSubmit && (
+            <Button
+              variant="primary"
+              pending={decideMutation.isPending || sendMutation.isPending}
+              onClick={() => handleSubmit(estimate.status === 'DRAFT')}
+            >
+              {estimate.status === 'DRAFT'
+                ? 'Gửi khách & lưu phê duyệt'
+                : 'Lưu quyết định phê duyệt'}
+            </Button>
+          )}
         </div>
       </div>
     </Sheet>

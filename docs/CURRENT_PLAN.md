@@ -1,171 +1,99 @@
-# Kế Hoạch Phân Công Kỹ Thuật Viên QC Ngay Tại Màn Lệnh Sửa Chữa
+# Kế Hoạch Lễ Tân Tạo Hoặc Nối Tài Khoản Đăng Nhập Cho Khách Có Sẵn
 
-> **Mã plan**: `qc-assignment-on-order`
+> **Mã plan**: `customer-account-linking`
 > **Chế độ**: `PLAN:` (tuân thủ `AGENTS.md`, `docs/CODING_GUIDELINES.md`, `docs/UI_DESIGN_GUIDELINES.md`).
-> **Kế thừa từ**: `plans/2026-11-qc-admin-on-behalf.md`. Plan đó cho admin ghi QC thay kỹ thuật viên được phân công, nhưng chưa có đường nào trên giao diện để phân công QC khi phiếu đã chờ QC.
-
-Đường dẫn Java dưới đây tính từ `src/main/java/com/Group13_65CNTT/AutoGarage/`. Đường dẫn frontend tính từ `frontend/src/`.
+> **Kế thừa từ**: `plans/2026-11-account-status-visibility.md` (mục "Ngoài phạm vi": lễ tân tạo/mời tài khoản cho khách; điều chỉnh sau hội tụ: khách tự đăng ký tạo hồ sơ trùng).
 
 ---
 
 ## 1. Mục Tiêu & Phạm Vi
 
 ### 1.1. Hiện trạng
-
-**Phiếu `WAITING_QC` không còn chỗ nào trên giao diện để phân công kỹ thuật viên QC.**
-
-- Chỗ phân công duy nhất là nút "Phân công" trong `features/repair/components/TaskWorkPanel.tsx:96`, nằm trong từng công việc ở tab "Công việc". Nút bị ẩn khi `finished` (công việc `COMPLETED`/`CANCELLED`, dòng 63).
-- Phiếu chỉ sang `WAITING_QC` khi mọi công việc đã `COMPLETED`, nên đúng lúc cần QC thì mọi nút "Phân công" đều biến mất.
-- Backend lại cho phép: `repair/service/impl/LaborExecutionServiceImpl.java:69` cố ý bỏ qua điều kiện "công việc đã hoàn thành" khi vai trò là QC.
-- Hệ quả: admin bấm QC trên phiếu chưa có người QC bị từ chối `QC_INSPECTOR_NOT_ASSIGNED` (2020, `quality/service/impl/QualityServiceImpl.java:77`) mà không có cách xử lý từ giao diện. Kỹ thuật viên cũng bị chặn tương tự ở `identity/service/impl/ObjectAccessServiceImpl.java:89` (`assignedToQc`).
-- Phân công QC gắn với một công việc cụ thể (`POST /repair-tasks/{taskId}/assignments`), người dùng khó hiểu "QC của phiếu" lại chọn qua "một công việc".
-- Tab QC (`features/repair/components/RepairOrderDetailModal.tsx:896-910`) chỉ liệt kê tên thợ QC đang trực ca, không cho phân công và không cho biết ai đã được phân công.
-- Các nút "Bắt đầu kiểm tra QC" ở dòng 913 và khoảng dòng 925 vẫn dùng `canTechnical` và không kiểm tra trạng thái, lệch với nút QC ở dòng 332 (đã giới hạn theo `canPerformQc` và `WAITING_QC`).
-- Đổi người QC hiện phải gỡ phân công cũ rồi tạo mới trên công việc. Nếu phiếu có hai phân công QC đang hoạt động, admin ghi QC bị từ chối `QC_INSPECTOR_INVALID` (2021).
+- Khách do lễ tân tạo tại quầy (`customers.user_id` trống) không có cách nào để có tài khoản gắn với hồ sơ đó.
+- Khi khách tự đăng ký (`RegistrationServiceImpl.register`), Keycloak tạo tài khoản với `emailVerified=false` (`KeycloakIdentityServiceImpl.createOrLinkUser`). Ở lần đăng nhập đầu, `AuthServiceImpl.me()` → `ensureCustomerProfileLinked` chỉ nối vào hồ sơ có sẵn khi email **đã xác thực** (`linkExistingCustomerByVerifiedEmail`); nếu không thì tạo **hồ sơ mới** mã `CUS-OIDC-…`. Kết quả: một người có hai hồ sơ, xe và lịch sử sửa chữa nằm ở hồ sơ cũ, tài khoản nằm ở hồ sơ mới.
+- Realm Keycloak không bật xác thực email và không có máy chủ gửi mail (`docker/keycloak/realm-export.json`), nên con đường "xác thực email để tự nối" hiện không thể xảy ra.
+- Nhân viên đã có tiền lệ: quản trị viên tạo tài khoản kèm mật khẩu ban đầu (`UserServiceImpl.createUser` → `createOrLinkUser(..., password)`, mật khẩu không phải tạm thời vì form đăng nhập dùng password grant, không xử lý được "required action").
 
 ### 1.2. Mục tiêu
-
-- Ngay ở tab QC của lệnh sửa chữa, admin và lễ tân thấy ai đang được phân công QC và phân công hoặc đổi người bằng một thao tác, khi phiếu `WAITING_QC`.
-- Chỉ chọn được kỹ thuật viên đủ điều kiện: đang hoạt động, có quyền QC, đang trong ca, không phải thợ chính của phiếu. Mọi lúc phiếu chỉ có tối đa một kỹ thuật viên QC đang hoạt động.
-- Sau khi phân công, admin hoặc chính kỹ thuật viên đó ghi QC được ngay, không phải sang màn Khoang & lịch ca.
-- Các nút "Bắt đầu kiểm tra QC" trong tab QC nhất quán với nút ở đầu phiếu: chỉ hiện cho `ADMIN`/`TECHNICIAN` khi phiếu `WAITING_QC`.
+- **A. Tạo tài khoản cho khách có sẵn:** ở màn Khách hàng, khách "Chưa có tài khoản" có nút **Tạo tài khoản**. Lễ tân nhập tên đăng nhập, email (điền sẵn từ hồ sơ), mật khẩu ban đầu (có nút sinh ngẫu nhiên). Hệ thống tạo tài khoản Keycloak vai trò CUSTOMER, dòng `users`, và nối ngay vào hồ sơ. Khách đăng nhập lần đầu thấy đúng xe và lịch sử của mình, không phát sinh hồ sơ mới.
+- **B. Gộp hồ sơ trùng:** khách đã lỡ tự đăng ký (có hồ sơ `CUS-OIDC-…` riêng) thì lễ tân mở hồ sơ cũ, bấm **Nối tài khoản**, chọn hồ sơ đã có tài khoản. Hệ thống chuyển tài khoản sang hồ sơ cũ và ngừng hoạt động hồ sơ trùng. Chỉ cho gộp khi hồ sơ trùng chưa có xe, lịch hẹn, phiếu sửa chữa, hóa đơn hay bảo hành; nếu có thì báo rõ lý do.
+- Gợi ý ở cột "Tài khoản" đổi thành hướng dẫn dùng hai nút trên.
 
 ### 1.3. Ngoài phạm vi
+- **Bật xác thực email để tự nối.** Cần máy chủ gửi mail (SMTP hoặc Mailpit cho môi trường dev), bật `verifyEmail` trong realm, và đổi `ensureCustomerProfileLinked` để chưa tạo hồ sơ mới cho tới khi email được xác thực. Nên làm thành plan riêng sau khi A và B chạy ổn.
+- Gửi mật khẩu cho khách qua email/SMS; khách tự đổi mật khẩu trong ứng dụng (hiện đổi qua trang tài khoản Keycloak).
+- Gộp hồ sơ khi hồ sơ trùng đã có dữ liệu nghiệp vụ (chuyển xe, phiếu, hóa đơn giữa hai hồ sơ).
+- Chặn đăng ký khi email trùng hồ sơ có sẵn (email chưa xác thực nên không đủ tin cậy, và làm lộ việc email đã tồn tại).
 
-- Không đổi quy tắc ghi QC của plan `qc-admin-on-behalf` (admin ghi thay, bốn mắt, điều kiện ca).
-- Không cho `TECHNICIAN` tự phân công QC cho mình. Chỉ `ADMIN` và `RECEPTIONIST` phân công, giống `assignTask` hiện tại.
-- Không đổi phân công thợ chính và thợ phụ, không đổi `TaskWorkPanel`.
-- Không cho admin ghi QC khi chưa phân công QC (đã chốt giữ yêu cầu phân công).
-- Không đổi màn Khoang & lịch ca. Xếp ca cho kỹ thuật viên vẫn làm ở đó.
-- Không thêm migration. Dữ liệu vẫn nằm ở `task_assignments`.
+## 2. Tiêu Chí Chấp Nhận
 
-## 2. Tiêu Chí Chấp Nhận (Acceptance Criteria)
-
-- **AC-1**: `POST /api/v1/repair-orders/{id}/qc-assignment` khi phiếu `WAITING_QC` tạo một phân công vai trò `QC` đang hoạt động cho kỹ thuật viên đủ điều kiện, gắn vào công việc cuối cùng của phiếu. Phản hồi 201. _Kiểm chứng_: unit test `LaborExecutionServiceTest`.
-- **AC-2**: Gọi lại với kỹ thuật viên khác thì phân công QC cũ được giải phóng và chỉ còn đúng một phân công QC đang hoạt động. _Kiểm chứng_: unit test kiểm tra `isActive=false`, `releasedAt` ở bản cũ và `findActiveQcForOrder` trả một bản.
-- **AC-3**: Bị từ chối bằng lỗi nghiệp vụ rõ ràng và không đổi dữ liệu khi:
-  - phiếu không ở `WAITING_QC`;
-  - phiếu chưa có công việc nào;
-  - kỹ thuật viên không hoạt động, không có `canQc` hoặc không trong ca (các lỗi này đã có ở `assignTask`);
-  - kỹ thuật viên là thợ chính (`REPAIR_MAIN`) của phiếu.
-
-  _Kiểm chứng_: unit test từng trường hợp.
-- **AC-4**: `GET /api/v1/repair-orders/{id}/qc-assignment` trả phân công QC đang hoạt động (có tên kỹ thuật viên) hoặc `data: null` khi chưa có. _Kiểm chứng_: unit test và gọi API.
-- **AC-5**: Chỉ `ADMIN`/`RECEPTIONIST` gọi được `POST`. `TECHNICIAN` và `CUSTOMER` nhận 403. _Kiểm chứng_: kiểm tra `@PreAuthorize` bằng test hoặc gọi API với hai vai trò.
-- **AC-6**: Tab QC của phiếu `WAITING_QC` hiện dòng "Kỹ thuật viên QC được phân công: <tên>" hoặc "Chưa phân công". Admin và lễ tân thấy nút "Phân công QC" (hoặc "Đổi người"). Vai trò khác không thấy nút. _Kiểm chứng_: thao tác trình duyệt với admin, lễ tân và kỹ thuật viên.
-- **AC-7**: Modal phân công QC chỉ liệt kê kỹ thuật viên có `canQc` đang trong ca. Phân công thành công thì tab QC cập nhật ngay, lỗi API hiển thị bằng `errorMessage`. _Kiểm chứng_: thao tác trình duyệt.
-- **AC-8**: Sau khi phân công, admin bấm "Kiểm tra chất lượng (QC)" ghi được biên bản (không còn lỗi 2020). _Kiểm chứng_: thao tác trình duyệt trên container mới.
-- **AC-9**: Các nút "Bắt đầu kiểm tra QC" trong tab QC chỉ hiện với `ADMIN`/`TECHNICIAN` khi phiếu `WAITING_QC`. _Kiểm chứng_: thao tác trình duyệt và `npm run lint`/`tsc`.
-- **AC-10**: Test hiện có vẫn qua: `LaborExecutionServiceTest`, `QualityCheckServiceTest`, `TV3WorkflowIntegrationTest`, `BusinessWorkflowIntegrationTests`, Vitest. _Kiểm chứng_: `./mvnw test` (bật `mysql-test` cho test tích hợp) và `npm --prefix frontend test`.
+- **AC-1**: `POST /api/v1/customers/{id}/account` (lễ tân, quản trị viên) với khách đang hoạt động, chưa có tài khoản: tạo người dùng Keycloak vai trò CUSTOMER, dòng `users` có `identity_id`, gán `customers.user_id`; trả khách hàng kèm `account.status = PENDING`. Ghi nhật ký `CUSTOMER_ACCOUNT_CREATED`. _Kiểm chứng_: test service với `KeycloakIdentityService` giả.
+- **AC-2**: Từ chối với lý do tiếng Việt khi: khách đã có tài khoản, khách ngừng hoạt động, tên đăng nhập hoặc email đã dùng, mật khẩu không đạt chính sách. Keycloak không được gọi trong các trường hợp này. _Kiểm chứng_: test service.
+- **AC-3**: Sau AC-1, lần gọi `GET /auth/me` đầu tiên của khách không tạo hồ sơ mới. _Kiểm chứng_: test tích hợp MySQL đi qua `me()` với JWT giả của tài khoản vừa tạo.
+- **AC-4**: `POST /api/v1/customers/{id}/account/link` với `{ "sourceCustomerId": … }`: chuyển `user_id` từ hồ sơ nguồn sang hồ sơ đích, hồ sơ nguồn bị bỏ `user_id` và ngừng hoạt động, trong một giao dịch; ghi nhật ký `CUSTOMER_ACCOUNT_LINKED`. _Kiểm chứng_: test tích hợp MySQL.
+- **AC-5**: AC-4 bị từ chối khi hồ sơ đích đã có tài khoản, hồ sơ nguồn không có tài khoản, hai hồ sơ trùng nhau, hoặc hồ sơ nguồn còn xe, lịch hẹn, phiếu sửa chữa, hóa đơn, bảo hành; thông báo nêu đúng loại dữ liệu đang chặn. _Kiểm chứng_: test service/tích hợp.
+- **AC-6**: Màn Khách hàng: khách "Chưa có tài khoản" có nút **Tạo tài khoản** (Modal giữa màn hình, 2 cột trên máy tính, 1 cột trên điện thoại) và **Nối tài khoản** (Modal chọn hồ sơ đã có tài khoản, tìm theo tên/SĐT/email). Thành công thì danh sách cập nhật trạng thái. _Kiểm chứng_: test RTL; kiểm tra trên trình duyệt.
+- **AC-7**: Toàn bộ test backend và frontend xanh.
 
 ## 3. Danh Sách File Mục Tiêu
 
-| File | Vùng dòng | Thay đổi |
-|---|---|---|
-| `repair/dto/request/QcAssignmentRequest.java` | file mới | DTO `employeeId`, `startsAt`, `endsAt` với Jakarta Validation có message |
-| `repair/service/LaborExecutionService.java` | 15-17 | Thêm `assignQcInspector` và `getQcAssignment` |
-| `repair/service/impl/LaborExecutionServiceImpl.java` | 60-153 (`assignTask`), 157-177 (`releaseAssignment`) | Thêm 2 hàm mới. Tái dùng kiểm tra của `assignTask` bằng cách tách phần tạo phân công thành hàm private dùng chung |
-| `repair/controller/RepairOrderController.java` | gần 134-150 (`/{id}/tasks`) | Thêm `POST` và `GET /{id}/qc-assignment`, `@PreAuthorize`, `@Operation` |
-| `repair/repository/TaskAssignmentRepository.java` | 19-21 | Dùng lại `findActiveQcForOrder`. Không cần query mới |
-| `src/test/.../repair/LaborExecutionServiceTest.java` | cuối file | Test cho AC-1 → AC-4 |
-| `frontend/src/features/repair/api/repairApi.ts` | 94-117 | Thêm `assignQcInspector`, `getQcAssignment` |
-| `frontend/src/features/repair/hooks/useRepair.ts` | cạnh `useAssignTaskMutation` | Thêm `useQcAssignmentQuery`, `useAssignQcInspectorMutation` (invalidate query của phiếu) |
-| `frontend/src/features/repair/utils/assignmentWindow.ts` | file mới | Chuyển `toLocalInput` và `DEFAULT_ASSIGNMENT_HOURS` từ `AssignTaskModal.tsx:10-22` sang để dùng chung |
-| `frontend/src/features/repair/components/AssignTaskModal.tsx` | 10-22 | Import từ `assignmentWindow.ts`, không đổi hành vi |
-| `frontend/src/features/repair/components/AssignQcModal.tsx` | file mới | Modal chọn kỹ thuật viên QC và khoảng thời gian |
-| `frontend/src/features/repair/components/RepairOrderDetailModal.tsx` | 896-935 (tab QC), 1057 | Thêm khối phân công QC, gắn `AssignQcModal`, đổi điều kiện hai nút "Bắt đầu kiểm tra QC" sang `canPerformQc && WAITING_QC` |
-| `docs/REPAIR_ORDER_LIFECYCLE.md` | mục 2.5 | Ghi cách phân công QC tại tab QC |
+| File | Thay đổi |
+|---|---|
+| `customer/dto/CreateCustomerAccountRequest.java` (mới) | `username`, `email`, `password` + validation |
+| `customer/dto/LinkCustomerAccountRequest.java` (mới) | `sourceCustomerId` |
+| `customer/service/CustomerService.java`, `CustomerServiceImpl.java` | `createAccount`, `linkAccount` |
+| `customer/controller/CustomerController.java` | hai endpoint, `HAS_FRONT_DESK` |
+| `customer/repository/CustomerRepository.java` | khóa dòng khi gộp (`findByIdForUpdate`) |
+| `common/constant/ApiPaths.java`, `AuditConstants.java` | đường dẫn `/{id}/account`, `/{id}/account/link`; hai hành động nhật ký |
+| `identity/repository/UserRepository.java` | dùng lại `existsByUsername`, `existsByEmail` |
+| `identity/service/KeycloakIdentityService.java` | dùng lại `createOrLinkUser` |
+| `frontend/src/features/customer/api/customerApi.ts`, `hooks/useCustomers.ts` | `createAccount`, `linkAccount` + mutation |
+| `frontend/src/features/customer/components/CustomerAccountModal.tsx` (mới) | form tạo tài khoản |
+| `frontend/src/features/customer/components/LinkAccountModal.tsx` (mới) | chọn hồ sơ có tài khoản (dùng `GET /customers?hasAccount=true&search=`) |
+| `frontend/src/features/customer/pages/CustomersPage.tsx`, `components/CustomerCards.tsx` | nút, gợi ý mới |
+| Test: `CustomerServiceTest`, `CustomerAccountIntegrationTest` (mới), `CustomersPage.test.tsx` | theo AC |
+| `docs/api/SECURITY.md` | mô tả hai endpoint |
 
 ## 4. Hợp Đồng Kỹ Thuật
 
-**Endpoint** (đường dẫn dùng `ApiPaths.REPAIR_ORDERS_BASE`):
-
-```
-POST /api/v1/repair-orders/{id}/qc-assignment   @PreAuthorize(SecurityConstants.HAS_FRONT_DESK)   -> 201 ApiResponse<TaskAssignmentResponse>
-GET  /api/v1/repair-orders/{id}/qc-assignment   @PreAuthorize(SecurityConstants.HAS_ROLE_INTERNAL_STAFF) -> 200 ApiResponse<TaskAssignmentResponse | null>
-```
-
-**DTO** `QcAssignmentRequest`:
-
-```java
-@NotNull(message = "ID nhân viên không được để trống") private Long employeeId;
-@NotNull(message = "Thời gian bắt đầu không được để trống") private Instant startsAt;
-@NotNull(message = "Thời gian dự kiến kết thúc không được để trống") private Instant endsAt;
-```
-
-**Service** (`LaborExecutionService`):
-
-```java
-TaskAssignmentResponse assignQcInspector(Long actorUserId, Long orderId, QcAssignmentRequest request);
-TaskAssignmentResponse getQcAssignment(Long orderId); // null khi chưa có
-```
-
-Quy tắc `assignQcInspector` (`@Transactional`, khóa phiếu bằng `findByIdForUpdate`):
-
-1. Phiếu phải `WAITING_QC`, nếu không ném `BusinessRuleException("Chỉ phân công kỹ thuật viên QC khi phiếu đang chờ QC")`.
-2. Lấy công việc cuối cùng của phiếu làm điểm gắn. Không có công việc: `BusinessRuleException("Phiếu chưa có công việc để gắn phân công QC")`.
-3. Nếu kỹ thuật viên là thợ chính của phiếu (`RepairOrderAssignmentRepository.findByRepairOrderIdAndAssignmentStage(..., REPAIR_MAIN)`): `BusinessRuleException("Thợ chính đã sửa chữa không được làm kỹ thuật viên QC của phiếu này")`.
-4. Giải phóng mọi phân công QC đang hoạt động của phiếu (`findActiveQcForOrder`): `isActive=false`, `releasedAt=now`. Đóng timer mở nếu có, theo cách `releaseAssignment` đang làm.
-5. Tạo phân công mới bằng đường dùng chung của `assignTask` với vai trò `QC`. Phần này đã có các kiểm tra hoạt động, `canQc`, chồng lịch, ca làm việc, kỹ năng. Lỗi nào xảy ra thì cả giao dịch rollback, phân công cũ giữ nguyên.
-
-Không thêm `ResponseCode` mới, dùng `BusinessRuleException` và `ConflictException` có thông báo tiếng Việt như `assignTask`.
-
-**Frontend**:
-
-```ts
-assignQcInspector(orderId, { employeeId, startsAt, endsAt }): Promise<TaskAssignment>
-getQcAssignment(orderId): Promise<TaskAssignment | null>
-```
-
-- `AssignQcModal` dùng `Modal`, `Field`, `Button`, `FormError` chung và `useOnShiftTechniciansQuery`, lọc `canQc`. Bố cục hai cột theo `UI_DESIGN_GUIDELINES.md`, không có ô chọn vai trò.
-- Khối trong tab QC dùng class có sẵn (`text-xs muted`, `Button variant="secondary"`), không thêm style mới.
-- Điều kiện hiện nút: `canFrontDesk && order.status === 'WAITING_QC'`.
+- `POST /api/v1/customers/{id}/account` — `@PreAuthorize(HAS_FRONT_DESK)`, body:
+  ```json
+  { "username": "an.nguyen", "email": "an@example.com", "password": "…" }
+  ```
+  `username` theo `SecurityConstants.USERNAME_PATTERN`; `email` tùy chọn, mặc định email hồ sơ; `password` qua `PasswordPolicy.validateNewPassword`. Trả `200` + `CustomerResponse`.
+- `POST /api/v1/customers/{id}/account/link` — `@PreAuthorize(HAS_FRONT_DESK)`, body `{ "sourceCustomerId": 12 }`. Trả `200` + `CustomerResponse` của hồ sơ đích.
+- Lỗi: `DUPLICATE_RESOURCE` (tên đăng nhập/email trùng), `BusinessRuleException` cho các điều kiện nghiệp vụ, `AUTHENTICATION_UNAVAILABLE` khi Keycloak lỗi.
+- Thứ tự tạo tài khoản: kiểm tra đầy đủ trong MySQL → `createOrLinkUser` → lưu `users` và `customers.user_id` trong cùng giao dịch. Giống `UserServiceImpl.createUser`: nếu lưu MySQL thất bại sau khi Keycloak đã tạo thì còn tài khoản Keycloak mồ côi; ghi log cảnh báo kèm tên đăng nhập để quản trị viên xử lý.
+- Gộp: khóa cả hai hồ sơ theo thứ tự id tăng dần; đặt `user_id` của nguồn về `NULL` và `flush` trước khi gán cho đích (ràng buộc `uq_customers_user`).
+- UI: `Modal` trong `shared/components/ui`, `Field`, `FormError`; mật khẩu sinh ngẫu nhiên đạt `policy.passwordMinLength`.
 
 ## 5. Checklist Thực Thi
 
-- [x] **Step 1: DTO và service phân công QC** _(AC-1, AC-2, AC-3, AC-4)_
-  - Thêm `QcAssignmentRequest`.
-  - Thêm `assignQcInspector`, `getQcAssignment` vào `LaborExecutionService` và `LaborExecutionServiceImpl`.
-  - Tách phần tạo phân công của `assignTask` thành hàm private dùng chung, giữ nguyên hành vi của `assignTask`.
-- [x] **Step 2: Endpoint trong `RepairOrderController`** _(AC-1, AC-4, AC-5)_
-  - Thêm `POST` và `GET /{id}/qc-assignment` với `@PreAuthorize` và `@Operation` tiếng Việt.
-- [x] **Step 3: Test backend** _(AC-1 → AC-5, AC-10)_
-  - Thêm vào `LaborExecutionServiceTest`: phân công thành công, đổi người (chỉ còn một bản đang hoạt động), phiếu không `WAITING_QC`, phiếu không có công việc, thợ chính, kỹ thuật viên không `canQc`, `getQcAssignment` có và không có.
-  - Chạy `./mvnw test -Dtest=LaborExecutionServiceTest,QualityCheckServiceTest,TV3WorkflowIntegrationTest`.
-- [x] **Step 4: API client, hook và tiện ích dùng chung** _(AC-6, AC-7)_
-  - Thêm hàm vào `repairApi.ts`, hook vào `useRepair.ts`.
-  - Tách `assignmentWindow.ts` và cập nhật `AssignTaskModal.tsx`.
-- [x] **Step 5: `AssignQcModal` và khối phân công trong tab QC** _(AC-6, AC-7, AC-9)_
-  - Tạo `AssignQcModal.tsx`.
-  - Thêm khối "Kỹ thuật viên QC được phân công" và nút "Phân công QC"/"Đổi người".
-  - Đổi điều kiện hai nút "Bắt đầu kiểm tra QC" sang `canPerformQc && WAITING_QC`.
-  - Chạy `npm --prefix frontend run lint`, `tsc` và `test`.
-- [x] **Step 6: Cập nhật tài liệu** _(AC-6)_
-  - Ghi cách phân công QC tại tab QC vào `docs/REPAIR_ORDER_LIFECYCLE.md` mục 2.5.
-- [x] **Step 7: Kiểm thử & xác minh** _(tất cả AC)_
-  - Bật `mysql-test`, chạy `BusinessWorkflowIntegrationTests`.
-  - Build lại container theo `README.md` (jar, frontend, `docker compose build`, `up`).
-  - Trên trình duyệt với admin, lễ tân, kỹ thuật viên: phân công QC, đổi người, admin ghi QC thành công, vai trò không đủ quyền không thấy nút.
-
-<!-- Mục 6 "Kết Quả Hội Tụ" do /converge thêm vào, không viết sẵn. -->
+- [x] **Step 1: DTO, hằng số đường dẫn và hành động nhật ký** _(AC-1, AC-4)_
+- [x] **Step 2: `createAccount` + các điều kiện từ chối + test** _(AC-1, AC-2)_
+- [x] **Step 3: Test tích hợp: tài khoản vừa tạo đăng nhập lần đầu không sinh hồ sơ mới** _(AC-3)_
+- [x] **Step 4: `linkAccount` + điều kiện chặn theo dữ liệu nghiệp vụ + test tích hợp** _(AC-4, AC-5)_
+- [x] **Step 5: Hai endpoint trong `CustomerController`** _(AC-1, AC-4)_
+- [x] **Step 6: API client, hook, `CustomerAccountModal`, `LinkAccountModal`** _(AC-6)_
+- [x] **Step 7: Nút và gợi ý ở màn Khách hàng (bảng và thẻ) + test RTL** _(AC-6)_
+- [x] **Step 8: Cập nhật tài liệu API** _(AC-1, AC-4)_
+- [x] **Step 9: Chạy toàn bộ test; build lại container; kiểm tra trên trình duyệt nếu có phiên đăng nhập** _(AC-7)_
 
 ## 6. Kết Quả Hội Tụ (Converge)
 
-Ngày: 2026-11-05. Kết luận: **partial** (mọi mục trong phạm vi đã có code; các mục kiểm chứng bằng giao diện và phân quyền chưa xác minh).
+Ngày: 2026-11-11. Kết luận: **partial** — mọi tiêu chí có bằng chứng bằng test; chưa thao tác trên trình duyệt (chưa có phiên đăng nhập trong trình duyệt của phiên làm việc). Container đã build lại với code mới.
 
 | Mục tiêu | Trạng thái | Ghi chú |
 |---|---|---|
-| AC-1 Phân công QC khi phiếu `WAITING_QC` | Đạt | `LaborExecutionServiceImpl.java:171`; test `assignQcInspector_Success` (vai trò QC, gắn công việc cuối, không ghi nhật ký công) |
-| AC-2 Đổi người giải phóng phân công cũ | Đạt | Test `assignQcInspector_ReplacesPreviousInspector` kiểm tra `isActive=false`, `releasedAt` |
-| AC-3 Từ chối các trường hợp không hợp lệ | Đạt | Có test: sai trạng thái, chưa có công việc, thợ chính, thiếu `canQc`. Không trong ca và không hoạt động dùng chung kiểm tra của `assignTask` (đã có test riêng ở `assignmentOutsideActiveShiftIsRejected`), chưa có test riêng cho đường QC |
-| AC-4 `GET` trả phân công hoặc `null` | Đạt | `LaborExecutionServiceImpl.java:216`; test `getQcAssignment_ReturnsActiveOrNull`. Chưa gọi thử qua HTTP |
-| AC-5 Chỉ `ADMIN`/`RECEPTIONIST` gọi `POST` | Chưa xác minh | `@PreAuthorize(HAS_FRONT_DESK)` ở `RepairOrderController.java:138`, chưa có test hay lệnh gọi API với vai trò khác |
-| AC-6 Tab QC hiện người được phân công và nút | Chưa xác minh | `RepairOrderDetailModal.tsx:138,911-919`; chưa thử trên trình duyệt |
-| AC-7 Modal chỉ liệt kê người QC trong ca | Chưa xác minh | `AssignQcModal.tsx` lọc `canQc` từ danh sách đang trong ca; chưa thử trên trình duyệt |
-| AC-8 Admin ghi QC được sau khi phân công | Chưa xác minh | Đường backend đã có test ở `qc-admin-on-behalf` (`adminRecordsQcOnBehalfOfAssignedInspector`); chưa chạy trọn luồng trên container |
-| AC-9 Nút "Bắt đầu kiểm tra QC" theo vai trò và trạng thái | Đạt (code) / chưa xác minh UI | `RepairOrderDetailModal.tsx:938,952` dùng `canPerformQc && WAITING_QC`; lint, `tsc`, build qua |
-| AC-10 Test hiện có vẫn qua | Đạt | `./mvnw test` 41/41 (gồm `BusinessWorkflowIntegrationTests` với MySQL test), Vitest 111/111 |
+| AC-1 Tạo tài khoản cho khách có sẵn | Đạt | `CustomerServiceTest.createAccount_CreatesIdentityAndLinksProfile`; `CustomerAccountIntegrationTest` kiểm `users.identity_id`, email mặc định từ hồ sơ |
+| AC-2 Các điều kiện từ chối, không gọi Keycloak | Đạt | 3 test: đã có tài khoản, trùng tên đăng nhập/email, khách ngừng hoạt động (`verifyNoInteractions`) |
+| AC-3 Đăng nhập lần đầu không sinh hồ sơ mới | Đạt | `createdAccountSignsIntoTheExistingProfile` đi qua `AuthService.me()` thật trên MySQL |
+| AC-4 Nối tài khoản | Đạt | `linkMovesTheAccountAndRetiresTheDuplicate` |
+| AC-5 Chặn gộp khi còn dữ liệu nghiệp vụ | Đạt | `linkRefusesWhenTheDuplicateHasBusinessData` (thông báo "1 xe"); các điều kiện còn lại nằm trong `linkAccount` |
+| AC-6 Giao diện | Đạt (chưa xác minh trình duyệt) | `CustomersPage.test.tsx`: nút chỉ hiện với khách chưa có tài khoản, tạo tài khoản gửi tên gợi ý, email hồ sơ, mật khẩu sinh ngẫu nhiên; thẻ di động cũng có hai nút |
+| AC-7 Toàn bộ test | Đạt | `./mvnw test` 627/627; vitest 198/198 (`--maxWorkers=3 --testTimeout=30000`); `tsc -b`, `eslint` xanh |
 
-Điều chỉnh so với plan: kiểm tra kỹ năng dịch vụ được bỏ qua cho vai trò QC (`createAssignment(..., checkServiceSkills=false)`), vì người kiểm định không cần kỹ năng của dịch vụ gắn vào công việc cuối. `assignTask` thường giữ nguyên.
+**Điều chỉnh kèm theo:** quy tắc trạng thái tài khoản (`AccountSummary.statusOf`, plan `account-status-visibility`) đổi thành "Đang hoạt động" chỉ khi đã có `last_login_at`. Trước đó chỉ cần có `identity_id`, nên tài khoản do lễ tân/quản trị viên vừa tạo hiện "Đang hoạt động" dù chưa đăng nhập. Hệ quả: các tài khoản cũ chưa từng ghi `last_login_at` hiện "Chưa đăng nhập lần nào" cho tới lần đăng nhập kế tiếp.
 
-Còn lại cần kiểm tay trên container mới: phân công/đổi QC bằng admin và lễ tân, kỹ thuật viên không thấy nút, admin ghi QC thành công sau khi phân công, gọi `POST` bằng vai trò kỹ thuật viên nhận 403.
+**Còn lại:** nếu lưu MySQL thất bại sau khi Keycloak đã tạo tài khoản thì còn tài khoản Keycloak mồ côi (giống `UserServiceImpl.createUser`); chỉ ghi log cảnh báo. Bật xác thực email để tự nối vẫn ngoài phạm vi.
+

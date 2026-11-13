@@ -1,0 +1,64 @@
+@startuml A2-tiep-nhan-ban-giao
+title A2 — Từ tiếp nhận xe đến bàn giao (UC09–UC12, UC16–UC19, UC27, UC31)
+|Lễ tân|
+start
+:Nhập ODO, nhiên liệu, lời khách kể;\nchọn thợ chẩn đoán, khoang;
+|Hệ thống|
+:Tạo phiếu sửa chữa;
+note right: phiếu NEW\nlịch hẹn → RECEIVED (tối đa 1 phiếu / lịch)
+:Ghi biên bản CHECK_IN và ảnh hiện trạng;
+|Kỹ thuật viên|
+:Bắt đầu chẩn đoán;
+note right: phiếu DIAGNOSING
+:Ghi kết luận chẩn đoán, ảnh lỗi;
+|Lễ tân|
+:Lập báo giá (A3);
+note right: phiếu WAITING_APPROVAL\nchẩn đoán bị chốt
+|Khách hàng|
+if (Duyệt ít nhất một dòng?) then (có)
+  |Hệ thống|
+  :Sinh công việc, giữ phụ tùng;
+  note right: phiếu APPROVED
+else (từ chối hết)
+  |Kỹ thuật viên|
+  :Mở lại chẩn đoán hoặc trả xe;
+  stop
+endif
+|Lễ tân|
+:Phân công thợ chính, thợ phụ\n(đúng ca, đúng kỹ năng);
+repeat
+  |Kỹ thuật viên|
+  :Bắt đầu timer;
+  note right: phiếu IN_PROGRESS\nmỗi thợ chỉ 1 timer (BR10)
+  :Làm việc;
+  if (Tạm dừng?) then (có)
+    :Dừng timer, chốt phiên;
+  else (xong)
+    :Hoàn thành công việc;
+  endif
+repeat while (Còn công việc chưa xong?) is (còn)
+|Hệ thống|
+:Phiếu WAITING_QC;
+|Kỹ thuật viên|
+:Kiểm tra chất lượng\n(can_qc, không phải thợ chính);
+if (QC đạt?) then (PASSED)
+  |Hệ thống|
+  :Phiếu COMPLETED;
+else (FAILED)
+  |Hệ thống|
+  :Phiếu QC_FAILED, công việc REWORK;
+  |Kỹ thuật viên|
+  :Làm lại rồi QC lần mới;
+  |Hệ thống|
+  :Phiếu COMPLETED sau QC đạt;
+endif
+|Lễ tân|
+:Lập hóa đơn, thu tiền (A5);
+note right: phiếu INVOICED
+:Nhập ODO ra, bàn giao xe;
+|Hệ thống|
+:Kiểm tra đã thanh toán hoặc trong hạn mức nợ;
+:Giải phóng khoang, lượng giữ;\ntạo sổ bảo hành, ghi hoa hồng;
+note right: phiếu CLOSED
+stop
+@enduml

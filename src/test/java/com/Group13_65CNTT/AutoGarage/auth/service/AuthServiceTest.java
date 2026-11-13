@@ -99,6 +99,22 @@ class AuthServiceTest {
         verify(customerRepository).saveAndFlush(customer);
     }
 
+    @org.junit.jupiter.api.BeforeEach
+    void fixedClock() {
+        org.mockito.Mockito.lenient().when(clock.instant()).thenReturn(java.time.Instant.parse("2026-11-11T08:00:00Z"));
+    }
+
+    @Test
+    void meRecordsTheSignInAtMostOncePerHour() {
+        when(currentUser.userIdOrNull()).thenReturn(1L);
+        when(currentUser.subjectOrNull()).thenReturn("customer-subject");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user()));
+        when(customerRepository.findByUserId(1L)).thenReturn(Optional.of(new Customer()));
+        service.me();
+        verify(userRepository).touchLastLogin(1L, java.time.Instant.parse("2026-11-11T08:00:00Z"),
+                java.time.Instant.parse("2026-11-11T07:00:00Z"));
+    }
+
     private void arrangeMe(String tokenEmail) {
         when(currentUser.userIdOrNull()).thenReturn(1L);
         when(currentUser.subjectOrNull()).thenReturn("customer-subject");

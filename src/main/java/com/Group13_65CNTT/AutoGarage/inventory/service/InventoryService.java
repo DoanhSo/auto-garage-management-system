@@ -2,6 +2,7 @@ package com.Group13_65CNTT.AutoGarage.inventory.service;
 
 import com.Group13_65CNTT.AutoGarage.inventory.dto.request.InventoryDocumentCreateRequest;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.response.InventoryDocumentResponse;
+import com.Group13_65CNTT.AutoGarage.inventory.dto.response.IssueCandidateResponse;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.response.InventoryTransactionResponse;
 import com.Group13_65CNTT.AutoGarage.inventory.dto.response.StockReconciliationResponse;
 import com.Group13_65CNTT.AutoGarage.inventory.entity.DocumentStatus;
@@ -29,6 +30,9 @@ public interface InventoryService extends InventoryOperations {
             Pageable pageable);
 
     void cancelDocument(long actorUserId, Long documentId);
+
+    /** Approved parts of the repair order that are reserved and still waiting to be issued. */
+    List<IssueCandidateResponse> getIssueCandidates(Long repairOrderId);
 
     Page<InventoryTransactionResponse> getTransactionsByPartId(Long partId, Pageable pageable);
 

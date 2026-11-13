@@ -42,6 +42,16 @@ public interface EmployeeShiftRepository extends JpaRepository<EmployeeShift, Lo
 
     Page<EmployeeShift> findByStatus(ShiftStatus status, Pageable pageable);
 
+    /** Shifts overlapping [from, to), optionally narrowed by employee and status. */
+    @Query("SELECT s FROM EmployeeShift s WHERE (:employeeId IS NULL OR s.employeeId = :employeeId) "
+            + "AND (:status IS NULL OR s.status = :status) AND s.endsAt > :from AND s.startsAt < :to")
+    Page<EmployeeShift> searchShifts(
+            @Param("employeeId") Long employeeId,
+            @Param("status") ShiftStatus status,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            Pageable pageable);
+
     @Query("SELECT s FROM EmployeeShift s WHERE s.serviceBayId = :bayId AND s.status = 'ACTIVE' " +
            "AND s.startsAt < :to AND s.endsAt > :from ORDER BY s.startsAt, s.employeeId")
     List<EmployeeShift> findActiveByBayBetween(

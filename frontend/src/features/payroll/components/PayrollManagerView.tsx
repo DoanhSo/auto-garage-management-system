@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { EmployeeLink } from '../../staff/components/EmployeeLink';
+import { useSearchParams } from 'react-router-dom';
 import {
   Calculator,
   ChevronLeft,
@@ -25,6 +27,8 @@ import {
   QueryError,
 } from '../../../shared/components/ui';
 import { csvMoney, csvSections, downloadCsv } from '../../../shared/utils/csvExport';
+import { RelatedLinks } from '../../../shared/components/RelatedLinks';
+import { SCHEDULING_ROLES, STAFF_MANAGE_ROLES } from '../../../app/access';
 import { useUrlTab } from '../../../shared/hooks/useUrlTab';
 import { formatDate, money } from '../../../shared/utils/format';
 import { useSchedulingEmployeesQuery } from '../../scheduling/hooks/useScheduling';
@@ -44,10 +48,8 @@ import {
   periodStatusVariant,
   type PayrollItem,
 } from '../types/payroll';
-import { EmployeePayrollDirectory } from './EmployeePayrollDirectory';
 import { EmployeeWorkSummaryModal } from './EmployeeWorkSummaryModal';
 import { PayrollAdjustModal } from './PayrollAdjustModal';
-import { SalaryCoefficientManager } from './SalaryCoefficientManager';
 import { ShiftBonusPolicyPanel } from './ShiftBonusPolicyPanel';
 
 type ItemRow = PayrollItem & { id: string };
@@ -67,6 +69,9 @@ export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
   const [skill, setSkill] = useState('ALL');
   const [confirm, setConfirm] = useState<'approve' | 'disburse' | null>(null);
   const [summaryItem, setSummaryItem] = useState<PayrollItem | null>(null);
+  const [params, setParams] = useSearchParams();
+  // ?employeeId= opens that employee's work summary, so other screens can link straight to it.
+  const linkedEmployeeId = params.get('employeeId');
   const [editing, setEditing] = useState<PayrollItem | null>(null);
 
   const key = monthKey(year, month);
@@ -211,7 +216,9 @@ export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
         const skills = skillsByEmployee.get(id) ?? [];
         return (
           <div>
-            <strong>{row.original.employeeName ?? '—'}</strong>
+            <EmployeeLink id={row.original.employeeId}>
+              {row.original.employeeName ?? '—'}
+            </EmployeeLink>
             <div className="description">
               {row.original.employeeCode}
               {skills.length > 0 && ` · ${skills.map((s) => SKILL_LABELS[s] ?? s).join(', ')}`}
@@ -306,8 +313,14 @@ export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
     <div className="page">
       <PageHeader
         eyebrow="Tài chính & Nhân sự"
-        title="Bảng lương & Quản trị nhân sự"
-        description="Theo dõi ca trực, năng suất, hồ sơ nhân viên và chính sách lương thưởng theo tháng."
+        title="Bảng lương"
+        description="Theo dõi giờ công, năng suất, thưởng ca và thực lĩnh của nhân viên theo tháng."
+      />
+      <RelatedLinks
+        links={[
+          { to: '/staff', label: 'Quản lý nhân viên', roles: STAFF_MANAGE_ROLES },
+          { to: '/scheduling?tab=shifts', label: 'Lịch ca làm việc', roles: SCHEDULING_ROLES },
+        ]}
       />
 
       <div className="tabs" role="group" aria-label="Màn hình bảng lương">
@@ -317,9 +330,6 @@ export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
           </button>
         ))}
       </div>
-
-      {tab === 'employees' && <EmployeePayrollDirectory canCreate={canApprove} />}
-      {tab === 'coefficients' && <SalaryCoefficientManager />}
 
       {(tab === 'monthly' || tab === 'bonus') && (
         <section className="panel" aria-label="Chọn kỳ lương">
@@ -414,9 +424,7 @@ export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
       )}
 
       {tab === 'monthly' && query.isLoading && <Loading />}
-      {tab !== 'employees' && tab !== 'coefficients' && query.isError && (
-        <QueryError error={query.error} retry={() => void query.refetch()} />
-      )}
+      {query.isError && <QueryError error={query.error} retry={() => void query.refetch()} />}
 
       {tab === 'monthly' && query.isSuccess && !period && (
         <section className="panel stack" aria-label="Chưa có kỳ lương">
@@ -510,10 +518,25 @@ export function PayrollManagerView({ canApprove }: { canApprove: boolean }) {
       )}
 
       <EmployeeWorkSummaryModal
-        employeeId={summaryItem?.employeeId ?? null}
-        employeeName={summaryItem?.employeeName}
-        month={period?.periodMonth ?? ''}
-        onClose={() => setSummaryItem(null)}
+        employeeId={summaryItem?.employeeId ?? (query.isSuccess ? linkedEmployeeId : null)}
+        employeeName={
+          summaryItem?.employeeName ??
+          items.find((item) => String(item.employeeId) === linkedEmployeeId)?.employeeName
+        }
+        month={period?.periodMonth ?? key}
+        onClose={() => {
+          setSummaryItem(null);
+          if (linkedEmployeeId) {
+            setParams(
+              (previous) => {
+                const updated = new URLSearchParams(previous);
+                updated.delete('employeeId');
+                return updated;
+              },
+              { replace: true },
+            );
+          }
+        }}
       />
       <PayrollAdjustModal item={editing} onClose={() => setEditing(null)} />
 

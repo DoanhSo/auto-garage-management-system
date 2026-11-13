@@ -1,3 +1,4 @@
+import type { AccountSummary } from '../../../shared/types/contracts';
 export * from './schedulingTypes';
 
 export type ShiftStatus =
@@ -57,6 +58,7 @@ export interface ServiceBayCreateInput {
 export interface Employee {
   id: string | number;
   userId: string | number;
+  account?: AccountSummary | null;
   employeeCode: string;
   fullName?: string | null;
   username?: string | null;

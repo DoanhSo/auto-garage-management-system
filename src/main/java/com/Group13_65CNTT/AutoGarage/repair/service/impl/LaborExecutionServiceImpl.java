@@ -5,6 +5,8 @@ import com.Group13_65CNTT.AutoGarage.repair.dto.request.QcAssignmentRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.TaskAssignmentRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.request.TaskCompletionRequest;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.LaborSessionResponse;
+import com.Group13_65CNTT.AutoGarage.repair.dto.response.QcCandidateResponse;
+import com.Group13_65CNTT.AutoGarage.scheduling.dto.response.OnShiftTechnicianResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.TaskAssignmentResponse;
 import com.Group13_65CNTT.AutoGarage.repair.dto.response.TaskWorkSummaryResponse;
 import com.Group13_65CNTT.AutoGarage.repair.entity.*;
@@ -15,6 +17,7 @@ import com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderRepository;
 import com.Group13_65CNTT.AutoGarage.repair.repository.RepairTaskRepository;
 import com.Group13_65CNTT.AutoGarage.repair.repository.TaskAssignmentRepository;
 import com.Group13_65CNTT.AutoGarage.repair.service.LaborExecutionService;
+import com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode;
 import com.Group13_65CNTT.AutoGarage.scheduling.entity.Employee;
 import com.Group13_65CNTT.AutoGarage.scheduling.repository.EmployeeRepository;
 import com.Group13_65CNTT.AutoGarage.shared.exception.BusinessRuleException;
@@ -50,8 +53,14 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
 
     private final com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderAssignmentRepository workLogRepository;
 
+    private final com.Group13_65CNTT.AutoGarage.scheduling.service.DispatchService dispatchService;
+
     private final TaskAssignmentMapper taskAssignmentMapper;
     private final LaborSessionMapper laborSessionMapper;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.Group13_65CNTT.AutoGarage.shared.contracts.InventoryOperations inventoryOperations;
 
     // =========================================================================
     // TV3-06 Phân công KTV
@@ -225,6 +234,30 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<QcCandidateResponse> getQcCandidates(Long orderId) {
+        if (!repairOrderRepository.existsById(orderId)) {
+            throw new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa với ID: " + orderId);
+        }
+        java.util.Set<Long> mainRepairers = workLogRepository
+                .findByRepairOrderIdAndAssignmentStage(orderId, AssignmentStage.REPAIR_MAIN).stream()
+                .map(RepairOrderAssignment::getEmployeeId)
+                .collect(java.util.stream.Collectors.toSet());
+        return dispatchService.getOnShiftTechnicians().stream()
+                .filter(OnShiftTechnicianResponse::canQc)
+                .map(tech -> {
+                    boolean main = mainRepairers.contains(tech.employeeId());
+                    return new QcCandidateResponse(
+                            tech.employeeId(), tech.employeeCode(), tech.fullName(), tech.shiftEndsAt(),
+                            tech.serviceBayId(), tech.bayCode(), tech.bayName(), tech.skills(),
+                            !main, main ? QcCandidateResponse.Reason.MAIN_REPAIRER : null);
+                })
+                .sorted(java.util.Comparator.comparing(QcCandidateResponse::eligible).reversed()
+                        .thenComparing(QcCandidateResponse::fullName, java.text.Collator.getInstance()))
+                .toList();
+    }
+
+    @Override
     @Transactional
     public void releaseAssignment(Long actorUserId, Long assignmentId) {
         log.info("Releasing assignment #{} by actor #{}", assignmentId, actorUserId);
@@ -280,11 +313,12 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
 
         RepairTask task = repairTaskRepository.findByIdForUpdate(assignment.getTaskId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy công việc"));
-        requireOpenOrder(task.getRepairOrderId());
+        RepairOrder order = requireOpenOrder(task.getRepairOrderId());
         if (task.getStatus() == TaskStatus.COMPLETED || task.getStatus() == TaskStatus.CANCELLED
                 || assignment.getAssignmentRole() == AssignmentRole.QC) {
             throw new BusinessRuleException("Không thể bấm giờ thi công cho công việc đã kết thúc hoặc phân công QC");
         }
+        requireWorkStartAllowed(order);
 
         Employee employee = employeeRepository.findById(assignment.getEmployeeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy kỹ thuật viên"));
@@ -388,6 +422,9 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
         }
 
         requireOpenOrder(task.getRepairOrderId());
+        if (task.getTaskType() == TaskType.REPAIR) {
+            inventoryOperations.requireIssuedBeforeCompletion(task.getRepairOrderId());
+        }
 
         Instant now = Instant.now();
 
@@ -445,13 +482,36 @@ public class LaborExecutionServiceImpl implements LaborExecutionService {
                 .orElse(employee.getEmployeeCode());
     }
 
-    private void requireOpenOrder(Long orderId) {
+    private RepairOrder requireOpenOrder(Long orderId) {
         RepairOrder order = repairOrderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiếu sửa chữa"));
         if (order.getStatus() == RepairOrderStatus.CLOSED || order.getStatus() == RepairOrderStatus.CANCELLED
                 || order.getStatus() == RepairOrderStatus.INVOICED) {
             throw new BusinessRuleException("Phiếu đã kết thúc hoặc xuất hóa đơn, không thể tiếp tục thi công");
         }
+        return order;
+    }
+
+    /**
+     * Work may start only after the customer approved the estimate and every reserved part of the order
+     * has been issued from stock.
+     */
+    private void requireWorkStartAllowed(RepairOrder order) {
+        RepairOrderStatus status = order.getStatus();
+        if (status == RepairOrderStatus.NEW || status == RepairOrderStatus.DIAGNOSING
+                || status == RepairOrderStatus.WAITING_APPROVAL) {
+            throw new ConflictException(ResponseCode.WORK_START_BLOCKED,
+                    "Phiếu chưa được duyệt báo giá. Hãy duyệt báo giá trước khi bắt đầu công việc.");
+        }
+        if (status == RepairOrderStatus.WAITING_PARTS) {
+            throw new ConflictException(ResponseCode.WORK_START_BLOCKED,
+                    "Phiếu đang chờ phụ tùng. Hãy xuất kho đủ phụ tùng trước khi bắt đầu công việc.");
+        }
+        if (status == RepairOrderStatus.WAITING_QC || status == RepairOrderStatus.COMPLETED) {
+            throw new ConflictException(ResponseCode.WORK_START_BLOCKED,
+                    "Phiếu đã xong thi công, không thể bắt đầu thêm công việc.");
+        }
+        inventoryOperations.requireIssuedForWorkStart(order.getId());
     }
 
     private java.util.Set<String> skills(String value) {

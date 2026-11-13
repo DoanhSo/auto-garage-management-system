@@ -95,6 +95,8 @@ class LaborExecutionServiceTest {
     private com.Group13_65CNTT.AutoGarage.catalog.repository.ServiceRepository serviceRepository;
     @Mock
     private com.Group13_65CNTT.AutoGarage.repair.repository.RepairOrderAssignmentRepository workLogRepository;
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.scheduling.service.DispatchService dispatchService;
 
     private RepairOrder mockOrder;
     private RepairTask mockTask;
@@ -103,6 +105,8 @@ class LaborExecutionServiceTest {
 
     @BeforeEach
     void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                laborExecutionService, "inventoryOperations", inventoryOperations);
         mockOrder = RepairOrder.builder()
                 .id(100L)
                 .orderCode("RO-20261023-00001")
@@ -290,6 +294,70 @@ class LaborExecutionServiceTest {
                 .hasMessageContaining("đang có một phiên bấm giờ chưa kết thúc");
     }
 
+    // ---- Cổng bắt đầu công việc: báo giá đã duyệt và phụ tùng đã xuất kho ----
+
+    @Mock
+    private com.Group13_65CNTT.AutoGarage.shared.contracts.InventoryOperations inventoryOperations;
+
+    private void stubTimerBasics() {
+        when(taskAssignmentRepository.findById(1L)).thenReturn(Optional.of(mockAssignment));
+    }
+
+    @Test
+    @DisplayName("Cổng bắt đầu việc: phiếu chờ duyệt báo giá bị chặn WORK_START_BLOCKED")
+    void startTimer_WaitingApproval_Blocked() {
+        stubTimerBasics();
+        mockOrder.setStatus(RepairOrderStatus.WAITING_APPROVAL);
+
+        assertThatThrownBy(() -> laborExecutionService.startTimer(1L, 1L))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("responseCode",
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.WORK_START_BLOCKED)
+                .hasMessageContaining("duyệt báo giá");
+        verify(laborSessionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Cổng bắt đầu việc: phiếu chờ phụ tùng bị chặn")
+    void startTimer_WaitingParts_Blocked() {
+        stubTimerBasics();
+        mockOrder.setStatus(RepairOrderStatus.WAITING_PARTS);
+
+        assertThatThrownBy(() -> laborExecutionService.startTimer(1L, 1L))
+                .hasFieldOrPropertyWithValue("responseCode",
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.WORK_START_BLOCKED)
+                .hasMessageContaining("chờ phụ tùng");
+    }
+
+    @Test
+    @DisplayName("Cổng bắt đầu việc: còn phụ tùng giữ chỗ chưa xuất kho thì nêu tên và dặn xuất kho")
+    void startTimer_PartsNotIssued_Blocked() {
+        stubTimerBasics();
+        doThrow(new ConflictException(com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.WORK_START_BLOCKED,
+                "Còn phụ tùng đã giữ chỗ nhưng chưa xuất kho: Lọc dầu. Hãy xuất kho trước khi bắt đầu công việc."))
+                .when(inventoryOperations).requireIssuedForWorkStart(100L);
+
+        assertThatThrownBy(() -> laborExecutionService.startTimer(1L, 1L))
+                .hasMessageContaining("Lọc dầu")
+                .hasMessageContaining("xuất kho");
+        verify(laborSessionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Cổng bắt đầu việc: làm lại sau QC trượt vẫn bấm giờ được khi đã xuất đủ")
+    void startTimer_QcFailedRework_Allowed() {
+        stubTimerBasics();
+        mockOrder.setStatus(RepairOrderStatus.QC_FAILED);
+        when(employeeRepository.findById(5L)).thenReturn(Optional.of(mockEmployee));
+        when(laborSessionRepository.findTopByEmployeeIdAndEndsAtIsNull(5L)).thenReturn(Optional.empty());
+        LaborSession session = LaborSession.builder().id(99L).assignmentId(1L).employeeId(5L).build();
+        when(laborSessionRepository.save(any(LaborSession.class))).thenReturn(session);
+        when(laborSessionMapper.toResponse(session)).thenReturn(LaborSessionResponse.builder().id(99L).build());
+
+        assertThat(laborExecutionService.startTimer(1L, 1L)).isNotNull();
+        verify(inventoryOperations).requireIssuedForWorkStart(100L);
+    }
+
     @Test
     @DisplayName("TV3-07: Tạm dừng bấm giờ (PAUSE) cập nhật stop_reason và chuyển task sang PAUSED")
     void stopTimer_Pause_Success() {
@@ -320,6 +388,21 @@ class LaborExecutionServiceTest {
     // =========================================================================
     // TV3-08 Hoàn thành công việc
     // =========================================================================
+
+    @Test
+    @DisplayName("Hoàn thành công việc sửa chữa khi còn phụ tùng chưa xuất kho: báo đúng bước đang làm")
+    void completeTask_PartsPending_UsesCompletionGate() {
+        org.mockito.Mockito.doThrow(new ConflictException(
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.PARTS_PENDING_ISSUE,
+                        "Hãy xuất kho hoặc hủy giữ chỗ trước khi hoàn thành công việc."))
+                .when(inventoryOperations).requireIssuedBeforeCompletion(100L);
+
+        assertThatThrownBy(() -> laborExecutionService.completeTask(1L, 10L, new TaskCompletionRequest("Xong")))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("responseCode",
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.PARTS_PENDING_ISSUE);
+        verify(inventoryOperations, org.mockito.Mockito.never()).requireIssuedForWorkStart(100L);
+    }
 
     @Test
     @DisplayName("TV3-08: Hoàn thành công việc đóng timer, giải phóng phân công và chuyển phiếu sang WAITING_QC khi hết việc")
@@ -468,5 +551,79 @@ class LaborExecutionServiceTest {
 
         when(taskAssignmentRepository.findActiveQcForOrder(100L)).thenReturn(List.of());
         assertThat(laborExecutionService.getQcAssignment(100L)).isNull();
+    }
+
+    // =========================================================================
+    // Danh sách ứng viên QC theo ca đang trực
+    // =========================================================================
+
+    private com.Group13_65CNTT.AutoGarage.scheduling.dto.response.OnShiftTechnicianResponse onShift(
+            long employeeId, String name, boolean canQc, Long bayId, String bayCode) {
+        return new com.Group13_65CNTT.AutoGarage.scheduling.dto.response.OnShiftTechnicianResponse(
+                employeeId, "NV-" + employeeId, name, 100L + employeeId, null, null,
+                Instant.now().minus(1, ChronoUnit.HOURS), Instant.now().plus(3, ChronoUnit.HOURS),
+                bayId, bayCode, bayId == null ? null : "Khoang " + bayCode, List.of("ENGINE"), canQc,
+                0, 0, BigDecimal.ZERO, false, null,
+                com.Group13_65CNTT.AutoGarage.scheduling.dto.response.OnShiftTechnicianResponse.Availability.AVAILABLE);
+    }
+
+    @Test
+    @DisplayName("Ứng viên QC: chỉ người có quyền QC đang trong ca; người ca gắn khoang vẫn chọn được")
+    void getQcCandidates_ListsQcCapableOnShiftIncludingBayFixed() {
+        when(repairOrderRepository.existsById(100L)).thenReturn(true);
+        when(workLogRepository.findByRepairOrderIdAndAssignmentStage(100L, AssignmentStage.REPAIR_MAIN))
+                .thenReturn(List.of());
+        when(dispatchService.getOnShiftTechnicians()).thenReturn(List.of(
+                onShift(1L, "An", true, 6L, "B06"),
+                onShift(2L, "Binh", false, null, null),
+                onShift(3L, "Chi", true, null, null)));
+
+        var result = laborExecutionService.getQcCandidates(100L);
+
+        assertThat(result).extracting(c -> c.employeeId()).containsExactly(1L, 3L);
+        var bayFixed = result.get(0);
+        assertThat(bayFixed.eligible()).isTrue();
+        assertThat(bayFixed.reason()).isNull();
+        assertThat(bayFixed.serviceBayId()).isEqualTo(6L);
+        assertThat(bayFixed.bayCode()).isEqualTo("B06");
+    }
+
+    @Test
+    @DisplayName("Ứng viên QC: thợ chính của phiếu vẫn hiện nhưng bị khóa với lý do MAIN_REPAIRER, xếp sau người chọn được")
+    void getQcCandidates_MarksMainRepairerIneligible() {
+        when(repairOrderRepository.existsById(100L)).thenReturn(true);
+        when(workLogRepository.findByRepairOrderIdAndAssignmentStage(100L, AssignmentStage.REPAIR_MAIN))
+                .thenReturn(List.of(RepairOrderAssignment.builder().employeeId(1L).build()));
+        when(dispatchService.getOnShiftTechnicians()).thenReturn(List.of(
+                onShift(1L, "An", true, 6L, "B06"),
+                onShift(3L, "Chi", true, null, null)));
+
+        var result = laborExecutionService.getQcCandidates(100L);
+
+        assertThat(result).extracting(c -> c.employeeId()).containsExactly(3L, 1L);
+        assertThat(result.get(1).eligible()).isFalse();
+        assertThat(result.get(1).reason())
+                .isEqualTo(com.Group13_65CNTT.AutoGarage.repair.dto.response.QcCandidateResponse.Reason.MAIN_REPAIRER);
+    }
+
+    @Test
+    @DisplayName("Ứng viên QC: không ai trong ca lúc này (ca chỉ ở ngày đã qua) thì danh sách rỗng")
+    void getQcCandidates_EmptyWhenNobodyOnShiftNow() {
+        when(repairOrderRepository.existsById(100L)).thenReturn(true);
+        when(workLogRepository.findByRepairOrderIdAndAssignmentStage(100L, AssignmentStage.REPAIR_MAIN))
+                .thenReturn(List.of());
+        when(dispatchService.getOnShiftTechnicians()).thenReturn(List.of());
+
+        assertThat(laborExecutionService.getQcCandidates(100L)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Ứng viên QC: phiếu không tồn tại thì báo không tìm thấy")
+    void getQcCandidates_UnknownOrder() {
+        when(repairOrderRepository.existsById(999L)).thenReturn(false);
+
+        assertThatThrownBy(() -> laborExecutionService.getQcCandidates(999L))
+                .isInstanceOf(com.Group13_65CNTT.AutoGarage.shared.exception.ResourceNotFoundException.class);
+        verifyNoInteractions(dispatchService);
     }
 }

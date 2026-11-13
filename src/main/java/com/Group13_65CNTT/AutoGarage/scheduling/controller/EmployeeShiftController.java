@@ -170,13 +170,15 @@ public class EmployeeShiftController {
     public ResponseEntity<ApiResponse<Page<ShiftResponse>>> getShifts(
             @RequestParam(required = false) Long employeeId,
             @RequestParam(required = false) ShiftStatus status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(required = false) Integer size,
             @RequestParam(defaultValue = "startsAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
             HttpServletRequest httpRequest) {
         Page<ShiftResponse> responses = schedulingService.getShifts(
-                employeeId, status, pagination.page(page, size != null ? size : pagination.defaultSize(), sortBy, sortDir, SORT_FIELDS));
+                employeeId, status, from, to, pagination.page(page, size != null ? size : pagination.defaultSize(), sortBy, sortDir, SORT_FIELDS));
         return ResponseEntity.ok(ApiResponse.success(ResponseCode.SUCCESS, responses, httpRequest.getRequestURI()));
     }
 

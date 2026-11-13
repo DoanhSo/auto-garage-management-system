@@ -276,11 +276,17 @@ public class EstimateServiceImpl implements EstimateService, EstimateApproval {
     @Transactional(readOnly = true)
     public Page<EstimateResponse> searchEstimates(Long repairOrderId, EstimateStatus status,
                                                   int page, int size, String sortBy, String sortDir) {
-        if (repairOrderId == null) customerScope.requireTechnical();
-        else customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.REPAIR_ORDER, repairOrderId);
+        // Customers see only estimates of their own orders, and never unsent drafts.
+        Long customerId = customerScope.customerIdForQuery(null);
+        if (repairOrderId != null) {
+            customerScope.requireResource(com.Group13_65CNTT.AutoGarage.common.enums.AccessResource.REPAIR_ORDER, repairOrderId);
+        } else if (customerId == null) {
+            customerScope.requireTechnical();
+        }
         Pageable pageable = pagination.page(page, size, sortBy, sortDir,
                 Set.of("id", "estimateCode", "versionNo", "status", "createdAt", "totalAmount"));
-        Page<Estimate> pageResult = estimateRepository.searchEstimates(repairOrderId, status, pageable);
+        Page<Estimate> pageResult = estimateRepository.searchEstimates(
+                repairOrderId, status, customerId, customerId != null, pageable);
         return pageResult.map(est -> {
             List<EstimateItemResponse> items = estimateItemRepository.findByEstimateIdOrderByLineNoAsc(est.getId()).stream()
                     .map(estimateItemMapper::toResponse)

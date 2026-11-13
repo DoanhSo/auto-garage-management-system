@@ -66,6 +66,8 @@ public class AuthServiceImpl implements AuthService {
                 user = userRepository.saveAndFlush(user);
             }
         }
+        java.time.Instant now = clock.instant();
+        userRepository.touchLastLogin(user.getId(), now, now.minus(SecurityConstants.LAST_LOGIN_REFRESH_INTERVAL));
         if (user.getRole() == Role.CUSTOMER && customerRepository != null) {
             ensureCustomerProfileLinked(user);
         }

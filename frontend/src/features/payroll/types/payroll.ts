@@ -157,12 +157,10 @@ export interface PayrollItemAdjustInput {
 }
 
 /** Sub-screens of /payroll, kept in `?tab=` so the sidebar tree and the page tabs agree. */
-export const PAYROLL_TABS = ['monthly', 'employees', 'coefficients', 'bonus'] as const;
+export const PAYROLL_TABS = ['monthly', 'bonus'] as const;
 export type PayrollTab = (typeof PAYROLL_TABS)[number];
 export const payrollTabLabels: Record<PayrollTab, string> = {
   monthly: 'Bảng lương tháng',
-  employees: 'Quản lý nhân viên',
-  coefficients: 'Hệ số & Đơn giá lương',
   bonus: 'Chính sách thưởng ca',
 };
 

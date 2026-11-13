@@ -23,6 +23,15 @@ public class CustomerResponse {
     private Instant createdAt;
     private Instant updatedAt;
     private Long version;
+    private com.Group13_65CNTT.AutoGarage.identity.dto.response.AccountSummary account;
+
+    public com.Group13_65CNTT.AutoGarage.identity.dto.response.AccountSummary getAccount() {
+        return account;
+    }
+
+    public void setAccount(com.Group13_65CNTT.AutoGarage.identity.dto.response.AccountSummary account) {
+        this.account = account;
+    }
 
     public Long getId() {
         return id;

@@ -6,6 +6,7 @@ import { z } from 'zod';
 export interface CustomerQueryParams {
   search?: string;
   isActive?: boolean;
+  hasAccount?: boolean;
 }
 
 export const customerApi = {
@@ -17,6 +18,7 @@ export const customerApi = {
         queryString({
           search: params?.search,
           isActive: params?.isActive,
+          hasAccount: params?.hasAccount,
         }),
       { signal },
     );
@@ -48,6 +50,22 @@ export const customerApi = {
     });
     return customerSchema.parse(raw);
   },
+
+  createAccount: async (
+    id: string,
+    values: { username: string; email: string | null; password: string },
+  ): Promise<Customer> =>
+    customerSchema.parse(
+      await request<unknown>(`/customers/${id}/account`, { method: 'POST', body: values }),
+    ),
+
+  linkAccount: async (id: string, sourceCustomerId: string): Promise<Customer> =>
+    customerSchema.parse(
+      await request<unknown>(`/customers/${id}/account/link`, {
+        method: 'POST',
+        body: { sourceCustomerId },
+      }),
+    ),
 
   activate: async (id: string): Promise<Customer> => {
     const raw = await request<unknown>(`/customers/${id}/activate`, { method: 'POST' });

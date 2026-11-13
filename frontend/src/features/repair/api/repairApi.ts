@@ -5,6 +5,7 @@ import type {
   RepairOrderStatus,
   RepairTask,
   TaskAssignment,
+  QcCandidate,
   LaborSession,
   TaskWorkSummary,
   AssignmentRole,
@@ -75,22 +76,6 @@ export const repairApi = {
     return request<RepairTask[]>(`/repair-orders/${orderId}/tasks`);
   },
 
-  async createTask(
-    orderId: string | number,
-    data: {
-      taskName: string;
-      description?: string;
-      taskType?: string;
-      quantity?: number;
-      unitPrice?: number;
-    },
-  ): Promise<RepairTask> {
-    return request<RepairTask>(`/repair-orders/${orderId}/tasks`, {
-      method: 'POST',
-      body: data,
-    });
-  },
-
   async assignTask(
     taskId: string | number,
     data: {
@@ -118,6 +103,10 @@ export const repairApi = {
 
   async getQcAssignment(orderId: string | number): Promise<TaskAssignment | null> {
     return request<TaskAssignment | null>(`/repair-orders/${orderId}/qc-assignment`);
+  },
+
+  async getQcCandidates(orderId: string | number): Promise<QcCandidate[]> {
+    return request<QcCandidate[]>(`/repair-orders/${orderId}/qc-candidates`);
   },
 
   async releaseAssignment(assignmentId: string | number): Promise<void> {

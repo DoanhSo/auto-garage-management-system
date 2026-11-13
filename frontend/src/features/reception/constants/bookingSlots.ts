@@ -1,4 +1,3 @@
-import { dateTimeInput } from '../../../shared/utils/dates';
 import type { Booking } from '../../../shared/types/contracts';
 
 /** Số khoang kỹ thuật của xưởng, dùng làm sức chứa tối đa mỗi khung giờ. */
@@ -45,34 +44,17 @@ export function isActiveBooking(booking: Booking): boolean {
   return booking.status !== 'CANCELLED' && booking.status !== 'NO_SHOW';
 }
 
-/** Chuỗi `YYYY-MM-DDTHH:mm` theo giờ địa phương. */
-export function localDateTime(iso: string): string {
-  return dateTimeInput(iso);
-}
+// Các hàm tuần/ngày dùng chung với sơ đồ lịch ca nên nằm ở shared; giữ lại đường dẫn cũ cho màn đặt lịch.
+export {
+  WEEKDAY_LABELS,
+  localDate,
+  localDateTime,
+  shiftDate,
+  todayKey,
+  weekStart,
+} from '../../../shared/utils/weekCalendar';
 
-/** Ngày `YYYY-MM-DD` theo giờ địa phương. */
-export function localDate(iso: string): string {
-  return localDateTime(iso).slice(0, 10);
-}
-
-export function todayKey(): string {
-  return localDate(new Date().toISOString());
-}
-
-/** Ngày thứ Hai của tuần chứa `dateKey`. */
-export function weekStart(dateKey: string): string {
-  const date = new Date(`${dateKey || todayKey()}T00:00`);
-  const offset = (date.getDay() + 6) % 7;
-  return shiftDate(localDate(date.toISOString()), -offset);
-}
-
-export const WEEKDAY_LABELS: readonly string[] = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-
-export function shiftDate(dateKey: string, days: number): string {
-  const date = new Date(`${dateKey || todayKey()}T00:00`);
-  date.setDate(date.getDate() + days);
-  return localDate(date.toISOString());
-}
+import { localDate, todayKey } from '../../../shared/utils/weekCalendar';
 
 /** Kiểm tra một khung giờ trên một ngày cụ thể có nằm trong quá khứ so với hiện tại hay không. */
 export function isSlotInPast(day: string, slot: string): boolean {

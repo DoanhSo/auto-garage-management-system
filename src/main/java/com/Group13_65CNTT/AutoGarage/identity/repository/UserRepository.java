@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -19,6 +20,16 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+    /**
+     * Records a sign-in unless one was recorded after {@code staleBefore}. A bulk update leaves the optimistic
+     * version alone, so two tabs loading at once cannot fail each other.
+     */
+    @Modifying
+    @Query("UPDATE User u SET u.lastLoginAt = :now WHERE u.id = :id "
+            + "AND (u.lastLoginAt IS NULL OR u.lastLoginAt < :staleBefore)")
+    int touchLastLogin(@Param("id") Long id, @Param("now") java.time.Instant now,
+            @Param("staleBefore") java.time.Instant staleBefore);
+
     Optional<User> findByIdentityId(String identityId);
 
     Optional<User> findByUsername(String username);

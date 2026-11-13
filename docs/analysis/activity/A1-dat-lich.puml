@@ -1,0 +1,37 @@
+@startuml A1-dat-lich
+title A1 — Đặt, xác nhận, dời và hủy lịch hẹn (UC07, UC08)
+|Khách hàng|
+start
+:Chọn xe, dịch vụ chính, khung giờ;
+|Hệ thống|
+:Khóa hàng khoang theo khung giờ;
+if (Khoang và khung giờ còn trống?\n[starts_at, ends_at) không giao nhau) then (có)
+  :Tạo lịch hẹn PENDING\nGiữ khoang HELD;
+  :Ghi thông báo PENDING cho lễ tân;
+else (không)
+  :Báo hết chỗ, gợi ý khung khác;
+  stop
+endif
+|Lễ tân|
+if (Khách đổi ý?) then (dời lịch)
+  |Hệ thống|
+  :Giải phóng khoang cũ và giữ khoang mới\ntrong cùng giao dịch (BR07);
+else if (hủy) then
+  |Hệ thống|
+  :Lịch hẹn CANCELLED, khoang RELEASED;
+  stop
+else (giữ nguyên)
+  |Lễ tân|
+  :Xác nhận lịch hẹn;
+  |Hệ thống|
+  :Lịch hẹn CONFIRMED;
+endif
+|Hệ thống|
+if (Khách đến đúng hẹn?) then (có)
+  :Chuyển sang tiếp nhận (A2);
+  note right: booking → RECEIVED
+else (không)
+  :Lịch hẹn NO_SHOW, giải phóng khoang;
+endif
+stop
+@enduml

@@ -101,6 +101,22 @@ class RepairWorkflowServiceTest {
     private BillingOperations billingOperations;
     @Mock
     private InventoryOperations inventoryOperations;
+
+    @Test
+    @DisplayName("Chuyển sang chờ QC dùng cổng xuất kho riêng của bước QC")
+    void transitionStatus_ToWaitingQc_UsesQcGate() {
+        RepairOrder order = RepairOrder.builder().id(50L).status(RepairOrderStatus.IN_PROGRESS).build();
+        when(repairOrderRepository.findByIdForUpdate(50L)).thenReturn(Optional.of(order));
+        org.mockito.Mockito.doThrow(new com.Group13_65CNTT.AutoGarage.shared.exception.ConflictException(
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.PARTS_PENDING_ISSUE,
+                        "Hãy xuất kho hoặc hủy giữ chỗ trước khi chuyển sang chờ QC."))
+                .when(inventoryOperations).requireIssuedBeforeQc(50L);
+
+        assertThatThrownBy(() -> repairService.transitionStatus(10L, 50L, RepairOrderStatus.WAITING_QC, null))
+                .hasFieldOrPropertyWithValue("responseCode",
+                        com.Group13_65CNTT.AutoGarage.common.enums.ResponseCode.PARTS_PENDING_ISSUE);
+        verify(inventoryOperations, never()).requireIssueComplete(50L);
+    }
     @Mock
     private NotificationAudit notificationAudit;
 

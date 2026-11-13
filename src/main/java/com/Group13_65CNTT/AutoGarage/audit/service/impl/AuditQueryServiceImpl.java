@@ -49,20 +49,52 @@ public class AuditQueryServiceImpl implements AuditQueryService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<AuditEventResponse> searchEvents(Long actorId, String action, Pageable pageable) {
+    public Page<AuditEventResponse> searchEvents(
+            Long actorId, String action, String query, List<String> actions, Pageable pageable) {
         pagination.validate(pageable);
+        List<String> codes = actions == null ? List.of() : actions;
         if ((actorId != null && actorId <= 0)
-                || (action != null && action.length() > AuditConstants.ACTION_MAX_LENGTH)) {
+                || (action != null && action.length() > AuditConstants.ACTION_MAX_LENGTH)
+                || (query != null && query.length() > AuditConstants.QUERY_MAX_LENGTH)
+                || codes.size() > AuditConstants.ACTIONS_MAX_COUNT
+                || codes.stream().anyMatch(code -> code == null || code.length() > AuditConstants.ACTION_MAX_LENGTH)) {
             throw new BusinessException(ResponseCode.BAD_REQUEST);
         }
+        String term = query == null ? "" : query.trim();
+        boolean hasQuery = !term.isEmpty();
         Page<AuditEventResponse> page =
                 repository
                         .searchEvents(
-                                actorId, action == null || action.isBlank() ? null : action, pageable)
+                                actorId,
+                                action == null || action.isBlank() ? null : action,
+                                hasQuery,
+                                likePattern(term),
+                                entityIdOf(term),
+                                // An empty IN list is not portable; the empty string never equals a stored action.
+                                codes.isEmpty() || !hasQuery ? List.of("") : codes,
+                                pageable)
                         .map(mapper::toResponse);
         describeUsers(page.getContent());
         describeEntities(page.getContent());
         return page;
+    }
+
+    /** Lower-cased {@code %term%} with LIKE wildcards in the keyword escaped so they match literally. */
+    static String likePattern(String term) {
+        String escape = String.valueOf(AuditConstants.LIKE_ESCAPE);
+        String escaped = term.toLowerCase(java.util.Locale.ROOT)
+                .replace(escape, escape + escape)
+                .replace("%", escape + "%")
+                .replace("_", escape + "_");
+        return "%" + escaped + "%";
+    }
+
+    /** The keyword as an entity id when it is a plain number, otherwise null. */
+    static Long entityIdOf(String term) {
+        if (term.isEmpty() || term.length() > 18 || !term.chars().allMatch(Character::isDigit)) {
+            return null;
+        }
+        return Long.valueOf(term);
     }
 
     private void describeUsers(List<AuditEventResponse> events) {

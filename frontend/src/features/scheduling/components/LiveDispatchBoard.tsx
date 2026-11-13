@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { EmployeeLink } from '../../staff/components/EmployeeLink';
 import { Clock, Hammer, LogIn, LogOut, UserCheck, Wrench } from 'lucide-react';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { useToast } from '../../../app/providers/ToastProvider';
@@ -227,7 +228,9 @@ export function LiveDispatchBoard({
                 {reconciliation.data?.map((row) => (
                   <tr key={row.shiftId}>
                     <td>
-                      <strong>{row.employeeName ?? row.employeeCode}</strong>
+                      <EmployeeLink id={row.employeeId}>
+                        {row.employeeName ?? row.employeeCode}
+                      </EmployeeLink>
                     </td>
                     <td>
                       {row.shiftType ? shiftTypeLabels[row.shiftType] : '—'} · {hhmm(row.startsAt)}–
